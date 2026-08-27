@@ -10,6 +10,7 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/repositories" element={<RepositoriesPage />} />
         <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
         <Route path="/search-runs/:id" element={<SearchResultsPage />} />

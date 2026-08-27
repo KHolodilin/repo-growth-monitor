@@ -15,6 +15,7 @@ public class SpaController {
 
     @GetMapping(value = {
             "/",
+            "/dashboard",
             "/repositories",
             "/repositories/{id:[0-9]+}",
             "/search-runs/{id:[0-9]+}"

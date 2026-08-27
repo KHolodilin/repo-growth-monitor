@@ -17,6 +17,11 @@ public class AnalyticsController {
         this.analyticsService = analyticsService;
     }
 
+    @GetMapping("/dashboard")
+    public DashboardResponse dashboard(@RequestParam(defaultValue = "30d") String period) {
+        return analyticsService.dashboard(period);
+    }
+
     @GetMapping("/portfolio")
     public AnalyticsService.PortfolioSnapshot portfolio(@RequestParam(defaultValue = "30d") String period) {
         return analyticsService.portfolio(period);

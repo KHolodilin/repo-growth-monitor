@@ -16,3 +16,7 @@ export function Button({ className, ...props }: ButtonHTMLAttributes<HTMLButtonE
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("rounded-xl border bg-card p-5 shadow-sm", className)} {...props} />;
 }
+
+export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("animate-pulse rounded-xl bg-muted", className)} {...props} />;
+}

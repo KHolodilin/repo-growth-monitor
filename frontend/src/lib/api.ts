@@ -43,14 +43,34 @@ export type Repository = {
   owner: Owner;
 };
 
-export type Portfolio = {
-  repositories: number;
-  views: number;
-  visitors: number;
-  clones: number;
-  uniqueCloners: number;
-  stars: number;
-  table: { id: number; fullName: string; visitors: number; views: number; clones: number; stars: number }[];
+export type Dashboard = {
+  period: string;
+  from: string;
+  to: string;
+  lastSyncAt: string | null;
+  state: "NO_REPOSITORIES" | "FIRST_COLLECTION" | "READY";
+  partialData: { present: boolean; message: string } | null;
+  collectionWarning: { partialRepositories: number; message: string } | null;
+  activeCollection: { status: string; successfulJobs: number; plannedJobs: number } | null;
+  summary: {
+    repositories: number;
+    views: { value: number; growthPercent: number | null };
+    visitors: { value: number; growthPercent: number | null };
+    clones: { value: number; growthPercent: number | null };
+    stars: { total: number; change: number | null };
+  };
+  traffic: { date: string; views: number | null; visitors: number | null; clones: number | null }[];
+  repositories: {
+    id: number;
+    fullName: string;
+    visitors: number;
+    views: number;
+    clones: number;
+    stars: number;
+    growthPercent: number | null;
+    collectionStatus: string | null;
+    jobs: { jobType: string; status: string }[];
+  }[];
 };
 
 export type TrafficPoint = {

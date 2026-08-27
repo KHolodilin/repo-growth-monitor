@@ -166,6 +166,20 @@ public class CollectionJobJdbcRepository {
                 .list();
     }
 
+    public List<CollectionJob> findByRunIds(List<Long> runIds) {
+        if (runIds == null || runIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbcClient.sql("""
+                        SELECT * FROM collection_job
+                        WHERE collection_run_id IN (:runIds)
+                        ORDER BY collection_run_id, job_type
+                        """)
+                .param("runIds", runIds)
+                .query(MAPPER)
+                .list();
+    }
+
     public int countByStatus(CollectionJobStatus status) {
         return jdbcClient.sql("SELECT COUNT(*) FROM collection_job WHERE status = :status")
                 .param("status", status.name())

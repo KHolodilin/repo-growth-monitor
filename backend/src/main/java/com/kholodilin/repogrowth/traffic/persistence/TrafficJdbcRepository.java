@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public class TrafficJdbcRepository {
@@ -208,6 +209,132 @@ public class TrafficJdbcRepository {
                 .single();
     }
 
+    public TrafficTotals portfolioTotalsInRange(LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT COALESCE(SUM(t.views), 0) AS views,
+                               COALESCE(SUM(t.unique_visitors), 0) AS unique_visitors,
+                               COALESCE(SUM(t.clones), 0) AS clones,
+                               COALESCE(SUM(t.unique_cloners), 0) AS unique_cloners
+                        FROM traffic_daily t
+                        JOIN repository r ON r.id = t.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND t.traffic_date >= :fromDate
+                          AND t.traffic_date <= :toDate
+                        """)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new TrafficTotals(
+                        rs.getLong("views"),
+                        rs.getLong("unique_visitors"),
+                        rs.getLong("clones"),
+                        rs.getLong("unique_cloners")
+                ))
+                .single();
+    }
+
+    public List<RepositoryPeriodTotals> totalsByTrackedRepository(LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT r.id,
+                               r.full_name,
+                               r.stars,
+                               COALESCE(SUM(t.views), 0) AS views,
+                               COALESCE(SUM(t.unique_visitors), 0) AS unique_visitors,
+                               COALESCE(SUM(t.clones), 0) AS clones
+                        FROM repository r
+                        LEFT JOIN traffic_daily t
+                          ON t.repository_id = r.id
+                         AND t.traffic_date >= :fromDate
+                         AND t.traffic_date <= :toDate
+                        WHERE r.tracking_enabled = TRUE
+                        GROUP BY r.id, r.full_name, r.stars
+                        ORDER BY unique_visitors DESC, r.full_name
+                        """)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new RepositoryPeriodTotals(
+                        rs.getLong("id"),
+                        rs.getString("full_name"),
+                        rs.getLong("unique_visitors"),
+                        rs.getLong("views"),
+                        rs.getLong("clones"),
+                        rs.getInt("stars")
+                ))
+                .list();
+    }
+
+    public List<DailyTotals> dailyPortfolio(LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT t.traffic_date,
+                               SUM(t.views) AS views,
+                               SUM(t.unique_visitors) AS unique_visitors,
+                               SUM(t.clones) AS clones
+                        FROM traffic_daily t
+                        JOIN repository r ON r.id = t.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND t.traffic_date >= :fromDate
+                          AND t.traffic_date <= :toDate
+                        GROUP BY t.traffic_date
+                        ORDER BY t.traffic_date
+                        """)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new DailyTotals(
+                        rs.getObject("traffic_date", LocalDate.class),
+                        rs.getLong("views"),
+                        rs.getLong("unique_visitors"),
+                        rs.getLong("clones")
+                ))
+                .list();
+    }
+
+    public boolean hasTrackedTraffic() {
+        return jdbcClient.sql("""
+                        SELECT EXISTS (
+                            SELECT 1
+                            FROM traffic_daily t
+                            JOIN repository r ON r.id = t.repository_id
+                            WHERE r.tracking_enabled = TRUE
+                        )
+                        """)
+                .query(Boolean.class)
+                .single();
+    }
+
+    public Optional<LocalDate> earliestTrackedTrafficDate() {
+        return jdbcClient.sql("""
+                        SELECT MIN(t.traffic_date)
+                        FROM traffic_daily t
+                        JOIN repository r ON r.id = t.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                        """)
+                .query(LocalDate.class)
+                .optional();
+    }
+
+    public Long starsChangeSince(LocalDate fromInclusive) {
+        return jdbcClient.sql("""
+                        WITH tracked AS (
+                            SELECT id, stars FROM repository WHERE tracking_enabled = TRUE
+                        ),
+                        baseline AS (
+                            SELECT DISTINCT ON (s.repository_id)
+                                   s.repository_id,
+                                   s.stars
+                            FROM repository_daily_stats s
+                            JOIN tracked t ON t.id = s.repository_id
+                            WHERE s.stat_date < :fromDate
+                            ORDER BY s.repository_id, s.stat_date DESC
+                        )
+                        SELECT SUM(t.stars - b.stars)
+                        FROM tracked t
+                        JOIN baseline b ON b.repository_id = t.id
+                        """)
+                .param("fromDate", fromInclusive)
+                .query(Long.class)
+                .optional()
+                .orElse(null);
+    }
+
     public Instant latestReferrerSnapshot(long repositoryId) {
         return jdbcClient.sql("""
                         SELECT MAX(snapshot_at) FROM traffic_referrer_snapshot WHERE repository_id = :repositoryId
@@ -270,6 +397,19 @@ public class TrafficJdbcRepository {
     }
 
     public record TrafficTotals(long views, long uniqueVisitors, long clones, long uniqueCloners) {
+    }
+
+    public record RepositoryPeriodTotals(
+            long repositoryId,
+            String fullName,
+            long uniqueVisitors,
+            long views,
+            long clones,
+            int stars
+    ) {
+    }
+
+    public record DailyTotals(LocalDate date, long views, long uniqueVisitors, long clones) {
     }
 
     public record ReferrerRow(String referrer, int views, int uniqueVisitors) {

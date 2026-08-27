@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -61,6 +62,31 @@ public class CollectionRunJdbcRepository {
                 .param("id", id)
                 .query(MAPPER)
                 .optional();
+    }
+
+    public Instant latestCompletedAtForTracked() {
+        return jdbcClient.sql("""
+                        SELECT MAX(cr.completed_at)
+                        FROM collection_run cr
+                        JOIN repository r ON r.id = cr.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND cr.completed_at IS NOT NULL
+                        """)
+                .query(Instant.class)
+                .optional()
+                .orElse(null);
+    }
+
+    public List<CollectionRun> latestPerTrackedRepository() {
+        return jdbcClient.sql("""
+                        SELECT DISTINCT ON (cr.repository_id) cr.*
+                        FROM collection_run cr
+                        JOIN repository r ON r.id = cr.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                        ORDER BY cr.repository_id, cr.business_date DESC, cr.created_at DESC
+                        """)
+                .query(MAPPER)
+                .list();
     }
 
     public Optional<CollectionRun> latestForRepository(long repositoryId) {

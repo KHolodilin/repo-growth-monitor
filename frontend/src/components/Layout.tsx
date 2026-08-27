@@ -1,7 +1,10 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { BarChart3 } from "lucide-react";
 
 export function Layout() {
+  const location = useLocation();
+  const dashboardActive = location.pathname === "/" || location.pathname === "/dashboard";
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -11,7 +14,7 @@ export function Layout() {
             Repo Growth Monitor
           </div>
           <nav className="flex gap-4 text-sm">
-            <NavLink to="/" className={linkClass} end>
+            <NavLink to="/" className={() => (dashboardActive ? "font-medium text-primary" : "text-muted-foreground hover:text-foreground")} end>
               Dashboard
             </NavLink>
             <NavLink to="/repositories" className={linkClass}>
