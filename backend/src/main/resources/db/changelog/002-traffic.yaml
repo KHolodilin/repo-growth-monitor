@@ -1,0 +1,60 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-traffic
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE traffic_daily (
+                  id                BIGSERIAL PRIMARY KEY,
+                  repository_id     BIGINT NOT NULL REFERENCES repository (id),
+                  traffic_date      DATE NOT NULL,
+                  views             INTEGER NOT NULL DEFAULT 0,
+                  unique_visitors   INTEGER NOT NULL DEFAULT 0,
+                  clones            INTEGER NOT NULL DEFAULT 0,
+                  unique_cloners    INTEGER NOT NULL DEFAULT 0,
+                  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_traffic_daily_repo_date UNIQUE (repository_id, traffic_date)
+              );
+
+              CREATE INDEX idx_traffic_daily_repo_date ON traffic_daily (repository_id, traffic_date DESC);
+
+              CREATE TABLE repository_daily_stats (
+                  id              BIGSERIAL PRIMARY KEY,
+                  repository_id   BIGINT NOT NULL REFERENCES repository (id),
+                  stat_date       DATE NOT NULL,
+                  stars           INTEGER NOT NULL,
+                  forks           INTEGER NOT NULL,
+                  open_issues     INTEGER NOT NULL,
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_repository_daily_stats UNIQUE (repository_id, stat_date)
+              );
+
+              CREATE INDEX idx_repository_daily_stats_repo_date
+                  ON repository_daily_stats (repository_id, stat_date DESC);
+
+              CREATE TABLE traffic_referrer_snapshot (
+                  id                BIGSERIAL PRIMARY KEY,
+                  repository_id     BIGINT NOT NULL REFERENCES repository (id),
+                  snapshot_at       TIMESTAMPTZ NOT NULL,
+                  referrer          TEXT NOT NULL,
+                  views             INTEGER NOT NULL,
+                  unique_visitors   INTEGER NOT NULL
+              );
+
+              CREATE INDEX idx_referrer_snapshot_repo_time
+                  ON traffic_referrer_snapshot (repository_id, snapshot_at DESC);
+
+              CREATE TABLE traffic_path_snapshot (
+                  id                BIGSERIAL PRIMARY KEY,
+                  repository_id     BIGINT NOT NULL REFERENCES repository (id),
+                  snapshot_at       TIMESTAMPTZ NOT NULL,
+                  path              TEXT NOT NULL,
+                  title             TEXT,
+                  views             INTEGER NOT NULL,
+                  unique_visitors   INTEGER NOT NULL
+              );
+
+              CREATE INDEX idx_path_snapshot_repo_time
+                  ON traffic_path_snapshot (repository_id, snapshot_at DESC);

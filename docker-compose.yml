@@ -1,0 +1,38 @@
+name: repo-growth-monitor
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: repogrowth
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d repogrowth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  repo-growth-monitor:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_API_BASE_URL: https://api.github.com
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/repogrowth
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      COLLECTION_PLANNER_FROM: ${COLLECTION_PLANNER_FROM:-10:00}
+      COLLECTION_PLANNER_TO: ${COLLECTION_PLANNER_TO:-18:00}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

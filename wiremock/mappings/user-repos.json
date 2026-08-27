@@ -1,0 +1,64 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/user/repos"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": [
+      {
+        "id": 1001,
+        "name": "spring-outbox",
+        "full_name": "acme/spring-outbox",
+        "description": "Transactional outbox for Spring Boot",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 128,
+        "forks_count": 19,
+        "open_issues_count": 4,
+        "html_url": "https://github.com/acme/spring-outbox",
+        "created_at": "2023-03-12T10:00:00Z",
+        "updated_at": "2026-08-27T12:00:00Z",
+        "owner": {
+          "id": 42,
+          "login": "acme",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/42?v=4",
+          "html_url": "https://github.com/acme"
+        }
+      },
+      {
+        "id": 1002,
+        "name": "kafka-starter",
+        "full_name": "acme/kafka-starter",
+        "description": "Spring Boot Kafka starter",
+        "private": true,
+        "visibility": "private",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 41,
+        "forks_count": 6,
+        "open_issues_count": 2,
+        "html_url": "https://github.com/acme/kafka-starter",
+        "created_at": "2024-01-08T09:00:00Z",
+        "updated_at": "2026-08-26T18:00:00Z",
+        "owner": {
+          "id": 42,
+          "login": "acme",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/42?v=4",
+          "html_url": "https://github.com/acme"
+        }
+      }
+    ]
+  }
+}

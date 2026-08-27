@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/.*/.*/traffic/popular/paths"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": [
+      { "path": "/acme/spring-outbox", "title": "acme/spring-outbox", "count": 510, "uniques": 190 },
+      { "path": "/acme/spring-outbox/blob/main/README.md", "title": "README.md", "count": 240, "uniques": 110 },
+      { "path": "/acme/spring-outbox/issues", "title": "Issues", "count": 48, "uniques": 30 }
+    ]
+  }
+}

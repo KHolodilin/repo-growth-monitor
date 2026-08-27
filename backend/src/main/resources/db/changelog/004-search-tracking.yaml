@@ -1,0 +1,63 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-search-tracking
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE search_query (
+                  id              BIGSERIAL PRIMARY KEY,
+                  repository_id   BIGINT NOT NULL REFERENCES repository (id),
+                  name            TEXT NOT NULL,
+                  query           TEXT NOT NULL,
+                  enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+                  result_limit    INTEGER NOT NULL DEFAULT 50,
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE INDEX idx_search_query_repo ON search_query (repository_id);
+
+              CREATE TABLE search_run (
+                  id                              BIGSERIAL PRIMARY KEY,
+                  search_query_id                 BIGINT NOT NULL REFERENCES search_query (id) ON DELETE CASCADE,
+                  repository_id                   BIGINT NOT NULL REFERENCES repository (id),
+                  business_date                   DATE NOT NULL,
+                  status                          TEXT NOT NULL,
+                  attempt                         INTEGER NOT NULL DEFAULT 0,
+                  next_attempt_at                 TIMESTAMPTZ,
+                  locked_by                       TEXT,
+                  locked_until                    TIMESTAMPTZ,
+                  started_at                      TIMESTAMPTZ,
+                  completed_at                    TIMESTAMPTZ,
+                  total_count                     INTEGER,
+                  tracked_repository_position     INTEGER,
+                  error_code                      TEXT,
+                  error_message                   TEXT,
+                  created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_search_run_query_date UNIQUE (search_query_id, business_date)
+              );
+
+              CREATE INDEX idx_search_run_claim
+                  ON search_run (status, next_attempt_at, locked_until);
+              CREATE INDEX idx_search_run_query_date
+                  ON search_run (search_query_id, business_date DESC);
+
+              CREATE TABLE search_result (
+                  id                      BIGSERIAL PRIMARY KEY,
+                  search_run_id           BIGINT NOT NULL REFERENCES search_run (id) ON DELETE CASCADE,
+                  position                INTEGER NOT NULL,
+                  github_repository_id    BIGINT NOT NULL,
+                  full_name               TEXT NOT NULL,
+                  owner                   TEXT NOT NULL,
+                  stars                   INTEGER NOT NULL,
+                  forks                   INTEGER NOT NULL,
+                  language                TEXT,
+                  description             TEXT,
+                  repository_created_at   TIMESTAMPTZ,
+                  repository_updated_at   TIMESTAMPTZ,
+                  CONSTRAINT uq_search_result_run_position UNIQUE (search_run_id, position)
+              );
+
+              CREATE INDEX idx_search_result_run ON search_result (search_run_id);

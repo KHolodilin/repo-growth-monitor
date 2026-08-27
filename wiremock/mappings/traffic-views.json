@@ -1,0 +1,32 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/.*/.*/traffic/views"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "count": 1840,
+      "uniques": 612,
+      "views": [
+        { "timestamp": "2026-08-14T00:00:00Z", "count": 90, "uniques": 40 },
+        { "timestamp": "2026-08-15T00:00:00Z", "count": 110, "uniques": 48 },
+        { "timestamp": "2026-08-16T00:00:00Z", "count": 95, "uniques": 41 },
+        { "timestamp": "2026-08-17T00:00:00Z", "count": 140, "uniques": 55 },
+        { "timestamp": "2026-08-18T00:00:00Z", "count": 160, "uniques": 62 },
+        { "timestamp": "2026-08-19T00:00:00Z", "count": 120, "uniques": 50 },
+        { "timestamp": "2026-08-20T00:00:00Z", "count": 175, "uniques": 70 },
+        { "timestamp": "2026-08-21T00:00:00Z", "count": 150, "uniques": 58 },
+        { "timestamp": "2026-08-22T00:00:00Z", "count": 130, "uniques": 52 },
+        { "timestamp": "2026-08-23T00:00:00Z", "count": 145, "uniques": 57 },
+        { "timestamp": "2026-08-24T00:00:00Z", "count": 155, "uniques": 61 },
+        { "timestamp": "2026-08-25T00:00:00Z", "count": 170, "uniques": 66 },
+        { "timestamp": "2026-08-26T00:00:00Z", "count": 190, "uniques": 72 },
+        { "timestamp": "2026-08-27T00:00:00Z", "count": 210, "uniques": 80 }
+      ]
+    }
+  }
+}

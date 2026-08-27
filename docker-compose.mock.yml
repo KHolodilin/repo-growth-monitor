@@ -1,0 +1,52 @@
+name: repo-growth-mock
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: repogrowth_mock
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_mock:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d repogrowth_mock"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  github-mock:
+    image: wiremock/wiremock:3.13.1
+    restart: unless-stopped
+    command: ["--global-response-templating"]
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./wiremock/mappings:/home/wiremock/mappings
+
+  repo-growth-monitor:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      GITHUB_TOKEN: mock-token
+      GITHUB_API_BASE_URL: http://github-mock:8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/repogrowth_mock
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      APP_TIMEZONE: UTC
+      COLLECTION_PLANNER_FROM: "00:00"
+      COLLECTION_PLANNER_TO: "23:59"
+      COLLECTION_PLANNER_INTERVAL: 1m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      github-mock:
+        condition: service_started
+
+volumes:
+  pgdata_mock:

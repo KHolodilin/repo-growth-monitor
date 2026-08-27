@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: repo-growth-monitor
+  datasource:
+    url: jdbc:postgresql://localhost:5432/repogrowth
+    username: postgres
+    password: postgres
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+app:
+  timezone: UTC
+
+github:
+  token: ${GITHUB_TOKEN:}
+  api-base-url: https://api.github.com
+  connect-timeout: 10s
+  read-timeout: 30s
+
+collection:
+  workers: 4
+  job-lease: 5m
+  planner:
+    from: "10:00"
+    to: "18:00"
+    interval: 10m
+
+search:
+  workers: 1
+  default-result-limit: 50
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level traceId=%X{traceId} repositoryId=%X{repositoryId} collectionRunId=%X{collectionRunId} collectionJobId=%X{collectionJobId} searchRunId=%X{searchRunId} %logger{36} - %msg%n"
+  level:
+    com.kholodilin.repogrowth: INFO
+    org.springframework.web.client: WARN
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/.*/.*/traffic/popular/referrers"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": [
+      { "referrer": "github.com", "count": 420, "uniques": 180 },
+      { "referrer": "Google", "count": 210, "uniques": 95 },
+      { "referrer": "reddit.com", "count": 64, "uniques": 40 },
+      { "referrer": "stackoverflow.com", "count": 31, "uniques": 22 }
+    ]
+  }
+}

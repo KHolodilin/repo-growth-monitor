@@ -1,0 +1,73 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/search/repositories"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "total_count": 86,
+      "incomplete_results": false,
+      "items": [
+        {
+          "id": 9001,
+          "full_name": "competitor/outbox-kit",
+          "description": "Outbox kit",
+          "stargazers_count": 840,
+          "forks_count": 90,
+          "language": "Java",
+          "created_at": "2021-02-01T00:00:00Z",
+          "updated_at": "2026-08-20T00:00:00Z",
+          "owner": { "id": 501, "login": "competitor", "type": "Organization" }
+        },
+        {
+          "id": 9002,
+          "full_name": "another/spring-outbox",
+          "description": "Another outbox",
+          "stargazers_count": 310,
+          "forks_count": 40,
+          "language": "Java",
+          "created_at": "2022-05-01T00:00:00Z",
+          "updated_at": "2026-08-18T00:00:00Z",
+          "owner": { "id": 502, "login": "another", "type": "User" }
+        },
+        {
+          "id": 9003,
+          "full_name": "labs/kafka-outbox",
+          "description": "Kafka outbox",
+          "stargazers_count": 190,
+          "forks_count": 22,
+          "language": "Java",
+          "created_at": "2023-01-01T00:00:00Z",
+          "updated_at": "2026-08-10T00:00:00Z",
+          "owner": { "id": 503, "login": "labs", "type": "Organization" }
+        },
+        {
+          "id": 1001,
+          "full_name": "acme/spring-outbox",
+          "description": "Transactional outbox for Spring Boot",
+          "stargazers_count": 128,
+          "forks_count": 19,
+          "language": "Java",
+          "created_at": "2023-03-12T10:00:00Z",
+          "updated_at": "2026-08-27T12:00:00Z",
+          "owner": { "id": 42, "login": "acme", "type": "User" }
+        },
+        {
+          "id": 9004,
+          "full_name": "oss/outbox-jdbc",
+          "description": "JDBC outbox",
+          "stargazers_count": 77,
+          "forks_count": 9,
+          "language": "Java",
+          "created_at": "2024-04-01T00:00:00Z",
+          "updated_at": "2026-08-01T00:00:00Z",
+          "owner": { "id": 504, "login": "oss", "type": "User" }
+        }
+      ]
+    }
+  }
+}
