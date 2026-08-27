@@ -18,6 +18,7 @@ public record GitHubRepositoryResponse(
         boolean fork,
         boolean archived,
         @JsonProperty("stargazers_count") int stargazersCount,
+        @JsonProperty("subscribers_count") Integer subscribersCount,
         @JsonProperty("forks_count") int forksCount,
         @JsonProperty("open_issues_count") int openIssuesCount,
         @JsonProperty("html_url") String htmlUrl,
@@ -30,5 +31,9 @@ public record GitHubRepositoryResponse(
             return visibility.toUpperCase();
         }
         return privateRepository ? "PRIVATE" : "PUBLIC";
+    }
+
+    public int watchers() {
+        return subscribersCount == null ? 0 : subscribersCount;
     }
 }

@@ -92,8 +92,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(6), 50, 25, 5, 4);
         trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(4), 30, 15, 3, 2);
 
-        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 2, 0);
-        trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 4, 1);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0);
+        trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1);
 
         CollectionRun kafkaRun = runRepository.insertIgnore(kafka.id(), today, 4);
         jobRepository.insertIgnore(kafkaRun.id(), kafka.id(), today, CollectionJobType.TRAFFIC);
@@ -164,7 +164,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     private Repository track(GitHubOwner owner, long githubId, String name, String fullName, int stars) {
         Repository repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, githubId, owner.id(), name, fullName, name, "PUBLIC", "main", "Java",
-                false, false, stars, 2, 0, false,
+                false, false, stars, 0, 2, 0, false,
                 Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
                 null, null
         ));

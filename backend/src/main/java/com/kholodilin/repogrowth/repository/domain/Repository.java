@@ -15,6 +15,7 @@ public record Repository(
         boolean fork,
         boolean archived,
         int stars,
+        int watchers,
         int forks,
         int openIssues,
         boolean trackingEnabled,

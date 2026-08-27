@@ -96,6 +96,7 @@ public class RepositoryService {
                     remote.fork(),
                     remote.archived(),
                     remote.stargazersCount(),
+                    remote.watchers(),
                     remote.forksCount(),
                     remote.openIssuesCount(),
                     false,

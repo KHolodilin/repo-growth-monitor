@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.analytics.application;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.ActiveCollection;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.CollectionWarning;
@@ -108,22 +109,57 @@ public class AnalyticsService {
         );
     }
 
-    public RepositoryTrafficSnapshot traffic(long repositoryId, String period) {
+    public RepositoryTrafficSnapshot traffic(long repositoryId, String periodParam) {
         Repository repository = repositoryService.get(repositoryId);
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
-        LocalDate from = fromDate(period);
-        List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, from);
+        LocalDate today = LocalDate.now(clock);
+        String normalized = DashboardPeriod.normalize(periodParam);
+        LocalDate earliest = null;
+        if ("all".equals(normalized)) {
+            earliest = trafficJdbcRepository.history(repositoryId, null).stream()
+                    .map(TrafficDaily::trafficDate)
+                    .min(LocalDate::compareTo)
+                    .orElse(today);
+        }
+        DashboardPeriod period = DashboardPeriod.of(periodParam, today, earliest);
+        List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
+        TrafficTotals totals = trafficJdbcRepository.totals(repositoryId, period.allTime() ? null : period.from());
         java.time.Instant referrerSnapshot = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
         java.time.Instant pathSnapshot = trafficJdbcRepository.latestPathSnapshot(repositoryId);
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
         return new RepositoryTrafficSnapshot(
                 repository,
                 owner,
-                history,
+                period.value(),
+                totals,
+                repositorySeries(period, history),
                 trafficJdbcRepository.referrers(repositoryId, referrerSnapshot),
                 trafficJdbcRepository.paths(repositoryId, pathSnapshot),
                 latestRun == null ? null : collectionController.toResponse(latestRun)
         );
+    }
+
+    private static List<TrafficChartPoint> repositorySeries(DashboardPeriod period, List<TrafficDaily> history) {
+        Map<LocalDate, TrafficDaily> byDate = history.stream()
+                .collect(Collectors.toMap(TrafficDaily::trafficDate, point -> point, (left, right) -> left));
+        List<TrafficChartPoint> points = new ArrayList<>();
+        LocalDate cursor = period.from();
+        while (!cursor.isAfter(period.to())) {
+            TrafficDaily day = byDate.get(cursor);
+            if (day == null) {
+                points.add(new TrafficChartPoint(cursor, null, null, null, null));
+            } else {
+                points.add(new TrafficChartPoint(
+                        cursor,
+                        (long) day.views(),
+                        (long) day.uniqueVisitors(),
+                        (long) day.clones(),
+                        (long) day.uniqueCloners()
+                ));
+            }
+            cursor = cursor.plusDays(1);
+        }
+        return points;
     }
 
     private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
@@ -386,10 +422,22 @@ public class AnalyticsService {
     public record RepositoryTrafficSnapshot(
             Repository repository,
             GitHubOwner owner,
-            List<TrafficDaily> history,
+            String period,
+            TrafficJdbcRepository.TrafficTotals totals,
+            List<TrafficChartPoint> traffic,
             List<TrafficJdbcRepository.ReferrerRow> referrers,
             List<TrafficJdbcRepository.PathRow> paths,
             CollectionController.CollectionRunResponse lastCollection
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record TrafficChartPoint(
+            LocalDate date,
+            Long views,
+            Long uniqueVisitors,
+            Long clones,
+            Long uniqueCloners
     ) {
     }
 }

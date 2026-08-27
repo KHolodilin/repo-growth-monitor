@@ -53,11 +53,13 @@ public class RepositoryController {
                 repository.fork(),
                 repository.archived(),
                 repository.stars(),
+                repository.watchers(),
                 repository.forks(),
                 repository.openIssues(),
                 repository.trackingEnabled(),
                 repository.githubCreatedAt(),
                 repository.githubUpdatedAt(),
+                "https://github.com/" + repository.fullName(),
                 new RepositoryResponse.OwnerResponse(
                         owner.id(),
                         owner.githubId(),

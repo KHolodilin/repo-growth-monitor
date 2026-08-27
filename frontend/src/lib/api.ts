@@ -35,11 +35,13 @@ export type Repository = {
   fork: boolean;
   archived: boolean;
   stars: number;
+  watchers: number;
   forks: number;
   openIssues: number;
   trackingEnabled: boolean;
   githubCreatedAt?: string;
   githubUpdatedAt?: string;
+  githubUrl?: string;
   owner: Owner;
 };
 
@@ -74,11 +76,19 @@ export type Dashboard = {
 };
 
 export type TrafficPoint = {
-  trafficDate: string;
-  views: number;
-  uniqueVisitors: number;
-  clones: number;
-  uniqueCloners: number;
+  date: string;
+  views: number | null;
+  uniqueVisitors: number | null;
+  clones: number | null;
+  uniqueCloners: number | null;
+};
+
+export type CollectionJob = {
+  jobType: string;
+  status: string;
+  errorMessage?: string;
+  startedAt?: string;
+  completedAt?: string;
 };
 
 export type CollectionRun = {
@@ -89,13 +99,17 @@ export type CollectionRun = {
   plannedJobs: number;
   successfulJobs: number;
   failedJobs: number;
-  jobs: { jobType: string; status: string; errorMessage?: string }[];
+  createdAt?: string;
+  completedAt?: string;
+  jobs: CollectionJob[];
 };
 
 export type RepositoryTraffic = {
   repository: Repository;
   owner: Owner;
-  history: TrafficPoint[];
+  period: string;
+  totals: { views: number; uniqueVisitors: number; clones: number; uniqueCloners: number };
+  traffic: TrafficPoint[];
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
   lastCollection?: CollectionRun;

@@ -14,11 +14,13 @@ public record RepositoryResponse(
         boolean fork,
         boolean archived,
         int stars,
+        int watchers,
         int forks,
         int openIssues,
         boolean trackingEnabled,
         Instant githubCreatedAt,
         Instant githubUpdatedAt,
+        String githubUrl,
         OwnerResponse owner
 ) {
     public record OwnerResponse(

@@ -20,6 +20,7 @@
       "fork": false,
       "archived": false,
       "stargazers_count": 128,
+      "subscribers_count": 12,
       "forks_count": 19,
       "open_issues_count": 4,
       "html_url": "https://github.com/{{request.pathSegments.[1]}}/{{request.pathSegments.[2]}}",

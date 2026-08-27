@@ -51,6 +51,7 @@ public class CollectionPlanner {
         for (CollectionJobType type : JOB_TYPES) {
             jobRepository.insertIgnore(run.id(), repositoryId, businessDate, type);
         }
+        jobRepository.requeueFailed(run.id());
         runRepository.refreshAggregates(run.id());
         return runRepository.findById(run.id()).orElse(run);
     }

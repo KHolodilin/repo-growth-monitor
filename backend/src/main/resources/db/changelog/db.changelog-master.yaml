@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/003-collection-queue.yaml
   - include:
       file: db/changelog/004-search-tracking.yaml
+  - include:
+      file: db/changelog/005-watchers.yaml

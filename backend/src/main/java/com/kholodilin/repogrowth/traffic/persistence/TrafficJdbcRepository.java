@@ -60,18 +60,20 @@ public class TrafficJdbcRepository {
                 .update();
     }
 
-    public void upsertDailyStats(long repositoryId, LocalDate date, int stars, int forks, int openIssues) {
+    public void upsertDailyStats(long repositoryId, LocalDate date, int stars, int watchers, int forks, int openIssues) {
         jdbcClient.sql("""
-                        INSERT INTO repository_daily_stats (repository_id, stat_date, stars, forks, open_issues)
-                        VALUES (:repositoryId, :statDate, :stars, :forks, :openIssues)
+                        INSERT INTO repository_daily_stats (repository_id, stat_date, stars, watchers, forks, open_issues)
+                        VALUES (:repositoryId, :statDate, :stars, :watchers, :forks, :openIssues)
                         ON CONFLICT (repository_id, stat_date) DO UPDATE SET
                             stars = EXCLUDED.stars,
+                            watchers = EXCLUDED.watchers,
                             forks = EXCLUDED.forks,
                             open_issues = EXCLUDED.open_issues
                         """)
                 .param("repositoryId", repositoryId)
                 .param("statDate", date)
                 .param("stars", stars)
+                .param("watchers", watchers)
                 .param("forks", forks)
                 .param("openIssues", openIssues)
                 .update();

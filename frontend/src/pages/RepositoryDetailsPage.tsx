@@ -1,52 +1,102 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import {
   api,
+  type CollectionJob,
   type CollectionRun,
   type Repository,
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { formatDelta, formatNumber, formatRank } from "../lib/utils";
-import { Button, Card } from "../components/ui";
+import { cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { Button, Card, Skeleton } from "../components/ui";
+import { PeriodSelector, type Period } from "../components/PeriodSelector";
 
 type Tab = "overview" | "traffic" | "search";
+
+const JOB_LABELS: Record<string, string> = {
+  TRAFFIC: "Traffic",
+  REFERRERS: "Referrers",
+  POPULAR_PATHS: "Popular Paths",
+  REPOSITORY_STATS: "Repository Stats",
+};
 
 export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [tab, setTab] = useState<Tab>("overview");
+  const [period, setPeriod] = useState<Period>("30d");
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
   const [queryText, setQueryText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [collecting, setCollecting] = useState(false);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!id) {
       return;
     }
     const [repository, trafficData, searchData] = await Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
-      api<RepositoryTraffic>(`/api/v1/repositories/${id}/traffic?period=90d`),
+      api<RepositoryTraffic>(`/api/v1/repositories/${id}/traffic?period=${period}`),
       api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
     ]);
     setRepo(repository);
     setTraffic(trafficData);
     setVisibility(searchData);
-  }
+  }, [id, period]);
 
   useEffect(() => {
-    load().catch((err: Error) => setError(err.message));
-  }, [id]);
+    let cancelled = false;
+    setLoading(true);
+    load()
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  const runStatus = traffic?.lastCollection?.status;
+  const runActive = runStatus === "RUNNING" || runStatus === "PLANNED";
+
+  useEffect(() => {
+    if (!runActive) {
+      setCollecting(false);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [runActive, load]);
 
   async function collect() {
-    await api(`/api/v1/repositories/${id}/collect`, { method: "POST" });
-    await load();
+    if (!id || collecting || runActive) {
+      return;
+    }
+    setCollecting(true);
+    try {
+      await api(`/api/v1/repositories/${id}/collect`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+      setCollecting(false);
+    }
   }
 
   async function createQuery() {
-    if (!queryText.trim()) {
+    if (!id || !queryText.trim()) {
       return;
     }
     await api(`/api/v1/repositories/${id}/search-queries`, {
@@ -65,28 +115,62 @@ export function RepositoryDetailsPage() {
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
-  if (!repo || !traffic) {
-    return <p className="text-muted-foreground">Loading repository…</p>;
+  if (loading || !repo || !traffic) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-10 w-80" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+      </div>
+    );
   }
+
+  const busy = collecting || runActive;
 
   return (
     <div className="space-y-6">
+      <nav className="text-sm text-muted-foreground">
+        <Link className="hover:text-foreground" to="/dashboard">
+          Portfolio
+        </Link>
+        <span className="px-2">/</span>
+        <span className="text-foreground">{repo.fullName}</span>
+      </nav>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{repo.fullName}</h1>
           <p className="text-sm text-muted-foreground">{repo.description}</p>
         </div>
-        <Button onClick={() => void collect()}>Collect now</Button>
+        <Button disabled={busy} onClick={() => void collect()}>
+          {busy ? "Collecting..." : "Collect now"}
+        </Button>
       </div>
-      <div className="flex gap-2">
-        {(["overview", "traffic", "search"] as Tab[]).map((item) => (
-          <Button key={item} className={tab === item ? "" : "bg-muted text-foreground"} onClick={() => setTab(item)}>
-            {item === "search" ? "Search Visibility" : item[0].toUpperCase() + item.slice(1)}
-          </Button>
+      <div className="inline-flex rounded-lg border bg-muted p-1">
+        {([
+          ["overview", "Overview"],
+          ["traffic", "Traffic"],
+          ["search", "Search Visibility"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium",
+              tab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
         ))}
       </div>
-      {tab === "overview" && <Overview repo={repo} lastCollection={traffic.lastCollection} />}
-      {tab === "traffic" && <TrafficPanel traffic={traffic} />}
+      {tab === "overview" && (
+        <Overview repo={repo} lastCollection={traffic.lastCollection} busy={busy} onCollect={() => void collect()} />
+      )}
+      {tab === "traffic" && <TrafficPanel traffic={traffic} period={period} onPeriod={setPeriod} />}
       {tab === "search" && (
         <SearchPanel
           visibility={visibility}
@@ -100,65 +184,183 @@ export function RepositoryDetailsPage() {
   );
 }
 
-function Overview({ repo, lastCollection }: { repo: Repository; lastCollection?: CollectionRun }) {
+function Overview({
+  repo,
+  lastCollection,
+  busy,
+  onCollect,
+}: {
+  repo: Repository;
+  lastCollection?: CollectionRun;
+  busy: boolean;
+  onCollect: () => void;
+}) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
-        <h2 className="mb-3 font-medium">Overview</h2>
-        <dl className="grid grid-cols-2 gap-2 text-sm">
+        <h2 className="mb-4 font-medium">Overview</h2>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <dt className="text-muted-foreground">Owner</dt>
           <dd>{repo.owner.login}</dd>
           <dt className="text-muted-foreground">Visibility</dt>
           <dd>{repo.visibility}</dd>
           <dt className="text-muted-foreground">Stars</dt>
           <dd>{formatNumber(repo.stars)}</dd>
+          <dt className="text-muted-foreground">Watchers</dt>
+          <dd>{formatNumber(repo.watchers)}</dd>
           <dt className="text-muted-foreground">Forks</dt>
           <dd>{formatNumber(repo.forks)}</dd>
+          {repo.language && (
+            <>
+              <dt className="text-muted-foreground">Language</dt>
+              <dd>{repo.language}</dd>
+            </>
+          )}
+          {repo.defaultBranch && (
+            <>
+              <dt className="text-muted-foreground">Default branch</dt>
+              <dd>{repo.defaultBranch}</dd>
+            </>
+          )}
           <dt className="text-muted-foreground">GitHub</dt>
           <dd>
-            <a className="text-primary" href={`https://github.com/${repo.fullName}`} target="_blank" rel="noreferrer">
-              {repo.fullName}
+            <a className="text-primary hover:underline" href={repo.githubUrl ?? `https://github.com/${repo.fullName}`} target="_blank" rel="noreferrer">
+              Open repository
             </a>
           </dd>
         </dl>
       </Card>
+      <CollectionStatusCard run={lastCollection} busy={busy} onCollect={onCollect} />
+    </div>
+  );
+}
+
+function CollectionStatusCard({
+  run,
+  busy,
+  onCollect,
+}: {
+  run?: CollectionRun;
+  busy: boolean;
+  onCollect: () => void;
+}) {
+  if (!run) {
+    return (
       <Card>
-        <h2 className="mb-3 font-medium">Collection Status</h2>
-        {lastCollection ? <CollectionStatus run={lastCollection} /> : <p className="text-sm text-muted-foreground">No collection yet.</p>}
+        <h2 className="mb-4 font-medium">Collection Status</h2>
+        <h3 className="font-medium">No collection data yet.</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Run your first collection to fetch GitHub repository statistics.
+        </p>
+        <Button className="mt-4" disabled={busy} onClick={onCollect}>
+          {busy ? "Collecting..." : "Collect now"}
+        </Button>
       </Card>
-    </div>
-  );
-}
+    );
+  }
 
-function CollectionStatus({ run }: { run: CollectionRun }) {
+  if (run.status === "FAILED") {
+    const failed = run.jobs.find((job) => job.status === "FAILED");
+    return (
+      <Card>
+        <h2 className="mb-4 font-medium">Collection Status</h2>
+        <h3 className="font-medium text-red-700">Collection failed</h3>
+        <p className="mt-2 text-sm text-muted-foreground">Last attempt: {formatSyncTime(run.completedAt ?? run.createdAt) ?? "—"}</p>
+        {failed?.errorMessage && <p className="mt-2 text-sm">{failed.errorMessage}</p>}
+        <Button className="mt-4" disabled={busy} onClick={onCollect}>
+          {busy ? "Collecting..." : "Retry"}
+        </Button>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-2 text-sm">
-      <div>
-        {run.businessDate} · {run.status} · {run.successfulJobs} / {run.plannedJobs} successful
+    <Card>
+      <h2 className="mb-4 font-medium">Collection Status</h2>
+      <div className="text-sm">
+        {formatBusinessDate(run.businessDate)} · {run.status}
       </div>
-      {run.jobs.map((job) => (
-        <div key={job.jobType}>
-          {job.status === "SUCCESS" ? "✓" : job.status === "FAILED" ? "✗" : "…"} {job.jobType}
-          {job.errorMessage ? ` — ${job.errorMessage}` : ""}
-        </div>
-      ))}
+      <div className="mt-1 text-sm text-muted-foreground">
+        {run.successfulJobs} / {run.plannedJobs} successful
+      </div>
+      {(run.completedAt || run.createdAt) && (
+        <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
+      )}
+      <div className="mt-4 space-y-2 text-sm">
+        {run.jobs.map((job) => (
+          <JobRow key={job.jobType} job={job} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function JobRow({ job }: { job: CollectionJob }) {
+  const icon = job.status === "SUCCESS" ? "✓" : job.status === "FAILED" ? "✕" : job.status === "RUNNING" ? "⟳" : "○";
+  const color =
+    job.status === "SUCCESS"
+      ? "text-emerald-700"
+      : job.status === "FAILED"
+        ? "text-red-700"
+        : job.status === "RUNNING"
+          ? "text-primary"
+          : "text-muted-foreground";
+  return (
+    <div className={cn("group relative flex items-center justify-between gap-3", color)}>
+      <span>
+        {icon} {JOB_LABELS[job.jobType] ?? job.jobType}
+      </span>
+      {job.status === "FAILED" && (
+        <span className="invisible absolute left-0 top-6 z-10 w-64 rounded-md border bg-card p-3 text-xs font-normal text-foreground shadow-lg group-hover:visible">
+          <div className="mb-1 font-medium">{JOB_LABELS[job.jobType] ?? job.jobType}</div>
+          <div>{job.errorMessage ?? "Collection failed"}</div>
+          {job.completedAt && (
+            <div className="mt-1 text-muted-foreground">Last attempt: {formatJobTime(job.completedAt)}</div>
+          )}
+        </span>
+      )}
     </div>
   );
 }
 
-function TrafficPanel({ traffic }: { traffic: RepositoryTraffic }) {
+function TrafficPanel({
+  traffic,
+  period,
+  onPeriod,
+}: {
+  traffic: RepositoryTraffic;
+  period: Period;
+  onPeriod: (period: Period) => void;
+}) {
   const option = useMemo(
     () => ({
-      tooltip: { trigger: "axis" },
+      tooltip: {
+        trigger: "axis",
+        formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
+          if (!Array.isArray(params) || params.length === 0) {
+            return "";
+          }
+          const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
+            new Date(`${params[0].axisValue}T00:00:00`),
+          );
+          const rows = params
+            .map((item) => {
+              const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
+              return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
+            })
+            .join("");
+          return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
+        },
+      },
       legend: { data: ["Views", "Visitors", "Clones", "Unique cloners"] },
-      dataZoom: [{ type: "inside" }, { type: "slider" }],
-      xAxis: { type: "category", data: traffic.history.map((point) => point.trafficDate) },
+      grid: { left: 16, right: 16, top: 40, bottom: 24, containLabel: true },
+      xAxis: { type: "category", data: traffic.traffic.map((point) => point.date), boundaryGap: false },
       yAxis: { type: "value" },
       series: [
-        { name: "Views", type: "line", data: traffic.history.map((point) => point.views) },
-        { name: "Visitors", type: "line", data: traffic.history.map((point) => point.uniqueVisitors) },
-        { name: "Clones", type: "line", data: traffic.history.map((point) => point.clones) },
-        { name: "Unique cloners", type: "line", data: traffic.history.map((point) => point.uniqueCloners) },
+        { name: "Views", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.views ?? null) },
+        { name: "Visitors", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.uniqueVisitors ?? null) },
+        { name: "Clones", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.clones ?? null) },
+        { name: "Unique cloners", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.uniqueCloners ?? null) },
       ],
     }),
     [traffic],
@@ -166,58 +368,79 @@ function TrafficPanel({ traffic }: { traffic: RepositoryTraffic }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <PeriodSelector period={period} onPeriod={onPeriod} />
+      </div>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Kpi label="Views" value={traffic.totals.views} />
+        <Kpi label="Unique Visitors" value={traffic.totals.uniqueVisitors} />
+        <Kpi label="Clones" value={traffic.totals.clones} />
+        <Kpi label="Unique Cloners" value={traffic.totals.uniqueCloners} />
+      </div>
       <Card>
-        <h2 className="mb-3 font-medium">Traffic history</h2>
-        <ReactECharts option={option} style={{ height: 360 }} />
+        <h2 className="mb-3 font-medium">Traffic</h2>
+        <ReactECharts option={option} style={{ height: 360, width: "100%" }} />
       </Card>
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <h2 className="mb-3 font-medium">Referrers</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th>Source</th>
-                <th className="text-right">Views</th>
-                <th className="text-right">Visitors</th>
-              </tr>
-            </thead>
-            <tbody>
-              {traffic.referrers.map((row) => (
-                <tr key={row.referrer} className="border-t">
-                  <td className="py-2">{row.referrer}</td>
-                  <td className="text-right">{formatNumber(row.views)}</td>
-                  <td className="text-right">{formatNumber(row.uniqueVisitors)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <MetricTable
+            rows={traffic.referrers.map((row) => ({ key: row.referrer, title: row.referrer, views: row.views, visitors: row.uniqueVisitors }))}
+          />
         </Card>
         <Card>
-          <h2 className="mb-3 font-medium">Popular paths</h2>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th>Path</th>
-                <th className="text-right">Views</th>
-                <th className="text-right">Visitors</th>
-              </tr>
-            </thead>
-            <tbody>
-              {traffic.paths.map((row) => (
-                <tr key={row.path} className="border-t">
-                  <td className="py-2">
-                    <div>{row.path}</div>
-                    <div className="text-xs text-muted-foreground">{row.title}</div>
-                  </td>
-                  <td className="text-right">{formatNumber(row.views)}</td>
-                  <td className="text-right">{formatNumber(row.uniqueVisitors)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h2 className="mb-3 font-medium">Popular Paths</h2>
+          <MetricTable
+            rows={traffic.paths.map((row) => ({
+              key: row.path,
+              title: row.path,
+              subtitle: row.title,
+              views: row.views,
+              visitors: row.uniqueVisitors,
+            }))}
+          />
         </Card>
       </div>
     </div>
+  );
+}
+
+function Kpi({ label, value }: { label: string; value: number }) {
+  return (
+    <Card>
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="mt-2 text-2xl font-semibold">{formatNumber(value)}</div>
+    </Card>
+  );
+}
+
+function MetricTable({
+  rows,
+}: {
+  rows: { key: string; title: string; subtitle?: string; views: number; visitors: number }[];
+}) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-left text-muted-foreground">
+          <th>Source</th>
+          <th className="text-right">Views</th>
+          <th className="text-right">Visitors</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key} className="border-t">
+            <td className="py-2">
+              <div>{row.title}</div>
+              {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
+            </td>
+            <td className="text-right">{formatNumber(row.views)}</td>
+            <td className="text-right">{formatNumber(row.visitors)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -298,23 +521,22 @@ function RankChart({ history }: { history: SearchHistory }) {
     title: { text: history.query.name, left: 0, textStyle: { fontSize: 14 } },
     tooltip: { trigger: "axis" },
     xAxis: { type: "category", data: history.points.map((point) => point.date) },
-    yAxis: {
-      type: "value",
-      inverse: true,
-      min: 1,
-      name: "Rank",
-    },
-    series: [
-      {
-        type: "line",
-        connectNulls: false,
-        data: history.points.map((point) => point.position),
-      },
-    ],
+    yAxis: { type: "value", inverse: true, min: 1, name: "Rank" },
+    series: [{ type: "line", connectNulls: false, data: history.points.map((point) => point.position) }],
   };
   return (
     <Card>
       <ReactECharts option={option} style={{ height: 280 }} />
     </Card>
   );
+}
+
+function formatBusinessDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
+    new Date(`${value}T00:00:00`),
+  );
+}
+
+function formatJobTime(iso: string) {
+  return new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 }

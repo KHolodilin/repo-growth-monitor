@@ -43,6 +43,7 @@ public class RepositoryStatsCollector implements Collector {
             repositoryJdbcRepository.updateStats(
                     context.repository().id(),
                     remote.stargazersCount(),
+                    remote.watchers(),
                     remote.forksCount(),
                     remote.openIssuesCount(),
                     remote.updatedAt()
@@ -51,6 +52,7 @@ public class RepositoryStatsCollector implements Collector {
                     context.repository().id(),
                     context.job().businessDate(),
                     remote.stargazersCount(),
+                    remote.watchers(),
                     remote.forksCount(),
                     remote.openIssuesCount()
             );

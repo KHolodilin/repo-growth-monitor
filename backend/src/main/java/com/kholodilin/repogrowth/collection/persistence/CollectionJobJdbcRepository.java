@@ -180,6 +180,21 @@ public class CollectionJobJdbcRepository {
                 .list();
     }
 
+    public int requeueFailed(long runId) {
+        return jdbcClient.sql("""
+                        UPDATE collection_job
+                        SET status = 'READY',
+                            locked_by = NULL,
+                            locked_until = NULL,
+                            next_attempt_at = NOW(),
+                            updated_at = NOW()
+                        WHERE collection_run_id = :runId
+                          AND status = 'FAILED'
+                        """)
+                .param("runId", runId)
+                .update();
+    }
+
     public int countByStatus(CollectionJobStatus status) {
         return jdbcClient.sql("SELECT COUNT(*) FROM collection_job WHERE status = :status")
                 .param("status", status.name())

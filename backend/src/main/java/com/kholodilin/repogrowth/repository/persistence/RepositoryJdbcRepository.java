@@ -27,6 +27,7 @@ public class RepositoryJdbcRepository {
             rs.getBoolean("fork"),
             rs.getBoolean("archived"),
             rs.getInt("stars"),
+            rs.getInt("watchers"),
             rs.getInt("forks"),
             rs.getInt("open_issues"),
             rs.getBoolean("tracking_enabled"),
@@ -46,11 +47,11 @@ public class RepositoryJdbcRepository {
         return jdbcClient.sql("""
                         INSERT INTO repository (
                             github_id, owner_id, name, full_name, description, visibility, default_branch,
-                            language, fork, archived, stars, forks, open_issues, tracking_enabled,
+                            language, fork, archived, stars, watchers, forks, open_issues, tracking_enabled,
                             github_created_at, github_updated_at
                         ) VALUES (
                             :githubId, :ownerId, :name, :fullName, :description, :visibility, :defaultBranch,
-                            :language, :fork, :archived, :stars, :forks, :openIssues, FALSE,
+                            :language, :fork, :archived, :stars, :watchers, :forks, :openIssues, FALSE,
                             :githubCreatedAt, :githubUpdatedAt
                         )
                         ON CONFLICT (github_id) DO UPDATE SET
@@ -64,6 +65,10 @@ public class RepositoryJdbcRepository {
                             fork = EXCLUDED.fork,
                             archived = EXCLUDED.archived,
                             stars = EXCLUDED.stars,
+                            watchers = CASE
+                                WHEN EXCLUDED.watchers > 0 THEN EXCLUDED.watchers
+                                ELSE repository.watchers
+                            END,
                             forks = EXCLUDED.forks,
                             open_issues = EXCLUDED.open_issues,
                             github_created_at = EXCLUDED.github_created_at,
@@ -82,6 +87,7 @@ public class RepositoryJdbcRepository {
                 .param("fork", incoming.fork())
                 .param("archived", incoming.archived())
                 .param("stars", incoming.stars())
+                .param("watchers", incoming.watchers())
                 .param("forks", incoming.forks())
                 .param("openIssues", incoming.openIssues())
                 .param("githubCreatedAt", SqlTime.ts(incoming.githubCreatedAt()))
@@ -129,10 +135,11 @@ public class RepositoryJdbcRepository {
                 .orElse(null);
     }
 
-    public void updateStats(long id, int stars, int forks, int openIssues, Instant githubUpdatedAt) {
+    public void updateStats(long id, int stars, int watchers, int forks, int openIssues, Instant githubUpdatedAt) {
         jdbcClient.sql("""
                         UPDATE repository
                         SET stars = :stars,
+                            watchers = :watchers,
                             forks = :forks,
                             open_issues = :openIssues,
                             github_updated_at = :githubUpdatedAt,
@@ -140,6 +147,7 @@ public class RepositoryJdbcRepository {
                         WHERE id = :id
                         """)
                 .param("stars", stars)
+                .param("watchers", watchers)
                 .param("forks", forks)
                 .param("openIssues", openIssues)
                 .param("githubUpdatedAt", SqlTime.ts(githubUpdatedAt))

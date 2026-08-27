@@ -88,7 +88,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, 200L, owner.id(), "demo", "acme/demo", "demo repo", "PUBLIC", "main", "Java",
-                false, false, 10, 2, 1, false, Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
+                false, false, 10, 0, 2, 1, false, Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
                 null, null
         ));
         repositoryJdbcRepository.setTracking(repository.id(), true);
@@ -121,6 +121,40 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .isIn(CollectionJobStatus.RETRY, CollectionJobStatus.FAILED, CollectionJobStatus.RUNNING);
         CollectionRun updated = runRepository.findById(run.id()).orElseThrow();
         assertThat(updated.status().name()).isNotEqualTo("SUCCESS");
+    }
+
+    @Test
+    void collectNowRequeuesFailedJobsWithoutDuplicatingSuccess() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob traffic = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        CollectionJob paths = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.POPULAR_PATHS)
+                .findFirst()
+                .orElseThrow();
+        jobRepository.markSuccess(traffic.id());
+        jobRepository.markFailed(paths.id(), "GITHUB_ERROR", "boom");
+        runRepository.refreshAggregates(run.id());
+
+        CollectionRun retried = collectionPlanner.planRepository(repository.id(), date);
+        List<CollectionJob> jobs = jobRepository.findByRun(retried.id());
+        assertThat(jobs).hasSize(4);
+        assertThat(jobs.stream().filter(job -> job.jobType() == CollectionJobType.TRAFFIC).findFirst().orElseThrow().status())
+                .isEqualTo(CollectionJobStatus.SUCCESS);
+        assertThat(jobs.stream().filter(job -> job.jobType() == CollectionJobType.POPULAR_PATHS).findFirst().orElseThrow().status())
+                .isEqualTo(CollectionJobStatus.READY);
+    }
+
+    @Test
+    void repositoryStatsCollectorPersistsWatchersFromSubscribersCount() {
+        collectionPlanner.planRepository(repository.id(), planningWindow.businessDate());
+        drainCollection(8);
+        Repository updated = repositoryJdbcRepository.findById(repository.id()).orElseThrow();
+        assertThat(updated.watchers()).isEqualTo(5);
+        assertThat(updated.stars()).isEqualTo(11);
     }
 
     @Test
@@ -217,7 +251,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .thenReturn(List.of(new GitHubPathResponse("/acme/demo", "demo", 4, 2)));
         when(gitHubClient.getRepository(anyString(), anyString())).thenReturn(new GitHubRepositoryResponse(
                 200L, "demo", "acme/demo", "demo repo", false, "public", "main", "Java", false, false,
-                11, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), owner
+                11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), owner
         ));
         when(gitHubClient.searchRepositories(anyString(), anyInt())).thenReturn(
                 new com.kholodilin.repogrowth.github.model.GitHubSearchResponse(1, List.of())

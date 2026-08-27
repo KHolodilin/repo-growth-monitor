@@ -4,9 +4,8 @@ import ReactECharts from "echarts-for-react";
 import { api, type Dashboard } from "../lib/api";
 import { cn, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
+import { PeriodSelector, type Period } from "../components/PeriodSelector";
 
-const PERIODS = ["7d", "30d", "90d", "1y", "all"] as const;
-type Period = (typeof PERIODS)[number];
 type SortKey = "visitors" | "views" | "clones" | "stars" | "growth";
 
 const JOB_LABELS: Record<string, string> = {
@@ -107,26 +106,6 @@ function DashboardHeader({
         </div>
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
-    </div>
-  );
-}
-
-function PeriodSelector({ period, onPeriod }: { period: Period; onPeriod: (period: Period) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border bg-muted p-1">
-      {PERIODS.map((item) => (
-        <button
-          key={item}
-          type="button"
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium",
-            period === item ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-          )}
-          onClick={() => onPeriod(item)}
-        >
-          {item}
-        </button>
-      ))}
     </div>
   );
 }
