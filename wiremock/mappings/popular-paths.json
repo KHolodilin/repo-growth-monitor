@@ -1,17 +1,91 @@
 {
-  "request": {
-    "method": "GET",
-    "urlPathPattern": "/repos/.*/.*/traffic/popular/paths"
-  },
-  "response": {
-    "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
+  "mappings": [
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/acme/kafka-starter/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/acme/kafka-starter", "title": "acme/kafka-starter", "count": 120, "uniques": 48 },
+          { "path": "/acme/kafka-starter/blob/main/README.md", "title": "README.md", "count": 67, "uniques": 31 },
+          { "path": "/acme/kafka-starter/blob/main/docs/outbox.md", "title": "docs/outbox.md", "count": 22, "uniques": 14 }
+        ]
+      }
     },
-    "jsonBody": [
-      { "path": "/acme/spring-outbox", "title": "acme/spring-outbox", "count": 510, "uniques": 190 },
-      { "path": "/acme/spring-outbox/blob/main/README.md", "title": "README.md", "count": 240, "uniques": 110 },
-      { "path": "/acme/spring-outbox/issues", "title": "Issues", "count": 48, "uniques": 30 }
-    ]
-  }
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/acme/spring-outbox/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/acme/spring-outbox", "title": "acme/spring-outbox", "count": 510, "uniques": 190 },
+          { "path": "/acme/spring-outbox/blob/main/README.md", "title": "README.md", "count": 240, "uniques": 110 },
+          { "path": "/acme/spring-outbox/issues", "title": "Issues", "count": 48, "uniques": 30 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/competitor/outbox-kit/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/competitor/outbox-kit", "title": "competitor/outbox-kit", "count": 1100, "uniques": 390 },
+          { "path": "/competitor/outbox-kit/wiki", "title": "Wiki", "count": 320, "uniques": 140 },
+          { "path": "/competitor/outbox-kit/releases", "title": "Releases", "count": 95, "uniques": 60 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/another/spring-outbox/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/another/spring-outbox", "title": "another/spring-outbox", "count": 210, "uniques": 85 },
+          { "path": "/another/spring-outbox/blob/main/README.md", "title": "README.md", "count": 80, "uniques": 40 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/labs/kafka-outbox/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/labs/kafka-outbox", "title": "labs/kafka-outbox", "count": 72, "uniques": 35 },
+          { "path": "/labs/kafka-outbox/issues", "title": "Issues", "count": 19, "uniques": 11 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/oss/outbox-jdbc/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/oss/outbox-jdbc", "title": "oss/outbox-jdbc", "count": 95, "uniques": 44 },
+          { "path": "/oss/outbox-jdbc/blob/main/README.md", "title": "README.md", "count": 48, "uniques": 22 },
+          { "path": "/oss/outbox-jdbc/wiki/Transactions", "title": "Transactions", "count": 15, "uniques": 9 }
+        ]
+      }
+    },
+    {
+      "priority": 10,
+      "request": { "method": "GET", "urlPathPattern": "/repos/.*/.*/traffic/popular/paths" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "path": "/", "title": "Home", "count": 8, "uniques": 5 }
+        ]
+      }
+    }
+  ]
 }

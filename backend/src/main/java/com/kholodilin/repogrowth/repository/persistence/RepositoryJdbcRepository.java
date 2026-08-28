@@ -172,7 +172,8 @@ public class RepositoryJdbcRepository {
             Instant githubUpdatedAt,
             Instant githubPushedAt,
             Instant lastCommitAt,
-            Instant enrichedAt
+            Instant enrichedAt,
+            boolean archived
     ) {
         jdbcClient.sql("""
                         UPDATE repository
@@ -185,6 +186,7 @@ public class RepositoryJdbcRepository {
                             github_pushed_at = :githubPushedAt,
                             last_commit_at = COALESCE(:lastCommitAt, last_commit_at),
                             enriched_at = :enrichedAt,
+                            archived = :archived,
                             updated_at = NOW()
                         WHERE id = :id
                         """)
@@ -198,6 +200,7 @@ public class RepositoryJdbcRepository {
                 .param("githubPushedAt", SqlTime.ts(githubPushedAt))
                 .param("lastCommitAt", SqlTime.ts(lastCommitAt))
                 .param("enrichedAt", SqlTime.ts(enrichedAt))
+                .param("archived", archived)
                 .update();
     }
 

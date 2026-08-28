@@ -45,6 +45,8 @@ export type Repository = {
   githubUrl?: string;
   owner: Owner;
   contributors: number;
+  activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
+  lastActivityAt?: string | null;
 };
 
 export type Dashboard = {
@@ -74,6 +76,9 @@ export type Dashboard = {
     growthPercent: number | null;
     collectionStatus: string | null;
     jobs: { jobType: string; status: string }[];
+    archived: boolean;
+    activityAt?: string | null;
+    activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
   }[];
 };
 

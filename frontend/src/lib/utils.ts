@@ -88,6 +88,9 @@ export function formatActivity(status?: string | null) {
   if (status === "INACTIVE") {
     return "Inactive";
   }
+  if (status === "ARCHIVED") {
+    return "Archived";
+  }
   return "Unknown";
 }
 
@@ -97,7 +100,7 @@ export function formatActivityPresentation(status?: string | null, iso?: string 
     return "Unknown";
   }
   const relative = formatRelativeTime(iso);
-  if (!iso || relative === "—") {
+  if (!iso || relative === "—" || label === "Archived") {
     return label;
   }
   return `${label} · ${relative}`;
@@ -110,7 +113,7 @@ export function activityClass(status?: string | null) {
   if (status === "LOW_ACTIVITY") {
     return "text-amber-700";
   }
-  if (status === "INACTIVE") {
+  if (status === "INACTIVE" || status === "ARCHIVED") {
     return "text-slate-500";
   }
   return "text-muted-foreground";

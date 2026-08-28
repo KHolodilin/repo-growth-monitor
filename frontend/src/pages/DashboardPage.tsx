@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import { api, type Dashboard } from "../lib/api";
-import { cn, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
+import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, type Period } from "../components/PeriodSelector";
 
@@ -245,7 +245,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
         <h2 className="font-medium">Repositories</h2>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="w-full min-w-[860px] text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
@@ -254,6 +254,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Clones" active={sortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
               <SortHeader label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
               <SortHeader label="Growth" active={sortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
+              <th className="px-5 py-2 font-medium">Activity</th>
             </tr>
           </thead>
           <tbody>
@@ -283,6 +284,9 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.stars)}</td>
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
+                  </td>
+                  <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
+                    {formatActivityPresentation(row.activityStatus, row.activityAt)}
                   </td>
                 </tr>
               );

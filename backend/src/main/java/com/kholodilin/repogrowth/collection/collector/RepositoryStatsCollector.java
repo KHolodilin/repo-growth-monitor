@@ -66,7 +66,8 @@ public class RepositoryStatsCollector implements Collector {
                     remote.updatedAt(),
                     remote.pushedAt(),
                     resolvedLastCommitAt,
-                    java.time.Instant.now()
+                    java.time.Instant.now(),
+                    remote.archived()
             );
             trafficJdbcRepository.upsertDailyStats(
                     context.repository().id(),

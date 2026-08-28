@@ -1,18 +1,97 @@
 {
-  "request": {
-    "method": "GET",
-    "urlPathPattern": "/repos/.*/.*/traffic/popular/referrers"
-  },
-  "response": {
-    "status": 200,
-    "headers": {
-      "Content-Type": "application/json"
+  "mappings": [
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/acme/kafka-starter/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "docs.confluent.io", "count": 86, "uniques": 41 },
+          { "referrer": "github.com", "count": 54, "uniques": 28 },
+          { "referrer": "Google", "count": 33, "uniques": 18 },
+          { "referrer": "twitter.com", "count": 12, "uniques": 9 }
+        ]
+      }
     },
-    "jsonBody": [
-      { "referrer": "github.com", "count": 420, "uniques": 180 },
-      { "referrer": "Google", "count": 210, "uniques": 95 },
-      { "referrer": "reddit.com", "count": 64, "uniques": 40 },
-      { "referrer": "stackoverflow.com", "count": 31, "uniques": 22 }
-    ]
-  }
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/acme/spring-outbox/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "github.com", "count": 420, "uniques": 180 },
+          { "referrer": "Google", "count": 210, "uniques": 95 },
+          { "referrer": "reddit.com", "count": 64, "uniques": 40 },
+          { "referrer": "stackoverflow.com", "count": 31, "uniques": 22 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/competitor/outbox-kit/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "github.com", "count": 980, "uniques": 410 },
+          { "referrer": "Google", "count": 640, "uniques": 280 },
+          { "referrer": "news.ycombinator.com", "count": 210, "uniques": 150 },
+          { "referrer": "Bing", "count": 88, "uniques": 40 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/another/spring-outbox/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "baeldung.com", "count": 180, "uniques": 90 },
+          { "referrer": "Medium", "count": 95, "uniques": 50 },
+          { "referrer": "github.com", "count": 70, "uniques": 40 },
+          { "referrer": "youtube.com", "count": 28, "uniques": 16 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/labs/kafka-outbox/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "discord.com", "count": 55, "uniques": 30 },
+          { "referrer": "github.com", "count": 40, "uniques": 22 },
+          { "referrer": "duckduckgo.com", "count": 18, "uniques": 12 }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/repos/oss/outbox-jdbc/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "stackoverflow.com", "count": 140, "uniques": 70 },
+          { "referrer": "github.com", "count": 60, "uniques": 35 },
+          { "referrer": "jdbc.postgresql.org", "count": 25, "uniques": 14 }
+        ]
+      }
+    },
+    {
+      "priority": 10,
+      "request": { "method": "GET", "urlPathPattern": "/repos/.*/.*/traffic/popular/referrers" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          { "referrer": "github.com", "count": 10, "uniques": 6 }
+        ]
+      }
+    }
+  ]
 }

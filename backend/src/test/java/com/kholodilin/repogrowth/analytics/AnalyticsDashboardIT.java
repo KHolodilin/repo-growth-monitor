@@ -157,6 +157,46 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(all.summary().stars().change()).isNull();
     }
 
+    @Test
+    void trafficAggregatesReferrersAndPathsForSelectedPeriod() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        Instant earlierSameDay = today.minusDays(2).atTime(8, 0).atZone(clock.getZone()).toInstant();
+        Instant laterSameDay = today.minusDays(2).atTime(18, 0).atZone(clock.getZone()).toInstant();
+        Instant todaySnapshot = today.atTime(12, 0).atZone(clock.getZone()).toInstant();
+
+        trafficJdbcRepository.insertReferrers(kafka.id(), earlierSameDay, "github.com", 100, 40);
+        trafficJdbcRepository.insertReferrers(kafka.id(), earlierSameDay, "legacy.com", 9, 4);
+        trafficJdbcRepository.insertReferrers(kafka.id(), laterSameDay, "github.com", 110, 45);
+        trafficJdbcRepository.insertReferrers(kafka.id(), laterSameDay, "Google", 55, 22);
+        trafficJdbcRepository.insertReferrers(kafka.id(), todaySnapshot, "github.com", 200, 80);
+        trafficJdbcRepository.insertReferrers(kafka.id(), todaySnapshot, "Google", 90, 30);
+
+        trafficJdbcRepository.insertPath(kafka.id(), laterSameDay, "/readme", "README", 40, 15);
+        trafficJdbcRepository.insertPath(kafka.id(), todaySnapshot, "/readme", "README", 70, 25);
+        trafficJdbcRepository.insertPath(kafka.id(), todaySnapshot, "/issues", "Issues", 12, 8);
+
+        AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d");
+        assertThat(oneDay.referrers()).containsExactly(
+                new TrafficJdbcRepository.ReferrerRow("github.com", 200, 80),
+                new TrafficJdbcRepository.ReferrerRow("Google", 90, 30)
+        );
+        assertThat(oneDay.paths()).containsExactly(
+                new TrafficJdbcRepository.PathRow("/readme", "README", 70, 25),
+                new TrafficJdbcRepository.PathRow("/issues", "Issues", 12, 8)
+        );
+
+        AnalyticsService.RepositoryTrafficSnapshot sevenDays = analyticsService.traffic(kafka.id(), "7d");
+        assertThat(sevenDays.referrers()).containsExactly(
+                new TrafficJdbcRepository.ReferrerRow("github.com", 310, 125),
+                new TrafficJdbcRepository.ReferrerRow("Google", 145, 52)
+        );
+        assertThat(sevenDays.paths()).containsExactly(
+                new TrafficJdbcRepository.PathRow("/readme", "README", 110, 40),
+                new TrafficJdbcRepository.PathRow("/issues", "Issues", 12, 8)
+        );
+    }
+
     private void createRepos() {
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         kafka = track(owner, 201L, "kafka-starter", "acme/kafka-starter", 41);

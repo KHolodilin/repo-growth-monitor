@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Repository } from "../lib/api";
+import { activityClass, formatActivityPresentation } from "../lib/utils";
 import { Button, Card } from "../components/ui";
 
 export function RepositoriesPage() {
@@ -63,6 +64,9 @@ export function RepositoriesPage() {
                     {repo.visibility} · {repo.stars} stars · {repo.owner.login}
                   </div>
                 </div>
+              </div>
+              <div className={`shrink-0 text-sm ${activityClass(repo.activityStatus)}`}>
+                {formatActivityPresentation(repo.activityStatus, repo.lastActivityAt)}
               </div>
             </label>
           ))}

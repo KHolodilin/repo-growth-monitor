@@ -19,6 +19,8 @@ import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
+import com.kholodilin.repogrowth.search.application.ActivityClassifier;
+import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
@@ -29,6 +31,7 @@ import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.Traff
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ public class AnalyticsService {
     private final CollectionRunJdbcRepository runRepository;
     private final CollectionJobJdbcRepository jobRepository;
     private final CollectionController collectionController;
+    private final ActivityClassifier activityClassifier;
     private final Clock clock;
 
     public AnalyticsService(
@@ -56,6 +60,7 @@ public class AnalyticsService {
             CollectionRunJdbcRepository runRepository,
             CollectionJobJdbcRepository jobRepository,
             CollectionController collectionController,
+            ActivityClassifier activityClassifier,
             Clock clock
     ) {
         this.repositoryService = repositoryService;
@@ -63,6 +68,7 @@ public class AnalyticsService {
         this.runRepository = runRepository;
         this.jobRepository = jobRepository;
         this.collectionController = collectionController;
+        this.activityClassifier = activityClassifier;
         this.clock = clock;
     }
 
@@ -125,8 +131,6 @@ public class AnalyticsService {
         DashboardPeriod period = DashboardPeriod.of(periodParam, today, earliest);
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
         TrafficTotals totals = trafficJdbcRepository.totals(repositoryId, period.allTime() ? null : period.from());
-        java.time.Instant referrerSnapshot = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
-        java.time.Instant pathSnapshot = trafficJdbcRepository.latestPathSnapshot(repositoryId);
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
         return new RepositoryTrafficSnapshot(
                 repository,
@@ -134,8 +138,8 @@ public class AnalyticsService {
                 period.value(),
                 totals,
                 repositorySeries(period, history),
-                trafficJdbcRepository.referrers(repositoryId, referrerSnapshot),
-                trafficJdbcRepository.paths(repositoryId, pathSnapshot),
+                trafficJdbcRepository.referrersInRange(repositoryId, period.from(), period.to(), clock.getZone()),
+                trafficJdbcRepository.pathsInRange(repositoryId, period.from(), period.to(), clock.getZone()),
                 latestRun == null ? null : collectionController.toResponse(latestRun)
         );
     }
@@ -279,6 +283,8 @@ public class AnalyticsService {
                 : jobsByRun.getOrDefault(run.id(), List.of()).stream()
                         .map(job -> new JobStatus(job.jobType().name(), job.status().name()))
                         .toList();
+        Instant activityAt = row.lastCommitAt() != null ? row.lastCommitAt() : row.githubPushedAt();
+        ActivityStatus activityStatus = activityClassifier.classify(row.archived(), activityAt);
         return new RepositoryRow(
                 row.repositoryId(),
                 row.fullName(),
@@ -288,7 +294,10 @@ public class AnalyticsService {
                 row.stars(),
                 growth,
                 run == null ? null : run.status().name(),
-                jobs
+                jobs,
+                row.archived(),
+                activityAt,
+                activityStatus.name()
         );
     }
 
@@ -399,6 +408,7 @@ public class AnalyticsService {
             return null;
         }
         return switch (period.toLowerCase()) {
+            case "1d" -> today;
             case "7d" -> today.minusDays(6);
             case "30d" -> today.minusDays(29);
             case "90d" -> today.minusDays(89);

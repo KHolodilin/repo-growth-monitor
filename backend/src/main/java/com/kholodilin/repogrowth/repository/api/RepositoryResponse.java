@@ -23,6 +23,8 @@ public record RepositoryResponse(
         Instant githubUpdatedAt,
         Instant lastCommitAt,
         String githubUrl,
+        String activityStatus,
+        Instant lastActivityAt,
         OwnerResponse owner
 ) {
     public record OwnerResponse(

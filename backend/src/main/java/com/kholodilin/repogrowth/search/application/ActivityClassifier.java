@@ -20,6 +20,13 @@ public class ActivityClassifier {
     }
 
     public ActivityStatus classify(Instant activityAt) {
+        return classify(false, activityAt);
+    }
+
+    public ActivityStatus classify(boolean archived, Instant activityAt) {
+        if (archived) {
+            return ActivityStatus.ARCHIVED;
+        }
         if (activityAt == null) {
             return ActivityStatus.UNKNOWN;
         }

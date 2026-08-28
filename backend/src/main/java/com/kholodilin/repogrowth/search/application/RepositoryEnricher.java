@@ -107,7 +107,7 @@ public class RepositoryEnricher {
 
     private SearchResult applyCache(SearchResult snapshot, Repository cached) {
         Instant activityAt = cached.activityAt() != null ? cached.activityAt() : snapshot.activityAt();
-        ActivityStatus status = activityClassifier.classify(activityAt);
+        ActivityStatus status = activityClassifier.classify(cached.archived(), activityAt);
         return new SearchResult(
                 snapshot.id(),
                 snapshot.searchRunId(),

@@ -4,5 +4,6 @@ public enum ActivityStatus {
     ACTIVE,
     LOW_ACTIVITY,
     INACTIVE,
+    ARCHIVED,
     UNKNOWN
 }

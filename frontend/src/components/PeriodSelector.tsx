@@ -1,6 +1,6 @@
 import { cn } from "../lib/utils";
 
-export const PERIODS = ["7d", "30d", "90d", "1y", "all"] as const;
+export const PERIODS = ["1d", "7d", "30d", "90d", "1y", "all"] as const;
 export type Period = (typeof PERIODS)[number];
 
 export function PeriodSelector({ period, onPeriod }: { period: Period; onPeriod: (period: Period) => void }) {

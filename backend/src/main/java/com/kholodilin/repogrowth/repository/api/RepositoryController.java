@@ -3,6 +3,7 @@ package com.kholodilin.repogrowth.repository.api;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,9 +20,11 @@ import java.util.List;
 public class RepositoryController {
 
     private final RepositoryService repositoryService;
+    private final ActivityClassifier activityClassifier;
 
-    public RepositoryController(RepositoryService repositoryService) {
+    public RepositoryController(RepositoryService repositoryService, ActivityClassifier activityClassifier) {
         this.repositoryService = repositoryService;
+        this.activityClassifier = activityClassifier;
     }
 
     @GetMapping
@@ -62,6 +65,8 @@ public class RepositoryController {
                 repository.githubUpdatedAt(),
                 repository.lastCommitAt(),
                 "https://github.com/" + repository.fullName(),
+                activityClassifier.classify(repository.archived(), repository.activityAt()).name(),
+                repository.activityAt(),
                 new RepositoryResponse.OwnerResponse(
                         owner.id(),
                         owner.githubId(),

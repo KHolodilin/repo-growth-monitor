@@ -13,7 +13,7 @@ public record DashboardPeriod(
         LocalDate previousTo
 ) {
 
-    private static final Set<String> ALLOWED = Set.of("7d", "30d", "90d", "1y", "all");
+    private static final Set<String> ALLOWED = Set.of("1d", "7d", "30d", "90d", "1y", "all");
 
     public static DashboardPeriod of(String raw, LocalDate today, LocalDate earliestTrafficDate) {
         String period = normalize(raw);
@@ -24,6 +24,7 @@ public record DashboardPeriod(
             return new DashboardPeriod(period, from, to, null, null);
         }
         from = switch (period) {
+            case "1d" -> today;
             case "7d" -> today.minusDays(6);
             case "90d" -> today.minusDays(89);
             case "1y" -> today.minusYears(1).plusDays(1);

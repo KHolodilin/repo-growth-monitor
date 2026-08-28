@@ -67,7 +67,10 @@ public record DashboardResponse(
             int stars,
             Double growthPercent,
             String collectionStatus,
-            List<JobStatus> jobs
+            List<JobStatus> jobs,
+            boolean archived,
+            Instant activityAt,
+            String activityStatus
     ) {
     }
 

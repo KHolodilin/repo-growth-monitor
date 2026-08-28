@@ -25,5 +25,6 @@ class ActivityClassifierTest {
         assertThat(classifier.classify(Instant.parse("2026-06-01T00:00:00Z"))).isEqualTo(ActivityStatus.LOW_ACTIVITY);
         assertThat(classifier.classify(Instant.parse("2025-01-01T00:00:00Z"))).isEqualTo(ActivityStatus.INACTIVE);
         assertThat(classifier.classify(null)).isEqualTo(ActivityStatus.UNKNOWN);
+        assertThat(classifier.classify(true, Instant.parse("2026-08-20T00:00:00Z"))).isEqualTo(ActivityStatus.ARCHIVED);
     }
 }
