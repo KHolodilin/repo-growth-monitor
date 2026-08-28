@@ -139,6 +139,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(missing.views()).isNull();
         assertThat(missing.visitors()).isNull();
         assertThat(missing.clones()).isNull();
+        assertThat(dashboard.traffic().getLast().date()).isEqualTo(today.minusDays(4));
+        assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today));
 
         DashboardResponse.RepositoryRow kafkaRow = dashboard.repositories().stream()
                 .filter(row -> row.fullName().equals("acme/kafka-starter"))

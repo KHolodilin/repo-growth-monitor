@@ -195,6 +195,23 @@ public class CollectionJobJdbcRepository {
                 .update();
     }
 
+    public int requeueCompleted(long runId, CollectionJobType type) {
+        return jdbcClient.sql("""
+                        UPDATE collection_job
+                        SET status = 'READY',
+                            locked_by = NULL,
+                            locked_until = NULL,
+                            next_attempt_at = NOW(),
+                            updated_at = NOW()
+                        WHERE collection_run_id = :runId
+                          AND job_type = :jobType
+                          AND status IN ('SUCCESS', 'FAILED')
+                        """)
+                .param("runId", runId)
+                .param("jobType", type.name())
+                .update();
+    }
+
     public int countByStatus(CollectionJobStatus status) {
         return jdbcClient.sql("SELECT COUNT(*) FROM collection_job WHERE status = :status")
                 .param("status", status.name())

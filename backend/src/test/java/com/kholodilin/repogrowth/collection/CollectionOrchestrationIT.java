@@ -28,6 +28,7 @@ import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +76,8 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
     RepositoryLock repositoryLock;
     @Autowired
     JdbcClient jdbcClient;
+    @Autowired
+    TrafficJdbcRepository trafficJdbcRepository;
 
     private Repository repository;
 
@@ -85,6 +88,10 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         jdbcClient.sql("DELETE FROM search_query").update();
         jdbcClient.sql("DELETE FROM collection_job").update();
         jdbcClient.sql("DELETE FROM collection_run").update();
+        jdbcClient.sql("DELETE FROM traffic_path_snapshot").update();
+        jdbcClient.sql("DELETE FROM traffic_referrer_snapshot").update();
+        jdbcClient.sql("DELETE FROM traffic_daily").update();
+        jdbcClient.sql("DELETE FROM repository_daily_stats").update();
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, 200L, owner.id(), "demo", "acme/demo", "demo repo", "PUBLIC", "main", "Java",
@@ -137,6 +144,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .orElseThrow();
         jobRepository.markSuccess(traffic.id());
         jobRepository.markFailed(paths.id(), "GITHUB_ERROR", "boom");
+        trafficJdbcRepository.upsertDaily(repository.id(), date, 1, 1, 0, 0);
         runRepository.refreshAggregates(run.id());
 
         CollectionRun retried = collectionPlanner.planRepository(repository.id(), date);
@@ -146,6 +154,66 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .isEqualTo(CollectionJobStatus.SUCCESS);
         assertThat(jobs.stream().filter(job -> job.jobType() == CollectionJobType.POPULAR_PATHS).findFirst().orElseThrow().status())
                 .isEqualTo(CollectionJobStatus.READY);
+    }
+
+    @Test
+    void plannerRequeuesTrafficWhenRecentDaysAreMissing() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob traffic = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        jobRepository.markSuccess(traffic.id());
+        trafficJdbcRepository.upsertDaily(repository.id(), date.minusDays(2), 4, 2, 1, 1);
+        runRepository.refreshAggregates(run.id());
+
+        collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob refreshed = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        assertThat(refreshed.status()).isEqualTo(CollectionJobStatus.READY);
+    }
+
+    @Test
+    void plannerDoesNotRequeueTrafficWhenCurrentDayExists() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob traffic = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        jobRepository.markSuccess(traffic.id());
+        trafficJdbcRepository.upsertDaily(repository.id(), date, 4, 2, 1, 1);
+        runRepository.refreshAggregates(run.id());
+
+        collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob unchanged = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        assertThat(unchanged.status()).isEqualTo(CollectionJobStatus.SUCCESS);
+    }
+
+    @Test
+    void collectNowRefreshesTrafficEvenWhenCurrentDayExists() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob traffic = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        jobRepository.markSuccess(traffic.id());
+        trafficJdbcRepository.upsertDaily(repository.id(), date, 4, 2, 1, 1);
+        runRepository.refreshAggregates(run.id());
+
+        collectionPlanner.planRepository(repository.id(), date, true);
+        CollectionJob refreshed = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        assertThat(refreshed.status()).isEqualTo(CollectionJobStatus.READY);
     }
 
     @Test

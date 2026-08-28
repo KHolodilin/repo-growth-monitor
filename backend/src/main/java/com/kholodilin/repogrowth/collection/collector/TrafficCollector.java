@@ -51,6 +51,7 @@ public class TrafficCollector implements Collector {
             values[2] = day.count();
             values[3] = day.uniques();
         }
+        fillOmittedDays(merged);
         transactionTemplate.executeWithoutResult(status -> {
             for (Map.Entry<LocalDate, int[]> entry : merged.entrySet()) {
                 int[] values = entry.getValue();
@@ -64,5 +65,16 @@ public class TrafficCollector implements Collector {
                 );
             }
         });
+    }
+
+    static void fillOmittedDays(Map<LocalDate, int[]> merged) {
+        if (merged.isEmpty()) {
+            return;
+        }
+        LocalDate from = merged.keySet().stream().min(LocalDate::compareTo).orElseThrow();
+        LocalDate to = merged.keySet().stream().max(LocalDate::compareTo).orElseThrow();
+        for (LocalDate cursor = from; !cursor.isAfter(to); cursor = cursor.plusDays(1)) {
+            merged.putIfAbsent(cursor, new int[]{0, 0, 0, 0});
+        }
     }
 }

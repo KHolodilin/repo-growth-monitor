@@ -135,6 +135,18 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
+    public Optional<LocalDate> latestDate(long repositoryId) {
+        return jdbcClient.sql("""
+                        SELECT MAX(traffic_date)
+                        FROM traffic_daily
+                        WHERE repository_id = :repositoryId
+                        """)
+                .param("repositoryId", repositoryId)
+                .query(LocalDate.class)
+                .optional()
+                .filter(date -> date != null);
+    }
+
     public TrafficTotals totals(long repositoryId, LocalDate fromInclusive) {
         if (fromInclusive == null) {
             return jdbcClient.sql("""

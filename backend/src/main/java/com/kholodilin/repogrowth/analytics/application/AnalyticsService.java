@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -159,7 +160,7 @@ public class AnalyticsService {
             }
             cursor = cursor.plusDays(1);
         }
-        return points;
+        return dropTrailingGaps(points, TrafficChartPoint::views);
     }
 
     private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
@@ -305,7 +306,15 @@ public class AnalyticsService {
             }
             cursor = cursor.plusDays(1);
         }
-        return points;
+        return dropTrailingGaps(points, TrafficPoint::views);
+    }
+
+    static <T> List<T> dropTrailingGaps(List<T> points, Function<T, Long> views) {
+        int end = points.size();
+        while (end > 0 && views.apply(points.get(end - 1)) == null) {
+            end--;
+        }
+        return end == points.size() ? points : new ArrayList<>(points.subList(0, end));
     }
 
     static PartialData partialData(List<TrafficPoint> traffic) {

@@ -6,6 +6,7 @@ import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcReposit
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,15 +23,18 @@ public class CollectionPlanner {
     private final RepositoryJdbcRepository repositoryJdbcRepository;
     private final CollectionRunJdbcRepository runRepository;
     private final CollectionJobJdbcRepository jobRepository;
+    private final TrafficJdbcRepository trafficJdbcRepository;
 
     public CollectionPlanner(
             RepositoryJdbcRepository repositoryJdbcRepository,
             CollectionRunJdbcRepository runRepository,
-            CollectionJobJdbcRepository jobRepository
+            CollectionJobJdbcRepository jobRepository,
+            TrafficJdbcRepository trafficJdbcRepository
     ) {
         this.repositoryJdbcRepository = repositoryJdbcRepository;
         this.runRepository = runRepository;
         this.jobRepository = jobRepository;
+        this.trafficJdbcRepository = trafficJdbcRepository;
     }
 
     @Transactional
@@ -38,7 +42,7 @@ public class CollectionPlanner {
         List<Repository> tracked = repositoryJdbcRepository.findTracked();
         int createdRuns = 0;
         for (Repository repository : tracked) {
-            planRepository(repository.id(), businessDate);
+            planRepository(repository.id(), businessDate, false);
             createdRuns++;
         }
         log.info("Collection planner processed trackedRepositories={} businessDate={}", tracked.size(), businessDate);
@@ -47,12 +51,26 @@ public class CollectionPlanner {
 
     @Transactional
     public CollectionRun planRepository(long repositoryId, LocalDate businessDate) {
+        return planRepository(repositoryId, businessDate, false);
+    }
+
+    @Transactional
+    public CollectionRun planRepository(long repositoryId, LocalDate businessDate, boolean refreshTraffic) {
         CollectionRun run = runRepository.insertIgnore(repositoryId, businessDate, JOB_TYPES.length);
         for (CollectionJobType type : JOB_TYPES) {
             jobRepository.insertIgnore(run.id(), repositoryId, businessDate, type);
         }
         jobRepository.requeueFailed(run.id());
+        if (refreshTraffic || isTrafficStale(repositoryId, businessDate)) {
+            jobRepository.requeueCompleted(run.id(), CollectionJobType.TRAFFIC);
+        }
         runRepository.refreshAggregates(run.id());
         return runRepository.findById(run.id()).orElse(run);
+    }
+
+    private boolean isTrafficStale(long repositoryId, LocalDate businessDate) {
+        return trafficJdbcRepository.latestDate(repositoryId)
+                .filter(latest -> !latest.isBefore(businessDate))
+                .isEmpty();
     }
 }

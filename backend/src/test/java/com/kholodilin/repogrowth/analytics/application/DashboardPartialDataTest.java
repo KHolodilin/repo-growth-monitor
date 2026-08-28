@@ -42,4 +42,16 @@ class DashboardPartialDataTest {
                 LocalDate.of(2026, 8, 22)
         ))).isEqualTo("Aug 21–22");
     }
+
+    @Test
+    void trailingUnpublishedDaysAreDroppedFromTheSeries() {
+        List<TrafficPoint> traffic = List.of(
+                new TrafficPoint(LocalDate.of(2026, 8, 26), 100L, 40L, 5L),
+                new TrafficPoint(LocalDate.of(2026, 8, 27), null, null, null),
+                new TrafficPoint(LocalDate.of(2026, 8, 28), null, null, null)
+        );
+        List<TrafficPoint> trimmed = AnalyticsService.dropTrailingGaps(traffic, TrafficPoint::views);
+        assertThat(trimmed).extracting(TrafficPoint::date)
+                .containsExactly(LocalDate.of(2026, 8, 26));
+    }
 }

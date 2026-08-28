@@ -47,7 +47,7 @@ public class CollectionController {
     @PostMapping("/repositories/{id}/collect")
     public CollectionRunResponse collect(@PathVariable long id) {
         repositoryService.get(id);
-        CollectionRun run = collectionPlanner.planRepository(id, planningWindow.businessDate());
+        CollectionRun run = collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
         return toResponse(run);
     }
 
