@@ -585,28 +585,34 @@ function MetricTable({
   rows: { key: string; title: string; subtitle?: string; views: number; visitors: number }[];
 }) {
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-left text-muted-foreground">
-          <th>Source</th>
-          <th className="text-right">Views</th>
-          <th className="text-right">Visitors</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => (
-          <tr key={row.key} className="border-t">
-            <td className="py-2">
-              <div>{row.title}</div>
-              {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
-            </td>
-            <td className="text-right">{formatNumber(row.views)}</td>
-            <td className="text-right">{formatNumber(row.visitors)}</td>
+    <div className="overflow-x-auto">
+      <table className="w-full table-fixed text-sm">
+        <thead>
+          <tr className="text-left text-muted-foreground">
+            <th className="pr-3">Source</th>
+            <th className="w-16 whitespace-nowrap pl-2 text-right">Views</th>
+            <th className="w-[4.75rem] whitespace-nowrap pl-2 text-right">Visitors</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key} className="border-t">
+              <td className="max-w-0 py-2 pr-3 align-top">
+                <div className="[overflow-wrap:anywhere]">{wrapPath(row.title)}</div>
+                {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
+              </td>
+              <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.views)}</td>
+              <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.visitors)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
+}
+
+function wrapPath(value: string) {
+  return value.replaceAll("/", "/\u200b");
 }
 
 type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results";
