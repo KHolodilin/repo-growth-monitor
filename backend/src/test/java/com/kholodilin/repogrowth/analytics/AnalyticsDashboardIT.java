@@ -81,6 +81,9 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.summary().repositories()).isEqualTo(2);
         assertThat(dashboard.summary().views().value()).isZero();
         assertThat(dashboard.traffic()).isEmpty();
+        assertThat(dashboard.repositories()).hasSize(2);
+        assertThat(dashboard.repositories()).extracting(DashboardResponse.RepositoryRow::fullName)
+                .containsExactlyInAnyOrder("acme/kafka-starter", "acme/spring-outbox");
     }
 
     @Test
@@ -163,39 +166,43 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     void trafficAggregatesReferrersAndPathsForSelectedPeriod() {
         createRepos();
         LocalDate today = LocalDate.now(clock);
-        Instant earlierSameDay = today.minusDays(2).atTime(8, 0).atZone(clock.getZone()).toInstant();
-        Instant laterSameDay = today.minusDays(2).atTime(18, 0).atZone(clock.getZone()).toInstant();
-        Instant todaySnapshot = today.atTime(12, 0).atZone(clock.getZone()).toInstant();
+        Instant snapshotAt = today.atTime(12, 0).atZone(clock.getZone()).toInstant();
 
-        trafficJdbcRepository.insertReferrers(kafka.id(), earlierSameDay, "github.com", 100, 40);
-        trafficJdbcRepository.insertReferrers(kafka.id(), earlierSameDay, "legacy.com", 9, 4);
-        trafficJdbcRepository.insertReferrers(kafka.id(), laterSameDay, "github.com", 110, 45);
-        trafficJdbcRepository.insertReferrers(kafka.id(), laterSameDay, "Google", 55, 22);
-        trafficJdbcRepository.insertReferrers(kafka.id(), todaySnapshot, "github.com", 200, 80);
-        trafficJdbcRepository.insertReferrers(kafka.id(), todaySnapshot, "Google", 90, 30);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(15), 20, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(14), 3, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(9), 2, 2, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(8), 1, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(7), 1, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(5), 1, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(4), 37, 2, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(3), 22, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(2), 6, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(1), 6, 1, 0, 0);
 
-        trafficJdbcRepository.insertPath(kafka.id(), laterSameDay, "/readme", "README", 40, 15);
-        trafficJdbcRepository.insertPath(kafka.id(), todaySnapshot, "/readme", "README", 70, 25);
-        trafficJdbcRepository.insertPath(kafka.id(), todaySnapshot, "/issues", "Issues", 12, 8);
-
-        AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d");
-        assertThat(oneDay.referrers()).containsExactly(
-                new TrafficJdbcRepository.ReferrerRow("github.com", 200, 80),
-                new TrafficJdbcRepository.ReferrerRow("Google", 90, 30)
-        );
-        assertThat(oneDay.paths()).containsExactly(
-                new TrafficJdbcRepository.PathRow("/readme", "README", 70, 25),
-                new TrafficJdbcRepository.PathRow("/issues", "Issues", 12, 8)
-        );
+        trafficJdbcRepository.insertReferrers(kafka.id(), snapshotAt, "github.com", 81, 3);
+        trafficJdbcRepository.insertReferrers(kafka.id(), snapshotAt, "mvnrepository.com", 1, 1);
+        trafficJdbcRepository.insertPath(kafka.id(), snapshotAt, "/readme", "README", 38, 5);
+        trafficJdbcRepository.insertPath(kafka.id(), snapshotAt, "/pulse", "Pulse", 17, 1);
 
         AnalyticsService.RepositoryTrafficSnapshot sevenDays = analyticsService.traffic(kafka.id(), "7d");
+        assertThat(sevenDays.totals().views()).isEqualTo(72);
         assertThat(sevenDays.referrers()).containsExactly(
-                new TrafficJdbcRepository.ReferrerRow("github.com", 310, 125),
-                new TrafficJdbcRepository.ReferrerRow("Google", 145, 52)
+                new TrafficJdbcRepository.ReferrerRow("github.com", 77, 2),
+                new TrafficJdbcRepository.ReferrerRow("mvnrepository.com", 1, 1)
         );
         assertThat(sevenDays.paths()).containsExactly(
-                new TrafficJdbcRepository.PathRow("/readme", "README", 110, 40),
-                new TrafficJdbcRepository.PathRow("/issues", "Issues", 12, 8)
+                new TrafficJdbcRepository.PathRow("/readme", "README", 36, 3),
+                new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 16, 1)
+        );
+
+        AnalyticsService.RepositoryTrafficSnapshot thirtyDays = analyticsService.traffic(kafka.id(), "30d");
+        assertThat(thirtyDays.referrers()).containsExactly(
+                new TrafficJdbcRepository.ReferrerRow("github.com", 81, 3),
+                new TrafficJdbcRepository.ReferrerRow("mvnrepository.com", 1, 1)
+        );
+        assertThat(thirtyDays.paths()).containsExactly(
+                new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5),
+                new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 17, 1)
         );
     }
 
@@ -212,6 +219,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
                 null, null, null, null, null, null
         ));
+        repositoryJdbcRepository.markAccountAccessible(repository.id());
         repositoryJdbcRepository.setTracking(repository.id(), true);
         return repositoryJdbcRepository.findById(repository.id()).orElseThrow();
     }

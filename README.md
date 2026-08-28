@@ -4,17 +4,17 @@ Self-hosted GitHub repository growth analytics: traffic, search rankings, and a 
 
 ## Quick start
 
-Two independent Compose files. Do not run both at once — they share host port `8080`.
+Two independent Compose files. They can run together: production app uses `8080`, mock app uses `8082`.
 
 ### Mock stack (WireMock + test database)
 
-No GitHub token. Isolated Postgres volume `pgdata_mock`, database `repogrowth_mock`.
+No GitHub token. Isolated Postgres volume `pgdata_mock_18`, database `repogrowth_mock`.
 
 ```bash
 docker compose -f docker-compose.mock.yml up -d --build
 ```
 
-- App: http://localhost:8080
+- App: http://localhost:8082
 - WireMock: http://localhost:8081/__admin
 - Test Postgres: `localhost:5433` (user/password `postgres`, db `repogrowth_mock`)
 
@@ -22,7 +22,7 @@ Planner window is always open. Stop with `docker compose -f docker-compose.mock.
 
 ### Production-like stack (real GitHub)
 
-Uses a Fine-grained PAT and a separate Postgres volume `pgdata`.
+Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`.
 
 ```bash
 cp .env.example .env

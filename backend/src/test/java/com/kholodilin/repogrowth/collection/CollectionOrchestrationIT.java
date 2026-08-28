@@ -103,6 +103,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 false, false, 10, 0, 2, 1, 0, false, Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
                 null, null, null, null, null, null
         ));
+        repositoryJdbcRepository.markAccountAccessible(repository.id());
         repositoryJdbcRepository.setTracking(repository.id(), true);
         repository = repositoryJdbcRepository.findById(repository.id()).orElseThrow();
         stubGithubSuccess();

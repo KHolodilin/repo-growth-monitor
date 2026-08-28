@@ -86,6 +86,16 @@ public class RepositoryStatsCollector implements Collector {
         }
         boolean resolvedSecurityPolicy = hasSecurityPolicy;
 
+        boolean hasIssueTemplate = files.hasIssueTemplate();
+        if (!hasIssueTemplate) {
+            try {
+                hasIssueTemplate = gitHubClient.hasIssueTemplates(owner, name);
+            } catch (RuntimeException ex) {
+                log.warn("Issue template lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
+            }
+        }
+        boolean resolvedIssueTemplate = hasIssueTemplate;
+
         Instant lastReleaseAt = null;
         boolean releaseFetched = false;
         try {
@@ -107,7 +117,7 @@ public class RepositoryStatsCollector implements Collector {
                 files.hasCodeOfConduct(),
                 files.hasContributing(),
                 resolvedSecurityPolicy,
-                files.hasIssueTemplate(),
+                resolvedIssueTemplate,
                 files.hasPullRequestTemplate()
         );
 

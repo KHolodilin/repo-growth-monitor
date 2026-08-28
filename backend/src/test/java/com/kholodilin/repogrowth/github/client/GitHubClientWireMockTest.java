@@ -205,4 +205,13 @@ class GitHubClientWireMockTest {
                                 """)));
         assertThat(client.latestCommitAt("acme", "a")).contains(java.time.Instant.parse("2026-08-28T07:54:00Z"));
     }
+
+    @Test
+    void detectsIssueTemplatesDirectory() {
+        wireMock.stubFor(get("/repos/acme/a/contents/.github/ISSUE_TEMPLATE")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"name\":\"bug_report.yml\",\"type\":\"file\"}]")));
+        assertThat(client.hasIssueTemplates("acme", "a")).isTrue();
+    }
 }

@@ -213,7 +213,38 @@ public class AnalyticsService {
 
     private DashboardResponse firstCollection(DashboardPeriod period, List<Repository> tracked) {
         List<CollectionRun> latestRuns = runRepository.latestPerTrackedRepository();
+        Map<Long, CollectionRun> runByRepo = latestRuns.stream()
+                .collect(Collectors.toMap(CollectionRun::repositoryId, Function.identity(), (left, right) -> left));
+        Map<Long, List<CollectionJob>> jobsByRun = jobRepository.findByRunIds(
+                        latestRuns.stream().map(CollectionRun::id).toList()
+                ).stream()
+                .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
+        List<RepositoryRow> rows = tracked.stream()
+                .map(repository -> {
+                    CollectionRun run = runByRepo.get(repository.id());
+                    List<JobStatus> jobs = run == null
+                            ? List.of()
+                            : jobsByRun.getOrDefault(run.id(), List.of()).stream()
+                                    .map(job -> new JobStatus(job.jobType().name(), job.status().name()))
+                                    .toList();
+                    Instant activityAt = repository.activityAt();
+                    return new RepositoryRow(
+                            repository.id(),
+                            repository.fullName(),
+                            0,
+                            0,
+                            0,
+                            repository.stars(),
+                            null,
+                            run == null ? null : run.status().name(),
+                            jobs,
+                            repository.archived(),
+                            activityAt,
+                            activityClassifier.classify(repository.archived(), activityAt).name()
+                    );
+                })
+                .toList();
         return new DashboardResponse(
                 period.value(),
                 period.from(),
@@ -233,7 +264,7 @@ public class AnalyticsService {
                         new StarsMetric(starsTotal, null)
                 ),
                 List.of(),
-                List.of()
+                rows
         );
     }
 

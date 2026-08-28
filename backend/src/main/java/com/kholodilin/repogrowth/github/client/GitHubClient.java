@@ -243,6 +243,13 @@ public class GitHubClient {
         }
     }
 
+    public boolean hasIssueTemplates(String owner, String name) {
+        return fileExists(owner, name, ".github/ISSUE_TEMPLATE")
+                || fileExists(owner, name, ".github/ISSUE_TEMPLATE.md")
+                || fileExists(owner, name, "ISSUE_TEMPLATE.md")
+                || fileExists(owner, name, "docs/ISSUE_TEMPLATE.md");
+    }
+
     public GitHubSearchResponse searchRepositories(String query, int limit) {
         requireToken();
         int remaining = Math.max(1, limit);

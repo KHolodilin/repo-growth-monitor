@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import ReactECharts from "echarts-for-react";
 import {
   api,
   type CollectionJob,
@@ -15,8 +14,16 @@ import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { PersistentECharts } from "../components/PersistentECharts";
+import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 
 type Tab = "overview" | "traffic" | "search";
+
+const TAB_LABEL: Record<Tab, string> = {
+  traffic: "Traffic",
+  search: "Search Visibility",
+  overview: "Overview",
+};
 
 const JOB_LABELS: Record<string, string> = {
   TRAFFIC: "Traffic",
@@ -29,7 +36,7 @@ export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab: Tab = tabParam === "traffic" || tabParam === "search" ? tabParam : "overview";
+  const tab: Tab = tabParam === "overview" || tabParam === "search" ? tabParam : "traffic";
   const [period, setPeriod] = usePeriod(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
@@ -41,7 +48,7 @@ export function RepositoryDetailsPage() {
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
 
   function setTab(next: Tab) {
-    if (next === "overview") {
+    if (next === "traffic") {
       setSearchParams({}, { replace: true });
       return;
     }
@@ -143,6 +150,22 @@ export function RepositoryDetailsPage() {
     }
   }
 
+  async function deleteQuery(queryId: number) {
+    if (!id) {
+      return;
+    }
+    try {
+      await api(`/api/v1/search-queries/${queryId}`, { method: "DELETE" });
+      pruneChartSelection(
+        repoSearchChartId(id),
+        visibility.filter((item) => item.query.id !== queryId).map((item) => String(item.query.id)),
+      );
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -173,10 +196,13 @@ export function RepositoryDetailsPage() {
               { label: "Portfolio", to: "/dashboard" },
               {
                 label: repo.fullName,
-                to: tab === "overview" ? undefined : `/repositories/${repo.id}`,
+                repoSwitcher: {
+                  currentId: repo.id,
+                  hrefFor: (repositoryId) =>
+                    tab === "traffic" ? `/repositories/${repositoryId}` : `/repositories/${repositoryId}?tab=${tab}`,
+                },
               },
-              ...(tab === "search" ? [{ label: "Search Visibility" }] : []),
-              ...(tab === "traffic" ? [{ label: "Traffic" }] : []),
+              { label: TAB_LABEL[tab] },
             ]}
           />
           {repo.description && (
@@ -191,12 +217,12 @@ export function RepositoryDetailsPage() {
           {busy ? "Collecting..." : "Collect now"}
         </Button>
       </header>
-      {tab === "overview" && repo.health && <HealthScoreRow health={repo.health} />}
+      {repo.health && <HealthScoreRow health={repo.health} />}
       <div className="inline-flex rounded-lg border bg-muted p-1">
         {([
-          ["overview", "Overview"],
           ["traffic", "Traffic"],
           ["search", "Search Visibility"],
+          ["overview", "Overview"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -219,7 +245,9 @@ export function RepositoryDetailsPage() {
           onCollect={() => void collect()}
         />
       )}
-      {tab === "traffic" && <TrafficPanel traffic={traffic} period={period} onPeriod={setPeriod} />}
+      {tab === "traffic" && (
+        <TrafficPanel repositoryId={repo.id} traffic={traffic} period={period} onPeriod={setPeriod} />
+      )}
       {tab === "search" && (
         <SearchPanel
           repositoryId={repo.id}
@@ -229,6 +257,7 @@ export function RepositoryDetailsPage() {
           runningQueryId={runningQueryId}
           onCreate={() => void createQuery()}
           onRun={runQuery}
+          onDelete={(queryId) => void deleteQuery(queryId)}
         />
       )}
     </div>
@@ -454,10 +483,12 @@ function JobRow({ job }: { job: CollectionJob }) {
 }
 
 function TrafficPanel({
+  repositoryId,
   traffic,
   period,
   onPeriod,
 }: {
+  repositoryId: number;
   traffic: RepositoryTraffic;
   period: Period;
   onPeriod: (period: Period) => void;
@@ -508,7 +539,12 @@ function TrafficPanel({
       </div>
       <Card>
         <h2 className="mb-3 font-medium">Traffic</h2>
-        <ReactECharts option={option} style={{ height: 360, width: "100%" }} />
+        <PersistentECharts
+          chartId={repoTrafficChartId(repositoryId)}
+          series={TRAFFIC_SERIES}
+          option={option}
+          style={{ height: 360, width: "100%" }}
+        />
       </Card>
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -573,6 +609,8 @@ function MetricTable({
   );
 }
 
+type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results";
+
 function SearchPanel({
   repositoryId,
   visibility,
@@ -581,6 +619,7 @@ function SearchPanel({
   runningQueryId,
   onCreate,
   onRun,
+  onDelete,
 }: {
   repositoryId: number;
   visibility: SearchHistory[];
@@ -589,8 +628,36 @@ function SearchPanel({
   runningQueryId: number | null;
   onCreate: () => void;
   onRun: (id: number) => void;
+  onDelete: (id: number) => void;
 }) {
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
+  const [sortKey, setSortKey] = useState<QuerySortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  function toggle(key: QuerySortKey) {
+    if (sortKey === key) {
+      setSortDir((current) => (current === "desc" ? "asc" : "desc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDir(key === "name" || key === "rank" || key === "best" ? "asc" : "desc");
+  }
+
+  const sorted = useMemo(() => {
+    if (!sortKey) {
+      return visibility;
+    }
+    const copy = [...visibility];
+    copy.sort((left, right) => {
+      const compared = compareQueryRows(left, right, sortKey, sortDir);
+      if (compared !== 0) {
+        return compared;
+      }
+      return left.query.id - right.query.id;
+    });
+    return copy;
+  }, [visibility, sortKey, sortDir]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -607,17 +674,24 @@ function SearchPanel({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground">
-              <th className="py-2 pr-4">Search Query</th>
-              <th className="px-3 py-2 text-right">Rank</th>
-              <th className="px-3 py-2 text-right">7d</th>
-              <th className="px-3 py-2 text-right">30d</th>
-              <th className="px-3 py-2 text-right">Best</th>
-              <th className="px-3 py-2 text-right">Results</th>
-              <th className="pl-3 py-2" />
+              <QuerySortHeader
+                label="Search Query"
+                align="left"
+                className="py-2 pr-4"
+                active={sortKey === "name"}
+                dir={sortDir}
+                onClick={() => toggle("name")}
+              />
+              <QuerySortHeader label="Rank" active={sortKey === "rank"} dir={sortDir} onClick={() => toggle("rank")} />
+              <QuerySortHeader label="7d" active={sortKey === "change7d"} dir={sortDir} onClick={() => toggle("change7d")} />
+              <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
+              <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
+              <QuerySortHeader label="Results" active={sortKey === "results"} dir={sortDir} onClick={() => toggle("results")} />
+              <th className="py-2 pl-3" />
             </tr>
           </thead>
           <tbody>
-            {visibility.map((item) => {
+            {sorted.map((item) => {
               const running =
                 runningQueryId === item.query.id
                 || item.searchStatus === "RUNNING"
@@ -643,14 +717,23 @@ function SearchPanel({
                   <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
                   <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
                   <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
-                  <td className="py-3 pl-3 text-right">
-                    <Button
-                      className="bg-muted text-foreground"
-                      disabled={running}
-                      onClick={() => onRun(item.query.id)}
-                    >
-                      {running ? "Running..." : "Run"}
-                    </Button>
+                  <td className="py-3 pl-3">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        className="bg-muted text-foreground"
+                        disabled={running}
+                        onClick={() => onRun(item.query.id)}
+                      >
+                        {running ? "Running..." : "Run"}
+                      </Button>
+                      <Button
+                        className="bg-muted text-red-700"
+                        disabled={running}
+                        onClick={() => onDelete(item.query.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -658,15 +741,81 @@ function SearchPanel({
           </tbody>
         </table>
       </Card>
-      <CombinedRankChart visibility={visibility} highlightQueryId={hoveredQueryId} />
+      <CombinedRankChart repositoryId={repositoryId} visibility={visibility} highlightQueryId={hoveredQueryId} />
     </div>
   );
 }
 
+function QuerySortHeader({
+  label,
+  active,
+  dir,
+  align = "right",
+  className,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: "asc" | "desc";
+  align?: "left" | "right";
+  className?: string;
+  onClick: () => void;
+}) {
+  return (
+    <th className={cn(align === "right" ? "px-3 py-2 text-right" : "", className)}>
+      <button
+        type="button"
+        className={cn("font-medium hover:text-foreground", active && "text-foreground")}
+        onClick={onClick}
+      >
+        {label}
+        {active ? (dir === "desc" ? " ↓" : " ↑") : ""}
+      </button>
+    </th>
+  );
+}
+
+function compareQueryRows(left: SearchHistory, right: SearchHistory, key: QuerySortKey, dir: "asc" | "desc"): number {
+  if (key === "name") {
+    const compared = left.query.name.localeCompare(right.query.name, undefined, { sensitivity: "base" });
+    return dir === "desc" ? -compared : compared;
+  }
+  const leftValue = querySortValue(left, key);
+  const rightValue = querySortValue(right, key);
+  if (leftValue === null && rightValue === null) {
+    return 0;
+  }
+  if (leftValue === null) {
+    return 1;
+  }
+  if (rightValue === null) {
+    return -1;
+  }
+  return dir === "desc" ? rightValue - leftValue : leftValue - rightValue;
+}
+
+function querySortValue(item: SearchHistory, key: Exclude<QuerySortKey, "name">): number | null {
+  if (key === "rank") {
+    return item.currentRank;
+  }
+  if (key === "best") {
+    return item.bestRank;
+  }
+  if (key === "results") {
+    return item.totalResults ?? null;
+  }
+  if (key === "change7d") {
+    return item.change7d;
+  }
+  return item.change30d;
+}
+
 function CombinedRankChart({
+  repositoryId,
   visibility,
   highlightQueryId,
 }: {
+  repositoryId: number;
   visibility: SearchHistory[];
   highlightQueryId: number | null;
 }) {
@@ -685,13 +834,23 @@ function CombinedRankChart({
     });
   }, [visibility, highlightQueryId]);
 
+  const series = useMemo(
+    () => visibility.map((item) => ({ key: String(item.query.id), name: item.query.name })),
+    [visibility],
+  );
+
   if (visibility.length === 0) {
     return null;
   }
   return (
     <Card>
       <h2 className="mb-3 font-medium">Rank History</h2>
-      <ReactECharts option={option} style={{ height: 360, width: "100%" }} />
+      <PersistentECharts
+        chartId={repoSearchChartId(repositoryId)}
+        series={series}
+        option={option}
+        style={{ height: 360, width: "100%" }}
+      />
     </Card>
   );
 }

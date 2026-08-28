@@ -50,14 +50,14 @@ export function RepositoriesPage() {
         <div className="space-y-3">
           {repos.map((repo) => (
             <label key={repo.id} className="flex items-center justify-between gap-4 rounded-lg border px-3 py-3">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <input
                   type="checkbox"
                   checked={repo.trackingEnabled}
                   onChange={() => void toggle(repo)}
                 />
-                <div>
-                  <Link className="font-medium text-primary hover:underline" to={`/repositories/${repo.id}`}>
+                <div className="min-w-0">
+                  <Link className="break-words [overflow-wrap:anywhere] font-medium text-primary hover:underline" to={`/repositories/${repo.id}`}>
                     {repo.fullName}
                   </Link>
                   <div className="text-xs text-muted-foreground">

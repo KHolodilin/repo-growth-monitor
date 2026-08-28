@@ -1,19 +1,3 @@
 databaseChangeLog:
   - include:
       file: db/changelog/001-initial-schema.yaml
-  - include:
-      file: db/changelog/002-traffic.yaml
-  - include:
-      file: db/changelog/003-collection-queue.yaml
-  - include:
-      file: db/changelog/004-search-tracking.yaml
-  - include:
-      file: db/changelog/005-watchers.yaml
-  - include:
-      file: db/changelog/006-search-visibility.yaml
-  - include:
-      file: db/changelog/007-repository-topics.yaml
-  - include:
-      file: db/changelog/008-rename-repository-topics.yaml
-  - include:
-      file: db/changelog/009-repository-health.yaml

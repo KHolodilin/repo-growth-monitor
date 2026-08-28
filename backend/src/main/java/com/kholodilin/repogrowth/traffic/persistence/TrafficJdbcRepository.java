@@ -1,6 +1,9 @@
 package com.kholodilin.repogrowth.traffic.persistence;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
+import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath;
+import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath.DayTraffic;
+import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath.Observation;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -359,6 +362,41 @@ public class TrafficJdbcRepository {
     }
 
     public List<ReferrerRow> referrersInRange(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive, ZoneId zone) {
+        return SnapshotPeriodMath.aggregate(
+                fromInclusive,
+                toInclusive,
+                referrerObservations(repositoryId, fromInclusive, toInclusive, zone),
+                trafficWeights(repositoryId, fromInclusive, toInclusive)
+        ).stream()
+                .map(row -> new ReferrerRow(row.key(), row.views(), row.uniqueVisitors()))
+                .toList();
+    }
+
+    public List<PathRow> pathsInRange(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive, ZoneId zone) {
+        return SnapshotPeriodMath.aggregate(
+                fromInclusive,
+                toInclusive,
+                pathObservations(repositoryId, fromInclusive, toInclusive, zone),
+                trafficWeights(repositoryId, fromInclusive, toInclusive)
+        ).stream()
+                .map(row -> new PathRow(row.key(), row.title(), row.views(), row.uniqueVisitors()))
+                .toList();
+    }
+
+    private List<DayTraffic> trafficWeights(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive) {
+        LocalDate lookback = fromInclusive.minusDays(SnapshotPeriodMath.GITHUB_WINDOW_DAYS - 1);
+        return history(repositoryId, lookback).stream()
+                .filter(day -> !day.trafficDate().isAfter(toInclusive))
+                .map(day -> new DayTraffic(day.trafficDate(), day.views(), day.uniqueVisitors()))
+                .toList();
+    }
+
+    private List<Observation> referrerObservations(
+            long repositoryId,
+            LocalDate fromInclusive,
+            LocalDate toInclusive,
+            ZoneId zone
+    ) {
         String tz = postgresTimeZone(zone);
         return jdbcClient.sql("""
                         WITH dated AS (
@@ -377,34 +415,33 @@ public class TrafficJdbcRepository {
                             WHERE snapshot_date >= :fromDate
                               AND snapshot_date <= :toDate
                             GROUP BY snapshot_date
-                        ),
-                        daily AS (
-                            SELECT d.referrer, d.views, d.unique_visitors
-                            FROM dated d
-                            JOIN latest l
-                              ON l.snapshot_date = d.snapshot_date
-                             AND l.snapshot_at = d.snapshot_at
                         )
-                        SELECT referrer,
-                               SUM(views)::int AS views,
-                               SUM(unique_visitors)::int AS unique_visitors
-                        FROM daily
-                        GROUP BY referrer
-                        ORDER BY views DESC
+                        SELECT d.snapshot_date, d.referrer, d.views, d.unique_visitors
+                        FROM dated d
+                        JOIN latest l
+                          ON l.snapshot_date = d.snapshot_date
+                         AND l.snapshot_at = d.snapshot_at
                         """)
                 .param("repositoryId", repositoryId)
                 .param("tz", tz)
                 .param("fromDate", fromInclusive)
                 .param("toDate", toInclusive)
-                .query((rs, rowNum) -> new ReferrerRow(
+                .query((rs, rowNum) -> new Observation(
+                        rs.getObject("snapshot_date", LocalDate.class),
                         rs.getString("referrer"),
+                        null,
                         rs.getInt("views"),
                         rs.getInt("unique_visitors")
                 ))
                 .list();
     }
 
-    public List<PathRow> pathsInRange(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive, ZoneId zone) {
+    private List<Observation> pathObservations(
+            long repositoryId,
+            LocalDate fromInclusive,
+            LocalDate toInclusive,
+            ZoneId zone
+    ) {
         String tz = postgresTimeZone(zone);
         return jdbcClient.sql("""
                         WITH dated AS (
@@ -424,27 +461,19 @@ public class TrafficJdbcRepository {
                             WHERE snapshot_date >= :fromDate
                               AND snapshot_date <= :toDate
                             GROUP BY snapshot_date
-                        ),
-                        daily AS (
-                            SELECT d.path, d.title, d.views, d.unique_visitors
-                            FROM dated d
-                            JOIN latest l
-                              ON l.snapshot_date = d.snapshot_date
-                             AND l.snapshot_at = d.snapshot_at
                         )
-                        SELECT path,
-                               MAX(title) AS title,
-                               SUM(views)::int AS views,
-                               SUM(unique_visitors)::int AS unique_visitors
-                        FROM daily
-                        GROUP BY path
-                        ORDER BY views DESC
+                        SELECT d.snapshot_date, d.path, d.title, d.views, d.unique_visitors
+                        FROM dated d
+                        JOIN latest l
+                          ON l.snapshot_date = d.snapshot_date
+                         AND l.snapshot_at = d.snapshot_at
                         """)
                 .param("repositoryId", repositoryId)
                 .param("tz", tz)
                 .param("fromDate", fromInclusive)
                 .param("toDate", toInclusive)
-                .query((rs, rowNum) -> new PathRow(
+                .query((rs, rowNum) -> new Observation(
+                        rs.getObject("snapshot_date", LocalDate.class),
                         rs.getString("path"),
                         rs.getString("title"),
                         rs.getInt("views"),

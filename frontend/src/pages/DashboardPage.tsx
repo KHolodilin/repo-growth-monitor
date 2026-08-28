@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import ReactECharts from "echarts-for-react";
 import { api, type Dashboard } from "../lib/api";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { PersistentECharts } from "../components/PersistentECharts";
+import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 
 type SortKey = "visitors" | "views" | "clones" | "stars" | "growth";
 
@@ -20,17 +21,19 @@ export function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [collecting, setCollecting] = useState(false);
+
+  async function load() {
+    const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}`);
+    setData(dashboard);
+    return dashboard;
+  }
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    api<Dashboard>(`/api/v1/dashboard?period=${period}`)
-      .then((dashboard) => {
-        if (!cancelled) {
-          setData(dashboard);
-        }
-      })
+    load()
       .catch((err: Error) => {
         if (!cancelled) {
           setError(err.message);
@@ -47,6 +50,34 @@ export function DashboardPage() {
     };
   }, [period]);
 
+  const collectingFirst = data?.state === "FIRST_COLLECTION" || Boolean(data?.activeCollection);
+  useEffect(() => {
+    if (!collectingFirst) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void load().catch(() => undefined);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [collectingFirst, period]);
+
+  async function collectNow() {
+    if (!data || collecting) {
+      return;
+    }
+    setCollecting(true);
+    try {
+      await Promise.all(
+        data.repositories.map((row) => api(`/api/v1/repositories/${row.id}/collect`, { method: "POST" })),
+      );
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setCollecting(false);
+    }
+  }
+
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -56,13 +87,10 @@ export function DashboardPage() {
   if (data.state === "NO_REPOSITORIES") {
     return <NoRepositoriesState period={period} onPeriod={setPeriod} />;
   }
-  if (data.state === "FIRST_COLLECTION") {
-    return <FirstCollectionState data={data} period={period} onPeriod={setPeriod} />;
-  }
 
   return (
     <div className="space-y-6">
-      <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
+      <DashboardHeader data={data} period={period} onPeriod={setPeriod} onCollect={collectNow} collecting={collecting} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard label="Repositories" value={data.summary.repositories} />
         <TrafficKpi label="Views" metric={data.summary.views} period={period} />
@@ -70,6 +98,14 @@ export function DashboardPage() {
         <TrafficKpi label="Clones" metric={data.summary.clones} period={period} />
         <StarsKpi stars={data.summary.stars} period={period} />
       </div>
+      {data.state === "FIRST_COLLECTION" && (
+        <Card>
+          <h2 className="font-medium">No traffic yet</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use Collect now to fetch GitHub stats for the selected repositories. The chart fills in after the first successful collection.
+          </p>
+        </Card>
+      )}
       <TrafficChart traffic={data.traffic} />
       <RepositoryTable rows={data.repositories} />
     </div>
@@ -80,28 +116,39 @@ function DashboardHeader({
   data,
   period,
   onPeriod,
+  onCollect,
+  collecting,
 }: {
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
+  onCollect?: () => void;
+  collecting?: boolean;
 }) {
   const sync = formatSyncTime(data?.lastSyncAt);
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <h1 className="text-2xl font-semibold">Portfolio</h1>
       <div className="flex flex-col items-end gap-3">
-        <div className="text-right text-sm text-muted-foreground">
-          {sync ? <div>Last sync: {sync}</div> : <div>Last sync: —</div>}
-          {data?.collectionWarning && (
-            <div className="mt-1 text-amber-700">⚠ {data.collectionWarning.message}</div>
-          )}
-          {data?.partialData?.present && (
-            <div className="group relative mt-1 inline-block text-amber-700">
-              ⚠ Partial data
-              <div className="invisible absolute right-0 z-10 mt-2 w-72 rounded-md border bg-card p-3 text-left text-xs text-foreground shadow-lg group-hover:visible">
-                {data.partialData.message}
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="text-right text-sm text-muted-foreground">
+            {sync ? <div>Last sync: {sync}</div> : <div>Last sync: —</div>}
+            {data?.collectionWarning && (
+              <div className="mt-1 text-amber-700">⚠ {data.collectionWarning.message}</div>
+            )}
+            {data?.partialData?.present && (
+              <div className="group relative mt-1 inline-block text-amber-700">
+                ⚠ Partial data
+                <div className="invisible absolute right-0 z-10 mt-2 w-72 rounded-md border bg-card p-3 text-left text-xs text-foreground shadow-lg group-hover:visible">
+                  {data.partialData.message}
+                </div>
               </div>
-            </div>
+            )}
+          </div>
+          {onCollect && (
+            <Button disabled={collecting} onClick={onCollect}>
+              {collecting ? "Collecting..." : "Collect now"}
+            </Button>
           )}
         </div>
         <PeriodSelector period={period} onPeriod={onPeriod} />
@@ -201,7 +248,13 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
   return (
     <Card>
       <h2 className="mb-3 font-medium">Traffic</h2>
-      <ReactECharts option={option} style={{ height: 360, width: "100%" }} opts={{ renderer: "canvas" }} />
+      <PersistentECharts
+        chartId={dashboardTrafficChartId()}
+        series={TRAFFIC_SERIES}
+        option={option}
+        style={{ height: 360, width: "100%" }}
+        opts={{ renderer: "canvas" }}
+      />
     </Card>
   );
 }
@@ -266,9 +319,9 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   className="cursor-pointer border-t hover:bg-muted/60"
                   onClick={() => navigate(`/repositories/${row.id}`)}
                 >
-                  <td className="px-5 py-3">
+                  <td className="max-w-0 px-5 py-3 align-top">
                     <Link
-                      className="text-primary hover:underline"
+                      className="break-words [overflow-wrap:anywhere] text-primary hover:underline"
                       to={`/repositories/${row.id}`}
                       onClick={(event) => event.stopPropagation()}
                     >
@@ -357,33 +410,6 @@ function NoRepositoriesState({ period, onPeriod }: { period: Period; onPeriod: (
         <Link to="/repositories">
           <Button>Select repositories</Button>
         </Link>
-      </Card>
-    </div>
-  );
-}
-
-function FirstCollectionState({
-  data,
-  period,
-  onPeriod,
-}: {
-  data: Dashboard;
-  period: Period;
-  onPeriod: (period: Period) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <DashboardHeader data={data} period={period} onPeriod={onPeriod} />
-      <Card className="py-12">
-        <h2 className="text-lg font-medium">Collecting your first data...</h2>
-        <p className="mt-2 max-w-lg text-sm text-muted-foreground">
-          Your dashboard will appear after the first GitHub collection completes.
-        </p>
-        {data.activeCollection && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            {data.activeCollection.status} · {data.activeCollection.successfulJobs} / {data.activeCollection.plannedJobs} jobs
-          </p>
-        )}
       </Card>
     </div>
   );

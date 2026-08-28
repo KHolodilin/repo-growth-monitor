@@ -137,6 +137,38 @@ public class RepositoryJdbcRepository {
                 .list();
     }
 
+    public List<Repository> findAccountAccessible() {
+        return jdbcClient.sql("""
+                        SELECT * FROM repository
+                        WHERE account_accessible = TRUE
+                        ORDER BY full_name
+                        """)
+                .query(MAPPER)
+                .list();
+    }
+
+    public boolean isAccountAccessible(long id) {
+        return Boolean.TRUE.equals(jdbcClient.sql("""
+                        SELECT account_accessible
+                        FROM repository
+                        WHERE id = :id
+                        """)
+                .param("id", id)
+                .query(Boolean.class)
+                .optional()
+                .orElse(false));
+    }
+
+    public void markAccountAccessible(long id) {
+        jdbcClient.sql("""
+                        UPDATE repository
+                        SET account_accessible = TRUE, updated_at = NOW()
+                        WHERE id = :id
+                        """)
+                .param("id", id)
+                .update();
+    }
+
     public List<Repository> findTracked() {
         return jdbcClient.sql("SELECT * FROM repository WHERE tracking_enabled = TRUE ORDER BY full_name")
                 .query(MAPPER)

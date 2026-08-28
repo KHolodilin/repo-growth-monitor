@@ -2,14 +2,14 @@ name: repo-growth-monitor
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18.4
     restart: unless-stopped
     environment:
       POSTGRES_DB: repogrowth
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata_18:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d repogrowth"]
       interval: 5s
@@ -35,4 +35,4 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  pgdata_18:

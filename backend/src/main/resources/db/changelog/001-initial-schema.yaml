@@ -19,27 +19,218 @@ databaseChangeLog:
               );
 
               CREATE TABLE repository (
-                  id                  BIGSERIAL PRIMARY KEY,
-                  github_id           BIGINT NOT NULL,
-                  owner_id            BIGINT NOT NULL REFERENCES github_owner (id),
-                  name                TEXT NOT NULL,
-                  full_name           TEXT NOT NULL,
-                  description         TEXT,
-                  visibility          TEXT NOT NULL,
-                  default_branch      TEXT,
-                  language            TEXT,
-                  fork                BOOLEAN NOT NULL DEFAULT FALSE,
-                  archived            BOOLEAN NOT NULL DEFAULT FALSE,
-                  stars               INTEGER NOT NULL DEFAULT 0,
-                  forks               INTEGER NOT NULL DEFAULT 0,
-                  open_issues         INTEGER NOT NULL DEFAULT 0,
-                  tracking_enabled    BOOLEAN NOT NULL DEFAULT FALSE,
-                  github_created_at   TIMESTAMPTZ,
-                  github_updated_at   TIMESTAMPTZ,
-                  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  id                      BIGSERIAL PRIMARY KEY,
+                  github_id               BIGINT NOT NULL,
+                  owner_id                BIGINT NOT NULL REFERENCES github_owner (id),
+                  name                    TEXT NOT NULL,
+                  full_name               TEXT NOT NULL,
+                  description             TEXT,
+                  visibility              TEXT NOT NULL,
+                  default_branch          TEXT,
+                  language                TEXT,
+                  fork                    BOOLEAN NOT NULL DEFAULT FALSE,
+                  archived                BOOLEAN NOT NULL DEFAULT FALSE,
+                  stars                   INTEGER NOT NULL DEFAULT 0,
+                  watchers                INTEGER NOT NULL DEFAULT 0,
+                  forks                   INTEGER NOT NULL DEFAULT 0,
+                  open_issues             INTEGER NOT NULL DEFAULT 0,
+                  contributors            INTEGER NOT NULL DEFAULT 0,
+                  tracking_enabled        BOOLEAN NOT NULL DEFAULT FALSE,
+                  account_accessible      BOOLEAN NOT NULL DEFAULT FALSE,
+                  github_created_at       TIMESTAMPTZ,
+                  github_updated_at       TIMESTAMPTZ,
+                  github_pushed_at        TIMESTAMPTZ,
+                  last_commit_at          TIMESTAMPTZ,
+                  last_release_at         TIMESTAMPTZ,
+                  enriched_at             TIMESTAMPTZ,
+                  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                   CONSTRAINT uq_repository_github_id UNIQUE (github_id)
               );
 
               CREATE INDEX idx_repository_owner_id ON repository (owner_id);
               CREATE INDEX idx_repository_tracking ON repository (tracking_enabled);
+              CREATE INDEX idx_repository_account_accessible
+                  ON repository (account_accessible)
+                  WHERE account_accessible = TRUE;
+
+              CREATE TABLE repository_topics (
+                  repository_id BIGINT NOT NULL REFERENCES repository (id) ON DELETE CASCADE,
+                  topic         TEXT NOT NULL,
+                  PRIMARY KEY (repository_id, topic)
+              );
+
+              CREATE INDEX idx_repository_topics_topic ON repository_topics (topic);
+
+              CREATE TABLE repository_health (
+                  repository_id                 BIGINT PRIMARY KEY REFERENCES repository (id) ON DELETE CASCADE,
+                  homepage                      TEXT,
+                  has_readme                    BOOLEAN NOT NULL DEFAULT FALSE,
+                  readme_has_h1                 BOOLEAN NOT NULL DEFAULT FALSE,
+                  readme_has_name               BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_license                   BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_code_of_conduct           BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_contributing              BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_security_policy           BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_issue_template            BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_pull_request_template     BOOLEAN NOT NULL DEFAULT FALSE,
+                  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE TABLE traffic_daily (
+                  id                BIGSERIAL PRIMARY KEY,
+                  repository_id     BIGINT NOT NULL REFERENCES repository (id),
+                  traffic_date      DATE NOT NULL,
+                  views             INTEGER NOT NULL DEFAULT 0,
+                  unique_visitors   INTEGER NOT NULL DEFAULT 0,
+                  clones            INTEGER NOT NULL DEFAULT 0,
+                  unique_cloners    INTEGER NOT NULL DEFAULT 0,
+                  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_traffic_daily_repo_date UNIQUE (repository_id, traffic_date)
+              );
+
+              CREATE INDEX idx_traffic_daily_repo_date ON traffic_daily (repository_id, traffic_date DESC);
+
+              CREATE TABLE repository_daily_stats (
+                  id              BIGSERIAL PRIMARY KEY,
+                  repository_id   BIGINT NOT NULL REFERENCES repository (id),
+                  stat_date       DATE NOT NULL,
+                  stars           INTEGER NOT NULL,
+                  watchers        INTEGER NOT NULL DEFAULT 0,
+                  forks           INTEGER NOT NULL,
+                  open_issues     INTEGER NOT NULL,
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_repository_daily_stats UNIQUE (repository_id, stat_date)
+              );
+
+              CREATE INDEX idx_repository_daily_stats_repo_date
+                  ON repository_daily_stats (repository_id, stat_date DESC);
+
+              CREATE TABLE traffic_referrer_snapshot (
+                  id                BIGSERIAL PRIMARY KEY,
+                  repository_id     BIGINT NOT NULL REFERENCES repository (id),
+                  snapshot_at       TIMESTAMPTZ NOT NULL,
+                  referrer          TEXT NOT NULL,
+                  views             INTEGER NOT NULL,
+                  unique_visitors   INTEGER NOT NULL
+              );
+
+              CREATE INDEX idx_referrer_snapshot_repo_time
+                  ON traffic_referrer_snapshot (repository_id, snapshot_at DESC);
+
+              CREATE TABLE traffic_path_snapshot (
+                  id                BIGSERIAL PRIMARY KEY,
+                  repository_id     BIGINT NOT NULL REFERENCES repository (id),
+                  snapshot_at       TIMESTAMPTZ NOT NULL,
+                  path              TEXT NOT NULL,
+                  title             TEXT,
+                  views             INTEGER NOT NULL,
+                  unique_visitors   INTEGER NOT NULL
+              );
+
+              CREATE INDEX idx_path_snapshot_repo_time
+                  ON traffic_path_snapshot (repository_id, snapshot_at DESC);
+
+              CREATE TABLE collection_run (
+                  id                  BIGSERIAL PRIMARY KEY,
+                  repository_id       BIGINT NOT NULL REFERENCES repository (id),
+                  business_date       DATE NOT NULL,
+                  status              TEXT NOT NULL,
+                  planned_jobs        INTEGER NOT NULL DEFAULT 0,
+                  successful_jobs     INTEGER NOT NULL DEFAULT 0,
+                  failed_jobs         INTEGER NOT NULL DEFAULT 0,
+                  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  completed_at        TIMESTAMPTZ,
+                  CONSTRAINT uq_collection_run_repo_date UNIQUE (repository_id, business_date)
+              );
+
+              CREATE INDEX idx_collection_run_repo_date ON collection_run (repository_id, business_date DESC);
+
+              CREATE TABLE collection_job (
+                  id                  BIGSERIAL PRIMARY KEY,
+                  collection_run_id   BIGINT NOT NULL REFERENCES collection_run (id),
+                  repository_id       BIGINT NOT NULL REFERENCES repository (id),
+                  job_type            TEXT NOT NULL,
+                  business_date       DATE NOT NULL,
+                  status              TEXT NOT NULL,
+                  attempt             INTEGER NOT NULL DEFAULT 0,
+                  next_attempt_at     TIMESTAMPTZ,
+                  locked_by           TEXT,
+                  locked_until        TIMESTAMPTZ,
+                  started_at          TIMESTAMPTZ,
+                  completed_at        TIMESTAMPTZ,
+                  error_code          TEXT,
+                  error_message       TEXT,
+                  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_collection_job_repo_date_type UNIQUE (repository_id, business_date, job_type)
+              );
+
+              CREATE INDEX idx_collection_job_claim
+                  ON collection_job (status, next_attempt_at, locked_until);
+              CREATE INDEX idx_collection_job_run ON collection_job (collection_run_id);
+
+              CREATE TABLE search_query (
+                  id              BIGSERIAL PRIMARY KEY,
+                  repository_id   BIGINT NOT NULL REFERENCES repository (id),
+                  name            TEXT NOT NULL,
+                  query           TEXT NOT NULL,
+                  enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+                  result_limit    INTEGER NOT NULL DEFAULT 50,
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE INDEX idx_search_query_repo ON search_query (repository_id);
+
+              CREATE TABLE search_run (
+                  id                              BIGSERIAL PRIMARY KEY,
+                  search_query_id                 BIGINT NOT NULL REFERENCES search_query (id) ON DELETE CASCADE,
+                  repository_id                   BIGINT NOT NULL REFERENCES repository (id),
+                  business_date                   DATE NOT NULL,
+                  status                          TEXT NOT NULL,
+                  attempt                         INTEGER NOT NULL DEFAULT 0,
+                  next_attempt_at                 TIMESTAMPTZ,
+                  locked_by                       TEXT,
+                  locked_until                    TIMESTAMPTZ,
+                  started_at                      TIMESTAMPTZ,
+                  completed_at                    TIMESTAMPTZ,
+                  total_count                     INTEGER,
+                  tracked_repository_position     INTEGER,
+                  enrichment_status               TEXT,
+                  error_code                      TEXT,
+                  error_message                   TEXT,
+                  created_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at                      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT uq_search_run_query_date UNIQUE (search_query_id, business_date)
+              );
+
+              CREATE INDEX idx_search_run_claim
+                  ON search_run (status, next_attempt_at, locked_until);
+              CREATE INDEX idx_search_run_query_date
+                  ON search_run (search_query_id, business_date DESC);
+
+              CREATE TABLE search_result (
+                  id                      BIGSERIAL PRIMARY KEY,
+                  search_run_id           BIGINT NOT NULL REFERENCES search_run (id) ON DELETE CASCADE,
+                  position                INTEGER NOT NULL,
+                  github_repository_id    BIGINT NOT NULL,
+                  full_name               TEXT NOT NULL,
+                  owner                   TEXT NOT NULL,
+                  stars                   INTEGER NOT NULL,
+                  watchers                INTEGER NOT NULL DEFAULT 0,
+                  forks                   INTEGER NOT NULL,
+                  contributors            INTEGER NOT NULL DEFAULT 0,
+                  language                TEXT,
+                  description             TEXT,
+                  html_url                TEXT,
+                  repository_created_at   TIMESTAMPTZ,
+                  repository_updated_at   TIMESTAMPTZ,
+                  activity_at             TIMESTAMPTZ,
+                  activity_status         TEXT,
+                  metadata_updated_at     TIMESTAMPTZ,
+                  CONSTRAINT uq_search_result_run_position UNIQUE (search_run_id, position)
+              );
+
+              CREATE INDEX idx_search_result_run ON search_result (search_run_id);

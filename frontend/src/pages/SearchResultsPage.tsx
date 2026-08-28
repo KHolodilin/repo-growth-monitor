@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { api, type SearchRunResults } from "../lib/api";
-import { activityClass, formatActivityPresentation, formatNumber, formatPositionDelta, formatRank, formatSyncTime } from "../lib/utils";
+import { formatRank, formatSyncTime } from "../lib/utils";
 import { Card } from "../components/ui";
+import { SearchResultsTable } from "../components/SearchResultsTable";
 
 export function SearchResultsPage() {
   const { id } = useParams();
@@ -36,64 +37,10 @@ export function SearchResultsPage() {
         </p>
       </div>
       <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] table-fixed text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="w-10 whitespace-nowrap px-4 py-2">#</th>
-                <th className="whitespace-nowrap px-4 py-2">Repository</th>
-                <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Stars</th>
-                <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Watchers</th>
-                <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Forks</th>
-                <th className="w-[8.5rem] whitespace-nowrap px-4 py-2 text-right">Contributors</th>
-                <th className="w-[10rem] whitespace-nowrap px-4 py-2">Activity</th>
-                <th className="w-16 whitespace-nowrap px-4 py-2 text-right">Δ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row) => {
-                const mine = row.result.position === data.run.trackedRepositoryPosition;
-                return (
-                  <tr
-                    key={row.result.githubRepositoryId}
-                    className={`border-t ${mine ? "bg-blue-50 font-medium" : ""}`}
-                    title={
-                      row.result.metadataUpdatedAt
-                        ? `Repository metadata updated: ${formatSyncTime(row.result.metadataUpdatedAt)}`
-                        : undefined
-                    }
-                  >
-                    <td className="whitespace-nowrap px-4 py-2.5">{row.result.position}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5">
-                      {mine ? (
-                        <Link className="text-primary hover:underline" to={`/repositories/${data.query.repositoryId}`}>
-                          {row.result.fullName}
-                        </Link>
-                      ) : (
-                        <a
-                          className="text-primary hover:underline"
-                          href={row.result.htmlUrl ?? `https://github.com/${row.result.fullName}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {row.result.fullName}
-                        </a>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.stars)}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.watchers)}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.forks)}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.contributors)}</td>
-                    <td className={activityClass(row.result.activityStatus) + " whitespace-nowrap px-4 py-2.5"}>
-                      {formatActivityPresentation(row.result.activityStatus, row.result.activityAt)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatPositionDelta(row.positionDelta)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <SearchResultsTable
+          rows={data.rows}
+          trackedPosition={data.run.trackedRepositoryPosition}
+        />
       </Card>
     </div>
   );

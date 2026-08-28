@@ -1,5 +1,7 @@
 package com.kholodilin.repogrowth.repository.application;
 
+import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
+import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
@@ -22,17 +24,23 @@ public class RepositoryService {
     private final GitHubOwnerJdbcRepository ownerRepository;
     private final RepositoryJdbcRepository repositoryJdbcRepository;
     private final AppMetrics metrics;
+    private final CollectionPlanner collectionPlanner;
+    private final PlanningWindow planningWindow;
 
     public RepositoryService(
             GitHubClient gitHubClient,
             GitHubOwnerJdbcRepository ownerRepository,
             RepositoryJdbcRepository repositoryJdbcRepository,
-            AppMetrics metrics
+            AppMetrics metrics,
+            CollectionPlanner collectionPlanner,
+            PlanningWindow planningWindow
     ) {
         this.gitHubClient = gitHubClient;
         this.ownerRepository = ownerRepository;
         this.repositoryJdbcRepository = repositoryJdbcRepository;
         this.metrics = metrics;
+        this.collectionPlanner = collectionPlanner;
+        this.planningWindow = planningWindow;
     }
 
     @Transactional
@@ -40,7 +48,7 @@ public class RepositoryService {
         if (refresh) {
             syncFromGitHub();
         }
-        List<Repository> repositories = repositoryJdbcRepository.findAll();
+        List<Repository> repositories = repositoryJdbcRepository.findAccountAccessible();
         metrics.setTrackedRepositories(repositoryJdbcRepository.countTracked());
         return repositories;
     }
@@ -61,8 +69,14 @@ public class RepositoryService {
     @Transactional
     public Repository setTracking(long id, boolean enabled) {
         get(id);
+        if (enabled && !repositoryJdbcRepository.isAccountAccessible(id)) {
+            throw ApiException.validation("Only repositories available to the GitHub token can be tracked");
+        }
         Repository updated = repositoryJdbcRepository.setTracking(id, enabled);
         metrics.setTrackedRepositories(repositoryJdbcRepository.countTracked());
+        if (enabled) {
+            collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
+        }
         return updated;
     }
 
@@ -110,6 +124,7 @@ public class RepositoryService {
                     null,
                     null
             ));
+            repositoryJdbcRepository.markAccountAccessible(stored.id());
             repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
         }
     }

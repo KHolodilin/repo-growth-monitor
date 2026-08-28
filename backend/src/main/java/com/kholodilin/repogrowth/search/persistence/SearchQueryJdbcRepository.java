@@ -81,7 +81,13 @@ public class SearchQueryJdbcRepository {
     }
 
     public List<SearchQuery> findEnabled() {
-        return jdbcClient.sql("SELECT * FROM search_query WHERE enabled = TRUE")
+        return jdbcClient.sql("""
+                        SELECT q.*
+                        FROM search_query q
+                        JOIN repository r ON r.id = q.repository_id
+                        WHERE q.enabled = TRUE
+                          AND r.account_accessible = TRUE
+                        """)
                 .query(MAPPER)
                 .list();
     }
