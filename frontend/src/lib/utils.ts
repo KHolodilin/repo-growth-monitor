@@ -70,3 +70,61 @@ export function formatDelta(value: number | null | undefined) {
   }
   return "0";
 }
+
+export function formatPositionDelta(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "NEW";
+  }
+  return formatDelta(value);
+}
+
+export function formatActivity(status?: string | null) {
+  if (status === "ACTIVE") {
+    return "Active";
+  }
+  if (status === "LOW_ACTIVITY") {
+    return "Low";
+  }
+  if (status === "INACTIVE") {
+    return "Inactive";
+  }
+  return "Unknown";
+}
+
+export function calendarDates(dates: string[]): string[] {
+  const sorted = [...new Set(dates)].sort();
+  if (sorted.length === 0) {
+    return [];
+  }
+  const out: string[] = [];
+  const cursor = new Date(`${sorted[0]}T00:00:00Z`);
+  const last = new Date(`${sorted[sorted.length - 1]}T00:00:00Z`);
+  while (cursor <= last) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
+
+export function formatRelativeTime(iso?: string | null) {
+  if (!iso) {
+    return "—";
+  }
+  const then = new Date(iso).getTime();
+  const days = Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
+  if (days === 0) {
+    return "today";
+  }
+  if (days === 1) {
+    return "1d ago";
+  }
+  if (days < 30) {
+    return `${days}d ago`;
+  }
+  const months = Math.floor(days / 30);
+  if (months < 12) {
+    return `${months}mo ago`;
+  }
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}

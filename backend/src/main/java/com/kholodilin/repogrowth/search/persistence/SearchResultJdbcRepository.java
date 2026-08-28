@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.search.persistence;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
+import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -21,11 +22,17 @@ public class SearchResultJdbcRepository {
             rs.getString("full_name"),
             rs.getString("owner"),
             rs.getInt("stars"),
+            rs.getInt("watchers"),
             rs.getInt("forks"),
+            rs.getInt("contributors"),
             rs.getString("language"),
             rs.getString("description"),
+            rs.getString("html_url"),
             toInstant(rs.getTimestamp("repository_created_at")),
-            toInstant(rs.getTimestamp("repository_updated_at"))
+            toInstant(rs.getTimestamp("repository_updated_at")),
+            toInstant(rs.getTimestamp("activity_at")),
+            activityStatus(rs.getString("activity_status")),
+            toInstant(rs.getTimestamp("metadata_updated_at"))
     );
 
     private final JdbcClient jdbcClient;
@@ -42,10 +49,14 @@ public class SearchResultJdbcRepository {
             jdbcClient.sql("""
                             INSERT INTO search_result (
                                 search_run_id, position, github_repository_id, full_name, owner,
-                                stars, forks, language, description, repository_created_at, repository_updated_at
+                                stars, watchers, forks, contributors, language, description, html_url,
+                                repository_created_at, repository_updated_at, activity_at, activity_status,
+                                metadata_updated_at
                             ) VALUES (
                                 :searchRunId, :position, :githubRepositoryId, :fullName, :owner,
-                                :stars, :forks, :language, :description, :repositoryCreatedAt, :repositoryUpdatedAt
+                                :stars, :watchers, :forks, :contributors, :language, :description, :htmlUrl,
+                                :repositoryCreatedAt, :repositoryUpdatedAt, :activityAt, :activityStatus,
+                                :metadataUpdatedAt
                             )
                             """)
                     .param("searchRunId", searchRunId)
@@ -54,13 +65,52 @@ public class SearchResultJdbcRepository {
                     .param("fullName", result.fullName())
                     .param("owner", result.owner())
                     .param("stars", result.stars())
+                    .param("watchers", result.watchers())
                     .param("forks", result.forks())
+                    .param("contributors", result.contributors())
                     .param("language", result.language())
                     .param("description", result.description())
+                    .param("htmlUrl", result.htmlUrl())
                     .param("repositoryCreatedAt", SqlTime.ts(result.repositoryCreatedAt()))
                     .param("repositoryUpdatedAt", SqlTime.ts(result.repositoryUpdatedAt()))
+                    .param("activityAt", SqlTime.ts(result.activityAt()))
+                    .param("activityStatus", result.activityStatus() == null ? null : result.activityStatus().name())
+                    .param("metadataUpdatedAt", SqlTime.ts(result.metadataUpdatedAt()))
                     .update();
         }
+    }
+
+    public void updateSnapshot(SearchResult result) {
+        jdbcClient.sql("""
+                        UPDATE search_result
+                        SET stars = :stars,
+                            watchers = :watchers,
+                            forks = :forks,
+                            contributors = :contributors,
+                            language = :language,
+                            description = :description,
+                            html_url = :htmlUrl,
+                            repository_created_at = :repositoryCreatedAt,
+                            repository_updated_at = :repositoryUpdatedAt,
+                            activity_at = :activityAt,
+                            activity_status = :activityStatus,
+                            metadata_updated_at = :metadataUpdatedAt
+                        WHERE id = :id
+                        """)
+                .param("id", result.id())
+                .param("stars", result.stars())
+                .param("watchers", result.watchers())
+                .param("forks", result.forks())
+                .param("contributors", result.contributors())
+                .param("language", result.language())
+                .param("description", result.description())
+                .param("htmlUrl", result.htmlUrl())
+                .param("repositoryCreatedAt", SqlTime.ts(result.repositoryCreatedAt()))
+                .param("repositoryUpdatedAt", SqlTime.ts(result.repositoryUpdatedAt()))
+                .param("activityAt", SqlTime.ts(result.activityAt()))
+                .param("activityStatus", result.activityStatus() == null ? null : result.activityStatus().name())
+                .param("metadataUpdatedAt", SqlTime.ts(result.metadataUpdatedAt()))
+                .update();
     }
 
     public List<SearchResult> findByRun(long searchRunId) {
@@ -68,6 +118,13 @@ public class SearchResultJdbcRepository {
                 .param("searchRunId", searchRunId)
                 .query(MAPPER)
                 .list();
+    }
+
+    private static ActivityStatus activityStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return ActivityStatus.valueOf(value);
     }
 
     private static Instant toInstant(Timestamp timestamp) {

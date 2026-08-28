@@ -95,8 +95,8 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, 200L, owner.id(), "demo", "acme/demo", "demo repo", "PUBLIC", "main", "Java",
-                false, false, 10, 0, 2, 1, false, Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
-                null, null
+                false, false, 10, 0, 2, 1, 0, false, Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
+                null, null, null, null, null, null
         ));
         repositoryJdbcRepository.setTracking(repository.id(), true);
         repository = repositoryJdbcRepository.findById(repository.id()).orElseThrow();
@@ -253,6 +253,16 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
     }
 
     @Test
+    void manualSearchRunDoesNotDuplicateActiveRun() {
+        var query = searchQueryJdbcRepository.insert(repository.id(), "q1", "outbox", true, 50);
+        LocalDate date = planningWindow.businessDate();
+        long first = searchPlanner.planQuery(query.id(), repository.id(), date);
+        long second = searchPlanner.planQuery(query.id(), repository.id(), date);
+        assertThat(second).isEqualTo(first);
+        assertThat(searchRunJdbcRepository.find(query.id(), date)).isPresent();
+    }
+
+    @Test
     void expiredLeaseIsReclaimed() {
         CollectionRun run = collectionPlanner.planRepository(repository.id(), planningWindow.businessDate());
         CollectionJob job = jobRepository.findByRun(run.id()).getFirst();
@@ -319,8 +329,9 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .thenReturn(List.of(new GitHubPathResponse("/acme/demo", "demo", 4, 2)));
         when(gitHubClient.getRepository(anyString(), anyString())).thenReturn(new GitHubRepositoryResponse(
                 200L, "demo", "acme/demo", "demo repo", false, "public", "main", "Java", false, false,
-                11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), owner
+                11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), Instant.now(), owner
         ));
+        when(gitHubClient.countContributors(anyString(), anyString())).thenReturn(4);
         when(gitHubClient.searchRepositories(anyString(), anyInt())).thenReturn(
                 new com.kholodilin.repogrowth.github.model.GitHubSearchResponse(1, List.of())
         );

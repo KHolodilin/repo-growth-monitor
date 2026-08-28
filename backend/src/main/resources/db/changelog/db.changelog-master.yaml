@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/changelog/004-search-tracking.yaml
   - include:
       file: db/changelog/005-watchers.yaml
+  - include:
+      file: db/changelog/006-search-visibility.yaml

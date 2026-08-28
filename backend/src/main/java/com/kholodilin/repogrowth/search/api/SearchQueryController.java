@@ -50,6 +50,11 @@ public class SearchQueryController {
         return new RunAccepted(runId);
     }
 
+    @GetMapping("/search-queries/{id}")
+    public SearchQuery get(@PathVariable long id) {
+        return searchQueryService.getQuery(id);
+    }
+
     @GetMapping("/search-queries/{id}/history")
     public SearchQueryService.SearchHistory history(@PathVariable long id) {
         return searchQueryService.history(id);
@@ -58,6 +63,11 @@ public class SearchQueryController {
     @GetMapping("/repositories/{id}/search-visibility")
     public List<SearchQueryService.SearchHistory> visibility(@PathVariable long id) {
         return searchQueryService.visibility(id);
+    }
+
+    @GetMapping("/search-queries/{id}/results")
+    public SearchQueryService.SearchRunResults latestResults(@PathVariable long id) {
+        return searchQueryService.latestResults(id);
     }
 
     @GetMapping("/search-runs/{id}/results")

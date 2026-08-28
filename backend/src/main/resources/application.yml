@@ -33,6 +33,10 @@ collection:
 search:
   workers: 1
   default-result-limit: 50
+  enrichment-ttl: 24h
+  activity:
+    active-days: 30
+    low-activity-days: 180
 
 management:
   endpoints:

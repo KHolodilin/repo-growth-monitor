@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.search.planner;
 
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
+import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,17 @@ public class SearchPlanner {
 
     @Transactional
     public long planQuery(long searchQueryId, long repositoryId, LocalDate businessDate) {
+        var existing = runRepository.find(searchQueryId, businessDate);
+        if (existing.isPresent()) {
+            var run = existing.get();
+            if (run.status() == SearchRunStatus.READY
+                    || run.status() == SearchRunStatus.RUNNING
+                    || run.status() == SearchRunStatus.RETRY) {
+                return run.id();
+            }
+            runRepository.requeueCompleted(run.id());
+            return run.id();
+        }
         runRepository.insertIgnore(searchQueryId, repositoryId, businessDate);
         return runRepository.find(searchQueryId, businessDate).orElseThrow().id();
     }

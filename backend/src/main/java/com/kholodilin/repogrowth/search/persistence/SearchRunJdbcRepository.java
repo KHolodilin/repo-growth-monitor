@@ -31,6 +31,7 @@ public class SearchRunJdbcRepository {
             toInstant(rs.getTimestamp("completed_at")),
             (Integer) rs.getObject("total_count"),
             (Integer) rs.getObject("tracked_repository_position"),
+            rs.getString("enrichment_status"),
             rs.getString("error_code"),
             rs.getString("error_message")
     );
@@ -140,6 +141,34 @@ public class SearchRunJdbcRepository {
                 .update();
     }
 
+    public void markEnrichment(long id, String enrichmentStatus) {
+        jdbcClient.sql("""
+                        UPDATE search_run
+                        SET enrichment_status = :enrichmentStatus,
+                            updated_at = NOW()
+                        WHERE id = :id
+                        """)
+                .param("id", id)
+                .param("enrichmentStatus", enrichmentStatus)
+                .update();
+    }
+
+    public void requeueCompleted(long id) {
+        jdbcClient.sql("""
+                        UPDATE search_run
+                        SET status = 'READY',
+                            locked_by = NULL,
+                            locked_until = NULL,
+                            next_attempt_at = NOW(),
+                            attempt = 0,
+                            updated_at = NOW()
+                        WHERE id = :id
+                          AND status IN ('SUCCESS', 'FAILED')
+                        """)
+                .param("id", id)
+                .update();
+    }
+
     public void markRetry(long id, Instant nextAttemptAt, String errorCode, String errorMessage) {
         jdbcClient.sql("""
                         UPDATE search_run
@@ -199,6 +228,18 @@ public class SearchRunJdbcRepository {
                         """)
                 .param("searchQueryId", searchQueryId)
                 .param("before", before)
+                .query(MAPPER)
+                .optional();
+    }
+
+    public Optional<SearchRun> latest(long searchQueryId) {
+        return jdbcClient.sql("""
+                        SELECT * FROM search_run
+                        WHERE search_query_id = :searchQueryId
+                        ORDER BY business_date DESC, id DESC
+                        LIMIT 1
+                        """)
+                .param("searchQueryId", searchQueryId)
                 .query(MAPPER)
                 .optional();
     }

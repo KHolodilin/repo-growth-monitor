@@ -17,6 +17,7 @@ public record SearchRun(
         Instant completedAt,
         Integer totalCount,
         Integer trackedRepositoryPosition,
+        String enrichmentStatus,
         String errorCode,
         String errorMessage
 ) {

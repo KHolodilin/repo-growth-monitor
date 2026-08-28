@@ -10,10 +10,16 @@ public record SearchResult(
         String fullName,
         String owner,
         int stars,
+        int watchers,
         int forks,
+        int contributors,
         String language,
         String description,
+        String htmlUrl,
         Instant repositoryCreatedAt,
-        Instant repositoryUpdatedAt
+        Instant repositoryUpdatedAt,
+        Instant activityAt,
+        ActivityStatus activityStatus,
+        Instant metadataUpdatedAt
 ) {
 }

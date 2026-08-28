@@ -16,10 +16,12 @@ public record RepositoryResponse(
         int stars,
         int watchers,
         int forks,
+        int contributors,
         int openIssues,
         boolean trackingEnabled,
         Instant githubCreatedAt,
         Instant githubUpdatedAt,
+        Instant lastCommitAt,
         String githubUrl,
         OwnerResponse owner
 ) {

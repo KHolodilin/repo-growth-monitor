@@ -14,7 +14,9 @@ public record GitHubSearchItem(
         @JsonProperty("forks_count") int forksCount,
         String language,
         String description,
+        @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("created_at") Instant createdAt,
-        @JsonProperty("updated_at") Instant updatedAt
+        @JsonProperty("updated_at") Instant updatedAt,
+        @JsonProperty("pushed_at") Instant pushedAt
 ) {
 }

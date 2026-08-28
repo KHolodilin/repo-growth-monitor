@@ -18,10 +18,18 @@ public record Repository(
         int watchers,
         int forks,
         int openIssues,
+        int contributors,
         boolean trackingEnabled,
         Instant githubCreatedAt,
         Instant githubUpdatedAt,
+        Instant githubPushedAt,
+        Instant lastCommitAt,
+        Instant lastReleaseAt,
+        Instant enrichedAt,
         Instant createdAt,
         Instant updatedAt
 ) {
+    public Instant activityAt() {
+        return lastCommitAt != null ? lastCommitAt : githubPushedAt;
+    }
 }

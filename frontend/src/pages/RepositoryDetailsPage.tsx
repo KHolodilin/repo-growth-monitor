@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import {
   api,
@@ -9,7 +9,7 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { calendarDates, cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, type Period } from "../components/PeriodSelector";
 
@@ -24,7 +24,9 @@ const JOB_LABELS: Record<string, string> = {
 
 export function RepositoryDetailsPage() {
   const { id } = useParams();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: Tab = tabParam === "traffic" || tabParam === "search" ? tabParam : "overview";
   const [period, setPeriod] = useState<Period>("30d");
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
@@ -33,6 +35,15 @@ export function RepositoryDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
+  const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
+
+  function setTab(next: Tab) {
+    if (next === "overview") {
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    setSearchParams({ tab: next }, { replace: true });
+  }
 
   const load = useCallback(async () => {
     if (!id) {
@@ -69,17 +80,26 @@ export function RepositoryDetailsPage() {
 
   const runStatus = traffic?.lastCollection?.status;
   const runActive = runStatus === "RUNNING" || runStatus === "PLANNED";
+  const searchActive = visibility.some((item) => {
+    const status = item.searchStatus;
+    return status === "RUNNING" || status === "READY" || status === "RETRY";
+  });
 
   useEffect(() => {
     if (!runActive) {
       setCollecting(false);
+    }
+    if (!searchActive) {
+      setRunningQueryId(null);
+    }
+    if (!runActive && !searchActive) {
       return;
     }
     const timer = window.setInterval(() => {
       void load().catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [runActive, load]);
+  }, [runActive, searchActive, load]);
 
   async function collect() {
     if (!id || collecting || runActive) {
@@ -108,8 +128,16 @@ export function RepositoryDetailsPage() {
   }
 
   async function runQuery(queryId: number) {
-    await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
-    await load();
+    if (runningQueryId != null) {
+      return;
+    }
+    setRunningQueryId(queryId);
+    try {
+      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
+      await load();
+    } finally {
+      setRunningQueryId(null);
+    }
   }
 
   if (error) {
@@ -118,8 +146,11 @@ export function RepositoryDetailsPage() {
   if (loading || !repo || !traffic) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="h-10 w-80" />
+        <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Skeleton className="h-7 w-72" />
+          <Skeleton className="h-9 w-28 sm:justify-self-end" />
+          <Skeleton className="h-4 w-64 sm:col-start-1" />
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
@@ -132,22 +163,29 @@ export function RepositoryDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <nav className="text-sm text-muted-foreground">
-        <Link className="hover:text-foreground" to="/dashboard">
-          Portfolio
-        </Link>
-        <span className="px-2">/</span>
-        <span className="text-foreground">{repo.fullName}</span>
-      </nav>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{repo.fullName}</h1>
-          <p className="text-sm text-muted-foreground">{repo.description}</p>
-        </div>
-        <Button disabled={busy} onClick={() => void collect()}>
+      <header className="grid grid-cols-1 items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <h1 className="min-w-0 text-xl font-semibold leading-snug sm:col-start-1 sm:row-start-1">
+          <Link className="text-sm font-medium text-muted-foreground hover:text-foreground" to="/dashboard">
+            Portfolio
+          </Link>
+          <span className="mx-2 text-sm font-normal text-muted-foreground" aria-hidden="true">
+            ›
+          </span>
+          <span className="break-all">{repo.fullName}</span>
+        </h1>
+        {repo.description && (
+          <p className="text-sm font-normal text-muted-foreground sm:col-start-1 sm:row-start-2">
+            {repo.description}
+          </p>
+        )}
+        <Button
+          className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
+          disabled={busy}
+          onClick={() => void collect()}
+        >
           {busy ? "Collecting..." : "Collect now"}
         </Button>
-      </div>
+      </header>
       <div className="inline-flex rounded-lg border bg-muted p-1">
         {([
           ["overview", "Overview"],
@@ -173,9 +211,11 @@ export function RepositoryDetailsPage() {
       {tab === "traffic" && <TrafficPanel traffic={traffic} period={period} onPeriod={setPeriod} />}
       {tab === "search" && (
         <SearchPanel
+          repositoryId={repo.id}
           visibility={visibility}
           queryText={queryText}
           setQueryText={setQueryText}
+          runningQueryId={runningQueryId}
           onCreate={() => void createQuery()}
           onRun={runQuery}
         />
@@ -196,7 +236,7 @@ function Overview({
   onCollect: () => void;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid items-start gap-4 md:grid-cols-2">
       <Card>
         <h2 className="mb-4 font-medium">Overview</h2>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -210,18 +250,14 @@ function Overview({
           <dd>{formatNumber(repo.watchers)}</dd>
           <dt className="text-muted-foreground">Forks</dt>
           <dd>{formatNumber(repo.forks)}</dd>
-          {repo.language && (
-            <>
-              <dt className="text-muted-foreground">Language</dt>
-              <dd>{repo.language}</dd>
-            </>
-          )}
-          {repo.defaultBranch && (
-            <>
-              <dt className="text-muted-foreground">Default branch</dt>
-              <dd>{repo.defaultBranch}</dd>
-            </>
-          )}
+          <dt className="text-muted-foreground">Contributors</dt>
+          <dd>{formatNumber(repo.contributors)}</dd>
+          <dt className="text-muted-foreground">Language</dt>
+          <dd>{repo.language ?? "—"}</dd>
+          <dt className="text-muted-foreground">Default branch</dt>
+          <dd>{repo.defaultBranch ?? "—"}</dd>
+          <dt className="text-muted-foreground">Last GitHub update</dt>
+          <dd>{formatSyncTime(repo.githubUpdatedAt) ?? "—"}</dd>
           <dt className="text-muted-foreground">GitHub</dt>
           <dd>
             <a className="text-primary hover:underline" href={repo.githubUrl ?? `https://github.com/${repo.fullName}`} target="_blank" rel="noreferrer">
@@ -445,30 +481,36 @@ function MetricTable({
 }
 
 function SearchPanel({
+  repositoryId,
   visibility,
   queryText,
   setQueryText,
+  runningQueryId,
   onCreate,
   onRun,
 }: {
+  repositoryId: number;
   visibility: SearchHistory[];
   queryText: string;
   setQueryText: (value: string) => void;
+  runningQueryId: number | null;
   onCreate: () => void;
   onRun: (id: number) => void;
 }) {
+  const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
   return (
     <div className="space-y-4">
-      <Card className="flex gap-2">
-        <input
-          className="flex-1 rounded-md border px-3 py-2 text-sm"
-          placeholder="transactional outbox language:java"
-          value={queryText}
-          onChange={(event) => setQueryText(event.target.value)}
-        />
-        <Button onClick={onCreate}>Add query</Button>
-      </Card>
       <Card>
+        <h2 className="mb-3 font-medium">Search Queries</h2>
+        <div className="mb-4 flex gap-2">
+          <input
+            className="flex-1 rounded-md border px-3 py-2 text-sm"
+            placeholder="transactional outbox language:java"
+            value={queryText}
+            onChange={(event) => setQueryText(event.target.value)}
+          />
+          <Button onClick={onCreate}>Add query</Button>
+        </div>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground">
@@ -482,25 +524,37 @@ function SearchPanel({
           </thead>
           <tbody>
             {visibility.map((item) => {
-              const latestRunId = item.points.at(-1)?.searchRunId;
+              const running =
+                runningQueryId === item.query.id
+                || item.searchStatus === "RUNNING"
+                || item.searchStatus === "READY"
+                || item.searchStatus === "RETRY";
               return (
-                <tr key={item.query.id} className="border-t">
+                <tr
+                  key={item.query.id}
+                  className={cn("border-t", hoveredQueryId === item.query.id && "bg-muted/60")}
+                  onMouseEnter={() => setHoveredQueryId(item.query.id)}
+                  onMouseLeave={() => setHoveredQueryId(null)}
+                >
                   <td className="py-3">
-                    {latestRunId ? (
-                      <Link className="text-primary hover:underline" to={`/search-runs/${latestRunId}`}>
-                        {item.query.name}
-                      </Link>
-                    ) : (
-                      item.query.name
-                    )}
+                    <Link
+                      className="text-primary hover:underline"
+                      to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
+                    >
+                      {item.query.name}
+                    </Link>
                   </td>
                   <td className="text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
                   <td className="text-right">{formatDelta(item.change7d)}</td>
                   <td className="text-right">{formatDelta(item.change30d)}</td>
                   <td className="text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
                   <td className="text-right">
-                    <Button className="bg-muted text-foreground" onClick={() => onRun(item.query.id)}>
-                      Run
+                    <Button
+                      className="bg-muted text-foreground"
+                      disabled={running}
+                      onClick={() => onRun(item.query.id)}
+                    >
+                      {running ? "Running..." : "Run"}
                     </Button>
                   </td>
                 </tr>
@@ -509,24 +563,74 @@ function SearchPanel({
           </tbody>
         </table>
       </Card>
-      {visibility.map((item) => (
-        <RankChart key={item.query.id} history={item} />
-      ))}
+      <CombinedRankChart visibility={visibility} highlightQueryId={hoveredQueryId} />
     </div>
   );
 }
 
-function RankChart({ history }: { history: SearchHistory }) {
-  const option = {
-    title: { text: history.query.name, left: 0, textStyle: { fontSize: 14 } },
-    tooltip: { trigger: "axis" },
-    xAxis: { type: "category", data: history.points.map((point) => point.date) },
-    yAxis: { type: "value", inverse: true, min: 1, name: "Rank" },
-    series: [{ type: "line", connectNulls: false, data: history.points.map((point) => point.position) }],
-  };
+function CombinedRankChart({
+  visibility,
+  highlightQueryId,
+}: {
+  visibility: SearchHistory[];
+  highlightQueryId: number | null;
+}) {
+  const option = useMemo(() => {
+    const dates = calendarDates(visibility.flatMap((item) => item.points.map((point) => point.date)));
+    const maxLimit = Math.max(50, ...visibility.map((item) => item.query.resultLimit));
+    const rankLabel = (value: number | null | undefined) => {
+      if (value == null) {
+        return "no data";
+      }
+      return value > maxLimit ? `>${maxLimit}` : `#${value}`;
+    };
+    return {
+      tooltip: {
+        trigger: "axis",
+        formatter: (params: { marker: string; seriesName: string; value: number | null }[]) =>
+          params.map((item) => `${item.marker}${item.seriesName}: ${rankLabel(item.value)}`).join("<br/>"),
+      },
+      legend: { type: "scroll" },
+      grid: { left: 24, right: 16, top: 48, bottom: 24, containLabel: true },
+      xAxis: { type: "category", data: dates, boundaryGap: false },
+      yAxis: {
+        type: "value",
+        inverse: true,
+        min: 1,
+        max: maxLimit + 1,
+        axisLabel: {
+          formatter: (value: number) => (value > maxLimit ? `>${maxLimit}` : `#${value}`),
+        },
+      },
+      series: visibility.map((item) => {
+        const highlighted = highlightQueryId === item.query.id;
+        const dimmed = highlightQueryId != null && !highlighted;
+        return {
+          name: item.query.name,
+          type: "line",
+          connectNulls: false,
+          showSymbol: true,
+          lineStyle: { width: highlighted ? 3.5 : 2, opacity: dimmed ? 0.25 : 1 },
+          itemStyle: { opacity: dimmed ? 0.25 : 1 },
+          data: dates.map((date) => {
+            const point = item.points.find((entry) => entry.date === date);
+            if (!point) {
+              return null;
+            }
+            return point.position ?? item.query.resultLimit + 1;
+          }),
+        };
+      }),
+    };
+  }, [visibility, highlightQueryId]);
+
+  if (visibility.length === 0) {
+    return null;
+  }
   return (
     <Card>
-      <ReactECharts option={option} style={{ height: 280 }} />
+      <h2 className="mb-3 font-medium">Rank History</h2>
+      <ReactECharts option={option} style={{ height: 360, width: "100%" }} />
     </Card>
   );
 }

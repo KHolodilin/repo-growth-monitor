@@ -30,9 +30,14 @@ public class RepositoryJdbcRepository {
             rs.getInt("watchers"),
             rs.getInt("forks"),
             rs.getInt("open_issues"),
+            rs.getInt("contributors"),
             rs.getBoolean("tracking_enabled"),
             toInstant(rs.getTimestamp("github_created_at")),
             toInstant(rs.getTimestamp("github_updated_at")),
+            toInstant(rs.getTimestamp("github_pushed_at")),
+            toInstant(rs.getTimestamp("last_commit_at")),
+            toInstant(rs.getTimestamp("last_release_at")),
+            toInstant(rs.getTimestamp("enriched_at")),
             toInstant(rs.getTimestamp("created_at")),
             toInstant(rs.getTimestamp("updated_at"))
     );
@@ -47,12 +52,14 @@ public class RepositoryJdbcRepository {
         return jdbcClient.sql("""
                         INSERT INTO repository (
                             github_id, owner_id, name, full_name, description, visibility, default_branch,
-                            language, fork, archived, stars, watchers, forks, open_issues, tracking_enabled,
-                            github_created_at, github_updated_at
+                            language, fork, archived, stars, watchers, forks, open_issues, contributors,
+                            tracking_enabled, github_created_at, github_updated_at, github_pushed_at,
+                            last_commit_at, last_release_at, enriched_at
                         ) VALUES (
                             :githubId, :ownerId, :name, :fullName, :description, :visibility, :defaultBranch,
-                            :language, :fork, :archived, :stars, :watchers, :forks, :openIssues, FALSE,
-                            :githubCreatedAt, :githubUpdatedAt
+                            :language, :fork, :archived, :stars, :watchers, :forks, :openIssues, :contributors,
+                            FALSE, :githubCreatedAt, :githubUpdatedAt, :githubPushedAt,
+                            :lastCommitAt, :lastReleaseAt, :enrichedAt
                         )
                         ON CONFLICT (github_id) DO UPDATE SET
                             owner_id = EXCLUDED.owner_id,
@@ -71,8 +78,16 @@ public class RepositoryJdbcRepository {
                             END,
                             forks = EXCLUDED.forks,
                             open_issues = EXCLUDED.open_issues,
+                            contributors = CASE
+                                WHEN EXCLUDED.contributors > 0 THEN EXCLUDED.contributors
+                                ELSE repository.contributors
+                            END,
                             github_created_at = EXCLUDED.github_created_at,
                             github_updated_at = EXCLUDED.github_updated_at,
+                            github_pushed_at = COALESCE(EXCLUDED.github_pushed_at, repository.github_pushed_at),
+                            last_commit_at = COALESCE(EXCLUDED.last_commit_at, repository.last_commit_at),
+                            last_release_at = COALESCE(EXCLUDED.last_release_at, repository.last_release_at),
+                            enriched_at = COALESCE(EXCLUDED.enriched_at, repository.enriched_at),
                             updated_at = NOW()
                         RETURNING *
                         """)
@@ -90,8 +105,13 @@ public class RepositoryJdbcRepository {
                 .param("watchers", incoming.watchers())
                 .param("forks", incoming.forks())
                 .param("openIssues", incoming.openIssues())
+                .param("contributors", incoming.contributors())
                 .param("githubCreatedAt", SqlTime.ts(incoming.githubCreatedAt()))
                 .param("githubUpdatedAt", SqlTime.ts(incoming.githubUpdatedAt()))
+                .param("githubPushedAt", SqlTime.ts(incoming.githubPushedAt()))
+                .param("lastCommitAt", SqlTime.ts(incoming.lastCommitAt()))
+                .param("lastReleaseAt", SqlTime.ts(incoming.lastReleaseAt()))
+                .param("enrichedAt", SqlTime.ts(incoming.enrichedAt()))
                 .query(MAPPER)
                 .single();
     }
@@ -99,6 +119,13 @@ public class RepositoryJdbcRepository {
     public Optional<Repository> findById(long id) {
         return jdbcClient.sql("SELECT * FROM repository WHERE id = :id")
                 .param("id", id)
+                .query(MAPPER)
+                .optional();
+    }
+
+    public Optional<Repository> findByGithubId(long githubId) {
+        return jdbcClient.sql("SELECT * FROM repository WHERE github_id = :githubId")
+                .param("githubId", githubId)
                 .query(MAPPER)
                 .optional();
     }
@@ -135,23 +162,42 @@ public class RepositoryJdbcRepository {
                 .orElse(null);
     }
 
-    public void updateStats(long id, int stars, int watchers, int forks, int openIssues, Instant githubUpdatedAt) {
+    public void updateStats(
+            long id,
+            int stars,
+            int watchers,
+            int forks,
+            int openIssues,
+            int contributors,
+            Instant githubUpdatedAt,
+            Instant githubPushedAt,
+            Instant lastCommitAt,
+            Instant enrichedAt
+    ) {
         jdbcClient.sql("""
                         UPDATE repository
                         SET stars = :stars,
                             watchers = :watchers,
                             forks = :forks,
                             open_issues = :openIssues,
+                            contributors = :contributors,
                             github_updated_at = :githubUpdatedAt,
+                            github_pushed_at = :githubPushedAt,
+                            last_commit_at = COALESCE(:lastCommitAt, last_commit_at),
+                            enriched_at = :enrichedAt,
                             updated_at = NOW()
                         WHERE id = :id
                         """)
+                .param("id", id)
                 .param("stars", stars)
                 .param("watchers", watchers)
                 .param("forks", forks)
                 .param("openIssues", openIssues)
+                .param("contributors", contributors)
                 .param("githubUpdatedAt", SqlTime.ts(githubUpdatedAt))
-                .param("id", id)
+                .param("githubPushedAt", SqlTime.ts(githubPushedAt))
+                .param("lastCommitAt", SqlTime.ts(lastCommitAt))
+                .param("enrichedAt", SqlTime.ts(enrichedAt))
                 .update();
     }
 

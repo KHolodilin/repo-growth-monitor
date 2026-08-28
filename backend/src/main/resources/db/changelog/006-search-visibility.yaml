@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-search-visibility
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE repository
+                  ADD COLUMN contributors INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN github_pushed_at TIMESTAMPTZ,
+                  ADD COLUMN last_commit_at TIMESTAMPTZ,
+                  ADD COLUMN last_release_at TIMESTAMPTZ,
+                  ADD COLUMN enriched_at TIMESTAMPTZ;
+
+              ALTER TABLE search_run
+                  ADD COLUMN enrichment_status TEXT;
+
+              ALTER TABLE search_result
+                  ADD COLUMN watchers INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN contributors INTEGER NOT NULL DEFAULT 0,
+                  ADD COLUMN html_url TEXT,
+                  ADD COLUMN activity_at TIMESTAMPTZ,
+                  ADD COLUMN activity_status TEXT,
+                  ADD COLUMN metadata_updated_at TIMESTAMPTZ;

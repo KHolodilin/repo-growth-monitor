@@ -10,6 +10,7 @@ import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
 import com.kholodilin.repogrowth.github.model.GitHubSearchResponse;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.search.application.RepositoryEnricher;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
 import com.kholodilin.repogrowth.search.domain.SearchRun;
@@ -42,6 +43,7 @@ public class SearchWorker {
     private final RetryPolicy retryPolicy;
     private final CollectionProperties collectionProperties;
     private final TransactionTemplate transactionTemplate;
+    private final RepositoryEnricher repositoryEnricher;
 
     public SearchWorker(
             SearchRunJdbcRepository runRepository,
@@ -52,7 +54,8 @@ public class SearchWorker {
             RepositoryLock repositoryLock,
             RetryPolicy retryPolicy,
             CollectionProperties collectionProperties,
-            TransactionTemplate transactionTemplate
+            TransactionTemplate transactionTemplate,
+            RepositoryEnricher repositoryEnricher
     ) {
         this.runRepository = runRepository;
         this.queryRepository = queryRepository;
@@ -63,6 +66,7 @@ public class SearchWorker {
         this.retryPolicy = retryPolicy;
         this.collectionProperties = collectionProperties;
         this.transactionTemplate = transactionTemplate;
+        this.repositoryEnricher = repositoryEnricher;
     }
 
     public boolean poll(String workerId) {
@@ -94,25 +98,12 @@ public class SearchWorker {
                 List<SearchResult> results = new ArrayList<>();
                 Integer position = null;
                 int index = 1;
-                for (GitHubSearchItem item : response.itemsOrEmpty()) {
+                List<GitHubSearchItem> items = response.itemsOrEmpty();
+                for (GitHubSearchItem item : items) {
                     if (index > query.resultLimit()) {
                         break;
                     }
-                    String ownerLogin = item.owner() == null ? "" : item.owner().login();
-                    results.add(new SearchResult(
-                            null,
-                            run.id(),
-                            index,
-                            item.id(),
-                            item.fullName(),
-                            ownerLogin,
-                            item.stargazersCount(),
-                            item.forksCount(),
-                            item.language(),
-                            item.description(),
-                            item.createdAt(),
-                            item.updatedAt()
-                    ));
+                    results.add(repositoryEnricher.fromSearchItem(run.id(), index, item));
                     if (item.id() == repository.githubId()) {
                         position = index;
                     }
@@ -123,6 +114,7 @@ public class SearchWorker {
                     resultRepository.replaceAll(run.id(), results);
                     runRepository.markSuccess(run.id(), response.totalCount(), trackedPosition);
                 });
+                enrichResults(run.id(), items);
                 log.info("Search run succeeded queryId={} position={}", query.id(), trackedPosition);
             } finally {
                 repositoryLock.unlock(lockConnection, run.repositoryId());
@@ -135,6 +127,25 @@ public class SearchWorker {
             sample.stop(Timer.builder("search.duration").register(Metrics.globalRegistry));
             LogMdc.clearJob();
         }
+    }
+
+    private void enrichResults(long searchRunId, List<GitHubSearchItem> items) {
+        List<SearchResult> stored = resultRepository.findByRun(searchRunId);
+        boolean partial = false;
+        for (int i = 0; i < stored.size(); i++) {
+            GitHubSearchItem item = i < items.size() ? items.get(i) : null;
+            if (item == null) {
+                continue;
+            }
+            try {
+                SearchResult enriched = repositoryEnricher.enrich(stored.get(i), item);
+                resultRepository.updateSnapshot(enriched);
+            } catch (Exception ex) {
+                partial = true;
+                log.warn("Search enrichment failed fullName={} error={}", stored.get(i).fullName(), ex.getMessage());
+            }
+        }
+        runRepository.markEnrichment(searchRunId, partial ? "PARTIAL" : "SUCCESS");
     }
 
     private void handleFailure(

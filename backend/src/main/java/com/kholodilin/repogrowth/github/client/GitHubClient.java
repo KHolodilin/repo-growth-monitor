@@ -39,6 +39,8 @@ import java.util.regex.Pattern;
 public class GitHubClient {
 
     private static final Pattern NEXT_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"next\"");
+    private static final Pattern LAST_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"last\"");
+    private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
     private static final int MAX_PER_PAGE = 100;
 
     private final RestClient restClient;
@@ -109,6 +111,24 @@ public class GitHubClient {
         );
         return read(response.getBody(), new TypeReference<List<GitHubPathResponse>>() {
         });
+    }
+
+    public int countContributors(String owner, String name) {
+        requireToken();
+        String path = "/repos/" + owner + "/" + name + "/contributors?per_page=1&anon=true";
+        ResponseEntity<byte[]> response = execute("contributors", "GET", path);
+        String last = lastPath(response.getHeaders().getFirst(HttpHeaders.LINK));
+        if (last != null) {
+            Matcher page = PAGE_QUERY.matcher(last);
+            if (page.find()) {
+                return Integer.parseInt(page.group(1));
+            }
+        }
+        List<Object> items = read(response.getBody() == null || response.getBody().length == 0
+                ? "[]".getBytes(StandardCharsets.UTF_8)
+                : response.getBody(), new TypeReference<List<Object>>() {
+        });
+        return items.size();
     }
 
     public GitHubSearchResponse searchRepositories(String query, int limit) {
@@ -262,6 +282,17 @@ public class GitHubClient {
         } catch (JacksonException ex) {
             throw GitHubException.malformed(ex);
         }
+    }
+
+    private String lastPath(String linkHeader) {
+        if (linkHeader == null || linkHeader.isBlank()) {
+            return null;
+        }
+        Matcher matcher = LAST_LINK.matcher(linkHeader);
+        if (!matcher.find()) {
+            return null;
+        }
+        return matcher.group(1);
     }
 
     private String nextPath(String linkHeader) {

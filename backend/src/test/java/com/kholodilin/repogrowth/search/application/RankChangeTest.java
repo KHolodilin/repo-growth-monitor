@@ -25,7 +25,7 @@ class RankChangeTest {
     }
 
     private SearchRun run(long queryId, LocalDate date, int position) {
-        return new SearchRun(1L, queryId, 1L, date, SearchRunStatus.SUCCESS, 1, null, null, null, null, null, 100, position, null, null);
+        return new SearchRun(1L, queryId, 1L, date, SearchRunStatus.SUCCESS, 1, null, null, null, null, null, 100, position, null, null, null);
     }
 
     private Integer changeSince(List<SearchRun> runs, SearchRun latest, int days) {

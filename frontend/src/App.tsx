@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { DashboardPage } from "./pages/DashboardPage";
 import { RepositoriesPage } from "./pages/RepositoriesPage";
 import { RepositoryDetailsPage } from "./pages/RepositoryDetailsPage";
+import { QueryDetailsPage } from "./pages/QueryDetailsPage";
 import { SearchResultsPage } from "./pages/SearchResultsPage";
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/repositories" element={<RepositoriesPage />} />
         <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+        <Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
         <Route path="/search-runs/:id" element={<SearchResultsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

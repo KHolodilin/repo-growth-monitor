@@ -61,6 +61,9 @@ public class CollectionPlanner {
             jobRepository.insertIgnore(run.id(), repositoryId, businessDate, type);
         }
         jobRepository.requeueFailed(run.id());
+        if (refreshTraffic) {
+            jobRepository.requeueCompleted(run.id(), CollectionJobType.REPOSITORY_STATS);
+        }
         if (refreshTraffic || isTrafficStale(repositoryId, businessDate)) {
             jobRepository.requeueCompleted(run.id(), CollectionJobType.TRAFFIC);
         }

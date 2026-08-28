@@ -5,9 +5,11 @@ import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Slf4j
 @Component
 public class RepositoryStatsCollector implements Collector {
 
@@ -39,6 +41,13 @@ public class RepositoryStatsCollector implements Collector {
                 context.ownerLogin(),
                 context.repository().name()
         );
+        int contributors = context.repository().contributors();
+        try {
+            contributors = gitHubClient.countContributors(context.ownerLogin(), context.repository().name());
+        } catch (RuntimeException ex) {
+            log.warn("Contributor count failed repository={} error={}", context.repository().fullName(), ex.getMessage());
+        }
+        int resolvedContributors = contributors;
         transactionTemplate.executeWithoutResult(status -> {
             repositoryJdbcRepository.updateStats(
                     context.repository().id(),
@@ -46,7 +55,11 @@ public class RepositoryStatsCollector implements Collector {
                     remote.watchers(),
                     remote.forksCount(),
                     remote.openIssuesCount(),
-                    remote.updatedAt()
+                    resolvedContributors,
+                    remote.updatedAt(),
+                    remote.pushedAt(),
+                    null,
+                    java.time.Instant.now()
             );
             trafficJdbcRepository.upsertDailyStats(
                     context.repository().id(),

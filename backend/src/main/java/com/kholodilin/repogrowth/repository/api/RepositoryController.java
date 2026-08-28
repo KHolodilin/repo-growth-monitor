@@ -55,10 +55,12 @@ public class RepositoryController {
                 repository.stars(),
                 repository.watchers(),
                 repository.forks(),
+                repository.contributors(),
                 repository.openIssues(),
                 repository.trackingEnabled(),
                 repository.githubCreatedAt(),
                 repository.githubUpdatedAt(),
+                repository.lastCommitAt(),
                 "https://github.com/" + repository.fullName(),
                 new RepositoryResponse.OwnerResponse(
                         owner.id(),

@@ -21,6 +21,8 @@
           "language": "Java",
           "created_at": "2021-02-01T00:00:00Z",
           "updated_at": "2026-08-20T00:00:00Z",
+          "pushed_at": "2026-08-26T00:00:00Z",
+          "html_url": "https://github.com/competitor/outbox-kit",
           "owner": { "id": 501, "login": "competitor", "type": "Organization" }
         },
         {
@@ -32,6 +34,8 @@
           "language": "Java",
           "created_at": "2022-05-01T00:00:00Z",
           "updated_at": "2026-08-18T00:00:00Z",
+          "pushed_at": "2026-05-01T00:00:00Z",
+          "html_url": "https://github.com/another/spring-outbox",
           "owner": { "id": 502, "login": "another", "type": "User" }
         },
         {
@@ -43,6 +47,8 @@
           "language": "Java",
           "created_at": "2023-01-01T00:00:00Z",
           "updated_at": "2026-08-10T00:00:00Z",
+          "pushed_at": "2024-01-01T00:00:00Z",
+          "html_url": "https://github.com/labs/kafka-outbox",
           "owner": { "id": 503, "login": "labs", "type": "Organization" }
         },
         {
@@ -54,6 +60,8 @@
           "language": "Java",
           "created_at": "2023-03-12T10:00:00Z",
           "updated_at": "2026-08-27T12:00:00Z",
+          "pushed_at": "2026-08-28T08:00:00Z",
+          "html_url": "https://github.com/acme/spring-outbox",
           "owner": { "id": 42, "login": "acme", "type": "User" }
         },
         {
@@ -65,6 +73,8 @@
           "language": "Java",
           "created_at": "2024-04-01T00:00:00Z",
           "updated_at": "2026-08-01T00:00:00Z",
+          "pushed_at": "2026-07-15T00:00:00Z",
+          "html_url": "https://github.com/oss/outbox-jdbc",
           "owner": { "id": 504, "login": "oss", "type": "User" }
         }
       ]

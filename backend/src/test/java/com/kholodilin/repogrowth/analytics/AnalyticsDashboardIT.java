@@ -166,9 +166,9 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     private Repository track(GitHubOwner owner, long githubId, String name, String fullName, int stars) {
         Repository repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, githubId, owner.id(), name, fullName, name, "PUBLIC", "main", "Java",
-                false, false, stars, 0, 2, 0, false,
+                false, false, stars, 0, 2, 0, 0, false,
                 Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
-                null, null
+                null, null, null, null, null, null
         ));
         repositoryJdbcRepository.setTracking(repository.id(), true);
         return repositoryJdbcRepository.findById(repository.id()).orElseThrow();

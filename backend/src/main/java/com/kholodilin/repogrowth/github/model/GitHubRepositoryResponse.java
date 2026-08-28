@@ -24,6 +24,7 @@ public record GitHubRepositoryResponse(
         @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("updated_at") Instant updatedAt,
+        @JsonProperty("pushed_at") Instant pushedAt,
         GitHubOwnerResponse owner
 ) {
     public String resolvedVisibility() {

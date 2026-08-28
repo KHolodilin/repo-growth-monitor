@@ -41,8 +41,10 @@ export type Repository = {
   trackingEnabled: boolean;
   githubCreatedAt?: string;
   githubUpdatedAt?: string;
+  lastCommitAt?: string;
   githubUrl?: string;
   owner: Owner;
+  contributors: number;
 };
 
 export type Dashboard = {
@@ -131,6 +133,9 @@ export type SearchHistory = {
   change30d: number | null;
   bestRank: number | null;
   points: { date: string; position: number | null; searchRunId: number }[];
+  lastChecked?: string | null;
+  searchStatus?: string | null;
+  enrichmentStatus?: string | null;
 };
 
 export type SearchRunResults = {
@@ -140,6 +145,8 @@ export type SearchRunResults = {
     totalCount: number | null;
     trackedRepositoryPosition: number | null;
     status: string;
+    enrichmentStatus?: string | null;
+    completedAt?: string | null;
   };
   query: SearchQuery;
   rows: {
@@ -149,9 +156,15 @@ export type SearchRunResults = {
       fullName: string;
       owner: string;
       stars: number;
+      watchers: number;
       forks: number;
+      contributors: number;
       language?: string;
       description?: string;
+      htmlUrl?: string;
+      activityAt?: string | null;
+      activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "UNKNOWN" | null;
+      metadataUpdatedAt?: string | null;
     };
     positionDelta: number | null;
   }[];

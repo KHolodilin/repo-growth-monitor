@@ -99,9 +99,14 @@ public class RepositoryService {
                     remote.watchers(),
                     remote.forksCount(),
                     remote.openIssuesCount(),
+                    0,
                     false,
                     remote.createdAt(),
                     remote.updatedAt(),
+                    remote.pushedAt(),
+                    null,
+                    null,
+                    null,
                     null,
                     null
             ));

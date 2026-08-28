@@ -13,6 +13,7 @@ import com.kholodilin.repogrowth.search.persistence.SearchResultJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -107,7 +108,19 @@ public class SearchQueryService {
         List<RankPoint> points = runs.stream()
                 .map(run -> new RankPoint(run.businessDate(), run.trackedRepositoryPosition(), run.id()))
                 .toList();
-        return new SearchHistory(query, current, change7, change30, best, points);
+        SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
+        Instant lastChecked = latestRun == null ? null : (latestRun.completedAt() != null ? latestRun.completedAt() : latestRun.startedAt());
+        String searchStatus = latestRun == null ? null : latestRun.status().name();
+        String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
+        return new SearchHistory(query, current, change7, change30, best, points, lastChecked, searchStatus, enrichmentStatus);
+    }
+
+    public SearchRunResults latestResults(long searchQueryId) {
+        getQuery(searchQueryId);
+        SearchRun run = runRepository.latestSuccessful(searchQueryId)
+                .or(() -> runRepository.latest(searchQueryId))
+                .orElseThrow(() -> ApiException.notFound("Search results not found"));
+        return results(run.id());
     }
 
     public SearchRunResults results(long searchRunId) {
@@ -166,7 +179,10 @@ public class SearchQueryService {
             Integer change7d,
             Integer change30d,
             Integer bestRank,
-            List<RankPoint> points
+            List<RankPoint> points,
+            Instant lastChecked,
+            String searchStatus,
+            String enrichmentStatus
     ) {
     }
 

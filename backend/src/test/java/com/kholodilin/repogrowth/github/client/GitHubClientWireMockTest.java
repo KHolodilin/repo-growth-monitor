@@ -172,4 +172,14 @@ class GitHubClientWireMockTest {
         assertThat(views.days()).hasSize(1);
         assertThat(views.days().get(0).date().toString()).isEqualTo("2026-08-20");
     }
+
+    @Test
+    void countsContributorsFromLastPageLink() {
+        wireMock.stubFor(get("/repos/acme/a/contributors?per_page=1&anon=true")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withHeader("Link", "<" + wireMock.baseUrl() + "/repos/acme/a/contributors?per_page=1&page=18>; rel=\"last\"")
+                        .withBody("[{\"login\":\"a\"}]")));
+        assertThat(client.countContributors("acme", "a")).isEqualTo(18);
+    }
 }
