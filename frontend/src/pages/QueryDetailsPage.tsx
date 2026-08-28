@@ -13,6 +13,7 @@ import {
   formatSyncTime,
 } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
 
 export function QueryDetailsPage() {
   const { repositoryId, queryId } = useParams();
@@ -136,23 +137,13 @@ export function QueryDetailsPage() {
     <div className="space-y-6">
       <header className="grid grid-cols-1 items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div className="sm:col-start-1 sm:row-start-1">
-          <nav className="text-sm">
-            <Link className="font-medium text-muted-foreground hover:text-foreground" to="/dashboard">
-              Portfolio
-            </Link>
-            <span className="mx-2 text-muted-foreground" aria-hidden="true">
-              ›
-            </span>
-            <Link className="font-medium text-muted-foreground hover:text-foreground" to={`/repositories/${repo.id}`}>
-              {repo.fullName}
-            </Link>
-            <span className="mx-2 text-muted-foreground" aria-hidden="true">
-              ›
-            </span>
-            <Link className="font-medium text-muted-foreground hover:text-foreground" to={`/repositories/${repo.id}?tab=search`}>
-              Search Visibility
-            </Link>
-          </nav>
+          <PageBreadcrumb
+            items={[
+              { label: "Portfolio", to: "/dashboard" },
+              { label: repo.fullName, to: `/repositories/${repo.id}` },
+              { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
+            ]}
+          />
           <h1 className="mt-2 break-all text-xl font-semibold">{history.query.query}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Last checked: {formatSyncTime(history.lastChecked) ?? "—"}
@@ -186,18 +177,18 @@ export function QueryDetailsPage() {
           <p className="text-sm text-muted-foreground">No search snapshot yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[880px] table-fixed text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground">
-                  <th className="py-2">#</th>
-                  <th>Repository</th>
-                  <th className="text-right">Stars</th>
-                  <th className="text-right">Watchers</th>
-                  <th className="text-right">Forks</th>
-                  <th className="text-right">Contributors</th>
-                  <th>Last Activity</th>
-                  <th>Activity</th>
-                  <th className="text-right">Δ</th>
+                  <th className="w-10 whitespace-nowrap px-4 py-2">#</th>
+                  <th className="whitespace-nowrap px-4 py-2">Repository</th>
+                  <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Stars</th>
+                  <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Watchers</th>
+                  <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Forks</th>
+                  <th className="w-[8.5rem] whitespace-nowrap px-4 py-2 text-right">Contributors</th>
+                  <th className="w-[8.5rem] whitespace-nowrap px-4 py-2">Last Activity</th>
+                  <th className="w-[7rem] whitespace-nowrap px-4 py-2">Activity</th>
+                  <th className="w-16 whitespace-nowrap px-4 py-2 text-right">Δ</th>
                 </tr>
               </thead>
               <tbody>
@@ -209,8 +200,8 @@ export function QueryDetailsPage() {
                       className={`border-t ${mine ? "bg-blue-50 font-medium" : ""}`}
                       title={row.result.metadataUpdatedAt ? `Repository metadata updated: ${formatSyncTime(row.result.metadataUpdatedAt)}` : undefined}
                     >
-                      <td className="py-2">{row.result.position}</td>
-                      <td>
+                      <td className="whitespace-nowrap px-4 py-2.5">{row.result.position}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5">
                         {mine ? (
                           <Link className="text-primary hover:underline" to={`/repositories/${repo.id}`}>
                             {row.result.fullName}
@@ -226,13 +217,13 @@ export function QueryDetailsPage() {
                           </a>
                         )}
                       </td>
-                      <td className="text-right">{formatNumber(row.result.stars)}</td>
-                      <td className="text-right">{formatNumber(row.result.watchers)}</td>
-                      <td className="text-right">{formatNumber(row.result.forks)}</td>
-                      <td className="text-right">{formatNumber(row.result.contributors)}</td>
-                      <td>{formatRelativeTime(row.result.activityAt)}</td>
-                      <td>{formatActivity(row.result.activityStatus)}</td>
-                      <td className="text-right">{formatPositionDelta(row.positionDelta)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.stars)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.watchers)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.forks)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.contributors)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5">{formatRelativeTime(row.result.activityAt)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5">{formatActivity(row.result.activityStatus)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatPositionDelta(row.positionDelta)}</td>
                     </tr>
                   );
                 })}

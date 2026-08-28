@@ -18,6 +18,7 @@ public class SpaController {
             "/dashboard",
             "/repositories",
             "/repositories/{id:[0-9]+}",
+            "/repositories/{id:[0-9]+}/search-queries/{queryId:[0-9]+}",
             "/search-runs/{id:[0-9]+}"
     }, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<Resource> spa(HttpServletRequest request) {

@@ -11,6 +11,7 @@ import {
 } from "../lib/api";
 import { calendarDates, cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
+import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, type Period } from "../components/PeriodSelector";
 
 type Tab = "overview" | "traffic" | "search";
@@ -164,20 +165,22 @@ export function RepositoryDetailsPage() {
   return (
     <div className="space-y-6">
       <header className="grid grid-cols-1 items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <h1 className="min-w-0 text-xl font-semibold leading-snug sm:col-start-1 sm:row-start-1">
-          <Link className="text-sm font-medium text-muted-foreground hover:text-foreground" to="/dashboard">
-            Portfolio
-          </Link>
-          <span className="mx-2 text-sm font-normal text-muted-foreground" aria-hidden="true">
-            ›
-          </span>
-          <span className="break-all">{repo.fullName}</span>
-        </h1>
-        {repo.description && (
-          <p className="text-sm font-normal text-muted-foreground sm:col-start-1 sm:row-start-2">
-            {repo.description}
-          </p>
-        )}
+        <div className="min-w-0 sm:col-start-1 sm:row-start-1">
+          <PageBreadcrumb
+            items={[
+              { label: "Portfolio", to: "/dashboard" },
+              {
+                label: repo.fullName,
+                to: tab === "overview" ? undefined : `/repositories/${repo.id}`,
+              },
+              ...(tab === "search" ? [{ label: "Search Visibility" }] : []),
+              ...(tab === "traffic" ? [{ label: "Traffic" }] : []),
+            ]}
+          />
+          {repo.description && (
+            <p className="mt-1 text-sm font-normal text-muted-foreground">{repo.description}</p>
+          )}
+        </div>
         <Button
           className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
           disabled={busy}
@@ -514,12 +517,12 @@ function SearchPanel({
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground">
-              <th>Search Query</th>
-              <th className="text-right">Rank</th>
-              <th className="text-right">7d</th>
-              <th className="text-right">30d</th>
-              <th className="text-right">Best</th>
-              <th />
+              <th className="py-2 pr-4">Search Query</th>
+              <th className="px-3 py-2 text-right">Rank</th>
+              <th className="px-3 py-2 text-right">7d</th>
+              <th className="px-3 py-2 text-right">30d</th>
+              <th className="px-3 py-2 text-right">Best</th>
+              <th className="pl-3 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -536,7 +539,7 @@ function SearchPanel({
                   onMouseEnter={() => setHoveredQueryId(item.query.id)}
                   onMouseLeave={() => setHoveredQueryId(null)}
                 >
-                  <td className="py-3">
+                  <td className="py-3 pr-4">
                     <Link
                       className="text-primary hover:underline"
                       to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
@@ -544,11 +547,11 @@ function SearchPanel({
                       {item.query.name}
                     </Link>
                   </td>
-                  <td className="text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
-                  <td className="text-right">{formatDelta(item.change7d)}</td>
-                  <td className="text-right">{formatDelta(item.change30d)}</td>
-                  <td className="text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
-                  <td className="text-right">
+                  <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
+                  <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
+                  <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
+                  <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
+                  <td className="py-3 pl-3 text-right">
                     <Button
                       className="bg-muted text-foreground"
                       disabled={running}
