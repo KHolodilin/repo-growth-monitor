@@ -151,10 +151,9 @@ function StarsKpi({ stars, period }: { stars: { total: number; change: number | 
       <div className="mt-2 text-2xl font-semibold">
         {formatNumber(stars.total)} <span className="text-sm font-normal text-muted-foreground">total</span>
       </div>
-      {period !== "all" && change !== null && change !== undefined && (
-        <div className={cn("mt-2 text-sm font-medium", change > 0 ? "text-emerald-700" : change < 0 ? "text-red-700" : "text-muted-foreground")}>
-          {change > 0 ? "+" : ""}
-          {formatNumber(change)} in {period}
+      {period !== "all" && (
+        <div className={cn("mt-2 text-sm font-medium", (change ?? 0) > 0 ? "text-emerald-700" : (change ?? 0) < 0 ? "text-red-700" : "text-muted-foreground")}>
+          {change !== null && change !== undefined ? `${change > 0 ? "+" : ""}${formatNumber(change)} in ${period}` : "—"}
         </div>
       )}
     </Card>

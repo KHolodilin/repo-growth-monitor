@@ -1,8 +1,10 @@
 package com.kholodilin.repogrowth.github.client;
 
+import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
+import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPathResponse;
 import com.kholodilin.repogrowth.github.model.GitHubReferrerResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
@@ -129,6 +131,35 @@ public class GitHubClient {
                 : response.getBody(), new TypeReference<List<Object>>() {
         });
         return items.size();
+    }
+
+    public Optional<Instant> latestCommitAt(String owner, String name) {
+        requireToken();
+        try {
+            ResponseEntity<byte[]> response = execute(
+                    "latestCommit",
+                    "GET",
+                    "/repos/" + owner + "/" + name + "/commits?per_page=1"
+            );
+            byte[] body = response.getBody();
+            if (body == null || body.length == 0) {
+                return Optional.empty();
+            }
+            List<GitHubCommitResponse> commits = read(body, new TypeReference<List<GitHubCommitResponse>>() {
+            });
+            if (commits.isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(commits.getFirst().committedAt());
+        } catch (GitHubException ex) {
+            if (ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED
+                    || ex.retryable()) {
+                throw ex;
+            }
+            log.warn("Latest commit lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
+            return Optional.empty();
+        }
     }
 
     public GitHubSearchResponse searchRepositories(String query, int limit) {

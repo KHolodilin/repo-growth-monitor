@@ -38,6 +38,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -223,6 +224,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         Repository updated = repositoryJdbcRepository.findById(repository.id()).orElseThrow();
         assertThat(updated.watchers()).isEqualTo(5);
         assertThat(updated.stars()).isEqualTo(11);
+        assertThat(updated.lastCommitAt()).isEqualTo(Instant.parse("2026-08-28T07:54:00Z"));
     }
 
     @Test
@@ -332,6 +334,8 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), Instant.now(), owner
         ));
         when(gitHubClient.countContributors(anyString(), anyString())).thenReturn(4);
+        when(gitHubClient.latestCommitAt(anyString(), anyString()))
+                .thenReturn(Optional.of(Instant.parse("2026-08-28T07:54:00Z")));
         when(gitHubClient.searchRepositories(anyString(), anyInt())).thenReturn(
                 new com.kholodilin.repogrowth.github.model.GitHubSearchResponse(1, List.of())
         );

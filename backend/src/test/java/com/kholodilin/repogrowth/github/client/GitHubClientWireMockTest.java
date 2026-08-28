@@ -182,4 +182,15 @@ class GitHubClientWireMockTest {
                         .withBody("[{\"login\":\"a\"}]")));
         assertThat(client.countContributors("acme", "a")).isEqualTo(18);
     }
+
+    @Test
+    void readsLatestCommitTimestamp() {
+        wireMock.stubFor(get("/repos/acme/a/commits?per_page=1")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"sha":"abc","commit":{"author":{"date":"2026-08-27T10:00:00Z"},"committer":{"date":"2026-08-28T07:54:00Z"}}}]
+                                """)));
+        assertThat(client.latestCommitAt("acme", "a")).contains(java.time.Instant.parse("2026-08-28T07:54:00Z"));
+    }
 }

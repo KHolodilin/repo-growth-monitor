@@ -91,6 +91,31 @@ export function formatActivity(status?: string | null) {
   return "Unknown";
 }
 
+export function formatActivityPresentation(status?: string | null, iso?: string | null) {
+  const label = formatActivity(status);
+  if (label === "Unknown") {
+    return "Unknown";
+  }
+  const relative = formatRelativeTime(iso);
+  if (!iso || relative === "—") {
+    return label;
+  }
+  return `${label} · ${relative}`;
+}
+
+export function activityClass(status?: string | null) {
+  if (status === "ACTIVE") {
+    return "text-emerald-700";
+  }
+  if (status === "LOW_ACTIVITY") {
+    return "text-amber-700";
+  }
+  if (status === "INACTIVE") {
+    return "text-slate-500";
+  }
+  return "text-muted-foreground";
+}
+
 export function calendarDates(dates: string[]): string[] {
   const sorted = [...new Set(dates)].sort();
   if (sorted.length === 0) {

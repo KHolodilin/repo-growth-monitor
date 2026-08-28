@@ -9,7 +9,8 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { calendarDates, cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, type Period } from "../components/PeriodSelector";
@@ -259,6 +260,8 @@ function Overview({
           <dd>{repo.language ?? "—"}</dd>
           <dt className="text-muted-foreground">Default branch</dt>
           <dd>{repo.defaultBranch ?? "—"}</dd>
+          <dt className="text-muted-foreground">Last commit</dt>
+          <dd>{formatSyncTime(repo.lastCommitAt) ?? "—"}</dd>
           <dt className="text-muted-foreground">Last GitHub update</dt>
           <dd>{formatSyncTime(repo.githubUpdatedAt) ?? "—"}</dd>
           <dt className="text-muted-foreground">GitHub</dt>
@@ -391,7 +394,7 @@ function TrafficPanel({
           return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
         },
       },
-      legend: { data: ["Views", "Visitors", "Clones", "Unique cloners"] },
+      legend: { data: ["Views", "Visitors", "Clones"] },
       grid: { left: 16, right: 16, top: 40, bottom: 24, containLabel: true },
       xAxis: { type: "category", data: traffic.traffic.map((point) => point.date), boundaryGap: false },
       yAxis: { type: "value" },
@@ -399,7 +402,6 @@ function TrafficPanel({
         { name: "Views", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.views ?? null) },
         { name: "Visitors", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.uniqueVisitors ?? null) },
         { name: "Clones", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.clones ?? null) },
-        { name: "Unique cloners", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.uniqueCloners ?? null) },
       ],
     }),
     [traffic],
@@ -522,6 +524,7 @@ function SearchPanel({
               <th className="px-3 py-2 text-right">7d</th>
               <th className="px-3 py-2 text-right">30d</th>
               <th className="px-3 py-2 text-right">Best</th>
+              <th className="px-3 py-2 text-right">Results</th>
               <th className="pl-3 py-2" />
             </tr>
           </thead>
@@ -551,6 +554,7 @@ function SearchPanel({
                   <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
                   <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
                   <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
+                  <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
                   <td className="py-3 pl-3 text-right">
                     <Button
                       className="bg-muted text-foreground"
@@ -579,52 +583,18 @@ function CombinedRankChart({
   highlightQueryId: number | null;
 }) {
   const option = useMemo(() => {
-    const dates = calendarDates(visibility.flatMap((item) => item.points.map((point) => point.date)));
-    const maxLimit = Math.max(50, ...visibility.map((item) => item.query.resultLimit));
-    const rankLabel = (value: number | null | undefined) => {
-      if (value == null) {
-        return "no data";
-      }
-      return value > maxLimit ? `>${maxLimit}` : `#${value}`;
-    };
-    return {
-      tooltip: {
-        trigger: "axis",
-        formatter: (params: { marker: string; seriesName: string; value: number | null }[]) =>
-          params.map((item) => `${item.marker}${item.seriesName}: ${rankLabel(item.value)}`).join("<br/>"),
-      },
-      legend: { type: "scroll" },
-      grid: { left: 24, right: 16, top: 48, bottom: 24, containLabel: true },
-      xAxis: { type: "category", data: dates, boundaryGap: false },
-      yAxis: {
-        type: "value",
-        inverse: true,
-        min: 1,
-        max: maxLimit + 1,
-        axisLabel: {
-          formatter: (value: number) => (value > maxLimit ? `>${maxLimit}` : `#${value}`),
-        },
-      },
-      series: visibility.map((item) => {
-        const highlighted = highlightQueryId === item.query.id;
-        const dimmed = highlightQueryId != null && !highlighted;
-        return {
-          name: item.query.name,
-          type: "line",
-          connectNulls: false,
-          showSymbol: true,
-          lineStyle: { width: highlighted ? 3.5 : 2, opacity: dimmed ? 0.25 : 1 },
-          itemStyle: { opacity: dimmed ? 0.25 : 1 },
-          data: dates.map((date) => {
-            const point = item.points.find((entry) => entry.date === date);
-            if (!point) {
-              return null;
-            }
-            return point.position ?? item.query.resultLimit + 1;
-          }),
-        };
-      }),
-    };
+    const dates = datesFromHistory(visibility.map((item) => item.points));
+    return rankHistoryOption({
+      dates,
+      legend: true,
+      series: visibility.map((item) => ({
+        name: item.query.name,
+        points: item.points,
+        limit: item.query.resultLimit,
+        highlighted: highlightQueryId === item.query.id,
+        dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
+      })),
+    });
   }, [visibility, highlightQueryId]);
 
   if (visibility.length === 0) {

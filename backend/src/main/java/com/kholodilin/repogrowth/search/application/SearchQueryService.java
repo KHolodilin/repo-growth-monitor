@@ -112,7 +112,19 @@ public class SearchQueryService {
         Instant lastChecked = latestRun == null ? null : (latestRun.completedAt() != null ? latestRun.completedAt() : latestRun.startedAt());
         String searchStatus = latestRun == null ? null : latestRun.status().name();
         String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
-        return new SearchHistory(query, current, change7, change30, best, points, lastChecked, searchStatus, enrichmentStatus);
+        Integer totalResults = runs.isEmpty() ? null : runs.get(runs.size() - 1).totalCount();
+        return new SearchHistory(
+                query,
+                current,
+                change7,
+                change30,
+                best,
+                points,
+                lastChecked,
+                searchStatus,
+                enrichmentStatus,
+                totalResults
+        );
     }
 
     public SearchRunResults latestResults(long searchQueryId) {
@@ -182,7 +194,8 @@ public class SearchQueryService {
             List<RankPoint> points,
             Instant lastChecked,
             String searchStatus,
-            String enrichmentStatus
+            String enrichmentStatus,
+            Integer totalResults
     ) {
     }
 

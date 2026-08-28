@@ -49,7 +49,7 @@ public class RepositoryEnricher {
 
     public SearchResult fromSearchItem(long searchRunId, int position, GitHubSearchItem item) {
         String ownerLogin = item.owner() == null ? "" : item.owner().login();
-        Instant activityAt = item.pushedAt() != null ? item.pushedAt() : item.updatedAt();
+        Instant activityAt = item.pushedAt();
         return new SearchResult(
                 null,
                 searchRunId,
@@ -87,7 +87,13 @@ public class RepositoryEnricher {
             log.warn("Contributor count failed fullName={} error={}", snapshot.fullName(), ex.errorCode());
         }
         Instant now = Instant.now(clock);
-        Repository stored = persist(item, remote, contributors, now);
+        Instant lastCommitAt = cached == null ? null : cached.lastCommitAt();
+        try {
+            lastCommitAt = gitHubClient.latestCommitAt(owner, name).orElse(lastCommitAt);
+        } catch (GitHubException ex) {
+            log.warn("Latest commit lookup failed fullName={} error={}", snapshot.fullName(), ex.errorCode());
+        }
+        Repository stored = persist(item, remote, contributors, lastCommitAt, now);
         return applyCache(snapshot, stored);
     }
 
@@ -124,7 +130,13 @@ public class RepositoryEnricher {
         );
     }
 
-    private Repository persist(GitHubSearchItem item, GitHubRepositoryResponse remote, int contributors, Instant enrichedAt) {
+    private Repository persist(
+            GitHubSearchItem item,
+            GitHubRepositoryResponse remote,
+            int contributors,
+            Instant lastCommitAt,
+            Instant enrichedAt
+    ) {
         GitHubOwnerResponse ownerResponse = remote.owner() != null ? remote.owner() : item.owner();
         OwnerType ownerType = ownerResponse != null && "Organization".equalsIgnoreCase(ownerResponse.type())
                 ? OwnerType.ORGANIZATION
@@ -157,7 +169,7 @@ public class RepositoryEnricher {
                 remote.createdAt(),
                 remote.updatedAt(),
                 remote.pushedAt(),
-                null,
+                lastCommitAt,
                 null,
                 enrichedAt,
                 null,

@@ -1,0 +1,64 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/acme/spring-outbox/commits"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          {
+            "sha": "aaa111",
+            "commit": {
+              "author": { "date": "2026-08-28T07:54:00Z" },
+              "committer": { "date": "2026-08-28T07:54:00Z" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/acme/kafka-starter/commits"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          {
+            "sha": "bbb222",
+            "commit": {
+              "author": { "date": "2026-08-26T07:54:00Z" },
+              "committer": { "date": "2026-08-26T07:54:00Z" }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/repos/.*/.*/commits"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": [
+          {
+            "sha": "ccc333",
+            "commit": {
+              "author": { "date": "2026-08-26T11:00:00Z" },
+              "committer": { "date": "2026-08-26T11:00:00Z" }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

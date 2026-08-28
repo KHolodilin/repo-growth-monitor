@@ -3,15 +3,15 @@ import { Link, useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import { api, type Repository, type SearchHistory, type SearchRunResults } from "../lib/api";
 import {
-  calendarDates,
-  formatActivity,
+  activityClass,
+  formatActivityPresentation,
   formatDelta,
   formatNumber,
   formatPositionDelta,
   formatRank,
-  formatRelativeTime,
   formatSyncTime,
 } from "../lib/utils";
+import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 
@@ -79,44 +79,17 @@ export function QueryDetailsPage() {
     if (!history) {
       return null;
     }
-    const limit = history.query.resultLimit;
-    const dates = calendarDates(history.points.map((point) => point.date));
-    const rankLabel = (value: number | null | undefined) => {
-      if (value == null) {
-        return "no data";
-      }
-      return value > limit ? `>${limit}` : `#${value}`;
-    };
-    return {
-      tooltip: {
-        trigger: "axis",
-        formatter: (params: { marker: string; seriesName: string; value: number | null }[]) =>
-          params.map((item) => `${item.marker}${rankLabel(item.value)}`).join("<br/>"),
-      },
-      grid: { left: 24, right: 16, top: 24, bottom: 24, containLabel: true },
-      xAxis: { type: "category", data: dates, boundaryGap: false },
-      yAxis: {
-        type: "value",
-        inverse: true,
-        min: 1,
-        max: limit + 1,
-        axisLabel: { formatter: (value: number) => (value > limit ? `>${limit}` : `#${value}`) },
-      },
+    const dates = datesFromHistory([history.points]);
+    return rankHistoryOption({
+      dates,
       series: [
         {
-          type: "line",
-          connectNulls: false,
-          showSymbol: true,
-          data: dates.map((date) => {
-            const point = history.points.find((entry) => entry.date === date);
-            if (!point) {
-              return null;
-            }
-            return point.position ?? limit + 1;
-          }),
+          name: history.query.name,
+          points: history.points,
+          limit: history.query.resultLimit,
         },
       ],
-    };
+    });
   }, [history]);
 
   if (error) {
@@ -161,7 +134,7 @@ export function QueryDetailsPage() {
         <Kpi label="7d Change" value={formatDelta(history.change7d)} />
         <Kpi label="30d Change" value={formatDelta(history.change30d)} />
         <Kpi label="Best Rank" value={formatRank(history.bestRank, history.query.resultLimit)} />
-        <Kpi label="Last Checked" value={formatSyncTime(history.lastChecked) ?? "—"} />
+        <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
       </div>
 
       {option && (
@@ -177,7 +150,7 @@ export function QueryDetailsPage() {
           <p className="text-sm text-muted-foreground">No search snapshot yet.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] table-fixed text-sm">
+            <table className="w-full min-w-[760px] table-fixed text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground">
                   <th className="w-10 whitespace-nowrap px-4 py-2">#</th>
@@ -186,8 +159,7 @@ export function QueryDetailsPage() {
                   <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Watchers</th>
                   <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Forks</th>
                   <th className="w-[8.5rem] whitespace-nowrap px-4 py-2 text-right">Contributors</th>
-                  <th className="w-[8.5rem] whitespace-nowrap px-4 py-2">Last Activity</th>
-                  <th className="w-[7rem] whitespace-nowrap px-4 py-2">Activity</th>
+                  <th className="w-[10rem] whitespace-nowrap px-4 py-2">Activity</th>
                   <th className="w-16 whitespace-nowrap px-4 py-2 text-right">Δ</th>
                 </tr>
               </thead>
@@ -221,8 +193,9 @@ export function QueryDetailsPage() {
                       <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.watchers)}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.forks)}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.contributors)}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5">{formatRelativeTime(row.result.activityAt)}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5">{formatActivity(row.result.activityStatus)}</td>
+                      <td className={activityClass(row.result.activityStatus) + " whitespace-nowrap px-4 py-2.5"}>
+                        {formatActivityPresentation(row.result.activityStatus, row.result.activityAt)}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatPositionDelta(row.positionDelta)}</td>
                     </tr>
                   );

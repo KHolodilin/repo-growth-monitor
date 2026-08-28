@@ -48,6 +48,13 @@ public class RepositoryStatsCollector implements Collector {
             log.warn("Contributor count failed repository={} error={}", context.repository().fullName(), ex.getMessage());
         }
         int resolvedContributors = contributors;
+        java.time.Instant lastCommitAt = null;
+        try {
+            lastCommitAt = gitHubClient.latestCommitAt(context.ownerLogin(), context.repository().name()).orElse(null);
+        } catch (RuntimeException ex) {
+            log.warn("Latest commit lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
+        }
+        java.time.Instant resolvedLastCommitAt = lastCommitAt;
         transactionTemplate.executeWithoutResult(status -> {
             repositoryJdbcRepository.updateStats(
                     context.repository().id(),
@@ -58,7 +65,7 @@ public class RepositoryStatsCollector implements Collector {
                     resolvedContributors,
                     remote.updatedAt(),
                     remote.pushedAt(),
-                    null,
+                    resolvedLastCommitAt,
                     java.time.Instant.now()
             );
             trafficJdbcRepository.upsertDailyStats(

@@ -136,6 +136,7 @@ export type SearchHistory = {
   lastChecked?: string | null;
   searchStatus?: string | null;
   enrichmentStatus?: string | null;
+  totalResults?: number | null;
 };
 
 export type SearchRunResults = {

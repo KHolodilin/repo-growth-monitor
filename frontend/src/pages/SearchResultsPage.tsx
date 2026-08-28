@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type SearchRunResults } from "../lib/api";
-import { formatActivity, formatNumber, formatPositionDelta, formatRank, formatRelativeTime, formatSyncTime } from "../lib/utils";
+import { activityClass, formatActivityPresentation, formatNumber, formatPositionDelta, formatRank, formatSyncTime } from "../lib/utils";
 import { Card } from "../components/ui";
 
 export function SearchResultsPage() {
@@ -37,7 +37,7 @@ export function SearchResultsPage() {
       </div>
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[880px] table-fixed text-sm">
+          <table className="w-full min-w-[760px] table-fixed text-sm">
             <thead>
               <tr className="text-left text-muted-foreground">
                 <th className="w-10 whitespace-nowrap px-4 py-2">#</th>
@@ -46,8 +46,7 @@ export function SearchResultsPage() {
                 <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Watchers</th>
                 <th className="w-[7.5rem] whitespace-nowrap px-4 py-2 text-right">Forks</th>
                 <th className="w-[8.5rem] whitespace-nowrap px-4 py-2 text-right">Contributors</th>
-                <th className="w-[8.5rem] whitespace-nowrap px-4 py-2">Last Activity</th>
-                <th className="w-[7rem] whitespace-nowrap px-4 py-2">Activity</th>
+                <th className="w-[10rem] whitespace-nowrap px-4 py-2">Activity</th>
                 <th className="w-16 whitespace-nowrap px-4 py-2 text-right">Δ</th>
               </tr>
             </thead>
@@ -85,8 +84,9 @@ export function SearchResultsPage() {
                     <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.watchers)}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.forks)}</td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatNumber(row.result.contributors)}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5">{formatRelativeTime(row.result.activityAt)}</td>
-                    <td className="whitespace-nowrap px-4 py-2.5">{formatActivity(row.result.activityStatus)}</td>
+                    <td className={activityClass(row.result.activityStatus) + " whitespace-nowrap px-4 py-2.5"}>
+                      {formatActivityPresentation(row.result.activityStatus, row.result.activityAt)}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-2.5 text-right">{formatPositionDelta(row.positionDelta)}</td>
                   </tr>
                 );
