@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.repository.api;
 
 import java.time.Instant;
+import java.util.List;
 
 public record RepositoryResponse(
         long id,
@@ -25,6 +26,8 @@ public record RepositoryResponse(
         String githubUrl,
         String activityStatus,
         Instant lastActivityAt,
+        List<String> topics,
+        RepositoryHealthResponse health,
         OwnerResponse owner
 ) {
     public record OwnerResponse(

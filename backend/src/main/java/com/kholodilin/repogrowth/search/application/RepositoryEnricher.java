@@ -148,7 +148,7 @@ public class RepositoryEnricher {
                 ownerResponse == null ? null : ownerResponse.avatarUrl(),
                 ownerResponse == null ? null : ownerResponse.htmlUrl()
         );
-        return repositoryJdbcRepository.upsertKeepingTracking(new Repository(
+        Repository stored = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null,
                 remote.id(),
                 owner.id(),
@@ -175,6 +175,8 @@ public class RepositoryEnricher {
                 null,
                 null
         ));
+        repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
+        return stored;
     }
 
     private static String nameFromFullName(String fullName) {

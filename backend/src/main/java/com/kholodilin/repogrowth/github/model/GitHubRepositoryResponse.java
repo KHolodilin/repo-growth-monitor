@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
+import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubRepositoryResponse(
@@ -25,7 +26,10 @@ public record GitHubRepositoryResponse(
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("updated_at") Instant updatedAt,
         @JsonProperty("pushed_at") Instant pushedAt,
-        GitHubOwnerResponse owner
+        GitHubOwnerResponse owner,
+        List<String> topics,
+        String homepage,
+        GitHubLicenseResponse license
 ) {
     public String resolvedVisibility() {
         if (visibility != null && !visibility.isBlank()) {
@@ -36,5 +40,25 @@ public record GitHubRepositoryResponse(
 
     public int watchers() {
         return subscribersCount == null ? 0 : subscribersCount;
+    }
+
+    public List<String> topicsOrEmpty() {
+        if (topics == null || topics.isEmpty()) {
+            return List.of();
+        }
+        return topics.stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    public boolean hasHomepage() {
+        return homepage != null && !homepage.isBlank();
+    }
+
+    public boolean hasLicense() {
+        return license != null && license.key() != null && !license.key().isBlank();
     }
 }

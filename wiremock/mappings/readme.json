@@ -1,0 +1,36 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/acme/kafka-starter/readme"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "name": "README.md",
+          "encoding": "utf-8",
+          "content": "# kafka-starter\n\nProduction-ready Transactional Outbox Pattern for Spring Boot 4 with Kafka and PostgreSQL.\n"
+        }
+      }
+    },
+    {
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/repos/[^/]+/[^/]+/readme"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "name": "README.md",
+          "encoding": "utf-8",
+          "content": "# Project\n\nSample repository.\n"
+        }
+      }
+    }
+  ]
+}

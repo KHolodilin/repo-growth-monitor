@@ -1,0 +1,49 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/acme/kafka-starter/community/profile"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "health_percentage": 100,
+          "files": {
+            "code_of_conduct": { "url": "https://api.github.com/repos/acme/kafka-starter/community/code_of_conduct" },
+            "code_of_conduct_file": { "url": "https://api.github.com/repos/acme/kafka-starter/contents/CODE_OF_CONDUCT.md" },
+            "contributing": { "url": "https://api.github.com/repos/acme/kafka-starter/contents/CONTRIBUTING.md" },
+            "issue_template": { "url": "https://api.github.com/repos/acme/kafka-starter/contents/.github/ISSUE_TEMPLATE" },
+            "pull_request_template": { "url": "https://api.github.com/repos/acme/kafka-starter/contents/.github/PULL_REQUEST_TEMPLATE.md" },
+            "license": { "key": "mit", "name": "MIT License" },
+            "readme": { "url": "https://api.github.com/repos/acme/kafka-starter/readme" }
+          }
+        }
+      }
+    },
+    {
+      "priority": 10,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/repos/[^/]+/[^/]+/community/profile"
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": {
+          "health_percentage": 40,
+          "files": {
+            "readme": { "url": "https://api.github.com/repos/example/readme" },
+            "license": null,
+            "code_of_conduct": null,
+            "contributing": null,
+            "issue_template": null,
+            "pull_request_template": null
+          }
+        }
+      }
+    }
+  ]
+}

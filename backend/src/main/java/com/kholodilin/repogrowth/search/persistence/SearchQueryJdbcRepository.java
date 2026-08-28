@@ -86,6 +86,13 @@ public class SearchQueryJdbcRepository {
                 .list();
     }
 
+    public int countByRepository(long repositoryId) {
+        return jdbcClient.sql("SELECT COUNT(*) FROM search_query WHERE repository_id = :repositoryId")
+                .param("repositoryId", repositoryId)
+                .query(Integer.class)
+                .single();
+    }
+
     public void delete(long id) {
         jdbcClient.sql("DELETE FROM search_query WHERE id = :id")
                 .param("id", id)

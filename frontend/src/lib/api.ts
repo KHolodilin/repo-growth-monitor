@@ -47,6 +47,18 @@ export type Repository = {
   contributors: number;
   activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
   lastActivityAt?: string | null;
+  topics?: string[];
+  health?: RepositoryHealth;
+};
+
+export type HealthCheckItem = {
+  label: string;
+  passed: boolean;
+};
+
+export type RepositoryHealth = {
+  discoverability: HealthCheckItem[];
+  communityStandards: HealthCheckItem[];
 };
 
 export type Dashboard = {

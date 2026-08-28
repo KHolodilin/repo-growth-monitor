@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-repository-health
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE repository_health (
+                  repository_id                 BIGINT PRIMARY KEY REFERENCES repository (id) ON DELETE CASCADE,
+                  homepage                      TEXT,
+                  has_readme                    BOOLEAN NOT NULL DEFAULT FALSE,
+                  readme_has_h1                 BOOLEAN NOT NULL DEFAULT FALSE,
+                  readme_has_name               BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_license                   BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_code_of_conduct           BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_contributing              BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_security_policy           BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_issue_template            BOOLEAN NOT NULL DEFAULT FALSE,
+                  has_pull_request_template     BOOLEAN NOT NULL DEFAULT FALSE,
+                  updated_at                    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );

@@ -11,3 +11,9 @@ databaseChangeLog:
       file: db/changelog/005-watchers.yaml
   - include:
       file: db/changelog/006-search-visibility.yaml
+  - include:
+      file: db/changelog/007-repository-topics.yaml
+  - include:
+      file: db/changelog/008-rename-repository-topics.yaml
+  - include:
+      file: db/changelog/009-repository-health.yaml

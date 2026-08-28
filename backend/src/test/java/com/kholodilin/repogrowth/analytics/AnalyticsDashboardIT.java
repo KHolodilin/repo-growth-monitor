@@ -58,6 +58,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         jdbcClient.sql("DELETE FROM search_result").update();
         jdbcClient.sql("DELETE FROM search_run").update();
         jdbcClient.sql("DELETE FROM search_query").update();
+        jdbcClient.sql("DELETE FROM repository_health").update();
+        jdbcClient.sql("DELETE FROM repository_topics").update();
         jdbcClient.sql("DELETE FROM repository").update();
         jdbcClient.sql("DELETE FROM github_owner").update();
     }

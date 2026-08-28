@@ -83,7 +83,7 @@ public class RepositoryService {
                     ownerResponse.avatarUrl(),
                     ownerResponse.htmlUrl()
             );
-            repositoryJdbcRepository.upsertKeepingTracking(new Repository(
+            Repository stored = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                     null,
                     remote.id(),
                     owner.id(),
@@ -110,6 +110,11 @@ public class RepositoryService {
                     null,
                     null
             ));
+            repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
         }
+    }
+
+    public List<String> topics(long repositoryId) {
+        return repositoryJdbcRepository.findTopics(repositoryId);
     }
 }

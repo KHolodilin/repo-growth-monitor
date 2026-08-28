@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.repository.api;
 
+import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
@@ -20,10 +21,16 @@ import java.util.List;
 public class RepositoryController {
 
     private final RepositoryService repositoryService;
+    private final RepositoryHealthService repositoryHealthService;
     private final ActivityClassifier activityClassifier;
 
-    public RepositoryController(RepositoryService repositoryService, ActivityClassifier activityClassifier) {
+    public RepositoryController(
+            RepositoryService repositoryService,
+            RepositoryHealthService repositoryHealthService,
+            ActivityClassifier activityClassifier
+    ) {
         this.repositoryService = repositoryService;
+        this.repositoryHealthService = repositoryHealthService;
         this.activityClassifier = activityClassifier;
     }
 
@@ -67,6 +74,8 @@ public class RepositoryController {
                 "https://github.com/" + repository.fullName(),
                 activityClassifier.classify(repository.archived(), repository.activityAt()).name(),
                 repository.activityAt(),
+                repositoryService.topics(repository.id()),
+                repositoryHealthService.forRepository(repository),
                 new RepositoryResponse.OwnerResponse(
                         owner.id(),
                         owner.githubId(),

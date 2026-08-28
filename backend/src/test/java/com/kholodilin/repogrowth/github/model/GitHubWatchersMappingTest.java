@@ -30,6 +30,24 @@ class GitHubWatchersMappingTest {
     }
 
     @Test
+    void topicsAreMappedAndNormalized() throws Exception {
+        GitHubRepositoryResponse response = mapper.readValue("""
+                {
+                  "id": 1002,
+                  "name": "kafka-starter",
+                  "full_name": "acme/kafka-starter",
+                  "stargazers_count": 41,
+                  "subscribers_count": 12,
+                  "forks_count": 6,
+                  "open_issues_count": 2,
+                  "topics": ["spring-boot", "kafka", " kafka ", "outbox"],
+                  "owner": { "id": 42, "login": "acme", "type": "User" }
+                }
+                """, GitHubRepositoryResponse.class);
+        assertThat(response.topicsOrEmpty()).containsExactly("kafka", "outbox", "spring-boot");
+    }
+
+    @Test
     void missingSubscribersCountDefaultsToZero() throws Exception {
         GitHubRepositoryResponse response = mapper.readValue("""
                 {

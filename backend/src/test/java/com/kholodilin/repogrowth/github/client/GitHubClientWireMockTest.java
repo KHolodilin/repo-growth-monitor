@@ -83,6 +83,18 @@ class GitHubClientWireMockTest {
     }
 
     @Test
+    void readsRepositoryTopics() {
+        wireMock.stubFor(get("/repos/acme/kafka-starter")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"id":1002,"name":"kafka-starter","full_name":"acme/kafka-starter","private":true,"fork":false,"archived":false,"stargazers_count":41,"forks_count":6,"open_issues_count":2,"topics":["spring-boot","kafka","outbox"],"owner":{"id":42,"login":"acme","type":"User"}}
+                                """)));
+        var repo = client.getRepository("acme", "kafka-starter");
+        assertThat(repo.topicsOrEmpty()).containsExactly("kafka", "outbox", "spring-boot");
+    }
+
+    @Test
     void emptyReferrers() {
         wireMock.stubFor(get("/repos/acme/a/traffic/popular/referrers")
                 .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));

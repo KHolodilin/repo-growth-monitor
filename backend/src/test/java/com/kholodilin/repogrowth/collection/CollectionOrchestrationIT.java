@@ -12,6 +12,8 @@ import com.kholodilin.repogrowth.collection.worker.CollectionWorker;
 import com.kholodilin.repogrowth.collection.worker.RepositoryLock;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
+import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
+import com.kholodilin.repogrowth.github.model.GitHubLicenseResponse;
 import com.kholodilin.repogrowth.github.model.GitHubOwnerResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPathResponse;
 import com.kholodilin.repogrowth.github.model.GitHubReferrerResponse;
@@ -93,6 +95,8 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         jdbcClient.sql("DELETE FROM traffic_referrer_snapshot").update();
         jdbcClient.sql("DELETE FROM traffic_daily").update();
         jdbcClient.sql("DELETE FROM repository_daily_stats").update();
+        jdbcClient.sql("DELETE FROM repository_health").update();
+        jdbcClient.sql("DELETE FROM repository_topics").update();
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, 200L, owner.id(), "demo", "acme/demo", "demo repo", "PUBLIC", "main", "Java",
@@ -225,6 +229,14 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         assertThat(updated.watchers()).isEqualTo(5);
         assertThat(updated.stars()).isEqualTo(11);
         assertThat(updated.lastCommitAt()).isEqualTo(Instant.parse("2026-08-28T07:54:00Z"));
+        assertThat(repositoryJdbcRepository.findTopics(repository.id())).containsExactly("kafka", "outbox");
+        assertThat(updated.lastReleaseAt()).isEqualTo(Instant.parse("2026-07-01T00:00:00Z"));
+        var health = repositoryJdbcRepository.findHealth(repository.id()).orElseThrow();
+        assertThat(health.hasReadme()).isTrue();
+        assertThat(health.readmeHasH1()).isTrue();
+        assertThat(health.hasLicense()).isTrue();
+        assertThat(health.hasSecurityPolicy()).isTrue();
+        assertThat(health.homepage()).isEqualTo("https://example.com/demo");
     }
 
     @Test
@@ -331,11 +343,21 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .thenReturn(List.of(new GitHubPathResponse("/acme/demo", "demo", 4, 2)));
         when(gitHubClient.getRepository(anyString(), anyString())).thenReturn(new GitHubRepositoryResponse(
                 200L, "demo", "acme/demo", "demo repo", false, "public", "main", "Java", false, false,
-                11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), Instant.now(), owner
+                11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), Instant.now(), owner,
+                List.of("kafka", "outbox"), "https://example.com/demo", new GitHubLicenseResponse("mit", "MIT License", "MIT")
         ));
         when(gitHubClient.countContributors(anyString(), anyString())).thenReturn(4);
         when(gitHubClient.latestCommitAt(anyString(), anyString()))
                 .thenReturn(Optional.of(Instant.parse("2026-08-28T07:54:00Z")));
+        when(gitHubClient.getCommunityProfile(anyString(), anyString())).thenReturn(new GitHubCommunityProfileResponse(
+                new GitHubCommunityProfileResponse.GitHubCommunityFiles(
+                        "readme", "license", "code", null, "contributing", "issue", "pr"
+                )
+        ));
+        when(gitHubClient.getReadme(anyString(), anyString())).thenReturn(Optional.of("# demo\n\nThe demo repository"));
+        when(gitHubClient.latestReleaseAt(anyString(), anyString()))
+                .thenReturn(Optional.of(Instant.parse("2026-07-01T00:00:00Z")));
+        when(gitHubClient.fileExists(anyString(), anyString(), anyString())).thenReturn(true);
         when(gitHubClient.searchRepositories(anyString(), anyInt())).thenReturn(
                 new com.kholodilin.repogrowth.github.model.GitHubSearchResponse(1, List.of())
         );

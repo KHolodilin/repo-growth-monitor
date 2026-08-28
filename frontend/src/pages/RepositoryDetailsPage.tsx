@@ -6,6 +6,7 @@ import {
   type CollectionJob,
   type CollectionRun,
   type Repository,
+  type RepositoryHealth,
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
@@ -13,7 +14,7 @@ import { cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../li
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
-import { PeriodSelector, type Period } from "../components/PeriodSelector";
+import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 
 type Tab = "overview" | "traffic" | "search";
 
@@ -29,7 +30,7 @@ export function RepositoryDetailsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab: Tab = tabParam === "traffic" || tabParam === "search" ? tabParam : "overview";
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = usePeriod(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
@@ -190,6 +191,7 @@ export function RepositoryDetailsPage() {
           {busy ? "Collecting..." : "Collect now"}
         </Button>
       </header>
+      {tab === "overview" && repo.health && <HealthScoreRow health={repo.health} />}
       <div className="inline-flex rounded-lg border bg-muted p-1">
         {([
           ["overview", "Overview"],
@@ -210,7 +212,12 @@ export function RepositoryDetailsPage() {
         ))}
       </div>
       {tab === "overview" && (
-        <Overview repo={repo} lastCollection={traffic.lastCollection} busy={busy} onCollect={() => void collect()} />
+        <Overview
+          repo={repo}
+          lastCollection={traffic.lastCollection}
+          busy={busy}
+          onCollect={() => void collect()}
+        />
       )}
       {tab === "traffic" && <TrafficPanel traffic={traffic} period={period} onPeriod={setPeriod} />}
       {tab === "search" && (
@@ -240,10 +247,11 @@ function Overview({
   onCollect: () => void;
 }) {
   return (
-    <div className="grid items-start gap-4 md:grid-cols-2">
-      <Card>
-        <h2 className="mb-4 font-medium">Overview</h2>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+    <div className="space-y-4">
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <Card>
+          <h2 className="mb-4 font-medium">Overview</h2>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
           <dt className="text-muted-foreground">Owner</dt>
           <dd>{repo.owner.login}</dd>
           <dt className="text-muted-foreground">Visibility</dt>
@@ -272,7 +280,87 @@ function Overview({
           </dd>
         </dl>
       </Card>
-      <CollectionStatusCard run={lastCollection} busy={busy} onCollect={onCollect} />
+      <div className="space-y-4">
+        <CollectionStatusCard run={lastCollection} busy={busy} onCollect={onCollect} />
+        <TopicsCard topics={repo.topics ?? []} />
+      </div>
+      </div>
+      {repo.health && <RepositoryHealthSection health={repo.health} />}
+    </div>
+  );
+}
+
+function TopicsCard({ topics }: { topics: string[] }) {
+  return (
+    <Card>
+      <h2 className="mb-3 font-medium">Topics</h2>
+      {topics.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No topics yet.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {topics.map((name) => (
+            <span
+              key={name}
+              className="inline-flex rounded-full bg-[#ddf4ff] px-2.5 py-0.5 text-xs font-medium text-[#0969da]"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function HealthScoreRow({ health }: { health: RepositoryHealth }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <HealthScoreCard title="Discoverability" items={health.discoverability} />
+      <HealthScoreCard title="Community Standards" items={health.communityStandards} />
+    </div>
+  );
+}
+
+function HealthScoreCard({ title, items }: { title: string; items: { label: string; passed: boolean }[] }) {
+  const passed = items.filter((item) => item.passed).length;
+  const percent = items.length === 0 ? 0 : Math.round((passed / items.length) * 100);
+  return (
+    <Card>
+      <div className="text-sm text-muted-foreground">{title}</div>
+      <div className="mt-1 text-2xl font-semibold">
+        {passed} / {items.length}
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} />
+      </div>
+    </Card>
+  );
+}
+
+function RepositoryHealthSection({ health }: { health: RepositoryHealth }) {
+  return (
+    <Card>
+      <h2 className="mb-4 font-medium">Repository Health</h2>
+      <div className="grid items-start gap-8 md:grid-cols-2">
+        <HealthCheckList title="Discoverability" items={health.discoverability} />
+        <HealthCheckList title="Community Standards" items={health.communityStandards} />
+      </div>
+    </Card>
+  );
+}
+
+function HealthCheckList({ title, items }: { title: string; items: { label: string; passed: boolean }[] }) {
+  return (
+    <div>
+      <h3 className="mb-3 text-sm font-medium">{title}</h3>
+      <div className="space-y-2 text-sm">
+        {items.map((item) => (
+          <div key={item.label} className={item.passed ? "text-emerald-700" : "text-muted-foreground"}>
+            <span className="mr-2">{item.passed ? "✓" : "○"}</span>
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

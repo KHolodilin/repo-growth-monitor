@@ -4,7 +4,7 @@ import ReactECharts from "echarts-for-react";
 import { api, type Dashboard } from "../lib/api";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
-import { PeriodSelector, type Period } from "../components/PeriodSelector";
+import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 
 type SortKey = "visitors" | "views" | "clones" | "stars" | "growth";
 
@@ -16,7 +16,7 @@ const JOB_LABELS: Record<string, string> = {
 };
 
 export function DashboardPage() {
-  const [period, setPeriod] = useState<Period>("30d");
+  const [period, setPeriod] = usePeriod();
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

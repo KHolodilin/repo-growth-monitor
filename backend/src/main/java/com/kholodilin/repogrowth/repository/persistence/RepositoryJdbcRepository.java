@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.repository.persistence;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
@@ -201,6 +202,106 @@ public class RepositoryJdbcRepository {
                 .param("lastCommitAt", SqlTime.ts(lastCommitAt))
                 .param("enrichedAt", SqlTime.ts(enrichedAt))
                 .param("archived", archived)
+                .update();
+    }
+
+    public void replaceTopics(long repositoryId, List<String> topics) {
+        jdbcClient.sql("DELETE FROM repository_topics WHERE repository_id = :id")
+                .param("id", repositoryId)
+                .update();
+        for (String topic : topics) {
+            jdbcClient.sql("""
+                            INSERT INTO repository_topics (repository_id, topic)
+                            VALUES (:id, :topic)
+                            """)
+                    .param("id", repositoryId)
+                    .param("topic", topic)
+                    .update();
+        }
+    }
+
+    public List<String> findTopics(long repositoryId) {
+        return jdbcClient.sql("""
+                        SELECT topic
+                        FROM repository_topics
+                        WHERE repository_id = :id
+                        ORDER BY topic
+                        """)
+                .param("id", repositoryId)
+                .query(String.class)
+                .list();
+    }
+
+    public void upsertHealth(long repositoryId, RepositoryHealthFacts facts) {
+        jdbcClient.sql("""
+                        INSERT INTO repository_health (
+                            repository_id, homepage, has_readme, readme_has_h1, readme_has_name,
+                            has_license, has_code_of_conduct, has_contributing, has_security_policy,
+                            has_issue_template, has_pull_request_template
+                        ) VALUES (
+                            :id, :homepage, :hasReadme, :readmeHasH1, :readmeHasName,
+                            :hasLicense, :hasCodeOfConduct, :hasContributing, :hasSecurityPolicy,
+                            :hasIssueTemplate, :hasPullRequestTemplate
+                        )
+                        ON CONFLICT (repository_id) DO UPDATE SET
+                            homepage = EXCLUDED.homepage,
+                            has_readme = EXCLUDED.has_readme,
+                            readme_has_h1 = EXCLUDED.readme_has_h1,
+                            readme_has_name = EXCLUDED.readme_has_name,
+                            has_license = EXCLUDED.has_license,
+                            has_code_of_conduct = EXCLUDED.has_code_of_conduct,
+                            has_contributing = EXCLUDED.has_contributing,
+                            has_security_policy = EXCLUDED.has_security_policy,
+                            has_issue_template = EXCLUDED.has_issue_template,
+                            has_pull_request_template = EXCLUDED.has_pull_request_template,
+                            updated_at = NOW()
+                        """)
+                .param("id", repositoryId)
+                .param("homepage", facts.homepage())
+                .param("hasReadme", facts.hasReadme())
+                .param("readmeHasH1", facts.readmeHasH1())
+                .param("readmeHasName", facts.readmeHasName())
+                .param("hasLicense", facts.hasLicense())
+                .param("hasCodeOfConduct", facts.hasCodeOfConduct())
+                .param("hasContributing", facts.hasContributing())
+                .param("hasSecurityPolicy", facts.hasSecurityPolicy())
+                .param("hasIssueTemplate", facts.hasIssueTemplate())
+                .param("hasPullRequestTemplate", facts.hasPullRequestTemplate())
+                .update();
+    }
+
+    public Optional<RepositoryHealthFacts> findHealth(long repositoryId) {
+        return jdbcClient.sql("""
+                        SELECT homepage, has_readme, readme_has_h1, readme_has_name, has_license,
+                               has_code_of_conduct, has_contributing, has_security_policy,
+                               has_issue_template, has_pull_request_template
+                        FROM repository_health
+                        WHERE repository_id = :id
+                        """)
+                .param("id", repositoryId)
+                .query((rs, rowNum) -> new RepositoryHealthFacts(
+                        rs.getString("homepage"),
+                        rs.getBoolean("has_readme"),
+                        rs.getBoolean("readme_has_h1"),
+                        rs.getBoolean("readme_has_name"),
+                        rs.getBoolean("has_license"),
+                        rs.getBoolean("has_code_of_conduct"),
+                        rs.getBoolean("has_contributing"),
+                        rs.getBoolean("has_security_policy"),
+                        rs.getBoolean("has_issue_template"),
+                        rs.getBoolean("has_pull_request_template")
+                ))
+                .optional();
+    }
+
+    public void updateLastReleaseAt(long id, Instant lastReleaseAt) {
+        jdbcClient.sql("""
+                        UPDATE repository
+                        SET last_release_at = :lastReleaseAt, updated_at = NOW()
+                        WHERE id = :id
+                        """)
+                .param("id", id)
+                .param("lastReleaseAt", SqlTime.ts(lastReleaseAt))
                 .update();
     }
 

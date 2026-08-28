@@ -5,8 +5,11 @@ import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
+import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPathResponse;
+import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
 import com.kholodilin.repogrowth.github.model.GitHubReferrerResponse;
+import com.kholodilin.repogrowth.github.model.GitHubReleaseResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
 import com.kholodilin.repogrowth.github.model.GitHubSearchResponse;
@@ -159,6 +162,84 @@ public class GitHubClient {
             }
             log.warn("Latest commit lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
             return Optional.empty();
+        }
+    }
+
+    public GitHubCommunityProfileResponse getCommunityProfile(String owner, String name) {
+        requireToken();
+        try {
+            ResponseEntity<byte[]> response = execute(
+                    "communityProfile",
+                    "GET",
+                    "/repos/" + owner + "/" + name + "/community/profile"
+            );
+            return read(response.getBody(), GitHubCommunityProfileResponse.class);
+        } catch (GitHubException ex) {
+            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+                throw ex;
+            }
+            log.warn("Community profile lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
+            return GitHubCommunityProfileResponse.empty();
+        }
+    }
+
+    public Optional<String> getReadme(String owner, String name) {
+        requireToken();
+        try {
+            ResponseEntity<byte[]> response = execute("readme", "GET", "/repos/" + owner + "/" + name + "/readme");
+            GitHubReadmeResponse readme = read(response.getBody(), GitHubReadmeResponse.class);
+            String text = readme.decodedText();
+            return text.isBlank() ? Optional.empty() : Optional.of(text);
+        } catch (GitHubException ex) {
+            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+                throw ex;
+            }
+            return Optional.empty();
+        }
+    }
+
+    public Optional<Instant> latestReleaseAt(String owner, String name) {
+        requireToken();
+        try {
+            ResponseEntity<byte[]> response = execute(
+                    "latestRelease",
+                    "GET",
+                    "/repos/" + owner + "/" + name + "/releases?per_page=1"
+            );
+            byte[] body = response.getBody();
+            if (body == null || body.length == 0) {
+                return Optional.empty();
+            }
+            List<GitHubReleaseResponse> releases = read(body, new TypeReference<List<GitHubReleaseResponse>>() {
+            });
+            return releases.stream()
+                    .filter(release -> !release.draft())
+                    .map(GitHubReleaseResponse::timestamp)
+                    .filter(timestamp -> timestamp != null)
+                    .findFirst();
+        } catch (GitHubException ex) {
+            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+                throw ex;
+            }
+            log.warn("Latest release lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
+            return Optional.empty();
+        }
+    }
+
+    public boolean fileExists(String owner, String name, String path) {
+        requireToken();
+        try {
+            execute("contents", "GET", "/repos/" + owner + "/" + name + "/contents/" + path);
+            return true;
+        } catch (GitHubException ex) {
+            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+                throw ex;
+            }
+            return false;
         }
     }
 
