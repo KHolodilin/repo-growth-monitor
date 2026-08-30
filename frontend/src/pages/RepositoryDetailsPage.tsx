@@ -15,6 +15,7 @@ import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
+import { ReferrerTrafficPanel } from "../components/ReferrerTrafficPanel";
 import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 
 type Tab = "overview" | "traffic" | "search";
@@ -542,8 +543,8 @@ function TrafficPanel({
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Kpi label="Visitors" value={traffic.totals.uniqueVisitors} />
         <Kpi label="Views" value={traffic.totals.views} />
-        <Kpi label="Unique Visitors" value={traffic.totals.uniqueVisitors} />
         <Kpi label="Clones" value={traffic.totals.clones} />
         <Kpi label="Unique Cloners" value={traffic.totals.uniqueCloners} />
       </div>
@@ -556,26 +557,13 @@ function TrafficPanel({
           style={{ height: 360, width: "100%" }}
         />
       </Card>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="mb-3 font-medium">Referrers</h2>
-          <MetricTable
-            rows={traffic.referrers.map((row) => ({ key: row.referrer, title: row.referrer, views: row.views, visitors: row.uniqueVisitors }))}
-          />
-        </Card>
-        <Card>
-          <h2 className="mb-3 font-medium">Popular Paths</h2>
-          <MetricTable
-            rows={traffic.paths.map((row) => ({
-              key: row.path,
-              title: row.path,
-              subtitle: row.title,
-              views: row.views,
-              visitors: row.uniqueVisitors,
-            }))}
-          />
-        </Card>
-      </div>
+      <ReferrerTrafficPanel
+        repositoryId={repositoryId}
+        period={period}
+        referrers={traffic.referrers}
+        paths={traffic.paths}
+        lastUpdated={traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt}
+      />
     </div>
   );
 }
@@ -587,42 +575,6 @@ function Kpi({ label, value }: { label: string; value: number }) {
       <div className="mt-2 text-2xl font-semibold">{formatNumber(value)}</div>
     </Card>
   );
-}
-
-function MetricTable({
-  rows,
-}: {
-  rows: { key: string; title: string; subtitle?: string; views: number; visitors: number }[];
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full table-fixed text-sm">
-        <thead>
-          <tr className="text-left text-muted-foreground">
-            <th className="pr-3">Source</th>
-            <th className="w-16 whitespace-nowrap pl-2 text-right">Views</th>
-            <th className="w-[4.75rem] whitespace-nowrap pl-2 text-right">Visitors</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-t">
-              <td className="max-w-0 py-2 pr-3 align-top">
-                <div className="[overflow-wrap:anywhere]">{wrapPath(row.title)}</div>
-                {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
-              </td>
-              <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.views)}</td>
-              <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.visitors)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function wrapPath(value: string) {
-  return value.replaceAll("/", "/\u200b");
 }
 
 type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results";

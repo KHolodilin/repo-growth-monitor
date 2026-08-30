@@ -123,6 +123,20 @@ export type CollectionRun = {
   jobs: CollectionJob[];
 };
 
+export type ReferrerHistory = {
+  repositoryId: number;
+  period: string;
+  from: string;
+  to: string;
+  snapshotCount: number;
+  sources: {
+    source: string;
+    views: number;
+    uniqueVisitors: number;
+    points: { date: string; views: number | null; visitors: number | null; previousSnapshotDate: string }[];
+  }[];
+};
+
 export type RepositoryTraffic = {
   repository: Repository;
   owner: Owner;

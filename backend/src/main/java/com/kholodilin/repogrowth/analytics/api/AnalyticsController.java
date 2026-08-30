@@ -34,4 +34,12 @@ public class AnalyticsController {
     ) {
         return analyticsService.traffic(id, period);
     }
+
+    @GetMapping("/repositories/{id}/referrers/history")
+    public AnalyticsService.ReferrerHistoryResponse referrerHistory(
+            @PathVariable long id,
+            @RequestParam(defaultValue = "30d") String period
+    ) {
+        return analyticsService.referrerHistory(id, period);
+    }
 }

@@ -201,6 +201,30 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         );
     }
 
+    @Test
+    void referrerHistoryUsesSnapshotDeltasAndLooksBackBeforeThePeriod() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        Instant before = today.minusDays(3).atTime(12, 0).atZone(clock.getZone()).toInstant();
+        Instant current = today.minusDays(1).atTime(12, 0).atZone(clock.getZone()).toInstant();
+        trafficJdbcRepository.insertReferrers(kafka.id(), before, "github.com", 215, 4);
+        trafficJdbcRepository.insertReferrers(kafka.id(), current, "github.com", 230, 6);
+        trafficJdbcRepository.insertReferrers(kafka.id(), current, "doubao.com", 1, 1);
+
+        AnalyticsService.ReferrerHistoryResponse history = analyticsService.referrerHistory(kafka.id(), "1d");
+        assertThat(history.snapshotCount()).isEqualTo(2);
+        assertThat(history.sources()).filteredOn(source -> source.source().equals("github.com"))
+                .singleElement()
+                .satisfies(source -> {
+                    assertThat(source.points()).hasSize(1);
+                    assertThat(source.points().getFirst().date()).isEqualTo(today.minusDays(1));
+                    assertThat(source.points().getFirst().views()).isEqualTo(15);
+                    assertThat(source.points().getFirst().visitors()).isEqualTo(2);
+                    assertThat(source.points().getFirst().previousSnapshotDate()).isEqualTo(today.minusDays(3));
+                });
+        assertThat(history.sources()).noneMatch(source -> source.source().equals("doubao.com") && !source.points().isEmpty());
+    }
+
     private void createRepos() {
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         kafka = track(owner, 201L, "kafka-starter", "acme/kafka-starter", 41);
