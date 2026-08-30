@@ -35,6 +35,12 @@ export function formatGrowth(value?: number | null) {
   return { direction: "flat" as const, label: "→ 0%" };
 }
 
+export function formatChartAxisDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
+    new Date(`${value}T00:00:00`),
+  );
+}
+
 export function formatSyncTime(iso?: string | null) {
   if (!iso) {
     return null;

@@ -26,6 +26,19 @@ class DashboardPartialDataTest {
     }
 
     @Test
+    void calendarHolesBetweenObservedDaysArePartialEvenWithoutPlaceholderPoints() {
+        List<TrafficPoint> traffic = List.of(
+                new TrafficPoint(LocalDate.of(2026, 8, 20), 100L, 40L, 5L),
+                new TrafficPoint(LocalDate.of(2026, 8, 22), 130L, 50L, 8L)
+        );
+        var partial = AnalyticsService.partialData(traffic);
+        assertThat(partial).isNotNull();
+        assertThat(partial.message()).isEqualTo(
+                "Data is unavailable for Aug 21 because the service was not running."
+        );
+    }
+
+    @Test
     void leadingEmptyDaysBeforeFirstObservationAreNotPartial() {
         List<TrafficPoint> traffic = List.of(
                 new TrafficPoint(LocalDate.of(2026, 8, 20), null, null, null),

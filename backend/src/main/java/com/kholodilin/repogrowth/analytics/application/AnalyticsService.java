@@ -25,7 +25,6 @@ import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.DailyTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.TrafficTotals;
 import org.springframework.stereotype.Service;
@@ -35,9 +34,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -145,26 +146,16 @@ public class AnalyticsService {
     }
 
     private static List<TrafficChartPoint> repositorySeries(DashboardPeriod period, List<TrafficDaily> history) {
-        Map<LocalDate, TrafficDaily> byDate = history.stream()
-                .collect(Collectors.toMap(TrafficDaily::trafficDate, point -> point, (left, right) -> left));
-        List<TrafficChartPoint> points = new ArrayList<>();
-        LocalDate cursor = period.from();
-        while (!cursor.isAfter(period.to())) {
-            TrafficDaily day = byDate.get(cursor);
-            if (day == null) {
-                points.add(new TrafficChartPoint(cursor, null, null, null, null));
-            } else {
-                points.add(new TrafficChartPoint(
-                        cursor,
+        return history.stream()
+                .filter(day -> !day.trafficDate().isAfter(period.to()))
+                .map(day -> new TrafficChartPoint(
+                        day.trafficDate(),
                         (long) day.views(),
                         (long) day.uniqueVisitors(),
                         (long) day.clones(),
                         (long) day.uniqueCloners()
-                ));
-            }
-            cursor = cursor.plusDays(1);
-        }
-        return dropTrailingGaps(points, TrafficChartPoint::views);
+                ))
+                .toList();
     }
 
     private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
@@ -333,20 +324,9 @@ public class AnalyticsService {
     }
 
     private List<TrafficPoint> series(DashboardPeriod period) {
-        Map<LocalDate, DailyTotals> byDate = trafficJdbcRepository.dailyPortfolio(period.from(), period.to()).stream()
-                .collect(Collectors.toMap(DailyTotals::date, point -> point));
-        List<TrafficPoint> points = new ArrayList<>();
-        LocalDate cursor = period.from();
-        while (!cursor.isAfter(period.to())) {
-            DailyTotals day = byDate.get(cursor);
-            if (day == null) {
-                points.add(new TrafficPoint(cursor, null, null, null));
-            } else {
-                points.add(new TrafficPoint(cursor, day.views(), day.uniqueVisitors(), day.clones()));
-            }
-            cursor = cursor.plusDays(1);
-        }
-        return dropTrailingGaps(points, TrafficPoint::views);
+        return trafficJdbcRepository.dailyPortfolio(period.from(), period.to()).stream()
+                .map(day -> new TrafficPoint(day.date(), day.views(), day.uniqueVisitors(), day.clones()))
+                .toList();
     }
 
     static <T> List<T> dropTrailingGaps(List<T> points, Function<T, Long> views) {
@@ -361,17 +341,20 @@ public class AnalyticsService {
         List<LocalDate> observed = traffic.stream()
                 .filter(point -> point.views() != null)
                 .map(TrafficPoint::date)
+                .sorted()
                 .toList();
         if (observed.isEmpty()) {
             return null;
         }
         LocalDate first = observed.getFirst();
         LocalDate last = observed.getLast();
-        List<LocalDate> gaps = traffic.stream()
-                .filter(point -> !point.date().isBefore(first) && !point.date().isAfter(last))
-                .filter(point -> point.views() == null)
-                .map(TrafficPoint::date)
-                .toList();
+        Set<LocalDate> present = new HashSet<>(observed);
+        List<LocalDate> gaps = new ArrayList<>();
+        for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+            if (!present.contains(day)) {
+                gaps.add(day);
+            }
+        }
         if (gaps.isEmpty()) {
             return null;
         }
@@ -439,7 +422,7 @@ public class AnalyticsService {
             return null;
         }
         return switch (period.toLowerCase()) {
-            case "1d" -> today;
+            case "1d" -> today.minusDays(1);
             case "7d" -> today.minusDays(6);
             case "30d" -> today.minusDays(29);
             case "90d" -> today.minusDays(89);

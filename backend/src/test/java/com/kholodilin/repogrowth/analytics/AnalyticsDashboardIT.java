@@ -137,14 +137,9 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.collectionWarning()).isNotNull();
         assertThat(dashboard.collectionWarning().partialRepositories()).isEqualTo(1);
 
-        DashboardResponse.TrafficPoint missing = dashboard.traffic().stream()
-                .filter(point -> point.date().equals(today.minusDays(5)))
-                .findFirst()
-                .orElseThrow();
-        assertThat(missing.views()).isNull();
-        assertThat(missing.visitors()).isNull();
-        assertThat(missing.clones()).isNull();
-        assertThat(dashboard.traffic().getLast().date()).isEqualTo(today.minusDays(4));
+        assertThat(dashboard.traffic()).extracting(DashboardResponse.TrafficPoint::date)
+                .containsExactly(today.minusDays(6), today.minusDays(4));
+        assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today.minusDays(5)));
         assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today));
 
         DashboardResponse.RepositoryRow kafkaRow = dashboard.repositories().stream()

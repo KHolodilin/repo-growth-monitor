@@ -48,6 +48,7 @@ export function PersistentECharts({ chartId, series, option, onEvents, ...rest }
   return (
     <ReactECharts
       option={mergedOption}
+      notMerge
       onEvents={{ ...onEvents, legendselectchanged: onLegendSelectChanged }}
       {...rest}
     />

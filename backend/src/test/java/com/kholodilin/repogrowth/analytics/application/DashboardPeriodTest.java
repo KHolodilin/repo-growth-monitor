@@ -25,10 +25,10 @@ class DashboardPeriodTest {
     void oneDayWindow() {
         DashboardPeriod period = DashboardPeriod.of("1d", TODAY, null);
         assertThat(period.value()).isEqualTo("1d");
-        assertThat(period.from()).isEqualTo(TODAY);
-        assertThat(period.to()).isEqualTo(TODAY);
-        assertThat(period.previousFrom()).isEqualTo(LocalDate.of(2026, 8, 27));
-        assertThat(period.previousTo()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(period.from()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(period.to()).isEqualTo(LocalDate.of(2026, 8, 27));
+        assertThat(period.previousFrom()).isEqualTo(LocalDate.of(2026, 8, 26));
+        assertThat(period.previousTo()).isEqualTo(LocalDate.of(2026, 8, 26));
     }
 
     @Test

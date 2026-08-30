@@ -17,23 +17,24 @@ public record DashboardPeriod(
 
     public static DashboardPeriod of(String raw, LocalDate today, LocalDate earliestTrafficDate) {
         String period = normalize(raw);
-        LocalDate to = today;
         LocalDate from;
         if ("all".equals(period)) {
             from = earliestTrafficDate != null ? earliestTrafficDate : today;
-            return new DashboardPeriod(period, from, to, null, null);
+            return new DashboardPeriod(period, from, today, null, null);
         }
+        // GitHub publishes completed UTC days; 1d is yesterday, not the unfinished today.
         from = switch (period) {
-            case "1d" -> today;
+            case "1d" -> today.minusDays(1);
             case "7d" -> today.minusDays(6);
             case "90d" -> today.minusDays(89);
             case "1y" -> today.minusYears(1).plusDays(1);
             default -> today.minusDays(29);
         };
-        long days = ChronoUnit.DAYS.between(from, to) + 1;
+        LocalDate toInclusive = "1d".equals(period) ? from : today;
+        long days = ChronoUnit.DAYS.between(from, toInclusive) + 1;
         LocalDate previousTo = from.minusDays(1);
         LocalDate previousFrom = previousTo.minusDays(days - 1);
-        return new DashboardPeriod(period, from, to, previousFrom, previousTo);
+        return new DashboardPeriod(period, from, toInclusive, previousFrom, previousTo);
     }
 
     public boolean allTime() {

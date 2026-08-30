@@ -9,7 +9,7 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { cn, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { cn, formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -501,9 +501,7 @@ function TrafficPanel({
           if (!Array.isArray(params) || params.length === 0) {
             return "";
           }
-          const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
-            new Date(`${params[0].axisValue}T00:00:00`),
-          );
+          const date = formatChartAxisDate(params[0].axisValue);
           const rows = params
             .map((item) => {
               const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
@@ -514,13 +512,25 @@ function TrafficPanel({
         },
       },
       legend: { data: ["Views", "Visitors", "Clones"] },
-      grid: { left: 16, right: 16, top: 40, bottom: 24, containLabel: true },
-      xAxis: { type: "category", data: traffic.traffic.map((point) => point.date), boundaryGap: false },
+      grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
+      xAxis: {
+        type: "category",
+        data: traffic.traffic.map((point) => point.date),
+        boundaryGap: traffic.traffic.length < 2,
+        axisLabel: {
+          hideOverlap: true,
+          showMinLabel: true,
+          showMaxLabel: true,
+          alignMinLabel: "left",
+          alignMaxLabel: "right",
+          formatter: (value: string) => formatChartAxisDate(String(value)),
+        },
+      },
       yAxis: { type: "value" },
       series: [
-        { name: "Views", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.views ?? null) },
-        { name: "Visitors", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.uniqueVisitors ?? null) },
-        { name: "Clones", type: "line", connectNulls: false, data: traffic.traffic.map((point) => point.clones ?? null) },
+        { name: "Views", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.traffic.map((point) => point.views ?? null) },
+        { name: "Visitors", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.traffic.map((point) => point.uniqueVisitors ?? null) },
+        { name: "Clones", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.traffic.map((point) => point.clones ?? null) },
       ],
     }),
     [traffic],

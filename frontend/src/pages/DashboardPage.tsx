@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
-import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
+import { activityClass, cn, formatActivityPresentation, formatChartAxisDate, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -216,9 +216,7 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
           if (!Array.isArray(params) || params.length === 0) {
             return "";
           }
-          const date = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
-            new Date(`${params[0].axisValue}T00:00:00`),
-          );
+          const date = formatChartAxisDate(params[0].axisValue);
           const rows = params
             .map((item) => {
               const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
@@ -229,17 +227,25 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
         },
       },
       legend: { data: ["Views", "Visitors", "Clones"] },
-      grid: { left: 16, right: 16, top: 40, bottom: 24, containLabel: true },
+      grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
       xAxis: {
         type: "category",
         data: traffic.map((point) => point.date),
-        boundaryGap: false,
+        boundaryGap: traffic.length < 2,
+        axisLabel: {
+          hideOverlap: true,
+          showMinLabel: true,
+          showMaxLabel: true,
+          alignMinLabel: "left",
+          alignMaxLabel: "right",
+          formatter: (value: string) => formatChartAxisDate(String(value)),
+        },
       },
       yAxis: { type: "value", name: "Metric value" },
       series: [
-        { name: "Views", type: "line", connectNulls: false, data: traffic.map((point) => point.views ?? null) },
-        { name: "Visitors", type: "line", connectNulls: false, data: traffic.map((point) => point.visitors ?? null) },
-        { name: "Clones", type: "line", connectNulls: false, data: traffic.map((point) => point.clones ?? null) },
+        { name: "Views", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.views ?? null) },
+        { name: "Visitors", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.visitors ?? null) },
+        { name: "Clones", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.clones ?? null) },
       ],
     }),
     [traffic],
