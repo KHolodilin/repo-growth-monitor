@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { defaultTopSources, readReferrerChartPrefs, writeReferrerChartPrefs, type ReferrerMetric } from "../lib/referrerChartPrefs";
-import { cn, formatChartAxisDate, formatNumber, formatSyncTime } from "../lib/utils";
+import { cn, formatChartAxisDate, formatNumber } from "../lib/utils";
 import { PersistentECharts } from "./PersistentECharts";
 import { ReferrerSourceIcon, referrerLineColor } from "./ReferrerSourceIcon";
 import { Button, Card } from "./ui";
@@ -35,13 +35,11 @@ export function ReferrerTrafficPanel({
   period,
   referrers,
   paths,
-  lastUpdated,
 }: {
   repositoryId: number;
   period: string;
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
-  lastUpdated?: string | null;
 }) {
   const [history, setHistory] = useState<ReferrerHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -195,13 +193,6 @@ export function ReferrerTrafficPanel({
           rows={pathRows}
           onViewAll={() => setViewAll("paths")}
         />
-      </div>
-      <div className="text-xs text-muted-foreground">
-        <div>
-          <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrer
-          traffic shows daily delta between snapshots.
-        </div>
-        {lastUpdated && <div className="mt-1">Last updated: {formatSyncTime(lastUpdated)}</div>}
       </div>
       {viewAll && (
         <ViewAllDialog

@@ -230,10 +230,20 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                     assertThat(source.points().getFirst().visitors()).isEqualTo(2);
                     assertThat(source.points().getFirst().previousSnapshotDate()).isEqualTo(today.minusDays(3));
                 });
-        assertThat(history.sources()).noneMatch(source -> source.source().equals("doubao.com"));
+        assertThat(history.sources()).filteredOn(source -> source.source().equals("doubao.com"))
+                .singleElement()
+                .satisfies(source -> {
+                    assertThat(source.views()).isEqualTo(1);
+                    assertThat(source.uniqueVisitors()).isEqualTo(1);
+                    assertThat(source.points()).hasSize(1);
+                    assertThat(source.points().getFirst().date()).isEqualTo(today.minusDays(1));
+                    assertThat(source.points().getFirst().views()).isEqualTo(1);
+                    assertThat(source.points().getFirst().visitors()).isEqualTo(1);
+                });
         assertThat(history.pathSnapshotCount()).isEqualTo(2);
         assertThat(history.paths()).containsExactly(
-                new AnalyticsService.ReferrerHistoryPath("/readme", "README", 12, 3)
+                new AnalyticsService.ReferrerHistoryPath("/readme", "README", 12, 3),
+                new AnalyticsService.ReferrerHistoryPath("/pulse", "Pulse", 17, 1)
         );
     }
 

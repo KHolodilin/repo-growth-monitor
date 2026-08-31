@@ -41,14 +41,17 @@ class ReferrerDeltaMathTest {
     }
 
     @Test
-    void newSourceOnLaterSnapshotHasNoPoint() {
+    void newSourceOnLaterSnapshotCountsAsDeltaFromZero() {
         Result result = ReferrerDeltaMath.dailyDeltas(List.of(
                 new SnapshotRow(AUG_28, "github.com", 215, 4),
                 new SnapshotRow(AUG_29, "github.com", 230, 6),
                 new SnapshotRow(AUG_29, "doubao.com", 1, 1)
         ), AUG_28, AUG_30);
 
-        assertThat(result.sources()).extracting(SourceSeries::source).containsExactly("github.com");
+        assertThat(result.sources()).containsExactly(
+                new SourceSeries("github.com", List.of(new Point(AUG_29, 15, 2, AUG_28))),
+                new SourceSeries("doubao.com", List.of(new Point(AUG_29, 1, 1, AUG_28)))
+        );
     }
 
     @Test

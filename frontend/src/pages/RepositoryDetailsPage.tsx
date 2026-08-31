@@ -23,13 +23,24 @@ import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SER
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 
-type Tab = "overview" | "traffic" | "search";
+type Tab = "overview" | "traffic" | "search" | "growth-events";
 
 const TAB_LABEL: Record<Tab, string> = {
   traffic: "Traffic",
   search: "Search Visibility",
   overview: "Overview",
+  "growth-events": "Growth Events",
 };
+
+function parseTab(tabParam: string | null): Tab {
+  if (tabParam === "overview" || tabParam === "search" || tabParam === "growth-events") {
+    return tabParam;
+  }
+  if (tabParam === "settings") {
+    return "growth-events";
+  }
+  return "traffic";
+}
 
 const JOB_LABELS: Record<string, string> = {
   TRAFFIC: "Traffic",
@@ -43,7 +54,7 @@ export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab: Tab = tabParam === "overview" || tabParam === "search" ? tabParam : "traffic";
+  const tab = parseTab(tabParam);
   const [period, setPeriod] = usePeriod(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
@@ -285,6 +296,7 @@ export function RepositoryDetailsPage() {
           ["traffic", "Traffic"],
           ["search", "Search Visibility"],
           ["overview", "Overview"],
+          ["growth-events", "Growth Events"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -306,6 +318,9 @@ export function RepositoryDetailsPage() {
           busy={busy}
           onCollect={() => void collect()}
         />
+      )}
+      {tab === "growth-events" && (
+        <GrowthEventsTab repositoryId={repo.id} period={period} onPeriod={setPeriod} />
       )}
       {tab === "traffic" && (
         <TrafficPanel repositoryId={repo.id} traffic={traffic} period={period} onPeriod={setPeriod} />
@@ -424,7 +439,6 @@ function Overview({
       <div className="space-y-4">
         <CollectionStatusCard run={lastCollection} busy={busy} onCollect={onCollect} />
         <TopicsCard topics={repo.topics ?? []} />
-        <GrowthEventSettingsCard repositoryId={repo.id} />
       </div>
       </div>
       {repo.health && <RepositoryHealthSection health={repo.health} />}
@@ -595,6 +609,38 @@ function JobRow({ job }: { job: CollectionJob }) {
   );
 }
 
+function GrowthEventsTab({
+  repositoryId,
+  period,
+  onPeriod,
+}: {
+  repositoryId: number;
+  period: Period;
+  onPeriod: (period: Period) => void;
+}) {
+  const [events, setEvents] = useState<GrowthEvent[]>([]);
+
+  const loadEvents = useCallback(() => {
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+      .then(setEvents)
+      .catch(() => setEvents([]));
+  }, [repositoryId, period]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <PeriodSelector period={period} onPeriod={onPeriod} />
+      </div>
+      <GrowthEventsPanel repositoryId={repositoryId} events={events} onChanged={loadEvents} />
+      <GrowthEventSettingsCard repositoryId={repositoryId} />
+    </div>
+  );
+}
+
 function TrafficPanel({
   repositoryId,
   traffic,
@@ -677,9 +723,18 @@ function TrafficPanel({
         period={period}
         referrers={traffic.referrers}
         paths={traffic.paths}
-        lastUpdated={traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt}
       />
-      <GrowthEventsPanel repositoryId={repositoryId} events={visibleEvents} onChanged={loadEvents} />
+      <div className="text-xs text-muted-foreground">
+        <div>
+          <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrer
+          traffic shows daily delta between snapshots.
+        </div>
+        {(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt) && (
+          <div className="mt-1">
+            Last updated: {formatSyncTime(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt)}
+          </div>
+        )}
+      </div>
       {markerEvents && (
         <EventDetailsDialog
           events={markerEvents}

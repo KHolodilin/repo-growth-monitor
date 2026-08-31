@@ -11,13 +11,13 @@ public record GitHubPullItem(
         int number,
         String title,
         String state,
-        boolean merged,
+        Boolean merged,
         @JsonProperty("html_url") String htmlUrl,
         @JsonProperty("created_at") Instant createdAt,
         @JsonProperty("merged_at") Instant mergedAt,
         GitHubOwnerResponse user
 ) {
     public boolean mergedPull() {
-        return merged || mergedAt != null;
+        return Boolean.TRUE.equals(merged) || mergedAt != null;
     }
 }

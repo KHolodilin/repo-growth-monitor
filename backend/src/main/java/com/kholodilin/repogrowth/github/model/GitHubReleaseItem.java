@@ -8,7 +8,7 @@ import java.time.Instant;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubReleaseItem(
         long id,
-        boolean draft,
+        Boolean draft,
         @JsonProperty("tag_name") String tagName,
         String name,
         @JsonProperty("html_url") String htmlUrl,

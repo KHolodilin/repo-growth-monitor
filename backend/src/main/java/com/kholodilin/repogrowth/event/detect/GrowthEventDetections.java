@@ -56,7 +56,7 @@ public final class GrowthEventDetections {
                 .map(GitHubPullItem::id)
                 .toList();
         List<Long> releaseIds = current.releasesOrEmpty().stream()
-                .filter(release -> !release.draft())
+                .filter(release -> !Boolean.TRUE.equals(release.draft()))
                 .map(GitHubReleaseItem::id)
                 .toList();
         List<String> contributorLogins = current.contributorsOrEmpty().stream()
@@ -222,7 +222,7 @@ public final class GrowthEventDetections {
         Set<Long> known = new HashSet<>(previous.releaseIdsOrEmpty());
         List<CandidateEvent> events = new ArrayList<>();
         for (GitHubReleaseItem release : current.releasesOrEmpty()) {
-            if (release.draft() || known.contains(release.id())) {
+            if (Boolean.TRUE.equals(release.draft()) || known.contains(release.id())) {
                 continue;
             }
             events.add(new CandidateEvent(

@@ -42,6 +42,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR, ex.getMessage()));
     }
 
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadable(Exception ex) {
+        return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR, "Invalid request body"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
         log.error("Unhandled error path={}", request.getRequestURI(), ex);

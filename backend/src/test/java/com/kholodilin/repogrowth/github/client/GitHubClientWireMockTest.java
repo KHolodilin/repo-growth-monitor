@@ -239,7 +239,7 @@ class GitHubClientWireMockTest {
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                [{"id":22,"number":2,"title":"Fix","state":"closed","merged":true,"html_url":"https://github.com/acme/a/pull/2","created_at":"2026-08-21T00:00:00Z","merged_at":"2026-08-22T00:00:00Z","user":{"id":2,"login":"alice","type":"User"}}]
+                                [{"id":22,"number":2,"title":"Fix","state":"closed","html_url":"https://github.com/acme/a/pull/2","created_at":"2026-08-21T00:00:00Z","merged_at":"2026-08-22T00:00:00Z","user":{"id":2,"login":"alice","type":"User"}}]
                                 """)));
         wireMock.stubFor(get("/repos/acme/a/releases?per_page=100")
                 .willReturn(aResponse()

@@ -47,7 +47,7 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
 
   return (
     <Card>
-      <h2 className="mb-3 font-medium">Growth Events</h2>
+      <h2 className="mb-3 font-medium">Automatic events</h2>
       <p className="mb-3 text-sm text-muted-foreground">
         Choose which automatic events to collect. Turning a type off does not delete existing events.
       </p>

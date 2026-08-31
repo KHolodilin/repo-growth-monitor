@@ -3,6 +3,7 @@ package com.kholodilin.repogrowth.event.api;
 import com.kholodilin.repogrowth.event.application.GrowthEventService;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -66,8 +67,13 @@ public class GrowthEventController {
     }
 
     @PutMapping("/repositories/{id}/growth-event-settings")
-    public List<GrowthEventSetting> updateSettings(@PathVariable long id, @RequestBody List<GrowthEventSetting> settings) {
-        return growthEventService.updateSettings(id, settings);
+    public List<GrowthEventSetting> updateSettings(@PathVariable long id, @RequestBody List<SettingUpdateRequest> settings) {
+        return growthEventService.updateSettings(
+                id,
+                settings.stream()
+                        .map(item -> new GrowthEventSetting(id, item.eventType(), item.enabled(), null, null))
+                        .toList()
+        );
     }
 
     public record ManualEventRequest(
@@ -77,5 +83,9 @@ public class GrowthEventController {
             String url,
             String description
     ) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SettingUpdateRequest(String eventType, boolean enabled) {
     }
 }
