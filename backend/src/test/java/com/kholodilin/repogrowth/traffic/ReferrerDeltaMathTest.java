@@ -99,5 +99,7 @@ class ReferrerDeltaMathTest {
                 new Point(AUG_28, 115, 2, aug24),
                 new Point(AUG_29, 15, 2, AUG_28)
         );
+        assertThat(ReferrerDeltaMath.sumViews(result.sources().getFirst().points())).isEqualTo(130);
+        assertThat(ReferrerDeltaMath.sumVisitors(result.sources().getFirst().points())).isEqualTo(4);
     }
 }

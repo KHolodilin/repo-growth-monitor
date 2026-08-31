@@ -210,19 +210,28 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.insertReferrers(kafka.id(), before, "github.com", 215, 4);
         trafficJdbcRepository.insertReferrers(kafka.id(), current, "github.com", 230, 6);
         trafficJdbcRepository.insertReferrers(kafka.id(), current, "doubao.com", 1, 1);
+        trafficJdbcRepository.insertPath(kafka.id(), before, "/readme", "README", 38, 5);
+        trafficJdbcRepository.insertPath(kafka.id(), current, "/readme", "README", 50, 8);
+        trafficJdbcRepository.insertPath(kafka.id(), current, "/pulse", "Pulse", 17, 1);
 
         AnalyticsService.ReferrerHistoryResponse history = analyticsService.referrerHistory(kafka.id(), "1d");
         assertThat(history.snapshotCount()).isEqualTo(2);
         assertThat(history.sources()).filteredOn(source -> source.source().equals("github.com"))
                 .singleElement()
                 .satisfies(source -> {
+                    assertThat(source.views()).isEqualTo(15);
+                    assertThat(source.uniqueVisitors()).isEqualTo(2);
                     assertThat(source.points()).hasSize(1);
                     assertThat(source.points().getFirst().date()).isEqualTo(today.minusDays(1));
                     assertThat(source.points().getFirst().views()).isEqualTo(15);
                     assertThat(source.points().getFirst().visitors()).isEqualTo(2);
                     assertThat(source.points().getFirst().previousSnapshotDate()).isEqualTo(today.minusDays(3));
                 });
-        assertThat(history.sources()).noneMatch(source -> source.source().equals("doubao.com") && !source.points().isEmpty());
+        assertThat(history.sources()).noneMatch(source -> source.source().equals("doubao.com"));
+        assertThat(history.pathSnapshotCount()).isEqualTo(2);
+        assertThat(history.paths()).containsExactly(
+                new AnalyticsService.ReferrerHistoryPath("/readme", "README", 12, 3)
+        );
     }
 
     private void createRepos() {

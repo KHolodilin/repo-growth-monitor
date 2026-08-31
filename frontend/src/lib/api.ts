@@ -135,6 +135,8 @@ export type ReferrerHistory = {
     uniqueVisitors: number;
     points: { date: string; views: number | null; visitors: number | null; previousSnapshotDate: string }[];
   }[];
+  pathSnapshotCount: number;
+  paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
 };
 
 export type RepositoryTraffic = {

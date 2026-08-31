@@ -78,6 +78,26 @@ public final class ReferrerDeltaMath {
         return new Result(List.copyOf(sources), List.copyOf(resets), dates.size());
     }
 
+    public static int sumViews(List<Point> points) {
+        int total = 0;
+        for (Point point : points) {
+            if (point.views() != null) {
+                total += point.views();
+            }
+        }
+        return total;
+    }
+
+    public static int sumVisitors(List<Point> points) {
+        int total = 0;
+        for (Point point : points) {
+            if (point.visitors() != null) {
+                total += point.visitors();
+            }
+        }
+        return total;
+    }
+
     private static Integer delta(int current, int previous) {
         int value = current - previous;
         return value < 0 ? null : value;

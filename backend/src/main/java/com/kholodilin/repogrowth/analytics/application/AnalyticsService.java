@@ -42,6 +42,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -172,37 +174,52 @@ public class AnalyticsService {
                     reset.previous()
             );
         }
-        Map<String, ReferrerRow> totals = trafficJdbcRepository.referrersInRange(
-                        repositoryId,
-                        period.from(),
-                        period.to(),
-                        clock.getZone()
-                ).stream()
-                .collect(Collectors.toMap(ReferrerRow::referrer, row -> row, (left, right) -> left));
-        Map<String, SourceSeries> bySource = deltas.sources().stream()
-                .collect(Collectors.toMap(SourceSeries::source, series -> series, (left, right) -> left));
-        Set<String> names = new HashSet<>();
-        names.addAll(totals.keySet());
-        names.addAll(bySource.keySet());
-        List<ReferrerHistorySource> sources = names.stream()
-                .sorted()
-                .map(name -> {
-                    ReferrerRow total = totals.get(name);
-                    SourceSeries series = bySource.get(name);
-                    return new ReferrerHistorySource(
-                            name,
-                            total == null ? 0 : total.views(),
-                            total == null ? 0 : total.uniqueVisitors(),
-                            series == null ? List.of() : series.points().stream()
-                                    .map(point -> new ReferrerHistoryPoint(
-                                            point.date(),
-                                            point.views(),
-                                            point.visitors(),
-                                            point.previousSnapshotDate()
-                                    ))
-                                    .toList()
-                    );
-                })
+        List<ReferrerHistorySource> sources = deltas.sources().stream()
+                .map(series -> new ReferrerHistorySource(
+                        series.source(),
+                        ReferrerDeltaMath.sumViews(series.points()),
+                        ReferrerDeltaMath.sumVisitors(series.points()),
+                        series.points().stream()
+                                .map(point -> new ReferrerHistoryPoint(
+                                        point.date(),
+                                        point.views(),
+                                        point.visitors(),
+                                        point.previousSnapshotDate()
+                                ))
+                                .toList()
+                ))
+                .sorted(Comparator
+                        .comparingInt(ReferrerHistorySource::uniqueVisitors)
+                        .reversed()
+                        .thenComparing(Comparator.comparingInt(ReferrerHistorySource::views).reversed())
+                        .thenComparing(ReferrerHistorySource::source))
+                .toList();
+        List<Observation> pathSnapshots = trafficJdbcRepository.pathSnapshotsForDelta(
+                repositoryId,
+                period.from(),
+                period.to(),
+                clock.getZone()
+        );
+        ReferrerDeltaMath.Result pathDeltas = ReferrerDeltaMath.dailyDeltas(
+                pathSnapshots.stream()
+                        .map(row -> new SnapshotRow(row.snapshotDate(), row.key(), row.views(), row.uniqueVisitors()))
+                        .toList(),
+                period.from(),
+                period.to()
+        );
+        Map<String, String> pathTitles = latestTitles(pathSnapshots);
+        List<ReferrerHistoryPath> paths = pathDeltas.sources().stream()
+                .map(series -> new ReferrerHistoryPath(
+                        series.source(),
+                        pathTitles.get(series.source()),
+                        ReferrerDeltaMath.sumViews(series.points()),
+                        ReferrerDeltaMath.sumVisitors(series.points())
+                ))
+                .sorted(Comparator
+                        .comparingInt(ReferrerHistoryPath::uniqueVisitors)
+                        .reversed()
+                        .thenComparing(Comparator.comparingInt(ReferrerHistoryPath::views).reversed())
+                        .thenComparing(ReferrerHistoryPath::path))
                 .toList();
         return new ReferrerHistoryResponse(
                 repositoryId,
@@ -210,8 +227,26 @@ public class AnalyticsService {
                 period.from(),
                 period.to(),
                 deltas.snapshotCount(),
-                sources
+                sources,
+                pathDeltas.snapshotCount(),
+                paths
         );
+    }
+
+    private static Map<String, String> latestTitles(List<Observation> snapshots) {
+        Map<String, String> titles = new HashMap<>();
+        Map<String, LocalDate> dates = new HashMap<>();
+        for (Observation snapshot : snapshots) {
+            if (snapshot.title() == null) {
+                continue;
+            }
+            LocalDate previous = dates.get(snapshot.key());
+            if (previous == null || !snapshot.snapshotDate().isBefore(previous)) {
+                titles.put(snapshot.key(), snapshot.title());
+                dates.put(snapshot.key(), snapshot.snapshotDate());
+            }
+        }
+        return titles;
     }
 
     private DashboardPeriod periodForRepository(long repositoryId, String periodParam) {
@@ -550,7 +585,9 @@ public class AnalyticsService {
             LocalDate from,
             LocalDate to,
             int snapshotCount,
-            List<ReferrerHistorySource> sources
+            List<ReferrerHistorySource> sources,
+            int pathSnapshotCount,
+            List<ReferrerHistoryPath> paths
     ) {
     }
 
@@ -559,6 +596,14 @@ public class AnalyticsService {
             int views,
             int uniqueVisitors,
             List<ReferrerHistoryPoint> points
+    ) {
+    }
+
+    public record ReferrerHistoryPath(
+            String path,
+            String title,
+            int views,
+            int uniqueVisitors
     ) {
     }
 

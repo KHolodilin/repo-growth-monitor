@@ -17,6 +17,8 @@ export type ReferrerHistory = {
   to: string;
   snapshotCount: number;
   sources: ReferrerHistorySource[];
+  pathSnapshotCount: number;
+  paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
 };
 
 export type ReferrerHistorySource = {
@@ -86,7 +88,41 @@ export function ReferrerTrafficPanel({
   }
 
   const enoughHistory = (history?.snapshotCount ?? 0) >= 2;
+  const enoughPathHistory = (history?.pathSnapshotCount ?? 0) >= 2;
   const moreCount = Math.max(0, (history?.sources.length ?? 0) - selected.length);
+  const referrerRows = enoughHistory && history
+    ? history.sources.map((row) => ({
+        key: row.source,
+        title: row.source,
+        views: row.views,
+        visitors: row.uniqueVisitors,
+        icon: true,
+      }))
+    : referrers
+        .slice()
+        .sort((left, right) => right.uniqueVisitors - left.uniqueVisitors || right.views - left.views)
+        .map((row) => ({
+          key: row.referrer,
+          title: row.referrer,
+          views: row.views,
+          visitors: row.uniqueVisitors,
+          icon: true,
+        }));
+  const pathRows = enoughPathHistory && history
+    ? history.paths.map((row) => ({
+        key: row.path,
+        title: row.path,
+        subtitle: row.title,
+        views: row.views,
+        visitors: row.uniqueVisitors,
+      }))
+    : paths.map((row) => ({
+        key: row.path,
+        title: row.path,
+        subtitle: row.title,
+        views: row.views,
+        visitors: row.uniqueVisitors,
+      }));
 
   return (
     <div className="space-y-4">
@@ -150,28 +186,13 @@ export function ReferrerTrafficPanel({
       <div className="grid gap-4 md:grid-cols-2">
         <CompactTable
           title="Top Referrers"
-          rows={referrers
-            .slice()
-            .sort((left, right) => right.uniqueVisitors - left.uniqueVisitors || right.views - left.views)
-            .map((row) => ({
-              key: row.referrer,
-              title: row.referrer,
-              views: row.views,
-              visitors: row.uniqueVisitors,
-              icon: true,
-            }))}
+          rows={referrerRows}
           onViewAll={() => setViewAll("referrers")}
         />
         <CompactTable
           title="Popular Paths"
           firstColumn="Path"
-          rows={paths.map((row) => ({
-            key: row.path,
-            title: row.path,
-            subtitle: row.title,
-            views: row.views,
-            visitors: row.uniqueVisitors,
-          }))}
+          rows={pathRows}
           onViewAll={() => setViewAll("paths")}
         />
       </div>
@@ -186,26 +207,7 @@ export function ReferrerTrafficPanel({
         <ViewAllDialog
           title={viewAll === "referrers" ? "All Referrers" : "All Popular Paths"}
           firstColumn={viewAll === "referrers" ? "Source" : "Path"}
-          rows={
-            viewAll === "referrers"
-              ? referrers
-                  .slice()
-                  .sort((left, right) => right.uniqueVisitors - left.uniqueVisitors || right.views - left.views)
-                  .map((row) => ({
-                    key: row.referrer,
-                    title: row.referrer,
-                    views: row.views,
-                    visitors: row.uniqueVisitors,
-                    icon: true,
-                  }))
-              : paths.map((row) => ({
-                  key: row.path,
-                  title: row.path,
-                  subtitle: row.title,
-                  views: row.views,
-                  visitors: row.uniqueVisitors,
-                }))
-          }
+          rows={viewAll === "referrers" ? referrerRows : pathRows}
           onClose={() => setViewAll(null)}
         />
       )}

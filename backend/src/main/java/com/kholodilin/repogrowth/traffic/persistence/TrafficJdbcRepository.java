@@ -421,6 +421,67 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
+    public List<Observation> pathSnapshotsForDelta(
+            long repositoryId,
+            LocalDate fromInclusive,
+            LocalDate toInclusive,
+            ZoneId zone
+    ) {
+        String tz = postgresTimeZone(zone);
+        return jdbcClient.sql("""
+                        WITH dated AS (
+                            SELECT
+                                (snapshot_at AT TIME ZONE :tz)::date AS snapshot_date,
+                                snapshot_at,
+                                path,
+                                title,
+                                views,
+                                unique_visitors
+                            FROM traffic_path_snapshot
+                            WHERE repository_id = :repositoryId
+                        ),
+                        latest AS (
+                            SELECT snapshot_date, MAX(snapshot_at) AS snapshot_at
+                            FROM dated
+                            GROUP BY snapshot_date
+                        ),
+                        predecessor AS (
+                            SELECT MAX(snapshot_date) AS snapshot_date
+                            FROM latest
+                            WHERE snapshot_date < :fromDate
+                        ),
+                        wanted AS (
+                            SELECT snapshot_date
+                            FROM latest
+                            WHERE snapshot_date >= :fromDate
+                              AND snapshot_date <= :toDate
+                            UNION
+                            SELECT snapshot_date
+                            FROM predecessor
+                            WHERE snapshot_date IS NOT NULL
+                        )
+                        SELECT d.snapshot_date, d.path, d.title, d.views, d.unique_visitors
+                        FROM dated d
+                        JOIN latest l
+                          ON l.snapshot_date = d.snapshot_date
+                         AND l.snapshot_at = d.snapshot_at
+                        JOIN wanted w ON w.snapshot_date = d.snapshot_date
+                        ORDER BY d.snapshot_date, d.path
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("tz", tz)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new Observation(
+                        rs.getObject("snapshot_date", LocalDate.class),
+                        rs.getString("path"),
+                        rs.getString("title"),
+                        rs.getInt("views"),
+                        rs.getInt("unique_visitors")
+                ))
+                .list();
+    }
+
     public Optional<LocalDate> earliestReferrerSnapshotDate(long repositoryId, ZoneId zone) {
         return jdbcClient.sql("""
                         SELECT MIN((snapshot_at AT TIME ZONE :tz)::date)
