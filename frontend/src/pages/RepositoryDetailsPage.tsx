@@ -9,7 +9,7 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { cn, formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -613,7 +613,7 @@ function Kpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results" | "updated";
+type QuerySortKey = "name" | "rank" | "change" | "change7d" | "change30d" | "best" | "results" | "updated";
 
 function normalizeSearchQuery(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -724,6 +724,7 @@ function SearchPanel({
                 onClick={() => toggle("name")}
               />
               <QuerySortHeader label="Rank" active={sortKey === "rank"} dir={sortDir} onClick={() => toggle("rank")} />
+              <QuerySortHeader label="Change" active={sortKey === "change"} dir={sortDir} onClick={() => toggle("change")} />
               <QuerySortHeader label="7d" active={sortKey === "change7d"} dir={sortDir} onClick={() => toggle("change7d")} />
               <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
               <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
@@ -739,6 +740,7 @@ function SearchPanel({
                 || item.searchStatus === "RUNNING"
                 || item.searchStatus === "READY"
                 || item.searchStatus === "RETRY";
+              const rankChange = formatQueryRankChange(item.change);
               return (
                 <tr
                   key={item.query.id}
@@ -755,6 +757,9 @@ function SearchPanel({
                     </Link>
                   </td>
                   <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
+                  <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
+                    {rankChange.label}
+                  </td>
                   <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
                   <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
                   <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
@@ -839,9 +844,32 @@ function compareQueryRows(left: SearchHistory, right: SearchHistory, key: QueryS
   return dir === "desc" ? rightValue - leftValue : leftValue - rightValue;
 }
 
+function queryChangeSortValue(item: SearchHistory): number | null {
+  const change = item.change;
+  if (!change || change.kind === "NONE") {
+    return null;
+  }
+  if (change.kind === "UNCHANGED") {
+    return 0;
+  }
+  if (change.kind === "IMPROVED") {
+    return change.amount;
+  }
+  if (change.kind === "DECLINED") {
+    return -change.amount;
+  }
+  if (change.kind === "ENTERED") {
+    return change.rank == null ? 1000 : 1000 - change.rank;
+  }
+  return -(1000 + change.amount);
+}
+
 function querySortValue(item: SearchHistory, key: Exclude<QuerySortKey, "name">): number | null {
   if (key === "rank") {
     return item.currentRank;
+  }
+  if (key === "change") {
+    return queryChangeSortValue(item);
   }
   if (key === "best") {
     return item.bestRank;

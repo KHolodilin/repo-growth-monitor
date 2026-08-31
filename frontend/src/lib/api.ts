@@ -159,9 +159,16 @@ export type SearchQuery = {
   resultLimit: number;
 };
 
+export type QueryRankChange = {
+  kind: "NONE" | "UNCHANGED" | "IMPROVED" | "DECLINED" | "ENTERED" | "EXITED";
+  amount: number;
+  rank: number | null;
+};
+
 export type SearchHistory = {
   query: SearchQuery;
   currentRank: number | null;
+  change: QueryRankChange;
   change7d: number | null;
   change30d: number | null;
   bestRank: number | null;

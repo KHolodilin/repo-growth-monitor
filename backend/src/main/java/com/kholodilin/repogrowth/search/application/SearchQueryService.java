@@ -122,6 +122,9 @@ public class SearchQueryService {
                 .sorted(Comparator.comparing(SearchRun::businessDate))
                 .toList();
         Integer current = latestPosition(runs);
+        boolean hasPrevious = runs.size() >= 2;
+        Integer previous = hasPrevious ? runs.get(runs.size() - 2).trackedRepositoryPosition() : null;
+        RankChangeMath.Change change = RankChangeMath.between(hasPrevious, previous, current, query.resultLimit());
         Integer change7 = changeSince(runs, 7);
         Integer change30 = changeSince(runs, 30);
         Integer best = runs.stream()
@@ -140,6 +143,7 @@ public class SearchQueryService {
         return new SearchHistory(
                 query,
                 current,
+                change,
                 change7,
                 change30,
                 best,
@@ -212,6 +216,7 @@ public class SearchQueryService {
     public record SearchHistory(
             SearchQuery query,
             Integer currentRank,
+            RankChangeMath.Change change,
             Integer change7d,
             Integer change30d,
             Integer bestRank,

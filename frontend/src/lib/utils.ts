@@ -77,6 +77,26 @@ export function formatDelta(value: number | null | undefined) {
   return "0";
 }
 
+export function formatQueryRankChange(change?: {
+  kind: "NONE" | "UNCHANGED" | "IMPROVED" | "DECLINED" | "ENTERED" | "EXITED";
+  amount: number;
+  rank: number | null;
+} | null) {
+  if (!change || change.kind === "NONE" || change.kind === "UNCHANGED") {
+    return { label: "—", direction: "flat" as const };
+  }
+  if (change.kind === "IMPROVED") {
+    return { label: `↑ ${change.amount}`, direction: "up" as const };
+  }
+  if (change.kind === "DECLINED") {
+    return { label: `↓ ${change.amount}`, direction: "down" as const };
+  }
+  if (change.kind === "ENTERED") {
+    return { label: `NEW #${change.rank}`, direction: "up" as const };
+  }
+  return { label: `↓ >${change.amount}`, direction: "down" as const };
+}
+
 export function formatPositionDelta(value: number | null | undefined) {
   if (value === null || value === undefined) {
     return "NEW";
