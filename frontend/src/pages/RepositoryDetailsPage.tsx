@@ -43,10 +43,12 @@ export function RepositoryDetailsPage() {
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
   const [queryText, setQueryText] = useState("");
+  const [queryError, setQueryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
+  const [runningAll, setRunningAll] = useState(false);
 
   function setTab(next: Tab) {
     if (next === "traffic") {
@@ -102,6 +104,7 @@ export function RepositoryDetailsPage() {
     }
     if (!searchActive) {
       setRunningQueryId(null);
+      setRunningAll(false);
     }
     if (!runActive && !searchActive) {
       return;
@@ -127,19 +130,32 @@ export function RepositoryDetailsPage() {
   }
 
   async function createQuery() {
-    if (!id || !queryText.trim()) {
+    if (!id) {
       return;
     }
-    await api(`/api/v1/repositories/${id}/search-queries`, {
-      method: "POST",
-      body: JSON.stringify({ name: queryText, query: queryText, enabled: true, resultLimit: 50 }),
-    });
-    setQueryText("");
-    await load();
+    const query = normalizeSearchQuery(queryText);
+    if (!query) {
+      return;
+    }
+    if (visibility.some((item) => normalizeSearchQuery(item.query.query) === query)) {
+      setQueryError("This search query is already tracked for the repository");
+      return;
+    }
+    try {
+      await api(`/api/v1/repositories/${id}/search-queries`, {
+        method: "POST",
+        body: JSON.stringify({ name: query, query, enabled: true, resultLimit: 50 }),
+      });
+      setQueryText("");
+      setQueryError(null);
+      await load();
+    } catch (err) {
+      setQueryError((err as Error).message);
+    }
   }
 
   async function runQuery(queryId: number) {
-    if (runningQueryId != null) {
+    if (runningQueryId != null || runningAll || searchActive) {
       return;
     }
     setRunningQueryId(queryId);
@@ -148,6 +164,20 @@ export function RepositoryDetailsPage() {
       await load();
     } finally {
       setRunningQueryId(null);
+    }
+  }
+
+  async function runAllQueries() {
+    if (!id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
+      return;
+    }
+    setRunningAll(true);
+    try {
+      await api(`/api/v1/repositories/${id}/search-queries/run`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setQueryError((err as Error).message);
+      setRunningAll(false);
     }
   }
 
@@ -254,10 +284,16 @@ export function RepositoryDetailsPage() {
           repositoryId={repo.id}
           visibility={visibility}
           queryText={queryText}
-          setQueryText={setQueryText}
+          setQueryText={(value) => {
+            setQueryText(value);
+            setQueryError(null);
+          }}
+          queryError={queryError}
           runningQueryId={runningQueryId}
+          runningAll={runningAll}
           onCreate={() => void createQuery()}
           onRun={runQuery}
+          onRunAll={() => void runAllQueries()}
           onDelete={(queryId) => void deleteQuery(queryId)}
         />
       )}
@@ -577,25 +613,35 @@ function Kpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results";
+type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results" | "updated";
+
+function normalizeSearchQuery(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
 
 function SearchPanel({
   repositoryId,
   visibility,
   queryText,
   setQueryText,
+  queryError,
   runningQueryId,
+  runningAll,
   onCreate,
   onRun,
+  onRunAll,
   onDelete,
 }: {
   repositoryId: number;
   visibility: SearchHistory[];
   queryText: string;
   setQueryText: (value: string) => void;
+  queryError: string | null;
   runningQueryId: number | null;
+  runningAll: boolean;
   onCreate: () => void;
   onRun: (id: number) => void;
+  onRunAll: () => void;
   onDelete: (id: number) => void;
 }) {
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
@@ -626,18 +672,45 @@ function SearchPanel({
     return copy;
   }, [visibility, sortKey, sortDir]);
 
+  const duplicate = visibility.some(
+    (item) =>
+      normalizeSearchQuery(item.query.query) === normalizeSearchQuery(queryText) && normalizeSearchQuery(queryText) !== "",
+  );
+  const searchBusy =
+    runningAll
+    || runningQueryId != null
+    || visibility.some(
+      (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
+    );
+
   return (
     <div className="space-y-4">
       <Card>
         <h2 className="mb-3 font-medium">Search Queries</h2>
-        <div className="mb-4 flex gap-2">
-          <input
-            className="flex-1 rounded-md border px-3 py-2 text-sm"
-            placeholder="transactional outbox language:java"
-            value={queryText}
-            onChange={(event) => setQueryText(event.target.value)}
-          />
-          <Button onClick={onCreate}>Add query</Button>
+        <div className="mb-4">
+          <div className="flex gap-2">
+            <input
+              className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+              placeholder="transactional outbox language:java"
+              value={queryText}
+              onChange={(event) => setQueryText(event.target.value)}
+            />
+            <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
+              Add query
+            </Button>
+            <Button
+              className="ml-auto shrink-0 bg-muted text-foreground"
+              disabled={visibility.length === 0 || searchBusy}
+              onClick={onRunAll}
+            >
+              {searchBusy ? "Running..." : "Run all"}
+            </Button>
+          </div>
+          {(queryError || duplicate) && (
+            <p className="mt-2 text-sm text-red-700">
+              {queryError ?? "This search query is already tracked for the repository"}
+            </p>
+          )}
         </div>
         <table className="w-full text-sm">
           <thead>
@@ -655,6 +728,7 @@ function SearchPanel({
               <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
               <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
               <QuerySortHeader label="Results" active={sortKey === "results"} dir={sortDir} onClick={() => toggle("results")} />
+              <QuerySortHeader label="Updated" active={sortKey === "updated"} dir={sortDir} onClick={() => toggle("updated")} />
               <th className="py-2 pl-3" />
             </tr>
           </thead>
@@ -685,14 +759,17 @@ function SearchPanel({
                   <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
                   <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
                   <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
+                    {formatSyncTime(item.lastChecked) ?? "—"}
+                  </td>
                   <td className="py-3 pl-3">
                     <div className="flex justify-end gap-2">
                       <Button
                         className="bg-muted text-foreground"
-                        disabled={running}
+                        disabled={running || searchBusy}
                         onClick={() => onRun(item.query.id)}
                       >
-                        {running ? "Running..." : "Run"}
+                        {running || runningAll ? "Running..." : "Run"}
                       </Button>
                       <Button
                         className="bg-muted text-red-700"
@@ -771,6 +848,9 @@ function querySortValue(item: SearchHistory, key: Exclude<QuerySortKey, "name">)
   }
   if (key === "results") {
     return item.totalResults ?? null;
+  }
+  if (key === "updated") {
+    return item.lastChecked ? Date.parse(item.lastChecked) : null;
   }
   if (key === "change7d") {
     return item.change7d;

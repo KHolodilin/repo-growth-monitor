@@ -80,6 +80,25 @@ public class SearchQueryJdbcRepository {
                 .list();
     }
 
+    public Optional<SearchQuery> findNormalized(long repositoryId, String normalizedQuery, Long excludeId) {
+        String sql = """
+                SELECT *
+                FROM search_query
+                WHERE repository_id = :repositoryId
+                  AND lower(btrim(regexp_replace(query, '\\s+', ' ', 'g'))) = :normalized
+                """;
+        if (excludeId != null) {
+            sql += " AND id <> :excludeId";
+        }
+        var spec = jdbcClient.sql(sql)
+                .param("repositoryId", repositoryId)
+                .param("normalized", normalizedQuery);
+        if (excludeId != null) {
+            spec = spec.param("excludeId", excludeId);
+        }
+        return spec.query(MAPPER).optional();
+    }
+
     public List<SearchQuery> findEnabled() {
         return jdbcClient.sql("""
                         SELECT q.*

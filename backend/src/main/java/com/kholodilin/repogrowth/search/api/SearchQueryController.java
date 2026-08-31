@@ -50,6 +50,11 @@ public class SearchQueryController {
         return new RunAccepted(runId);
     }
 
+    @PostMapping("/repositories/{id}/search-queries/run")
+    public RunAllAccepted runAll(@PathVariable long id) {
+        return new RunAllAccepted(searchQueryService.runAll(id));
+    }
+
     @GetMapping("/search-queries/{id}")
     public SearchQuery get(@PathVariable long id) {
         return searchQueryService.getQuery(id);
@@ -84,5 +89,8 @@ public class SearchQueryController {
     }
 
     public record RunAccepted(long searchRunId) {
+    }
+
+    public record RunAllAccepted(List<Long> searchRunIds) {
     }
 }
