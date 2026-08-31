@@ -6,6 +6,7 @@ import com.kholodilin.repogrowth.common.observability.AppMetrics;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
 import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
+import com.kholodilin.repogrowth.github.model.GitHubGraphQlResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPathResponse;
 import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
 import com.kholodilin.repogrowth.github.model.GitHubReferrerResponse;
@@ -20,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
@@ -35,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,6 +50,13 @@ public class GitHubClient {
     private static final Pattern LAST_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"last\"");
     private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
     private static final int MAX_PER_PAGE = 100;
+    private static final String MENTIONABLE_USERS_QUERY = """
+            query($owner: String!, $name: String!) {
+              repository(owner: $owner, name: $name) {
+                mentionableUsers { totalCount }
+              }
+            }
+            """;
 
     private final RestClient restClient;
     private final JsonMapper jsonMapper;
@@ -120,9 +130,36 @@ public class GitHubClient {
 
     public int countContributors(String owner, String name) {
         requireToken();
+        try {
+            Integer mentionable = countMentionableUsers(owner, name);
+            if (mentionable != null) {
+                return mentionable;
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Mentionable user count failed owner={} name={} error={}", owner, name, ex.getMessage());
+        }
+        return countContributorsFromRest(owner, name);
+    }
+
+    private Integer countMentionableUsers(String owner, String name) {
+        byte[] payload = jsonMapper.writeValueAsBytes(Map.of(
+                "query", MENTIONABLE_USERS_QUERY,
+                "variables", Map.of("owner", owner, "name", name)
+        ));
+        ResponseEntity<byte[]> response = executePost("mentionableUsers", "/graphql", payload);
+        GitHubGraphQlResponse parsed = read(response.getBody(), GitHubGraphQlResponse.class);
+        if (parsed.data() == null
+                || parsed.data().repository() == null
+                || parsed.data().repository().mentionableUsers() == null) {
+            return null;
+        }
+        return parsed.data().repository().mentionableUsers().totalCount();
+    }
+
+    private int countContributorsFromRest(String owner, String name) {
         String path = "/repos/" + owner + "/" + name + "/contributors?per_page=1&anon=true";
         ResponseEntity<byte[]> response = execute("contributors", "GET", path);
-        String last = lastPath(response.getHeaders().getFirst(HttpHeaders.LINK));
+        String last = lastPath(combinedLinkHeader(response.getHeaders()));
         if (last != null) {
             Matcher page = PAGE_QUERY.matcher(last);
             if (page.find()) {
@@ -338,6 +375,35 @@ public class GitHubClient {
         }
     }
 
+    private ResponseEntity<byte[]> executePost(String operation, String path, byte[] body) {
+        Timer.Sample sample = metrics.startTimer();
+        long started = System.nanoTime();
+        try {
+            ResponseEntity<byte[]> response = restClient.post()
+                    .uri(path)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, this::handleError)
+                    .toEntity(byte[].class);
+            metrics.githubRequest(operation, true);
+            log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+            return response;
+        } catch (GitHubException ex) {
+            metrics.githubRequest(operation, false);
+            log.info("GitHub request durationMs={} operation={} errorCategory={}",
+                    durationMs(started), operation, ex.errorCode());
+            throw ex;
+        } catch (ResourceAccessException ex) {
+            metrics.githubRequest(operation, false);
+            throw translateAccess(ex);
+        } finally {
+            sample.stop(io.micrometer.core.instrument.Timer.builder("github.api.duration")
+                    .tag("operation", operation)
+                    .register(io.micrometer.core.instrument.Metrics.globalRegistry));
+        }
+    }
+
     private void handleError(HttpRequest request, ClientHttpResponse response) throws IOException {
         int status = response.getStatusCode().value();
         Instant reset = rateLimitReset(response.getHeaders());
@@ -401,6 +467,14 @@ public class GitHubClient {
         } catch (JacksonException ex) {
             throw GitHubException.malformed(ex);
         }
+    }
+
+    private String combinedLinkHeader(HttpHeaders headers) {
+        List<String> values = headers.getOrEmpty(HttpHeaders.LINK);
+        if (values.isEmpty()) {
+            return null;
+        }
+        return String.join(", ", values);
     }
 
     private String lastPath(String linkHeader) {
