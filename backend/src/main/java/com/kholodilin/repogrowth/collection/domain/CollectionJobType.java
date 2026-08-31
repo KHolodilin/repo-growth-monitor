@@ -4,5 +4,6 @@ public enum CollectionJobType {
     TRAFFIC,
     REFERRERS,
     POPULAR_PATHS,
-    REPOSITORY_STATS
+    REPOSITORY_STATS,
+    GROWTH_EVENTS
 }

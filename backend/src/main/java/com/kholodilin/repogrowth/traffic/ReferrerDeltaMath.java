@@ -9,7 +9,8 @@ import java.util.TreeMap;
 
 /**
  * GitHub referrers are rolling window snapshots. The chart uses the day-to-day
- * change between consecutive stored snapshots, never a fabricated 0.
+ * change between consecutive stored snapshots. A source that first appears is a
+ * delta from 0; missing collection days are not filled with 0.
  */
 public final class ReferrerDeltaMath {
 
@@ -52,16 +53,15 @@ public final class ReferrerDeltaMath {
             Map<String, SnapshotRow> current = byDate.get(currentDate);
             for (SnapshotRow row : current.values()) {
                 SnapshotRow prior = previous.get(row.source());
-                if (prior == null) {
-                    continue;
+                int previousViews = prior == null ? 0 : prior.views();
+                int previousVisitors = prior == null ? 0 : prior.uniqueVisitors();
+                Integer views = delta(row.views(), previousViews);
+                Integer visitors = delta(row.uniqueVisitors(), previousVisitors);
+                if (views == null && row.views() < previousViews) {
+                    resets.add(new NegativeReset(currentDate, row.source(), "views", row.views(), previousViews));
                 }
-                Integer views = delta(row.views(), prior.views());
-                Integer visitors = delta(row.uniqueVisitors(), prior.uniqueVisitors());
-                if (views == null && row.views() < prior.views()) {
-                    resets.add(new NegativeReset(currentDate, row.source(), "views", row.views(), prior.views()));
-                }
-                if (visitors == null && row.uniqueVisitors() < prior.uniqueVisitors()) {
-                    resets.add(new NegativeReset(currentDate, row.source(), "visitors", row.uniqueVisitors(), prior.uniqueVisitors()));
+                if (visitors == null && row.uniqueVisitors() < previousVisitors) {
+                    resets.add(new NegativeReset(currentDate, row.source(), "visitors", row.uniqueVisitors(), previousVisitors));
                 }
                 if (views == null && visitors == null) {
                     continue;

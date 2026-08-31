@@ -4,6 +4,7 @@ import {
   api,
   type CollectionJob,
   type CollectionRun,
+  type GrowthEvent,
   type Repository,
   type RepositoryHealth,
   type RepositoryTraffic,
@@ -16,28 +17,44 @@ import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { ReferrerTrafficPanel } from "../components/ReferrerTrafficPanel";
+import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
+import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
+import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
+import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 
-type Tab = "overview" | "traffic" | "search";
+type Tab = "overview" | "traffic" | "search" | "growth-events";
 
 const TAB_LABEL: Record<Tab, string> = {
   traffic: "Traffic",
   search: "Search Visibility",
   overview: "Overview",
+  "growth-events": "Growth Events",
 };
+
+function parseTab(tabParam: string | null): Tab {
+  if (tabParam === "overview" || tabParam === "search" || tabParam === "growth-events") {
+    return tabParam;
+  }
+  if (tabParam === "settings") {
+    return "growth-events";
+  }
+  return "traffic";
+}
 
 const JOB_LABELS: Record<string, string> = {
   TRAFFIC: "Traffic",
   REFERRERS: "Referrers",
   POPULAR_PATHS: "Popular Paths",
   REPOSITORY_STATS: "Repository Stats",
+  GROWTH_EVENTS: "Growth Events",
 };
 
 export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab: Tab = tabParam === "overview" || tabParam === "search" ? tabParam : "traffic";
+  const tab = parseTab(tabParam);
   const [period, setPeriod] = usePeriod(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
@@ -279,6 +296,7 @@ export function RepositoryDetailsPage() {
           ["traffic", "Traffic"],
           ["search", "Search Visibility"],
           ["overview", "Overview"],
+          ["growth-events", "Growth Events"],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -300,6 +318,9 @@ export function RepositoryDetailsPage() {
           busy={busy}
           onCollect={() => void collect()}
         />
+      )}
+      {tab === "growth-events" && (
+        <GrowthEventsTab repositoryId={repo.id} period={period} onPeriod={setPeriod} />
       )}
       {tab === "traffic" && (
         <TrafficPanel repositoryId={repo.id} traffic={traffic} period={period} onPeriod={setPeriod} />
@@ -588,6 +609,38 @@ function JobRow({ job }: { job: CollectionJob }) {
   );
 }
 
+function GrowthEventsTab({
+  repositoryId,
+  period,
+  onPeriod,
+}: {
+  repositoryId: number;
+  period: Period;
+  onPeriod: (period: Period) => void;
+}) {
+  const [events, setEvents] = useState<GrowthEvent[]>([]);
+
+  const loadEvents = useCallback(() => {
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+      .then(setEvents)
+      .catch(() => setEvents([]));
+  }, [repositoryId, period]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <PeriodSelector period={period} onPeriod={onPeriod} />
+      </div>
+      <GrowthEventsPanel repositoryId={repositoryId} events={events} onChanged={loadEvents} />
+      <GrowthEventSettingsCard repositoryId={repositoryId} />
+    </div>
+  );
+}
+
 function TrafficPanel({
   repositoryId,
   traffic,
@@ -599,48 +652,22 @@ function TrafficPanel({
   period: Period;
   onPeriod: (period: Period) => void;
 }) {
-  const option = useMemo(
-    () => ({
-      tooltip: {
-        trigger: "axis",
-        formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
-          if (!Array.isArray(params) || params.length === 0) {
-            return "";
-          }
-          const date = formatChartAxisDate(params[0].axisValue);
-          const rows = params
-            .map((item) => {
-              const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-              return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
-            })
-            .join("");
-          return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
-        },
-      },
-      legend: { data: ["Views", "Visitors", "Clones"] },
-      grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
-      xAxis: {
-        type: "category",
-        data: traffic.traffic.map((point) => point.date),
-        boundaryGap: traffic.traffic.length < 2,
-        axisLabel: {
-          hideOverlap: true,
-          showMinLabel: true,
-          showMaxLabel: true,
-          alignMinLabel: "left",
-          alignMaxLabel: "right",
-          formatter: (value: string) => formatChartAxisDate(String(value)),
-        },
-      },
-      yAxis: { type: "value" },
-      series: [
-        { name: "Views", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.traffic.map((point) => point.views ?? null) },
-        { name: "Visitors", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.traffic.map((point) => point.uniqueVisitors ?? null) },
-        { name: "Clones", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.traffic.map((point) => point.clones ?? null) },
-      ],
-    }),
-    [traffic],
-  );
+  const [events, setEvents] = useState<GrowthEvent[]>([]);
+  const [filter, setFilter] = useState<EventFilter>("all");
+  const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
+
+  const loadEvents = useCallback(() => {
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+      .then(setEvents)
+      .catch(() => setEvents([]));
+  }, [repositoryId, period]);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  const visibleEvents = useMemo(() => filterGrowthEvents(events, filter), [events, filter]);
+  const option = useMemo(() => trafficChartOption(traffic.traffic, visibleEvents), [traffic, visibleEvents]);
 
   return (
     <div className="space-y-4">
@@ -654,12 +681,41 @@ function TrafficPanel({
         <Kpi label="Unique Cloners" value={traffic.totals.uniqueCloners} />
       </div>
       <Card>
-        <h2 className="mb-3 font-medium">Traffic</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-medium">Traffic</h2>
+          <div className="inline-flex rounded-lg border bg-muted p-1">
+            {([
+              ["all", "All"],
+              ["github", "GitHub"],
+              ["promotion", "Promotion"],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  filter === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setFilter(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <PersistentECharts
           chartId={repoTrafficChartId(repositoryId)}
           series={TRAFFIC_SERIES}
           option={option}
           style={{ height: 360, width: "100%" }}
+          onEvents={{
+            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
+              const clicked = markLineEvents(params);
+              if (clicked.length > 0) {
+                setMarkerEvents(clicked);
+              }
+            },
+          }}
         />
       </Card>
       <ReferrerTrafficPanel
@@ -667,8 +723,29 @@ function TrafficPanel({
         period={period}
         referrers={traffic.referrers}
         paths={traffic.paths}
-        lastUpdated={traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt}
       />
+      <div className="text-xs text-muted-foreground">
+        <div>
+          <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrer
+          traffic shows daily delta between snapshots.
+        </div>
+        {(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt) && (
+          <div className="mt-1">
+            Last updated: {formatSyncTime(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt)}
+          </div>
+        )}
+      </div>
+      {markerEvents && (
+        <EventDetailsDialog
+          events={markerEvents}
+          onClose={() => setMarkerEvents(null)}
+          onEdit={() => setMarkerEvents(null)}
+          onChanged={() => {
+            setMarkerEvents(null);
+            loadEvents();
+          }}
+        />
+      )}
     </div>
   );
 }

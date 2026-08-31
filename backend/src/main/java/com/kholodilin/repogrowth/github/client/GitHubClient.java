@@ -6,10 +6,14 @@ import com.kholodilin.repogrowth.common.observability.AppMetrics;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
 import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
+import com.kholodilin.repogrowth.github.model.GitHubContributorItem;
+import com.kholodilin.repogrowth.github.model.GitHubIssueItem;
 import com.kholodilin.repogrowth.github.model.GitHubGraphQlResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPathResponse;
+import com.kholodilin.repogrowth.github.model.GitHubPullItem;
 import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
 import com.kholodilin.repogrowth.github.model.GitHubReferrerResponse;
+import com.kholodilin.repogrowth.github.model.GitHubReleaseItem;
 import com.kholodilin.repogrowth.github.model.GitHubReleaseResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
@@ -50,6 +54,7 @@ public class GitHubClient {
     private static final Pattern LAST_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"last\"");
     private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
     private static final int MAX_PER_PAGE = 100;
+    private static final int MAX_LIST_PAGES = 5;
     private static final String MENTIONABLE_USERS_QUERY = """
             query($owner: String!, $name: String!) {
               repository(owner: $owner, name: $name) {
@@ -222,12 +227,14 @@ public class GitHubClient {
     }
 
     public Optional<String> getReadme(String owner, String name) {
+        return getReadmeDetails(owner, name).map(GitHubReadmeResponse::decodedText).filter(text -> !text.isBlank());
+    }
+
+    public Optional<GitHubReadmeResponse> getReadmeDetails(String owner, String name) {
         requireToken();
         try {
             ResponseEntity<byte[]> response = execute("readme", "GET", "/repos/" + owner + "/" + name + "/readme");
-            GitHubReadmeResponse readme = read(response.getBody(), GitHubReadmeResponse.class);
-            String text = readme.decodedText();
-            return text.isBlank() ? Optional.empty() : Optional.of(text);
+            return Optional.of(read(response.getBody(), GitHubReadmeResponse.class));
         } catch (GitHubException ex) {
             if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
                     || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
@@ -235,6 +242,42 @@ public class GitHubClient {
             }
             return Optional.empty();
         }
+    }
+
+    public List<GitHubIssueItem> listIssues(String owner, String name) {
+        return listPaged(
+                "issues",
+                "/repos/" + owner + "/" + name + "/issues?state=all&per_page=100&sort=created&direction=desc",
+                new TypeReference<List<GitHubIssueItem>>() {
+                }
+        );
+    }
+
+    public List<GitHubPullItem> listPulls(String owner, String name) {
+        return listPaged(
+                "pulls",
+                "/repos/" + owner + "/" + name + "/pulls?state=all&per_page=100&sort=created&direction=desc",
+                new TypeReference<List<GitHubPullItem>>() {
+                }
+        );
+    }
+
+    public List<GitHubReleaseItem> listReleases(String owner, String name) {
+        return listPaged(
+                "releases",
+                "/repos/" + owner + "/" + name + "/releases?per_page=100",
+                new TypeReference<List<GitHubReleaseItem>>() {
+                }
+        );
+    }
+
+    public List<GitHubContributorItem> listContributors(String owner, String name) {
+        return listPaged(
+                "contributorList",
+                "/repos/" + owner + "/" + name + "/contributors?per_page=100&anon=true",
+                new TypeReference<List<GitHubContributorItem>>() {
+                }
+        );
     }
 
     public Optional<Instant> latestReleaseAt(String owner, String name) {
@@ -467,6 +510,27 @@ public class GitHubClient {
         } catch (JacksonException ex) {
             throw GitHubException.malformed(ex);
         }
+    }
+
+    private <T> List<T> listPaged(String operation, String firstPath, TypeReference<List<T>> type) {
+        requireToken();
+        List<T> all = new ArrayList<>();
+        String path = firstPath;
+        int pages = 0;
+        while (path != null && pages < MAX_LIST_PAGES) {
+            ResponseEntity<byte[]> response = execute(operation, "GET", path);
+            all.addAll(readList(response.getBody(), type));
+            path = nextPath(combinedLinkHeader(response.getHeaders()));
+            pages++;
+        }
+        return all;
+    }
+
+    private <T> List<T> readList(byte[] body, TypeReference<List<T>> type) {
+        if (body == null || body.length == 0) {
+            return List.of();
+        }
+        return read(body, type);
     }
 
     private String combinedLinkHeader(HttpHeaders headers) {
