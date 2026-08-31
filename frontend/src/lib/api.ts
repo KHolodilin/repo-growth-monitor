@@ -123,6 +123,22 @@ export type CollectionRun = {
   jobs: CollectionJob[];
 };
 
+export type ReferrerHistory = {
+  repositoryId: number;
+  period: string;
+  from: string;
+  to: string;
+  snapshotCount: number;
+  sources: {
+    source: string;
+    views: number;
+    uniqueVisitors: number;
+    points: { date: string; views: number | null; visitors: number | null; previousSnapshotDate: string }[];
+  }[];
+  pathSnapshotCount: number;
+  paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
+};
+
 export type RepositoryTraffic = {
   repository: Repository;
   owner: Owner;
@@ -143,9 +159,16 @@ export type SearchQuery = {
   resultLimit: number;
 };
 
+export type QueryRankChange = {
+  kind: "NONE" | "UNCHANGED" | "IMPROVED" | "DECLINED" | "ENTERED" | "EXITED";
+  amount: number;
+  rank: number | null;
+};
+
 export type SearchHistory = {
   query: SearchQuery;
   currentRank: number | null;
+  change: QueryRankChange;
   change7d: number | null;
   change30d: number | null;
   bestRank: number | null;

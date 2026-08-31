@@ -9,12 +9,13 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { cn, formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
+import { ReferrerTrafficPanel } from "../components/ReferrerTrafficPanel";
 import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 
 type Tab = "overview" | "traffic" | "search";
@@ -42,10 +43,12 @@ export function RepositoryDetailsPage() {
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
   const [queryText, setQueryText] = useState("");
+  const [queryError, setQueryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
+  const [runningAll, setRunningAll] = useState(false);
 
   function setTab(next: Tab) {
     if (next === "traffic") {
@@ -101,6 +104,7 @@ export function RepositoryDetailsPage() {
     }
     if (!searchActive) {
       setRunningQueryId(null);
+      setRunningAll(false);
     }
     if (!runActive && !searchActive) {
       return;
@@ -126,19 +130,32 @@ export function RepositoryDetailsPage() {
   }
 
   async function createQuery() {
-    if (!id || !queryText.trim()) {
+    if (!id) {
       return;
     }
-    await api(`/api/v1/repositories/${id}/search-queries`, {
-      method: "POST",
-      body: JSON.stringify({ name: queryText, query: queryText, enabled: true, resultLimit: 50 }),
-    });
-    setQueryText("");
-    await load();
+    const query = normalizeSearchQuery(queryText);
+    if (!query) {
+      return;
+    }
+    if (visibility.some((item) => normalizeSearchQuery(item.query.query) === query)) {
+      setQueryError("This search query is already tracked for the repository");
+      return;
+    }
+    try {
+      await api(`/api/v1/repositories/${id}/search-queries`, {
+        method: "POST",
+        body: JSON.stringify({ name: query, query, enabled: true, resultLimit: 50 }),
+      });
+      setQueryText("");
+      setQueryError(null);
+      await load();
+    } catch (err) {
+      setQueryError((err as Error).message);
+    }
   }
 
   async function runQuery(queryId: number) {
-    if (runningQueryId != null) {
+    if (runningQueryId != null || runningAll || searchActive) {
       return;
     }
     setRunningQueryId(queryId);
@@ -147,6 +164,20 @@ export function RepositoryDetailsPage() {
       await load();
     } finally {
       setRunningQueryId(null);
+    }
+  }
+
+  async function runAllQueries() {
+    if (!id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
+      return;
+    }
+    setRunningAll(true);
+    try {
+      await api(`/api/v1/repositories/${id}/search-queries/run`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setQueryError((err as Error).message);
+      setRunningAll(false);
     }
   }
 
@@ -172,10 +203,13 @@ export function RepositoryDetailsPage() {
   if (loading || !repo || !traffic) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="space-y-3">
           <Skeleton className="h-7 w-72" />
-          <Skeleton className="h-9 w-28 sm:justify-self-end" />
-          <Skeleton className="h-4 w-64 sm:col-start-1" />
+          <Skeleton className="h-4 w-full max-w-2xl" />
+          <div className="flex items-center justify-between gap-4 border-t pt-3">
+            <Skeleton className="h-4 w-64" />
+            <Skeleton className="h-9 w-28" />
+          </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-64" />
@@ -189,33 +223,55 @@ export function RepositoryDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="grid grid-cols-1 items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="min-w-0 sm:col-start-1 sm:row-start-1">
-          <PageBreadcrumb
-            items={[
-              { label: "Portfolio", to: "/dashboard" },
-              {
-                label: repo.fullName,
-                repoSwitcher: {
-                  currentId: repo.id,
-                  hrefFor: (repositoryId) =>
-                    tab === "traffic" ? `/repositories/${repositoryId}` : `/repositories/${repositoryId}?tab=${tab}`,
-                },
+      <header className="space-y-0">
+        <PageBreadcrumb
+          items={[
+            { label: "Portfolio", to: "/dashboard" },
+            {
+              label: repo.fullName,
+              repoSwitcher: {
+                currentId: repo.id,
+                hrefFor: (repositoryId) =>
+                  tab === "traffic" ? `/repositories/${repositoryId}` : `/repositories/${repositoryId}?tab=${tab}`,
               },
-              { label: TAB_LABEL[tab] },
-            ]}
-          />
-          {repo.description && (
-            <p className="mt-1 text-sm font-normal text-muted-foreground">{repo.description}</p>
-          )}
+            },
+            { label: TAB_LABEL[tab] },
+          ]}
+        />
+        {repo.description && (
+          <p className="mt-3 border-t pt-3 text-sm font-normal text-muted-foreground">{repo.description}</p>
+        )}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t pt-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <a
+              className="text-primary hover:underline"
+              href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Github Traffic
+            </a>
+            <span className="inline-flex items-center gap-1">
+              <StarIcon />
+              {formatNumber(repo.stars)} stars
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <ForkIcon />
+              {formatNumber(repo.forks)} forks
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <WatchIcon />
+              {formatNumber(repo.watchers)} watchers
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <ContributorsIcon />
+              {formatNumber(repo.contributors)} contributors
+            </span>
+          </div>
+          <Button className="shrink-0" disabled={busy} onClick={() => void collect()}>
+            {busy ? "Collecting..." : "Collect now"}
+          </Button>
         </div>
-        <Button
-          className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
-          disabled={busy}
-          onClick={() => void collect()}
-        >
-          {busy ? "Collecting..." : "Collect now"}
-        </Button>
       </header>
       {repo.health && <HealthScoreRow health={repo.health} />}
       <div className="inline-flex rounded-lg border bg-muted p-1">
@@ -253,14 +309,64 @@ export function RepositoryDetailsPage() {
           repositoryId={repo.id}
           visibility={visibility}
           queryText={queryText}
-          setQueryText={setQueryText}
+          setQueryText={(value) => {
+            setQueryText(value);
+            setQueryError(null);
+          }}
+          queryError={queryError}
           runningQueryId={runningQueryId}
+          runningAll={runningAll}
           onCreate={() => void createQuery()}
           onRun={runQuery}
+          onRunAll={() => void runAllQueries()}
           onDelete={(queryId) => void deleteQuery(queryId)}
         />
       )}
     </div>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"
+      />
+    </svg>
+  );
+}
+
+function ForkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"
+      />
+    </svg>
+  );
+}
+
+function WatchIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.823C2.062 7.246 2.9 6.113 4.052 5.123 5.2 4.137 6.537 3.5 8 3.5s2.8.637 3.948 1.623c1.153.99 1.99 2.123 2.373 2.7a.137.137 0 0 1 0 .222c-.384.577-1.22 1.71-2.373 2.7-1.147.986-2.485 1.623-3.948 1.623s-2.8-.637-3.948-1.623c-1.153-.99-1.99-2.123-2.373-2.7a.137.137 0 0 1 0-.222ZM8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm0-1.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"
+      />
+    </svg>
+  );
+}
+
+function ContributorsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4 4 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.7 3.412.75.75 0 0 1-1.477.248A3.492 3.492 0 0 0 12.5 9.5h-1.75a.75.75 0 0 1-.183-1.478A3.001 3.001 0 0 1 11 4Zm-5.5 1.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 5.5Z"
+      />
+    </svg>
   );
 }
 
@@ -542,8 +648,8 @@ function TrafficPanel({
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Kpi label="Visitors" value={traffic.totals.uniqueVisitors} />
         <Kpi label="Views" value={traffic.totals.views} />
-        <Kpi label="Unique Visitors" value={traffic.totals.uniqueVisitors} />
         <Kpi label="Clones" value={traffic.totals.clones} />
         <Kpi label="Unique Cloners" value={traffic.totals.uniqueCloners} />
       </div>
@@ -556,26 +662,13 @@ function TrafficPanel({
           style={{ height: 360, width: "100%" }}
         />
       </Card>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="mb-3 font-medium">Referrers</h2>
-          <MetricTable
-            rows={traffic.referrers.map((row) => ({ key: row.referrer, title: row.referrer, views: row.views, visitors: row.uniqueVisitors }))}
-          />
-        </Card>
-        <Card>
-          <h2 className="mb-3 font-medium">Popular Paths</h2>
-          <MetricTable
-            rows={traffic.paths.map((row) => ({
-              key: row.path,
-              title: row.path,
-              subtitle: row.title,
-              views: row.views,
-              visitors: row.uniqueVisitors,
-            }))}
-          />
-        </Card>
-      </div>
+      <ReferrerTrafficPanel
+        repositoryId={repositoryId}
+        period={period}
+        referrers={traffic.referrers}
+        paths={traffic.paths}
+        lastUpdated={traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt}
+      />
     </div>
   );
 }
@@ -589,61 +682,35 @@ function Kpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-function MetricTable({
-  rows,
-}: {
-  rows: { key: string; title: string; subtitle?: string; views: number; visitors: number }[];
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full table-fixed text-sm">
-        <thead>
-          <tr className="text-left text-muted-foreground">
-            <th className="pr-3">Source</th>
-            <th className="w-16 whitespace-nowrap pl-2 text-right">Views</th>
-            <th className="w-[4.75rem] whitespace-nowrap pl-2 text-right">Visitors</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key} className="border-t">
-              <td className="max-w-0 py-2 pr-3 align-top">
-                <div className="[overflow-wrap:anywhere]">{wrapPath(row.title)}</div>
-                {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
-              </td>
-              <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.views)}</td>
-              <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.visitors)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+type QuerySortKey = "name" | "rank" | "change" | "change7d" | "change30d" | "best" | "results" | "updated";
 
-function wrapPath(value: string) {
-  return value.replaceAll("/", "/\u200b");
+function normalizeSearchQuery(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
-
-type QuerySortKey = "name" | "rank" | "change7d" | "change30d" | "best" | "results";
 
 function SearchPanel({
   repositoryId,
   visibility,
   queryText,
   setQueryText,
+  queryError,
   runningQueryId,
+  runningAll,
   onCreate,
   onRun,
+  onRunAll,
   onDelete,
 }: {
   repositoryId: number;
   visibility: SearchHistory[];
   queryText: string;
   setQueryText: (value: string) => void;
+  queryError: string | null;
   runningQueryId: number | null;
+  runningAll: boolean;
   onCreate: () => void;
   onRun: (id: number) => void;
+  onRunAll: () => void;
   onDelete: (id: number) => void;
 }) {
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
@@ -674,18 +741,45 @@ function SearchPanel({
     return copy;
   }, [visibility, sortKey, sortDir]);
 
+  const duplicate = visibility.some(
+    (item) =>
+      normalizeSearchQuery(item.query.query) === normalizeSearchQuery(queryText) && normalizeSearchQuery(queryText) !== "",
+  );
+  const searchBusy =
+    runningAll
+    || runningQueryId != null
+    || visibility.some(
+      (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
+    );
+
   return (
     <div className="space-y-4">
       <Card>
         <h2 className="mb-3 font-medium">Search Queries</h2>
-        <div className="mb-4 flex gap-2">
-          <input
-            className="flex-1 rounded-md border px-3 py-2 text-sm"
-            placeholder="transactional outbox language:java"
-            value={queryText}
-            onChange={(event) => setQueryText(event.target.value)}
-          />
-          <Button onClick={onCreate}>Add query</Button>
+        <div className="mb-4">
+          <div className="flex gap-2">
+            <input
+              className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+              placeholder="transactional outbox language:java"
+              value={queryText}
+              onChange={(event) => setQueryText(event.target.value)}
+            />
+            <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
+              Add query
+            </Button>
+            <Button
+              className="ml-auto shrink-0 bg-muted text-foreground"
+              disabled={visibility.length === 0 || searchBusy}
+              onClick={onRunAll}
+            >
+              {searchBusy ? "Running..." : "Run all"}
+            </Button>
+          </div>
+          {(queryError || duplicate) && (
+            <p className="mt-2 text-sm text-red-700">
+              {queryError ?? "This search query is already tracked for the repository"}
+            </p>
+          )}
         </div>
         <table className="w-full text-sm">
           <thead>
@@ -699,10 +793,12 @@ function SearchPanel({
                 onClick={() => toggle("name")}
               />
               <QuerySortHeader label="Rank" active={sortKey === "rank"} dir={sortDir} onClick={() => toggle("rank")} />
+              <QuerySortHeader label="Change" active={sortKey === "change"} dir={sortDir} onClick={() => toggle("change")} />
               <QuerySortHeader label="7d" active={sortKey === "change7d"} dir={sortDir} onClick={() => toggle("change7d")} />
               <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
               <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
               <QuerySortHeader label="Results" active={sortKey === "results"} dir={sortDir} onClick={() => toggle("results")} />
+              <QuerySortHeader label="Updated" active={sortKey === "updated"} dir={sortDir} onClick={() => toggle("updated")} />
               <th className="py-2 pl-3" />
             </tr>
           </thead>
@@ -713,6 +809,7 @@ function SearchPanel({
                 || item.searchStatus === "RUNNING"
                 || item.searchStatus === "READY"
                 || item.searchStatus === "RETRY";
+              const rankChange = formatQueryRankChange(item.change);
               return (
                 <tr
                   key={item.query.id}
@@ -729,18 +826,24 @@ function SearchPanel({
                     </Link>
                   </td>
                   <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
+                  <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
+                    {rankChange.label}
+                  </td>
                   <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
                   <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
                   <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
                   <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
+                    {formatSyncTime(item.lastChecked) ?? "—"}
+                  </td>
                   <td className="py-3 pl-3">
                     <div className="flex justify-end gap-2">
                       <Button
                         className="bg-muted text-foreground"
-                        disabled={running}
+                        disabled={running || searchBusy}
                         onClick={() => onRun(item.query.id)}
                       >
-                        {running ? "Running..." : "Run"}
+                        {running || runningAll ? "Running..." : "Run"}
                       </Button>
                       <Button
                         className="bg-muted text-red-700"
@@ -810,15 +913,41 @@ function compareQueryRows(left: SearchHistory, right: SearchHistory, key: QueryS
   return dir === "desc" ? rightValue - leftValue : leftValue - rightValue;
 }
 
+function queryChangeSortValue(item: SearchHistory): number | null {
+  const change = item.change;
+  if (!change || change.kind === "NONE") {
+    return null;
+  }
+  if (change.kind === "UNCHANGED") {
+    return 0;
+  }
+  if (change.kind === "IMPROVED") {
+    return change.amount;
+  }
+  if (change.kind === "DECLINED") {
+    return -change.amount;
+  }
+  if (change.kind === "ENTERED") {
+    return change.rank == null ? 1000 : 1000 - change.rank;
+  }
+  return -(1000 + change.amount);
+}
+
 function querySortValue(item: SearchHistory, key: Exclude<QuerySortKey, "name">): number | null {
   if (key === "rank") {
     return item.currentRank;
+  }
+  if (key === "change") {
+    return queryChangeSortValue(item);
   }
   if (key === "best") {
     return item.bestRank;
   }
   if (key === "results") {
     return item.totalResults ?? null;
+  }
+  if (key === "updated") {
+    return item.lastChecked ? Date.parse(item.lastChecked) : null;
   }
   if (key === "change7d") {
     return item.change7d;

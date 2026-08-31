@@ -23,10 +23,18 @@ import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath;
+import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath.NegativeReset;
+import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath.SnapshotRow;
+import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath.SourceSeries;
+import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath.Observation;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.ReferrerRow;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.TrafficTotals;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
@@ -34,6 +42,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -45,6 +55,7 @@ import java.util.stream.Collectors;
 @Service
 public class AnalyticsService {
 
+    private static final Logger log = LoggerFactory.getLogger(AnalyticsService.class);
     private static final DateTimeFormatter GAP_DATE = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
 
     private final RepositoryService repositoryService;
@@ -120,16 +131,7 @@ public class AnalyticsService {
     public RepositoryTrafficSnapshot traffic(long repositoryId, String periodParam) {
         Repository repository = repositoryService.get(repositoryId);
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
-        LocalDate today = LocalDate.now(clock);
-        String normalized = DashboardPeriod.normalize(periodParam);
-        LocalDate earliest = null;
-        if ("all".equals(normalized)) {
-            earliest = trafficJdbcRepository.history(repositoryId, null).stream()
-                    .map(TrafficDaily::trafficDate)
-                    .min(LocalDate::compareTo)
-                    .orElse(today);
-        }
-        DashboardPeriod period = DashboardPeriod.of(periodParam, today, earliest);
+        DashboardPeriod period = periodForRepository(repositoryId, periodParam);
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
         TrafficTotals totals = trafficJdbcRepository.totals(repositoryId, period.allTime() ? null : period.from());
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
@@ -143,6 +145,131 @@ public class AnalyticsService {
                 trafficJdbcRepository.pathsInRange(repositoryId, period.from(), period.to(), clock.getZone()),
                 latestRun == null ? null : collectionController.toResponse(latestRun)
         );
+    }
+
+    public ReferrerHistoryResponse referrerHistory(long repositoryId, String periodParam) {
+        repositoryService.get(repositoryId);
+        DashboardPeriod period = periodForRepository(repositoryId, periodParam);
+        List<Observation> snapshots = trafficJdbcRepository.referrerSnapshotsForDelta(
+                repositoryId,
+                period.from(),
+                period.to(),
+                clock.getZone()
+        );
+        ReferrerDeltaMath.Result deltas = ReferrerDeltaMath.dailyDeltas(
+                snapshots.stream()
+                        .map(row -> new SnapshotRow(row.snapshotDate(), row.key(), row.views(), row.uniqueVisitors()))
+                        .toList(),
+                period.from(),
+                period.to()
+        );
+        for (NegativeReset reset : deltas.resets()) {
+            log.info(
+                    "Referrer snapshot window reset repositoryId={} date={} source={} metric={} current={} previous={}",
+                    repositoryId,
+                    reset.date(),
+                    reset.source(),
+                    reset.metric(),
+                    reset.current(),
+                    reset.previous()
+            );
+        }
+        List<ReferrerHistorySource> sources = deltas.sources().stream()
+                .map(series -> new ReferrerHistorySource(
+                        series.source(),
+                        ReferrerDeltaMath.sumViews(series.points()),
+                        ReferrerDeltaMath.sumVisitors(series.points()),
+                        series.points().stream()
+                                .map(point -> new ReferrerHistoryPoint(
+                                        point.date(),
+                                        point.views(),
+                                        point.visitors(),
+                                        point.previousSnapshotDate()
+                                ))
+                                .toList()
+                ))
+                .sorted(Comparator
+                        .comparingInt(ReferrerHistorySource::uniqueVisitors)
+                        .reversed()
+                        .thenComparing(Comparator.comparingInt(ReferrerHistorySource::views).reversed())
+                        .thenComparing(ReferrerHistorySource::source))
+                .toList();
+        List<Observation> pathSnapshots = trafficJdbcRepository.pathSnapshotsForDelta(
+                repositoryId,
+                period.from(),
+                period.to(),
+                clock.getZone()
+        );
+        ReferrerDeltaMath.Result pathDeltas = ReferrerDeltaMath.dailyDeltas(
+                pathSnapshots.stream()
+                        .map(row -> new SnapshotRow(row.snapshotDate(), row.key(), row.views(), row.uniqueVisitors()))
+                        .toList(),
+                period.from(),
+                period.to()
+        );
+        Map<String, String> pathTitles = latestTitles(pathSnapshots);
+        List<ReferrerHistoryPath> paths = pathDeltas.sources().stream()
+                .map(series -> new ReferrerHistoryPath(
+                        series.source(),
+                        pathTitles.get(series.source()),
+                        ReferrerDeltaMath.sumViews(series.points()),
+                        ReferrerDeltaMath.sumVisitors(series.points())
+                ))
+                .sorted(Comparator
+                        .comparingInt(ReferrerHistoryPath::uniqueVisitors)
+                        .reversed()
+                        .thenComparing(Comparator.comparingInt(ReferrerHistoryPath::views).reversed())
+                        .thenComparing(ReferrerHistoryPath::path))
+                .toList();
+        return new ReferrerHistoryResponse(
+                repositoryId,
+                period.value(),
+                period.from(),
+                period.to(),
+                deltas.snapshotCount(),
+                sources,
+                pathDeltas.snapshotCount(),
+                paths
+        );
+    }
+
+    private static Map<String, String> latestTitles(List<Observation> snapshots) {
+        Map<String, String> titles = new HashMap<>();
+        Map<String, LocalDate> dates = new HashMap<>();
+        for (Observation snapshot : snapshots) {
+            if (snapshot.title() == null) {
+                continue;
+            }
+            LocalDate previous = dates.get(snapshot.key());
+            if (previous == null || !snapshot.snapshotDate().isBefore(previous)) {
+                titles.put(snapshot.key(), snapshot.title());
+                dates.put(snapshot.key(), snapshot.snapshotDate());
+            }
+        }
+        return titles;
+    }
+
+    private DashboardPeriod periodForRepository(long repositoryId, String periodParam) {
+        LocalDate today = LocalDate.now(clock);
+        String normalized = DashboardPeriod.normalize(periodParam);
+        LocalDate earliest = null;
+        if ("all".equals(normalized)) {
+            earliest = trafficJdbcRepository.history(repositoryId, null).stream()
+                    .map(TrafficDaily::trafficDate)
+                    .min(LocalDate::compareTo)
+                    .orElse(null);
+            LocalDate earliestReferrer = trafficJdbcRepository.earliestReferrerSnapshotDate(repositoryId, clock.getZone())
+                    .orElse(null);
+            if (earliest == null) {
+                earliest = earliestReferrer;
+            } else if (earliestReferrer != null && earliestReferrer.isBefore(earliest)) {
+                earliest = earliestReferrer;
+            }
+            if (earliest == null) {
+                earliest = today;
+            }
+        }
+        return DashboardPeriod.of(periodParam, today, earliest);
     }
 
     private static List<TrafficChartPoint> repositorySeries(DashboardPeriod period, List<TrafficDaily> history) {
@@ -449,6 +576,43 @@ public class AnalyticsService {
             long views,
             long clones,
             int stars
+    ) {
+    }
+
+    public record ReferrerHistoryResponse(
+            long repositoryId,
+            String period,
+            LocalDate from,
+            LocalDate to,
+            int snapshotCount,
+            List<ReferrerHistorySource> sources,
+            int pathSnapshotCount,
+            List<ReferrerHistoryPath> paths
+    ) {
+    }
+
+    public record ReferrerHistorySource(
+            String source,
+            int views,
+            int uniqueVisitors,
+            List<ReferrerHistoryPoint> points
+    ) {
+    }
+
+    public record ReferrerHistoryPath(
+            String path,
+            String title,
+            int views,
+            int uniqueVisitors
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record ReferrerHistoryPoint(
+            LocalDate date,
+            Integer views,
+            Integer visitors,
+            LocalDate previousSnapshotDate
     ) {
     }
 

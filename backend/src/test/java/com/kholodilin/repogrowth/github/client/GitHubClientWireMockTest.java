@@ -18,6 +18,7 @@ import java.time.Duration;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -183,6 +184,17 @@ class GitHubClientWireMockTest {
         var views = client.getViews("acme", "a");
         assertThat(views.days()).hasSize(1);
         assertThat(views.days().get(0).date().toString()).isEqualTo("2026-08-20");
+    }
+
+    @Test
+    void countsContributorsFromMentionableUsers() {
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"data":{"repository":{"mentionableUsers":{"totalCount":4}}}}
+                                """)));
+        assertThat(client.countContributors("acme", "a")).isEqualTo(4);
     }
 
     @Test

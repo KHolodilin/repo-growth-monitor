@@ -1,4 +1,4 @@
-import { calendarDates } from "./utils";
+import { calendarDates, formatChartAxisDate } from "./utils";
 
 const COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
 
@@ -46,12 +46,24 @@ export function rankHistoryOption({
             return `${item.name}: ${rankTooltipText(point, item.limit)}`;
           })
           .join("<br/>");
-        return `<div>${date}<br/>${rows}</div>`;
+        return `<div>${formatChartAxisDate(date)}<br/>${rows}</div>`;
       },
     },
     legend: legend ? { type: "scroll", data: series.map((item) => item.name) } : undefined,
-    grid: { left: 24, right: 16, top: legend ? 48 : 24, bottom: 24, containLabel: true },
-    xAxis: { type: "category", data: dates, boundaryGap: false },
+    grid: { left: 48, right: 72, top: legend ? 48 : 24, bottom: 40, containLabel: false },
+    xAxis: {
+      type: "category",
+      data: dates,
+      boundaryGap: dates.length < 2,
+      axisLabel: {
+        hideOverlap: true,
+        showMinLabel: true,
+        showMaxLabel: true,
+        alignMinLabel: "left",
+        alignMaxLabel: "right",
+        formatter: (value: string) => formatChartAxisDate(String(value)),
+      },
+    },
     yAxis: {
       type: "value",
       inverse: true,

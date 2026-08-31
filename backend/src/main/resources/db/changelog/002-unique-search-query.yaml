@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-unique-search-query
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              DELETE FROM search_query q
+              WHERE q.id NOT IN (
+                  SELECT MIN(id)
+                  FROM search_query
+                  GROUP BY repository_id, lower(btrim(regexp_replace(query, '\s+', ' ', 'g')))
+              );
+
+              CREATE UNIQUE INDEX uq_search_query_repo_normalized
+                  ON search_query (
+                      repository_id,
+                      (lower(btrim(regexp_replace(query, '\s+', ' ', 'g'))))
+                  );

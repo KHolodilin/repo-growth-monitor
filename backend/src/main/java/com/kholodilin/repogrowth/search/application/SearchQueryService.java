@@ -58,23 +58,39 @@ public class SearchQueryService {
 
     public SearchQuery create(long repositoryId, String name, String query, Boolean enabled, Integer resultLimit) {
         repositoryService.get(repositoryId);
-        if (query == null || query.isBlank()) {
-            throw ApiException.validation("Search query must not be blank");
-        }
+        String normalized = normalizeQuery(query);
+        ensureUnique(repositoryId, normalized, null);
         int limit = resultLimit == null ? searchProperties.defaultResultLimit() : resultLimit;
         boolean on = enabled == null || enabled;
-        return queryRepository.insert(repositoryId, name == null || name.isBlank() ? query : name, query, on, limit);
+        String label = name == null || name.isBlank() ? normalized : name.trim();
+        return queryRepository.insert(repositoryId, label, normalized, on, limit);
     }
 
     public SearchQuery update(long id, String name, String query, Boolean enabled, Integer resultLimit) {
         SearchQuery existing = getQuery(id);
+        String nextQuery = query == null ? existing.query() : normalizeQuery(query);
+        ensureUnique(existing.repositoryId(), nextQuery, existing.id());
         return queryRepository.update(
                 id,
                 name == null ? existing.name() : name,
-                query == null ? existing.query() : query,
+                nextQuery,
                 enabled == null ? existing.enabled() : enabled,
                 resultLimit == null ? existing.resultLimit() : resultLimit
         );
+    }
+
+    private void ensureUnique(long repositoryId, String normalizedQuery, Long excludeId) {
+        queryRepository.findNormalized(repositoryId, normalizedQuery.toLowerCase(), excludeId)
+                .ifPresent(ignored -> {
+                    throw ApiException.validation("This search query is already tracked for the repository");
+                });
+    }
+
+    static String normalizeQuery(String query) {
+        if (query == null || query.isBlank()) {
+            throw ApiException.validation("Search query must not be blank");
+        }
+        return query.trim().replaceAll("\\s+", " ");
     }
 
     public void delete(long id) {
@@ -91,6 +107,14 @@ public class SearchQueryService {
         return searchPlanner.planQuery(query.id(), query.repositoryId(), planningWindow.businessDate());
     }
 
+    public List<Long> runAll(long repositoryId) {
+        repositoryService.get(repositoryId);
+        LocalDate date = planningWindow.businessDate();
+        return list(repositoryId).stream()
+                .map(query -> searchPlanner.planQuery(query.id(), query.repositoryId(), date))
+                .toList();
+    }
+
     public SearchHistory history(long searchQueryId) {
         SearchQuery query = getQuery(searchQueryId);
         List<SearchRun> runs = runRepository.history(searchQueryId).stream()
@@ -98,6 +122,9 @@ public class SearchQueryService {
                 .sorted(Comparator.comparing(SearchRun::businessDate))
                 .toList();
         Integer current = latestPosition(runs);
+        boolean hasPrevious = runs.size() >= 2;
+        Integer previous = hasPrevious ? runs.get(runs.size() - 2).trackedRepositoryPosition() : null;
+        RankChangeMath.Change change = RankChangeMath.between(hasPrevious, previous, current, query.resultLimit());
         Integer change7 = changeSince(runs, 7);
         Integer change30 = changeSince(runs, 30);
         Integer best = runs.stream()
@@ -116,6 +143,7 @@ public class SearchQueryService {
         return new SearchHistory(
                 query,
                 current,
+                change,
                 change7,
                 change30,
                 best,
@@ -188,6 +216,7 @@ public class SearchQueryService {
     public record SearchHistory(
             SearchQuery query,
             Integer currentRank,
+            RankChangeMath.Change change,
             Integer change7d,
             Integer change30d,
             Integer bestRank,

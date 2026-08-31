@@ -116,7 +116,16 @@ export function QueryDetailsPage() {
               { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
             ]}
           />
-          <h1 className="mt-2 break-all text-xl font-semibold">{history.query.query}</h1>
+          <h1 className="mt-2 break-all text-xl font-semibold">
+            <a
+              className="text-primary hover:underline"
+              href={`https://github.com/search?q=${encodeURIComponent(history.query.query)}&type=repositories`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {history.query.query}
+            </a>
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Last checked: {formatSyncTime(history.lastChecked) ?? "—"}
             {history.searchStatus ? ` · Search: ${history.searchStatus}` : ""}
