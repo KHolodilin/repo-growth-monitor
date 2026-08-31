@@ -14,6 +14,7 @@ const JOB_LABELS: Record<string, string> = {
   REFERRERS: "Referrers",
   POPULAR_PATHS: "Popular Paths",
   REPOSITORY_STATS: "Repository Stats",
+  GROWTH_EVENTS: "Growth Events",
 };
 
 export function DashboardPage() {

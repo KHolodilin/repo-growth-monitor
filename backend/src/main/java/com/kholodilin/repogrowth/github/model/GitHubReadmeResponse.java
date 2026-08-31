@@ -7,6 +7,7 @@ import java.util.Base64;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubReadmeResponse(
+        String sha,
         String content,
         String encoding,
         String name

@@ -3,3 +3,5 @@ databaseChangeLog:
       file: db/changelog/001-initial-schema.yaml
   - include:
       file: db/changelog/002-unique-search-query.yaml
+  - include:
+      file: db/changelog/003-growth-events.yaml

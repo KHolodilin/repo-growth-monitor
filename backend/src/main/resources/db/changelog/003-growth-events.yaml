@@ -1,0 +1,44 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-growth-events
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE growth_event (
+                  id              BIGSERIAL PRIMARY KEY,
+                  repository_id   BIGINT NOT NULL REFERENCES repository (id),
+                  event_at        TIMESTAMPTZ NOT NULL,
+                  category        TEXT NOT NULL,
+                  type            TEXT NOT NULL,
+                  title           TEXT NOT NULL,
+                  description     TEXT,
+                  url             TEXT,
+                  source          TEXT NOT NULL,
+                  external_id     TEXT,
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  CONSTRAINT ck_growth_event_source CHECK (source IN ('GITHUB', 'MANUAL', 'SYSTEM'))
+              );
+
+              CREATE INDEX ix_growth_event_repository_event_at
+                  ON growth_event (repository_id, event_at DESC);
+
+              CREATE UNIQUE INDEX uq_growth_event_idempotent
+                  ON growth_event (repository_id, type, external_id)
+                  WHERE external_id IS NOT NULL;
+
+              CREATE TABLE growth_event_setting (
+                  repository_id   BIGINT NOT NULL REFERENCES repository (id),
+                  event_type      TEXT NOT NULL,
+                  enabled         BOOLEAN NOT NULL,
+                  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  PRIMARY KEY (repository_id, event_type)
+              );
+
+              CREATE TABLE growth_event_state (
+                  repository_id   BIGINT PRIMARY KEY REFERENCES repository (id),
+                  state           JSONB NOT NULL DEFAULT '{}'::jsonb,
+                  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );

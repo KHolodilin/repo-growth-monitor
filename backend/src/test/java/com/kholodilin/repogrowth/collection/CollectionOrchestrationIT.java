@@ -86,6 +86,9 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
 
     @BeforeEach
     void seed() {
+        jdbcClient.sql("DELETE FROM growth_event").update();
+        jdbcClient.sql("DELETE FROM growth_event_setting").update();
+        jdbcClient.sql("DELETE FROM growth_event_state").update();
         jdbcClient.sql("DELETE FROM search_result").update();
         jdbcClient.sql("DELETE FROM search_run").update();
         jdbcClient.sql("DELETE FROM search_query").update();
@@ -116,8 +119,8 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         collectionPlanner.planAll(date);
         CollectionRun run = runRepository.find(repository.id(), date).orElseThrow();
         List<CollectionJob> jobs = jobRepository.findByRun(run.id());
-        assertThat(jobs).hasSize(4);
-        assertThat(jobs.stream().map(CollectionJob::jobType).distinct()).hasSize(4);
+        assertThat(jobs).hasSize(5);
+        assertThat(jobs.stream().map(CollectionJob::jobType).distinct()).hasSize(5);
     }
 
     @Test
@@ -126,7 +129,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .thenThrow(GitHubException.api(500, true, null, "boom"));
         LocalDate date = planningWindow.businessDate();
         CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
-        drainCollection(8);
+        drainCollection(10);
         List<CollectionJob> jobs = jobRepository.findByRun(run.id());
         assertThat(jobs.stream().filter(job -> job.jobType() == CollectionJobType.TRAFFIC).findFirst().orElseThrow().status())
                 .isEqualTo(CollectionJobStatus.SUCCESS);
@@ -155,7 +158,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
 
         CollectionRun retried = collectionPlanner.planRepository(repository.id(), date);
         List<CollectionJob> jobs = jobRepository.findByRun(retried.id());
-        assertThat(jobs).hasSize(4);
+        assertThat(jobs).hasSize(5);
         assertThat(jobs.stream().filter(job -> job.jobType() == CollectionJobType.TRAFFIC).findFirst().orElseThrow().status())
                 .isEqualTo(CollectionJobStatus.SUCCESS);
         assertThat(jobs.stream().filter(job -> job.jobType() == CollectionJobType.POPULAR_PATHS).findFirst().orElseThrow().status())
@@ -210,7 +213,12 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
                 .findFirst()
                 .orElseThrow();
+        CollectionJob growthEvents = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.GROWTH_EVENTS)
+                .findFirst()
+                .orElseThrow();
         jobRepository.markSuccess(traffic.id());
+        jobRepository.markSuccess(growthEvents.id());
         trafficJdbcRepository.upsertDaily(repository.id(), date, 4, 2, 1, 1);
         runRepository.refreshAggregates(run.id());
 
@@ -219,13 +227,18 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
                 .findFirst()
                 .orElseThrow();
+        CollectionJob refreshedGrowth = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.GROWTH_EVENTS)
+                .findFirst()
+                .orElseThrow();
         assertThat(refreshed.status()).isEqualTo(CollectionJobStatus.READY);
+        assertThat(refreshedGrowth.status()).isEqualTo(CollectionJobStatus.READY);
     }
 
     @Test
     void repositoryStatsCollectorPersistsWatchersFromSubscribersCount() {
         collectionPlanner.planRepository(repository.id(), planningWindow.businessDate());
-        drainCollection(8);
+        drainCollection(10);
         Repository updated = repositoryJdbcRepository.findById(repository.id()).orElseThrow();
         assertThat(updated.watchers()).isEqualTo(5);
         assertThat(updated.stars()).isEqualTo(11);
@@ -356,6 +369,13 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
                 )
         ));
         when(gitHubClient.getReadme(anyString(), anyString())).thenReturn(Optional.of("# demo\n\nThe demo repository"));
+        when(gitHubClient.getReadmeDetails(anyString(), anyString()))
+                .thenReturn(Optional.of(new com.kholodilin.repogrowth.github.model.GitHubReadmeResponse(
+                        "sha1", "# demo\n\nThe demo repository", "utf-8", "README.md")));
+        when(gitHubClient.listIssues(anyString(), anyString())).thenReturn(List.of());
+        when(gitHubClient.listPulls(anyString(), anyString())).thenReturn(List.of());
+        when(gitHubClient.listReleases(anyString(), anyString())).thenReturn(List.of());
+        when(gitHubClient.listContributors(anyString(), anyString())).thenReturn(List.of());
         when(gitHubClient.latestReleaseAt(anyString(), anyString()))
                 .thenReturn(Optional.of(Instant.parse("2026-07-01T00:00:00Z")));
         when(gitHubClient.fileExists(anyString(), anyString(), anyString())).thenReturn(true);

@@ -63,6 +63,7 @@ public class CollectionPlanner {
         jobRepository.requeueFailed(run.id());
         if (refreshTraffic) {
             jobRepository.requeueCompleted(run.id(), CollectionJobType.REPOSITORY_STATS);
+            jobRepository.requeueCompleted(run.id(), CollectionJobType.GROWTH_EVENTS);
         }
         if (refreshTraffic || isTrafficStale(repositoryId, businessDate)) {
             jobRepository.requeueCompleted(run.id(), CollectionJobType.TRAFFIC);

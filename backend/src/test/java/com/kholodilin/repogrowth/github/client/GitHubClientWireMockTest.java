@@ -226,4 +226,48 @@ class GitHubClientWireMockTest {
                         .withBody("[{\"name\":\"bug_report.yml\",\"type\":\"file\"}]")));
         assertThat(client.hasIssueTemplates("acme", "a")).isTrue();
     }
+
+    @Test
+    void listsIssuesPullsReleasesAndContributors() {
+        wireMock.stubFor(get("/repos/acme/a/issues?state=all&per_page=100&sort=created&direction=desc")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"id":11,"number":1,"title":"Help wanted","state":"open","html_url":"https://github.com/acme/a/issues/1","created_at":"2026-08-20T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[{"name":"good first issue"}]}]
+                                """)));
+        wireMock.stubFor(get("/repos/acme/a/pulls?state=all&per_page=100&sort=created&direction=desc")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"id":22,"number":2,"title":"Fix","state":"closed","merged":true,"html_url":"https://github.com/acme/a/pull/2","created_at":"2026-08-21T00:00:00Z","merged_at":"2026-08-22T00:00:00Z","user":{"id":2,"login":"alice","type":"User"}}]
+                                """)));
+        wireMock.stubFor(get("/repos/acme/a/releases?per_page=100")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"id":33,"draft":false,"tag_name":"v1.0.0","name":"1.0.0","html_url":"https://github.com/acme/a/releases/tag/v1.0.0","published_at":"2026-08-23T00:00:00Z"}]
+                                """)));
+        wireMock.stubFor(get("/repos/acme/a/contributors?per_page=100&anon=true")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"login":"alice","type":"User"}]
+                                """)));
+        wireMock.stubFor(get("/repos/acme/a/readme")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"sha":"abc","content":"IyBkZW1v","encoding":"base64","name":"README.md"}
+                                """)));
+
+        assertThat(client.listIssues("acme", "a")).hasSize(1);
+        assertThat(client.listIssues("acme", "a").getFirst().hasGoodFirstIssueLabel()).isTrue();
+        assertThat(client.listPulls("acme", "a").getFirst().mergedPull()).isTrue();
+        assertThat(client.listReleases("acme", "a").getFirst().tagName()).isEqualTo("v1.0.0");
+        assertThat(client.listContributors("acme", "a")).extracting(item -> item.login()).containsExactly("alice");
+        assertThat(client.getReadmeDetails("acme", "a")).hasValueSatisfying(readme -> {
+            assertThat(readme.sha()).isEqualTo("abc");
+            assertThat(readme.decodedText()).isEqualTo("# demo");
+        });
+    }
 }

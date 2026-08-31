@@ -179,6 +179,35 @@ export type SearchHistory = {
   totalResults?: number | null;
 };
 
+export type GrowthEvent = {
+  id: number;
+  repositoryId: number;
+  eventAt: string;
+  category: string;
+  type: string;
+  title: string;
+  description?: string;
+  url?: string;
+  source: "GITHUB" | "MANUAL" | "SYSTEM" | string;
+  externalId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type GrowthEventSetting = {
+  repositoryId: number;
+  eventType: string;
+  enabled: boolean;
+};
+
+export type ManualGrowthEventRequest = {
+  type: string;
+  eventAt: string;
+  title: string;
+  url?: string;
+  description?: string;
+};
+
 export type SearchRunResults = {
   run: {
     id: number;
