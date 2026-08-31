@@ -203,10 +203,13 @@ export function RepositoryDetailsPage() {
   if (loading || !repo || !traffic) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="space-y-3">
           <Skeleton className="h-7 w-72" />
-          <Skeleton className="h-9 w-28 sm:justify-self-end" />
-          <Skeleton className="h-4 w-64 sm:col-start-1" />
+          <Skeleton className="h-4 w-full max-w-2xl" />
+          <div className="flex items-center justify-between gap-4 border-t pt-3">
+            <Skeleton className="h-4 w-64" />
+            <Skeleton className="h-9 w-28" />
+          </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Skeleton className="h-64" />
@@ -220,33 +223,55 @@ export function RepositoryDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="grid grid-cols-1 items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-        <div className="min-w-0 sm:col-start-1 sm:row-start-1">
-          <PageBreadcrumb
-            items={[
-              { label: "Portfolio", to: "/dashboard" },
-              {
-                label: repo.fullName,
-                repoSwitcher: {
-                  currentId: repo.id,
-                  hrefFor: (repositoryId) =>
-                    tab === "traffic" ? `/repositories/${repositoryId}` : `/repositories/${repositoryId}?tab=${tab}`,
-                },
+      <header className="space-y-0">
+        <PageBreadcrumb
+          items={[
+            { label: "Portfolio", to: "/dashboard" },
+            {
+              label: repo.fullName,
+              repoSwitcher: {
+                currentId: repo.id,
+                hrefFor: (repositoryId) =>
+                  tab === "traffic" ? `/repositories/${repositoryId}` : `/repositories/${repositoryId}?tab=${tab}`,
               },
-              { label: TAB_LABEL[tab] },
-            ]}
-          />
-          {repo.description && (
-            <p className="mt-1 text-sm font-normal text-muted-foreground">{repo.description}</p>
-          )}
+            },
+            { label: TAB_LABEL[tab] },
+          ]}
+        />
+        {repo.description && (
+          <p className="mt-3 border-t pt-3 text-sm font-normal text-muted-foreground">{repo.description}</p>
+        )}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t pt-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <a
+              className="text-primary hover:underline"
+              href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Github Traffic
+            </a>
+            <span className="inline-flex items-center gap-1">
+              <StarIcon />
+              {formatNumber(repo.stars)} stars
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <ForkIcon />
+              {formatNumber(repo.forks)} forks
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <WatchIcon />
+              {formatNumber(repo.watchers)} watchers
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <ContributorsIcon />
+              {formatNumber(repo.contributors)} contributors
+            </span>
+          </div>
+          <Button className="shrink-0" disabled={busy} onClick={() => void collect()}>
+            {busy ? "Collecting..." : "Collect now"}
+          </Button>
         </div>
-        <Button
-          className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
-          disabled={busy}
-          onClick={() => void collect()}
-        >
-          {busy ? "Collecting..." : "Collect now"}
-        </Button>
       </header>
       {repo.health && <HealthScoreRow health={repo.health} />}
       <div className="inline-flex rounded-lg border bg-muted p-1">
@@ -298,6 +323,50 @@ export function RepositoryDetailsPage() {
         />
       )}
     </div>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Zm0 2.445L6.615 5.5a.75.75 0 0 1-.564.41l-3.097.45 2.24 2.184a.75.75 0 0 1 .216.664l-.528 3.084 2.769-1.456a.75.75 0 0 1 .698 0l2.77 1.456-.53-3.084a.75.75 0 0 1 .216-.664l2.24-2.183-3.096-.45a.75.75 0 0 1-.564-.41L8 2.694Z"
+      />
+    </svg>
+  );
+}
+
+function ForkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M5 5.372v.878c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75v-.878a2.25 2.25 0 1 1 1.5 0v.878a2.25 2.25 0 0 1-2.25 2.25h-1.5v2.128a2.251 2.251 0 1 1-1.5 0V8.5h-1.5A2.25 2.25 0 0 1 3.5 6.25v-.878a2.25 2.25 0 1 1 1.5 0ZM5 3.25a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Zm6.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm-3 8.75a.75.75 0 1 0-1.5 0 .75.75 0 0 0 1.5 0Z"
+      />
+    </svg>
+  );
+}
+
+function WatchIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M8 2c1.981 0 3.671.992 4.933 2.078 1.27 1.091 2.187 2.345 2.637 3.023a1.62 1.62 0 0 1 0 1.798c-.45.678-1.367 1.932-2.637 3.023C11.67 13.008 9.981 14 8 14c-1.981 0-3.671-.992-4.933-2.078C1.797 10.83.88 9.576.43 8.898a1.62 1.62 0 0 1 0-1.798c.45-.677 1.367-1.931 2.637-3.022C4.33 2.992 6.019 2 8 2ZM1.679 7.823C2.062 7.246 2.9 6.113 4.052 5.123 5.2 4.137 6.537 3.5 8 3.5s2.8.637 3.948 1.623c1.153.99 1.99 2.123 2.373 2.7a.137.137 0 0 1 0 .222c-.384.577-1.22 1.71-2.373 2.7-1.147.986-2.485 1.623-3.948 1.623s-2.8-.637-3.948-1.623c-1.153-.99-1.99-2.123-2.373-2.7a.137.137 0 0 1 0-.222ZM8 10.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm0-1.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"
+      />
+    </svg>
+  );
+}
+
+function ContributorsIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M2 5.5a3.5 3.5 0 1 1 5.898 2.549 5.508 5.508 0 0 1 3.034 4.084.75.75 0 1 1-1.482.235 4 4 0 0 0-7.9 0 .75.75 0 0 1-1.482-.236A5.507 5.507 0 0 1 3.102 8.05 3.493 3.493 0 0 1 2 5.5ZM11 4a3.001 3.001 0 0 1 2.22 5.018 5.01 5.01 0 0 1 2.7 3.412.75.75 0 0 1-1.477.248A3.492 3.492 0 0 0 12.5 9.5h-1.75a.75.75 0 0 1-.183-1.478A3.001 3.001 0 0 1 11 4Zm-5.5 1.5a2 2 0 1 0-.001 3.999A2 2 0 0 0 5.5 5.5Z"
+      />
+    </svg>
   );
 }
 
