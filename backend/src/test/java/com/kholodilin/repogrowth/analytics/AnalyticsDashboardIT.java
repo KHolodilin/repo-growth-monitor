@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
@@ -22,8 +23,10 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AnalyticsDashboardIT extends AbstractPostgresTest {
 
@@ -161,51 +164,41 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     }
 
     @Test
-    void trafficAggregatesReferrersAndPathsForSelectedPeriod() {
+    void trafficCardsShowTheLatestSnapshotForEveryPeriod() {
         createRepos();
         LocalDate today = LocalDate.now(clock);
-        Instant snapshotAt = today.atTime(12, 0).atZone(clock.getZone()).toInstant();
+        Instant before = today.minusDays(3).atTime(12, 0).atZone(clock.getZone()).toInstant();
+        Instant latest = today.atTime(12, 0).atZone(clock.getZone()).toInstant();
 
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(15), 20, 1, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(14), 3, 1, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(9), 2, 2, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(8), 1, 1, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(7), 1, 1, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(5), 1, 1, 0, 0);
         trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(4), 37, 2, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(3), 22, 1, 0, 0);
-        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(2), 6, 1, 0, 0);
         trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(1), 6, 1, 0, 0);
 
-        trafficJdbcRepository.insertReferrers(kafka.id(), snapshotAt, "github.com", 81, 3);
-        trafficJdbcRepository.insertReferrers(kafka.id(), snapshotAt, "mvnrepository.com", 1, 1);
-        trafficJdbcRepository.insertPath(kafka.id(), snapshotAt, "/readme", "README", 38, 5);
-        trafficJdbcRepository.insertPath(kafka.id(), snapshotAt, "/pulse", "Pulse", 17, 1);
+        trafficJdbcRepository.insertReferrers(kafka.id(), before, "github.com", 40, 2);
+        trafficJdbcRepository.insertReferrers(kafka.id(), latest, "github.com", 81, 3);
+        trafficJdbcRepository.insertReferrers(kafka.id(), latest, "mvnrepository.com", 1, 1);
+        trafficJdbcRepository.insertPath(kafka.id(), before, "/readme", "README", 20, 2);
+        trafficJdbcRepository.insertPath(kafka.id(), latest, "/readme", "README", 38, 5);
+        trafficJdbcRepository.insertPath(kafka.id(), latest, "/pulse", "Pulse", 17, 1);
 
         AnalyticsService.RepositoryTrafficSnapshot sevenDays = analyticsService.traffic(kafka.id(), "7d");
-        assertThat(sevenDays.totals().views()).isEqualTo(72);
         assertThat(sevenDays.referrers()).containsExactly(
-                new TrafficJdbcRepository.ReferrerRow("github.com", 77, 2),
-                new TrafficJdbcRepository.ReferrerRow("mvnrepository.com", 1, 1)
-        );
-        assertThat(sevenDays.paths()).containsExactly(
-                new TrafficJdbcRepository.PathRow("/readme", "README", 36, 3),
-                new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 16, 1)
-        );
-
-        AnalyticsService.RepositoryTrafficSnapshot thirtyDays = analyticsService.traffic(kafka.id(), "30d");
-        assertThat(thirtyDays.referrers()).containsExactly(
                 new TrafficJdbcRepository.ReferrerRow("github.com", 81, 3),
                 new TrafficJdbcRepository.ReferrerRow("mvnrepository.com", 1, 1)
         );
-        assertThat(thirtyDays.paths()).containsExactly(
+        assertThat(sevenDays.paths()).containsExactly(
                 new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5),
                 new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 17, 1)
         );
+        assertThat(sevenDays.referrerSnapshotAt()).isEqualTo(latest);
+        assertThat(sevenDays.pathSnapshotAt()).isEqualTo(latest);
+
+        AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d");
+        assertThat(oneDay.referrers()).isEqualTo(sevenDays.referrers());
+        assertThat(oneDay.paths()).isEqualTo(sevenDays.paths());
     }
 
     @Test
-    void referrerHistoryUsesSnapshotDeltasAndLooksBackBeforeThePeriod() {
+    void trafficHistoryReturnsSnapshotValuesWithSignedDeltas() {
         createRepos();
         LocalDate today = LocalDate.now(clock);
         Instant before = today.minusDays(3).atTime(12, 0).atZone(clock.getZone()).toInstant();
@@ -217,34 +210,55 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.insertPath(kafka.id(), current, "/readme", "README", 50, 8);
         trafficJdbcRepository.insertPath(kafka.id(), current, "/pulse", "Pulse", 17, 1);
 
-        AnalyticsService.ReferrerHistoryResponse history = analyticsService.referrerHistory(kafka.id(), "1d");
-        assertThat(history.snapshotCount()).isEqualTo(2);
-        assertThat(history.sources()).filteredOn(source -> source.source().equals("github.com"))
-                .singleElement()
-                .satisfies(source -> {
-                    assertThat(source.views()).isEqualTo(15);
-                    assertThat(source.uniqueVisitors()).isEqualTo(2);
-                    assertThat(source.points()).hasSize(1);
-                    assertThat(source.points().getFirst().date()).isEqualTo(today.minusDays(1));
-                    assertThat(source.points().getFirst().views()).isEqualTo(15);
-                    assertThat(source.points().getFirst().visitors()).isEqualTo(2);
-                    assertThat(source.points().getFirst().previousSnapshotDate()).isEqualTo(today.minusDays(3));
-                });
-        assertThat(history.sources()).filteredOn(source -> source.source().equals("doubao.com"))
-                .singleElement()
-                .satisfies(source -> {
-                    assertThat(source.views()).isEqualTo(1);
-                    assertThat(source.uniqueVisitors()).isEqualTo(1);
-                    assertThat(source.points()).hasSize(1);
-                    assertThat(source.points().getFirst().date()).isEqualTo(today.minusDays(1));
-                    assertThat(source.points().getFirst().views()).isEqualTo(1);
-                    assertThat(source.points().getFirst().visitors()).isEqualTo(1);
-                });
-        assertThat(history.pathSnapshotCount()).isEqualTo(2);
-        assertThat(history.paths()).containsExactly(
-                new AnalyticsService.ReferrerHistoryPath("/readme", "README", 12, 3),
-                new AnalyticsService.ReferrerHistoryPath("/pulse", "Pulse", 17, 1)
+        AnalyticsService.SnapshotHistoryResponse referrers =
+                analyticsService.snapshotHistory(kafka.id(), "referrers", 2);
+        assertThat(referrers.kind()).isEqualTo("REFERRERS");
+        assertThat(referrers.from()).isEqualTo(today.minusDays(1));
+        assertThat(referrers.dates()).containsExactly(today.minusDays(1));
+        assertThat(referrers.rows()).containsExactly(
+                new AnalyticsService.SnapshotHistoryRow("github.com", null, List.of(
+                        new AnalyticsService.SnapshotHistoryCell(today.minusDays(1), 6, 230, 2, 15, false)
+                )),
+                new AnalyticsService.SnapshotHistoryRow("doubao.com", null, List.of(
+                        new AnalyticsService.SnapshotHistoryCell(today.minusDays(1), 1, 1, null, null, true)
+                ))
         );
+
+        AnalyticsService.SnapshotHistoryResponse paths =
+                analyticsService.snapshotHistory(kafka.id(), "paths", 14);
+        assertThat(paths.dates()).containsExactly(today.minusDays(3), today.minusDays(1));
+        assertThat(paths.rows()).containsExactly(
+                new AnalyticsService.SnapshotHistoryRow("/readme", "README", List.of(
+                        new AnalyticsService.SnapshotHistoryCell(today.minusDays(3), 5, 38, null, null, false),
+                        new AnalyticsService.SnapshotHistoryCell(today.minusDays(1), 8, 50, 3, 12, false)
+                )),
+                new AnalyticsService.SnapshotHistoryRow("/pulse", "Pulse", List.of(
+                        new AnalyticsService.SnapshotHistoryCell(today.minusDays(3), null, null, null, null, false),
+                        new AnalyticsService.SnapshotHistoryCell(today.minusDays(1), 1, 17, null, null, true)
+                ))
+        );
+    }
+
+    @Test
+    void trafficHistoryClampsTheRequestedWindowToTwoWeeks() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+
+        AnalyticsService.SnapshotHistoryResponse wide =
+                analyticsService.snapshotHistory(kafka.id(), null, 90);
+
+        assertThat(wide.kind()).isEqualTo("REFERRERS");
+        assertThat(wide.days()).isEqualTo(14);
+        assertThat(wide.from()).isEqualTo(today.minusDays(13));
+    }
+
+    @Test
+    void trafficHistoryRejectsAnUnknownKind() {
+        createRepos();
+
+        assertThatThrownBy(() -> analyticsService.snapshotHistory(kafka.id(), "sources", 7))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("sources");
     }
 
     private void createRepos() {

@@ -23,14 +23,14 @@ import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
-import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath;
-import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath.NegativeReset;
-import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath.SnapshotRow;
-import com.kholodilin.repogrowth.traffic.ReferrerDeltaMath.SourceSeries;
-import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath.Observation;
+import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath;
+import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
+import com.kholodilin.repogrowth.traffic.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.ReferrerRow;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.PathSnapshot;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.ReferrerSnapshot;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.TrafficTotals;
 import org.slf4j.Logger;
@@ -57,6 +57,8 @@ public class AnalyticsService {
 
     private static final Logger log = LoggerFactory.getLogger(AnalyticsService.class);
     private static final DateTimeFormatter GAP_DATE = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
+    /** GitHub reports a rolling 14-day window, so a wider history table would repeat itself. */
+    private static final int MAX_HISTORY_DAYS = 14;
 
     private final RepositoryService repositoryService;
     private final TrafficJdbcRepository trafficJdbcRepository;
@@ -135,118 +137,83 @@ public class AnalyticsService {
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
         TrafficTotals totals = trafficJdbcRepository.totals(repositoryId, period.allTime() ? null : period.from());
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
+        ReferrerSnapshot referrers = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
+        PathSnapshot paths = trafficJdbcRepository.latestPathSnapshot(repositoryId);
         return new RepositoryTrafficSnapshot(
                 repository,
                 owner,
                 period.value(),
                 totals,
                 repositorySeries(period, history),
-                trafficJdbcRepository.referrersInRange(repositoryId, period.from(), period.to(), clock.getZone()),
-                trafficJdbcRepository.pathsInRange(repositoryId, period.from(), period.to(), clock.getZone()),
+                referrers.rows(),
+                referrers.snapshotAt(),
+                paths.rows(),
+                paths.snapshotAt(),
                 latestRun == null ? null : collectionController.toResponse(latestRun)
         );
     }
 
-    public ReferrerHistoryResponse referrerHistory(long repositoryId, String periodParam) {
+    /**
+     * Both the chart and the table of the history page are served from this payload, so they cannot
+     * disagree about a snapshot. The chart hides negative deltas itself; the table shows them.
+     */
+    public SnapshotHistoryResponse snapshotHistory(long repositoryId, String kindParam, Integer daysParam) {
         repositoryService.get(repositoryId);
-        DashboardPeriod period = periodForRepository(repositoryId, periodParam);
-        List<Observation> snapshots = trafficJdbcRepository.referrerSnapshotsForDelta(
+        SnapshotKind kind = snapshotKind(kindParam);
+        int days = historyDays(daysParam);
+        LocalDate to = LocalDate.now(clock);
+        LocalDate from = to.minusDays(days - 1L);
+        List<Observation> snapshots = kind == SnapshotKind.PATHS
+                ? trafficJdbcRepository.pathSnapshotsForDelta(repositoryId, from, to, clock.getZone())
+                : trafficJdbcRepository.referrerSnapshotsForDelta(repositoryId, from, to, clock.getZone());
+        SnapshotHistoryMath.Result history = SnapshotHistoryMath.pivot(snapshots, from, to);
+        return new SnapshotHistoryResponse(
                 repositoryId,
-                period.from(),
-                period.to(),
-                clock.getZone()
-        );
-        ReferrerDeltaMath.Result deltas = ReferrerDeltaMath.dailyDeltas(
-                snapshots.stream()
-                        .map(row -> new SnapshotRow(row.snapshotDate(), row.key(), row.views(), row.uniqueVisitors()))
-                        .toList(),
-                period.from(),
-                period.to()
-        );
-        for (NegativeReset reset : deltas.resets()) {
-            log.info(
-                    "Referrer snapshot window reset repositoryId={} date={} source={} metric={} current={} previous={}",
-                    repositoryId,
-                    reset.date(),
-                    reset.source(),
-                    reset.metric(),
-                    reset.current(),
-                    reset.previous()
-            );
-        }
-        List<ReferrerHistorySource> sources = deltas.sources().stream()
-                .map(series -> new ReferrerHistorySource(
-                        series.source(),
-                        ReferrerDeltaMath.sumViews(series.points()),
-                        ReferrerDeltaMath.sumVisitors(series.points()),
-                        series.points().stream()
-                                .map(point -> new ReferrerHistoryPoint(
-                                        point.date(),
-                                        point.views(),
-                                        point.visitors(),
-                                        point.previousSnapshotDate()
-                                ))
-                                .toList()
-                ))
-                .sorted(Comparator
-                        .comparingInt(ReferrerHistorySource::uniqueVisitors)
-                        .reversed()
-                        .thenComparing(Comparator.comparingInt(ReferrerHistorySource::views).reversed())
-                        .thenComparing(ReferrerHistorySource::source))
-                .toList();
-        List<Observation> pathSnapshots = trafficJdbcRepository.pathSnapshotsForDelta(
-                repositoryId,
-                period.from(),
-                period.to(),
-                clock.getZone()
-        );
-        ReferrerDeltaMath.Result pathDeltas = ReferrerDeltaMath.dailyDeltas(
-                pathSnapshots.stream()
-                        .map(row -> new SnapshotRow(row.snapshotDate(), row.key(), row.views(), row.uniqueVisitors()))
-                        .toList(),
-                period.from(),
-                period.to()
-        );
-        Map<String, String> pathTitles = latestTitles(pathSnapshots);
-        List<ReferrerHistoryPath> paths = pathDeltas.sources().stream()
-                .map(series -> new ReferrerHistoryPath(
-                        series.source(),
-                        pathTitles.get(series.source()),
-                        ReferrerDeltaMath.sumViews(series.points()),
-                        ReferrerDeltaMath.sumVisitors(series.points())
-                ))
-                .sorted(Comparator
-                        .comparingInt(ReferrerHistoryPath::uniqueVisitors)
-                        .reversed()
-                        .thenComparing(Comparator.comparingInt(ReferrerHistoryPath::views).reversed())
-                        .thenComparing(ReferrerHistoryPath::path))
-                .toList();
-        return new ReferrerHistoryResponse(
-                repositoryId,
-                period.value(),
-                period.from(),
-                period.to(),
-                deltas.snapshotCount(),
-                sources,
-                pathDeltas.snapshotCount(),
-                paths
+                kind.name(),
+                days,
+                from,
+                to,
+                history.dates(),
+                history.rows().stream().map(AnalyticsService::toHistoryRow).toList()
         );
     }
 
-    private static Map<String, String> latestTitles(List<Observation> snapshots) {
-        Map<String, String> titles = new HashMap<>();
-        Map<String, LocalDate> dates = new HashMap<>();
-        for (Observation snapshot : snapshots) {
-            if (snapshot.title() == null) {
-                continue;
-            }
-            LocalDate previous = dates.get(snapshot.key());
-            if (previous == null || !snapshot.snapshotDate().isBefore(previous)) {
-                titles.put(snapshot.key(), snapshot.title());
-                dates.put(snapshot.key(), snapshot.snapshotDate());
-            }
+    private static SnapshotHistoryRow toHistoryRow(SnapshotHistoryMath.Row row) {
+        return new SnapshotHistoryRow(
+                row.key(),
+                row.title(),
+                row.cells().stream()
+                        .map(cell -> new SnapshotHistoryCell(
+                                cell.date(),
+                                cell.visitors(),
+                                cell.views(),
+                                cell.visitorsDelta(),
+                                cell.viewsDelta(),
+                                cell.firstSeen()
+                        ))
+                        .toList()
+        );
+    }
+
+    private static SnapshotKind snapshotKind(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return SnapshotKind.REFERRERS;
         }
-        return titles;
+        String normalized = raw.trim().toUpperCase(Locale.ROOT);
+        if (SnapshotKind.REFERRERS.name().equals(normalized)) {
+            return SnapshotKind.REFERRERS;
+        }
+        if (SnapshotKind.PATHS.name().equals(normalized)) {
+            return SnapshotKind.PATHS;
+        }
+        throw ApiException.validation("Unknown snapshot kind: " + raw);
+    }
+
+    private static int historyDays(Integer days) {
+        if (days == null) {
+            return MAX_HISTORY_DAYS;
+        }
+        return Math.min(MAX_HISTORY_DAYS, Math.max(1, days));
     }
 
     private DashboardPeriod periodForRepository(long repositoryId, String periodParam) {
@@ -579,40 +546,32 @@ public class AnalyticsService {
     ) {
     }
 
-    public record ReferrerHistoryResponse(
+    public record SnapshotHistoryResponse(
             long repositoryId,
-            String period,
+            String kind,
+            int days,
             LocalDate from,
             LocalDate to,
-            int snapshotCount,
-            List<ReferrerHistorySource> sources,
-            int pathSnapshotCount,
-            List<ReferrerHistoryPath> paths
+            List<LocalDate> dates,
+            List<SnapshotHistoryRow> rows
     ) {
     }
 
-    public record ReferrerHistorySource(
-            String source,
-            int views,
-            int uniqueVisitors,
-            List<ReferrerHistoryPoint> points
-    ) {
-    }
-
-    public record ReferrerHistoryPath(
-            String path,
+    public record SnapshotHistoryRow(
+            String key,
             String title,
-            int views,
-            int uniqueVisitors
+            List<SnapshotHistoryCell> cells
     ) {
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record ReferrerHistoryPoint(
+    public record SnapshotHistoryCell(
             LocalDate date,
-            Integer views,
             Integer visitors,
-            LocalDate previousSnapshotDate
+            Integer views,
+            Integer visitorsDelta,
+            Integer viewsDelta,
+            boolean firstSeen
     ) {
     }
 
@@ -623,7 +582,9 @@ public class AnalyticsService {
             TrafficJdbcRepository.TrafficTotals totals,
             List<TrafficChartPoint> traffic,
             List<TrafficJdbcRepository.ReferrerRow> referrers,
+            Instant referrerSnapshotAt,
             List<TrafficJdbcRepository.PathRow> paths,
+            Instant pathSnapshotAt,
             CollectionController.CollectionRunResponse lastCollection
     ) {
     }

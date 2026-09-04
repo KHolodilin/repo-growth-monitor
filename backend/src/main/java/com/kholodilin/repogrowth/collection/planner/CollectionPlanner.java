@@ -54,18 +54,23 @@ public class CollectionPlanner {
         return planRepository(repositoryId, businessDate, false);
     }
 
+    /**
+     * Collect now recollects everything for the day, including the referrer and path snapshots. A
+     * repeated snapshot is stored under its own timestamp and both the traffic cards and the history
+     * read the latest snapshot of a day, so the day keeps one column with fresher numbers.
+     */
     @Transactional
-    public CollectionRun planRepository(long repositoryId, LocalDate businessDate, boolean refreshTraffic) {
+    public CollectionRun planRepository(long repositoryId, LocalDate businessDate, boolean recollect) {
         CollectionRun run = runRepository.insertIgnore(repositoryId, businessDate, JOB_TYPES.length);
         for (CollectionJobType type : JOB_TYPES) {
             jobRepository.insertIgnore(run.id(), repositoryId, businessDate, type);
         }
         jobRepository.requeueFailed(run.id());
-        if (refreshTraffic) {
-            jobRepository.requeueCompleted(run.id(), CollectionJobType.REPOSITORY_STATS);
-            jobRepository.requeueCompleted(run.id(), CollectionJobType.GROWTH_EVENTS);
-        }
-        if (refreshTraffic || isTrafficStale(repositoryId, businessDate)) {
+        if (recollect) {
+            for (CollectionJobType type : JOB_TYPES) {
+                jobRepository.requeueCompleted(run.id(), type);
+            }
+        } else if (isTrafficStale(repositoryId, businessDate)) {
             jobRepository.requeueCompleted(run.id(), CollectionJobType.TRAFFIC);
         }
         runRepository.refreshAggregates(run.id());

@@ -1,9 +1,7 @@
 package com.kholodilin.repogrowth.traffic.persistence;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
-import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath;
-import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath.DayTraffic;
-import com.kholodilin.repogrowth.traffic.SnapshotPeriodMath.Observation;
+import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -495,125 +493,67 @@ public class TrafficJdbcRepository {
                 .filter(date -> date != null);
     }
 
-    public List<ReferrerRow> referrersInRange(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive, ZoneId zone) {
-        return SnapshotPeriodMath.aggregate(
-                fromInclusive,
-                toInclusive,
-                referrerObservations(repositoryId, fromInclusive, toInclusive, zone),
-                trafficWeights(repositoryId, fromInclusive, toInclusive)
-        ).stream()
-                .map(row -> new ReferrerRow(row.key(), row.views(), row.uniqueVisitors()))
-                .toList();
-    }
-
-    public List<PathRow> pathsInRange(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive, ZoneId zone) {
-        return SnapshotPeriodMath.aggregate(
-                fromInclusive,
-                toInclusive,
-                pathObservations(repositoryId, fromInclusive, toInclusive, zone),
-                trafficWeights(repositoryId, fromInclusive, toInclusive)
-        ).stream()
-                .map(row -> new PathRow(row.key(), row.title(), row.views(), row.uniqueVisitors()))
-                .toList();
-    }
-
-    private List<DayTraffic> trafficWeights(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive) {
-        LocalDate lookback = fromInclusive.minusDays(SnapshotPeriodMath.GITHUB_WINDOW_DAYS - 1);
-        return history(repositoryId, lookback).stream()
-                .filter(day -> !day.trafficDate().isAfter(toInclusive))
-                .map(day -> new DayTraffic(day.trafficDate(), day.views(), day.uniqueVisitors()))
-                .toList();
-    }
-
-    private List<Observation> referrerObservations(
-            long repositoryId,
-            LocalDate fromInclusive,
-            LocalDate toInclusive,
-            ZoneId zone
-    ) {
-        String tz = postgresTimeZone(zone);
-        return jdbcClient.sql("""
-                        WITH dated AS (
-                            SELECT
-                                (snapshot_at AT TIME ZONE :tz)::date AS snapshot_date,
-                                snapshot_at,
-                                referrer,
-                                views,
-                                unique_visitors
+    /**
+     * The cards mirror the GitHub traffic page, so they show the newest stored snapshot as is
+     * instead of anything aggregated over the selected period.
+     */
+    public ReferrerSnapshot latestReferrerSnapshot(long repositoryId) {
+        List<TimedReferrer> rows = jdbcClient.sql("""
+                        WITH latest AS (
+                            SELECT MAX(snapshot_at) AS snapshot_at
                             FROM traffic_referrer_snapshot
                             WHERE repository_id = :repositoryId
-                        ),
-                        latest AS (
-                            SELECT snapshot_date, MAX(snapshot_at) AS snapshot_at
-                            FROM dated
-                            WHERE snapshot_date >= :fromDate
-                              AND snapshot_date <= :toDate
-                            GROUP BY snapshot_date
                         )
-                        SELECT d.snapshot_date, d.referrer, d.views, d.unique_visitors
-                        FROM dated d
-                        JOIN latest l
-                          ON l.snapshot_date = d.snapshot_date
-                         AND l.snapshot_at = d.snapshot_at
+                        SELECT s.snapshot_at, s.referrer, s.views, s.unique_visitors
+                        FROM traffic_referrer_snapshot s
+                        JOIN latest l ON l.snapshot_at = s.snapshot_at
+                        WHERE s.repository_id = :repositoryId
+                        ORDER BY s.unique_visitors DESC, s.views DESC, s.referrer
                         """)
                 .param("repositoryId", repositoryId)
-                .param("tz", tz)
-                .param("fromDate", fromInclusive)
-                .param("toDate", toInclusive)
-                .query((rs, rowNum) -> new Observation(
-                        rs.getObject("snapshot_date", LocalDate.class),
-                        rs.getString("referrer"),
-                        null,
-                        rs.getInt("views"),
-                        rs.getInt("unique_visitors")
+                .query((rs, rowNum) -> new TimedReferrer(
+                        toInstant(rs.getTimestamp("snapshot_at")),
+                        new ReferrerRow(
+                                rs.getString("referrer"),
+                                rs.getInt("views"),
+                                rs.getInt("unique_visitors")
+                        )
                 ))
                 .list();
+        return new ReferrerSnapshot(
+                rows.isEmpty() ? null : rows.getFirst().snapshotAt(),
+                rows.stream().map(TimedReferrer::row).toList()
+        );
     }
 
-    private List<Observation> pathObservations(
-            long repositoryId,
-            LocalDate fromInclusive,
-            LocalDate toInclusive,
-            ZoneId zone
-    ) {
-        String tz = postgresTimeZone(zone);
-        return jdbcClient.sql("""
-                        WITH dated AS (
-                            SELECT
-                                (snapshot_at AT TIME ZONE :tz)::date AS snapshot_date,
-                                snapshot_at,
-                                path,
-                                title,
-                                views,
-                                unique_visitors
+    public PathSnapshot latestPathSnapshot(long repositoryId) {
+        List<TimedPath> rows = jdbcClient.sql("""
+                        WITH latest AS (
+                            SELECT MAX(snapshot_at) AS snapshot_at
                             FROM traffic_path_snapshot
                             WHERE repository_id = :repositoryId
-                        ),
-                        latest AS (
-                            SELECT snapshot_date, MAX(snapshot_at) AS snapshot_at
-                            FROM dated
-                            WHERE snapshot_date >= :fromDate
-                              AND snapshot_date <= :toDate
-                            GROUP BY snapshot_date
                         )
-                        SELECT d.snapshot_date, d.path, d.title, d.views, d.unique_visitors
-                        FROM dated d
-                        JOIN latest l
-                          ON l.snapshot_date = d.snapshot_date
-                         AND l.snapshot_at = d.snapshot_at
+                        SELECT s.snapshot_at, s.path, s.title, s.views, s.unique_visitors
+                        FROM traffic_path_snapshot s
+                        JOIN latest l ON l.snapshot_at = s.snapshot_at
+                        WHERE s.repository_id = :repositoryId
+                        ORDER BY s.unique_visitors DESC, s.views DESC, s.path
                         """)
                 .param("repositoryId", repositoryId)
-                .param("tz", tz)
-                .param("fromDate", fromInclusive)
-                .param("toDate", toInclusive)
-                .query((rs, rowNum) -> new Observation(
-                        rs.getObject("snapshot_date", LocalDate.class),
-                        rs.getString("path"),
-                        rs.getString("title"),
-                        rs.getInt("views"),
-                        rs.getInt("unique_visitors")
+                .query((rs, rowNum) -> new TimedPath(
+                        toInstant(rs.getTimestamp("snapshot_at")),
+                        new PathRow(
+                                rs.getString("path"),
+                                rs.getString("title"),
+                                rs.getInt("views"),
+                                rs.getInt("unique_visitors")
+                        )
                 ))
                 .list();
+        return new PathSnapshot(
+                rows.isEmpty() ? null : rows.getFirst().snapshotAt(),
+                rows.stream().map(TimedPath::row).toList()
+        );
     }
 
     public record TrafficTotals(long views, long uniqueVisitors, long clones, long uniqueCloners) {
@@ -639,6 +579,18 @@ public class TrafficJdbcRepository {
     }
 
     public record PathRow(String path, String title, int views, int uniqueVisitors) {
+    }
+
+    public record ReferrerSnapshot(Instant snapshotAt, List<ReferrerRow> rows) {
+    }
+
+    public record PathSnapshot(Instant snapshotAt, List<PathRow> rows) {
+    }
+
+    private record TimedReferrer(Instant snapshotAt, ReferrerRow row) {
+    }
+
+    private record TimedPath(Instant snapshotAt, PathRow row) {
     }
 
     private static Instant toInstant(Timestamp timestamp) {

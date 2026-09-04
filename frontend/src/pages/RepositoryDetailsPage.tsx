@@ -10,13 +10,13 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
+import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
-import { ReferrerTrafficPanel } from "../components/ReferrerTrafficPanel";
+import { SnapshotCards } from "../components/SnapshotCards";
 import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
@@ -718,16 +718,17 @@ function TrafficPanel({
           }}
         />
       </Card>
-      <ReferrerTrafficPanel
+      <SnapshotCards
         repositoryId={repositoryId}
-        period={period}
         referrers={traffic.referrers}
+        referrerSnapshotAt={traffic.referrerSnapshotAt}
         paths={traffic.paths}
+        pathSnapshotAt={traffic.pathSnapshotAt}
       />
       <div className="text-xs text-muted-foreground">
         <div>
-          <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrer
-          traffic shows daily delta between snapshots.
+          <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
+          paths show the latest GitHub snapshot; History has the change between snapshots.
         </div>
         {(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt) && (
           <div className="mt-1">
