@@ -123,20 +123,31 @@ export type CollectionRun = {
   jobs: CollectionJob[];
 };
 
-export type ReferrerHistory = {
+export type SnapshotKind = "REFERRERS" | "PATHS";
+
+export type SnapshotHistoryCell = {
+  date: string;
+  visitors: number | null;
+  views: number | null;
+  visitorsDelta: number | null;
+  viewsDelta: number | null;
+  firstSeen: boolean;
+};
+
+export type SnapshotHistoryRow = {
+  key: string;
+  title?: string;
+  cells: SnapshotHistoryCell[];
+};
+
+export type SnapshotHistory = {
   repositoryId: number;
-  period: string;
+  kind: SnapshotKind;
+  days: number;
   from: string;
   to: string;
-  snapshotCount: number;
-  sources: {
-    source: string;
-    views: number;
-    uniqueVisitors: number;
-    points: { date: string; views: number | null; visitors: number | null; previousSnapshotDate: string }[];
-  }[];
-  pathSnapshotCount: number;
-  paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
+  dates: string[];
+  rows: SnapshotHistoryRow[];
 };
 
 export type RepositoryTraffic = {
@@ -146,7 +157,9 @@ export type RepositoryTraffic = {
   totals: { views: number; uniqueVisitors: number; clones: number; uniqueCloners: number };
   traffic: TrafficPoint[];
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
+  referrerSnapshotAt?: string;
   paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
+  pathSnapshotAt?: string;
   lastCollection?: CollectionRun;
 };
 
