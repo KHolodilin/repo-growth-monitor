@@ -30,6 +30,7 @@ import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
+import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -46,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
@@ -206,33 +209,46 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
     }
 
     @Test
-    void collectNowRefreshesTrafficEvenWhenCurrentDayExists() {
+    void collectNowRequeuesEveryJobOfTheDay() {
         LocalDate date = planningWindow.businessDate();
         CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
-        CollectionJob traffic = jobRepository.findByRun(run.id()).stream()
-                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
-                .findFirst()
-                .orElseThrow();
-        CollectionJob growthEvents = jobRepository.findByRun(run.id()).stream()
-                .filter(job -> job.jobType() == CollectionJobType.GROWTH_EVENTS)
-                .findFirst()
-                .orElseThrow();
-        jobRepository.markSuccess(traffic.id());
-        jobRepository.markSuccess(growthEvents.id());
+        for (CollectionJob job : jobRepository.findByRun(run.id())) {
+            jobRepository.markSuccess(job.id());
+        }
         trafficJdbcRepository.upsertDaily(repository.id(), date, 4, 2, 1, 1);
         runRepository.refreshAggregates(run.id());
 
         collectionPlanner.planRepository(repository.id(), date, true);
-        CollectionJob refreshed = jobRepository.findByRun(run.id()).stream()
-                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
-                .findFirst()
-                .orElseThrow();
-        CollectionJob refreshedGrowth = jobRepository.findByRun(run.id()).stream()
-                .filter(job -> job.jobType() == CollectionJobType.GROWTH_EVENTS)
-                .findFirst()
-                .orElseThrow();
-        assertThat(refreshed.status()).isEqualTo(CollectionJobStatus.READY);
-        assertThat(refreshedGrowth.status()).isEqualTo(CollectionJobStatus.READY);
+
+        assertThat(jobRepository.findByRun(run.id()))
+                .extracting(CollectionJob::jobType, CollectionJob::status)
+                .containsExactlyInAnyOrder(
+                        tuple(CollectionJobType.TRAFFIC, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.REFERRERS, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.POPULAR_PATHS, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.REPOSITORY_STATS, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.GROWTH_EVENTS, CollectionJobStatus.READY)
+                );
+    }
+
+    @Test
+    void collectNowStoresAFresherSnapshotForTheSameDay() {
+        LocalDate date = planningWindow.businessDate();
+        collectionPlanner.planRepository(repository.id(), date);
+        drainCollection(10);
+        Instant first = trafficJdbcRepository.latestReferrerSnapshot(repository.id()).snapshotAt();
+
+        collectionPlanner.planRepository(repository.id(), date, true);
+        drainCollection(10);
+        Instant second = trafficJdbcRepository.latestReferrerSnapshot(repository.id()).snapshotAt();
+
+        assertThat(second).isAfter(first);
+        LocalDate snapshotDate = second.atZone(ZoneOffset.UTC).toLocalDate();
+        assertThat(trafficJdbcRepository.referrerSnapshotsForDelta(
+                repository.id(), snapshotDate, snapshotDate, ZoneOffset.UTC
+        ))
+                .extracting(Observation::snapshotDate, Observation::key)
+                .containsExactly(tuple(snapshotDate, "github.com"));
     }
 
     @Test
