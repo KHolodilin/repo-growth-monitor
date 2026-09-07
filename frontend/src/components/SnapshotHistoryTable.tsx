@@ -6,6 +6,9 @@ import { cn, formatChartAxisDate, formatNumber, growthClass } from "../lib/utils
 import { ReferrerSourceIcon } from "./ReferrerSourceIcon";
 import { Card } from "./ui";
 
+/** Auto table layout squeezes the only wrappable column, so the first column carries its own width. */
+const FIRST_COLUMN_WIDTH = "w-56";
+
 export function SnapshotHistoryTable({
   kind,
   history,
@@ -15,6 +18,7 @@ export function SnapshotHistoryTable({
 }) {
   const firstColumn = kind === "referrers" ? "Source" : "Path";
   const showIcons = kind === "referrers";
+  const dates = [...history.dates].reverse();
 
   if (history.dates.length === 0) {
     return (
@@ -42,11 +46,11 @@ export function SnapshotHistoryTable({
             <tr>
               <th
                 rowSpan={2}
-                className="sticky left-0 top-0 z-30 border-b bg-card px-3 pb-2 text-left align-bottom font-medium text-muted-foreground"
+                className="sticky left-0 top-0 z-30 border-b border-r bg-card px-3 pb-2 text-left align-bottom font-medium text-muted-foreground"
               >
-                {firstColumn}
+                <div className={FIRST_COLUMN_WIDTH}>{firstColumn}</div>
               </th>
-              {history.dates.map((date) => (
+              {dates.map((date) => (
                 <th
                   key={date}
                   colSpan={2}
@@ -57,7 +61,7 @@ export function SnapshotHistoryTable({
               ))}
             </tr>
             <tr>
-              {history.dates.map((date) => (
+              {dates.map((date) => (
                 <Fragment key={date}>
                   <th className="sticky top-8 z-20 whitespace-nowrap border-b border-l bg-card px-2 pb-2 text-right text-xs font-normal text-muted-foreground">
                     Visitors
@@ -72,8 +76,8 @@ export function SnapshotHistoryTable({
           <tbody>
             {history.rows.map((row) => (
               <tr key={row.key}>
-                <td className="sticky left-0 z-10 max-w-[18rem] border-b bg-card px-3 py-2 align-top">
-                  <div className="flex items-start gap-2">
+                <td className="sticky left-0 z-10 border-b border-r bg-card px-3 py-2 align-top">
+                  <div className={cn("flex items-start gap-2", FIRST_COLUMN_WIDTH)}>
                     {showIcons && <ReferrerSourceIcon source={row.key} />}
                     <div className="min-w-0">
                       <div className="[overflow-wrap:anywhere]">{wrapPath(row.key)}</div>
@@ -81,7 +85,7 @@ export function SnapshotHistoryTable({
                     </div>
                   </div>
                 </td>
-                {row.cells.map((cell) => (
+                {[...row.cells].reverse().map((cell) => (
                   <Fragment key={cell.date}>
                     <ValueCell cell={cell} metric="VISITORS" className="border-l" />
                     <ValueCell cell={cell} metric="VIEWS" />
