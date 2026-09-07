@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 
@@ -45,6 +46,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadable(Exception ex) {
         return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR, "Invalid request body"));
+    }
+
+    /** An unknown URL is a client mistake, so it must not be reported as a server failure. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleMissingResource(NoResourceFoundException ex, HttpServletRequest request) {
+        log.warn("No handler for path={}", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(ErrorCode.NOT_FOUND, "Not found"));
     }
 
     @ExceptionHandler(Exception.class)
