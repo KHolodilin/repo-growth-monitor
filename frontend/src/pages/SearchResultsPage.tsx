@@ -39,6 +39,7 @@ export function SearchResultsPage() {
       <Card>
         <SearchResultsTable
           rows={data.rows}
+          repositoryId={data.query.repositoryId}
           trackedPosition={data.run.trackedRepositoryPosition}
         />
       </Card>

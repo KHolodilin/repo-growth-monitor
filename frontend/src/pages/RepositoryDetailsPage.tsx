@@ -22,6 +22,7 @@ import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
+import { useTableSort } from "../lib/tableSortPrefs";
 
 type Tab = "overview" | "traffic" | "search" | "growth-events";
 
@@ -760,7 +761,10 @@ function Kpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-type QuerySortKey = "name" | "rank" | "change" | "change7d" | "change30d" | "best" | "results" | "updated";
+const QUERY_SORT_KEYS = ["name", "rank", "change", "change7d", "change30d", "best", "results", "updated"] as const;
+const QUERY_ASC_FIRST_KEYS = ["name", "rank", "best"] as const;
+
+type QuerySortKey = (typeof QUERY_SORT_KEYS)[number];
 
 function normalizeSearchQuery(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -792,17 +796,13 @@ function SearchPanel({
   onDelete: (id: number) => void;
 }) {
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
-  const [sortKey, setSortKey] = useState<QuerySortKey | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-
-  function toggle(key: QuerySortKey) {
-    if (sortKey === key) {
-      setSortDir((current) => (current === "desc" ? "asc" : "desc"));
-      return;
-    }
-    setSortKey(key);
-    setSortDir(key === "name" || key === "rank" || key === "best" ? "asc" : "desc");
-  }
+  const { sortKey, sortDir, toggle } = useTableSort({
+    tableId: "search-queries",
+    scope: repositoryId,
+    keys: QUERY_SORT_KEYS,
+    initial: { key: null, dir: "asc" },
+    ascFirst: QUERY_ASC_FIRST_KEYS,
+  });
 
   const sorted = useMemo(() => {
     if (!sortKey) {
