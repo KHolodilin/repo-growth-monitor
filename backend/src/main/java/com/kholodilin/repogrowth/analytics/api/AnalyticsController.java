@@ -35,11 +35,12 @@ public class AnalyticsController {
         return analyticsService.traffic(id, period);
     }
 
-    @GetMapping("/repositories/{id}/referrers/history")
-    public AnalyticsService.ReferrerHistoryResponse referrerHistory(
+    @GetMapping("/repositories/{id}/traffic-history")
+    public AnalyticsService.SnapshotHistoryResponse trafficHistory(
             @PathVariable long id,
-            @RequestParam(defaultValue = "30d") String period
+            @RequestParam(required = false) String kind,
+            @RequestParam(required = false) Integer days
     ) {
-        return analyticsService.referrerHistory(id, period);
+        return analyticsService.snapshotHistory(id, kind, days);
     }
 }

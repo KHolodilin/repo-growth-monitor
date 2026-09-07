@@ -40,6 +40,22 @@ export function eventTypeLabel(type: string) {
   return TYPE_LABELS.get(type) ?? type.replaceAll("_", " ").toLowerCase();
 }
 
+/**
+ * Chart markers sit right on the plot, so a full event title collides with the lines. A single
+ * event is named by its type and a group only by how many events it holds; the titles stay in the
+ * tooltip and in the event dialog.
+ */
+export function eventMarkerLabel(events: GrowthEvent[]) {
+  if (events.length === 0) {
+    return "";
+  }
+  if (events.length === 1) {
+    return eventTypeLabel(events[0].type);
+  }
+  const github = events.every((event) => event.source === "GITHUB" || event.source === "SYSTEM");
+  return `${events.length} - ${github ? "GitHub events" : "Growth events"}`;
+}
+
 export function eventUtcDate(event: GrowthEvent) {
   return event.eventAt.slice(0, 10);
 }

@@ -1,10 +1,65 @@
 import type { GrowthEvent, TrafficPoint } from "./api";
 import { formatChartAxisDate, formatNumber } from "./utils";
-import { eventTypeLabel, eventUtcDate, groupEventsByUtcDate } from "./growthEvents";
+import { eventMarkerLabel, eventTypeLabel, eventUtcDate, groupEventsByUtcDate } from "./growthEvents";
+
+const LABEL_LINES = 4;
+const LABEL_LINE_HEIGHT = 15;
+/** The pin of a marker sits on the peak value, so labels have to clear it. */
+const LABEL_DISTANCE = 30;
+/** Room above the plot for the legend and for every label line. */
+const LABEL_HEADROOM = 50 + LABEL_LINES * LABEL_LINE_HEIGHT;
+/** Width of one character at the label font size, and the gap kept between two labels. */
+const LABEL_CHAR_WIDTH = 5.8;
+const LABEL_GAP = 8;
+/** Only the ratio between this and the number of dates matters when spacing labels. */
+const ASSUMED_PLOT_WIDTH = 760;
+
+/**
+ * Every marker is labelled by its own day. Labels of days close together would be drawn on top of
+ * each other, so a label moves one line up as long as the line below is still taken by the label to
+ * its left. Label widths are estimated from the text, because "Reddit post" needs far less room
+ * than "First external contributor".
+ */
+function labelLines(dates: string[], groups: { date: string; events: GrowthEvent[] }[]) {
+  const slot = ASSUMED_PLOT_WIDTH / Math.max(1, dates.length - 1);
+  const takenUntil: number[] = [];
+  const lineByDate = new Map<string, number>();
+  const labels = groups
+    .map((group) => ({
+      date: group.date,
+      center: dates.indexOf(group.date) * slot,
+      width: eventMarkerLabel(group.events).length * LABEL_CHAR_WIDTH,
+    }))
+    .sort((left, right) => left.center - right.center);
+  for (const label of labels) {
+    const start = label.center - label.width / 2;
+    let line = 0;
+    while (line < LABEL_LINES && takenUntil[line] !== undefined && takenUntil[line] > start) {
+      line++;
+    }
+    if (line === LABEL_LINES) {
+      line = freestLine(takenUntil);
+    }
+    takenUntil[line] = label.center + label.width / 2 + LABEL_GAP;
+    lineByDate.set(label.date, line);
+  }
+  return lineByDate;
+}
+
+function freestLine(takenUntil: number[]) {
+  let freest = 0;
+  for (let line = 1; line < takenUntil.length; line++) {
+    if (takenUntil[line] < takenUntil[freest]) {
+      freest = line;
+    }
+  }
+  return freest;
+}
 
 export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak = 1) {
   const onAxis = new Set(dates);
   const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
+  const lines = labelLines(dates, groups);
   const tooltip = {
     formatter: (params: { data?: { events?: GrowthEvent[] } }) => {
       const items = params.data?.events ?? [];
@@ -23,12 +78,20 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
       symbol: "none",
       silent: false,
       animation: false,
-      label: { show: true, color: "#0969da", fontSize: 11, formatter: "{b}" },
+      label: {
+        show: true,
+        color: "#0969da",
+        fontSize: 11,
+        position: "end" as const,
+        distance: LABEL_DISTANCE,
+        formatter: "{b}",
+      },
       lineStyle: { type: "dashed" as const, color: "#0969da", width: 1.5 },
       tooltip,
       data: groups.map((group) => ({
         xAxis: group.date,
-        name: group.events.length > 1 ? `${group.events.length} events` : group.events[0]?.title,
+        name: eventMarkerLabel(group.events),
+        label: { offset: [0, -(lines.get(group.date) ?? 0) * LABEL_LINE_HEIGHT] },
         events: group.events,
       })),
     },
@@ -95,7 +158,13 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
       },
     },
     legend: { data: ["Views", "Visitors", "Clones"] },
-    grid: { left: 48, right: 72, top: 48, bottom: 40, containLabel: false },
+    grid: {
+      left: 48,
+      right: 72,
+      top: groups.length > 0 ? LABEL_HEADROOM : 48,
+      bottom: 40,
+      containLabel: false,
+    },
     xAxis: {
       type: "category",
       data: dates,
