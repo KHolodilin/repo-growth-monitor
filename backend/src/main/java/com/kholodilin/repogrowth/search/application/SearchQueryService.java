@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -117,10 +116,7 @@ public class SearchQueryService {
 
     public SearchHistory history(long searchQueryId) {
         SearchQuery query = getQuery(searchQueryId);
-        List<SearchRun> runs = runRepository.history(searchQueryId).stream()
-                .filter(run -> run.status().name().equals("SUCCESS"))
-                .sorted(Comparator.comparing(SearchRun::businessDate))
-                .toList();
+        List<SearchRun> runs = runRepository.snapshots(searchQueryId);
         Integer current = latestPosition(runs);
         boolean hasPrevious = runs.size() >= 2;
         Integer previous = hasPrevious ? runs.get(runs.size() - 2).trackedRepositoryPosition() : null;
@@ -136,7 +132,8 @@ public class SearchQueryService {
                 .map(run -> new RankPoint(run.businessDate(), run.trackedRepositoryPosition(), run.id()))
                 .toList();
         SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
-        Instant lastChecked = latestRun == null ? null : (latestRun.completedAt() != null ? latestRun.completedAt() : latestRun.startedAt());
+        // The row shows the newest snapshot, so it is dated by that snapshot and not by an attempt in flight.
+        Instant lastChecked = runs.isEmpty() ? null : runs.get(runs.size() - 1).snapshotAt();
         String searchStatus = latestRun == null ? null : latestRun.status().name();
         String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
         Integer totalResults = runs.isEmpty() ? null : runs.get(runs.size() - 1).totalCount();
@@ -157,7 +154,7 @@ public class SearchQueryService {
 
     public SearchRunResults latestResults(long searchQueryId) {
         getQuery(searchQueryId);
-        SearchRun run = runRepository.latestSuccessful(searchQueryId)
+        SearchRun run = runRepository.latestSnapshot(searchQueryId)
                 .or(() -> runRepository.latest(searchQueryId))
                 .orElseThrow(() -> ApiException.notFound("Search results not found"));
         return results(run.id());
@@ -168,7 +165,7 @@ public class SearchQueryService {
                 .orElseThrow(() -> ApiException.notFound("Search run not found"));
         SearchQuery query = getQuery(run.searchQueryId());
         List<SearchResult> current = resultRepository.findByRun(searchRunId);
-        Map<Long, Integer> previousPositions = runRepository.previousSuccessful(run.searchQueryId(), run.businessDate())
+        Map<Long, Integer> previousPositions = runRepository.previousSnapshot(run.searchQueryId(), run.businessDate())
                 .map(previous -> resultRepository.findByRun(previous.id()).stream()
                         .collect(Collectors.toMap(SearchResult::githubRepositoryId, SearchResult::position, (a, b) -> a)))
                 .orElse(Map.of());

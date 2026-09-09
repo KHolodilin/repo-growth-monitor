@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-search-run-snapshot
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE search_run
+                  ADD COLUMN snapshot_at TIMESTAMPTZ;
+
+              UPDATE search_run
+              SET snapshot_at = completed_at
+              WHERE status = 'SUCCESS'
+                AND completed_at IS NOT NULL;
+
+              CREATE INDEX ix_search_run_snapshot
+                  ON search_run (search_query_id, business_date DESC)
+                  WHERE snapshot_at IS NOT NULL;
