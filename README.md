@@ -4,14 +4,14 @@ Self-hosted GitHub repository growth analytics: traffic, search rankings, and a 
 
 ## Quick start
 
-Download `docker-compose.yml` and `.env.example` from the
+Download `docker-compose.yml` and `env.example` from the
 [latest Release](https://github.com/KHolodilin/repo-growth-monitor/releases/latest).
 A git clone, Java, and Node are not required. The first start creates an empty database.
 
 ```bash
 mkdir repo-growth-monitor && cd repo-growth-monitor
 # save the two files from the Release into this folder
-cp .env.example .env
+cp env.example .env
 # set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
 # set POSTGRES_PASSWORD
 docker compose up -d

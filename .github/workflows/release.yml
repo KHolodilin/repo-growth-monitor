@@ -40,21 +40,21 @@ jobs:
           mkdir -p dist-release
           sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.5.0|ghcr.io/kholodilin/repo-growth-monitor:${{ steps.version.outputs.version }}|" \
             deploy/docker-compose.yml > dist-release/docker-compose.yml
-          cp deploy/.env.example dist-release/.env.example
+          cp deploy/.env.example dist-release/env.example
 
       - uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           files: |
             dist-release/docker-compose.yml
-            dist-release/.env.example
+            dist-release/env.example
           body: |
-            Download `docker-compose.yml` and `.env.example`. Java, Node, and a git clone are not required.
+            Download `docker-compose.yml` and `env.example`. Java, Node, and a git clone are not required.
 
             ```bash
             mkdir repo-growth-monitor && cd repo-growth-monitor
             # save the two files from this Release into the folder
-            cp .env.example .env
+            cp env.example .env
             # set GITHUB_TOKEN (Contents/Metadata Read; Traffic needs Administration: Read)
             # set POSTGRES_PASSWORD
             docker compose up -d
