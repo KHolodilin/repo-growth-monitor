@@ -4,17 +4,38 @@ Self-hosted GitHub repository growth analytics: traffic, search rankings, and a 
 
 ## Quick start
 
-Download `docker-compose.yml` and `env.example` from the
-[latest Release](https://github.com/KHolodilin/repo-growth-monitor/releases/latest).
 A git clone, Java, and Node are not required. The first start creates an empty database.
 
+### 1. Download a compose file and start
+
+PowerShell:
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml -OutFile docker-compose.yml
+Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example -OutFile env.example
+Copy-Item env.example .env
+# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
+# set POSTGRES_PASSWORD
+docker compose up -d
+```
+
+bash:
+
 ```bash
-mkdir repo-growth-monitor && cd repo-growth-monitor
-# save the two files from the Release into this folder
+curl -fsSL -o docker-compose.yml https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml
+curl -fsSL -o env.example https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example
 cp env.example .env
 # set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
 # set POSTGRES_PASSWORD
 docker compose up -d
+```
+
+From a clone, the same files live in `deploy/`:
+
+```bash
+cp deploy/.env.example .env
+# set GITHUB_TOKEN and POSTGRES_PASSWORD
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
 Open http://localhost:8080
