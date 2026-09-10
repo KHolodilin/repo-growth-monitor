@@ -1,5 +1,17 @@
 # Repo Growth Monitor
 
+[![Release](https://img.shields.io/github/v/release/KHolodilin/repo-growth-monitor)](https://github.com/KHolodilin/repo-growth-monitor/releases/latest)
+[![Release workflow](https://img.shields.io/github/actions/workflow/status/KHolodilin/repo-growth-monitor/release.yml?label=release)](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/release.yml)
+[![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fkholodilin%2Frepo--growth--monitor-blue)](https://github.com/KHolodilin/repo-growth-monitor/pkgs/container/repo-growth-monitor)
+[![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://github.com/KHolodilin/repo-growth-monitor/releases/latest)
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![self-hosted](https://img.shields.io/badge/self--hosted-no%20SaaS-0A0A0A)](https://github.com/KHolodilin/repo-growth-monitor#quick-start)
+[![GitHub stars](https://img.shields.io/github/stars/KHolodilin/repo-growth-monitor?style=social)](https://github.com/KHolodilin/repo-growth-monitor/stargazers)
+
 Self-hosted GitHub repository growth analytics: traffic, search rankings, and a foundation for competitor discovery.
 
 ## Quick start
