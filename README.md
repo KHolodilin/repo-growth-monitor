@@ -4,7 +4,45 @@ Self-hosted GitHub repository growth analytics: traffic, search rankings, and a 
 
 ## Quick start
 
-Two independent Compose files. They can run together: production app uses `8080`, mock app uses `8082`.
+Download `docker-compose.yml` and `.env.example` from the
+[latest Release](https://github.com/KHolodilin/repo-growth-monitor/releases/latest).
+A git clone, Java, and Node are not required. The first start creates an empty database.
+
+```bash
+mkdir repo-growth-monitor && cd repo-growth-monitor
+# save the two files from the Release into this folder
+cp .env.example .env
+# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
+# set POSTGRES_PASSWORD
+docker compose up -d
+```
+
+Open http://localhost:8080
+
+1. Open **Repositories** and enable tracking.
+2. Click **Collect now**, or wait for the planner window (`10:00–18:00` UTC by default).
+3. View the **Dashboard** and repository details.
+
+Stop with `docker compose down`. Data stays in the `pgdata` volume. Wipe everything with
+`docker compose down -v`.
+
+To upgrade, replace `docker-compose.yml` with the file from a newer Release and run
+`docker compose up -d` again. Migrations apply on startup.
+
+## Local development
+
+### Production-like stack (build from source)
+
+Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is not the
+downloadable release: it builds the image on the machine.
+
+```bash
+cp .env.example .env
+# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
+docker compose up -d --build
+```
+
+Open http://localhost:8080. Stop with `docker compose down`.
 
 ### Mock stack (WireMock + test database)
 
@@ -20,27 +58,7 @@ docker compose -f docker-compose.mock.yml up -d --build
 
 Planner window is always open. Stop with `docker compose -f docker-compose.mock.yml down`.
 
-### Production-like stack (real GitHub)
-
-Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`.
-
-```bash
-cp .env.example .env
-# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
-docker compose up -d --build
-```
-
-Open http://localhost:8080
-
-1. Open **Repositories** and enable tracking.
-2. Click **Collect now**, or wait for the planner window (`10:00–18:00` UTC by default).
-3. View the **Dashboard** and repository details.
-
-Stop with `docker compose down`.
-
-You do not need to install Java, Node.js, or PostgreSQL locally.
-
-## Local development
+### Backend and frontend without Docker
 
 Backend (Java 21, Maven):
 
@@ -65,6 +83,7 @@ Vite proxies `/api` to `http://localhost:8080`.
 | Variable | Description |
 |---|---|
 | `GITHUB_TOKEN` | Fine-grained PAT. Never stored in PostgreSQL or returned by REST. |
+| `POSTGRES_PASSWORD` | Required by the downloadable Compose file. Used by Postgres and the app. |
 | `SPRING_DATASOURCE_URL` | JDBC URL (set automatically in Compose). |
 | `APP_TIMEZONE` | Timezone for `business_date` and the planner window. Default `UTC`. |
 | `COLLECTION_PLANNER_FROM` / `TO` | Strict planning window. Default `10:00`–`18:00`. |
