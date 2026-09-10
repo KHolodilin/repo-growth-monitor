@@ -15,6 +15,8 @@ public record SearchRun(
         Instant lockedUntil,
         Instant startedAt,
         Instant completedAt,
+        // Set when the run stored its results and kept when the row is queued for another attempt.
+        Instant snapshotAt,
         Integer totalCount,
         Integer trackedRepositoryPosition,
         String enrichmentStatus,

@@ -29,6 +29,7 @@ public class SearchRunJdbcRepository {
             toInstant(rs.getTimestamp("locked_until")),
             toInstant(rs.getTimestamp("started_at")),
             toInstant(rs.getTimestamp("completed_at")),
+            toInstant(rs.getTimestamp("snapshot_at")),
             (Integer) rs.getObject("total_count"),
             (Integer) rs.getObject("tracked_repository_position"),
             rs.getString("enrichment_status"),
@@ -128,6 +129,7 @@ public class SearchRunJdbcRepository {
                             locked_by = NULL,
                             locked_until = NULL,
                             completed_at = NOW(),
+                            snapshot_at = NOW(),
                             total_count = :totalCount,
                             tracked_repository_position = :position,
                             error_code = NULL,
@@ -206,10 +208,15 @@ public class SearchRunJdbcRepository {
                 .update();
     }
 
-    public List<SearchRun> history(long searchQueryId) {
+    /**
+     * Runs that already stored a snapshot, oldest first. A run queued for another attempt keeps its
+     * snapshot, so a re-run of today does not remove today from the series.
+     */
+    public List<SearchRun> snapshots(long searchQueryId) {
         return jdbcClient.sql("""
                         SELECT * FROM search_run
                         WHERE search_query_id = :searchQueryId
+                          AND snapshot_at IS NOT NULL
                         ORDER BY business_date
                         """)
                 .param("searchQueryId", searchQueryId)
@@ -217,11 +224,11 @@ public class SearchRunJdbcRepository {
                 .list();
     }
 
-    public Optional<SearchRun> previousSuccessful(long searchQueryId, LocalDate before) {
+    public Optional<SearchRun> previousSnapshot(long searchQueryId, LocalDate before) {
         return jdbcClient.sql("""
                         SELECT * FROM search_run
                         WHERE search_query_id = :searchQueryId
-                          AND status = 'SUCCESS'
+                          AND snapshot_at IS NOT NULL
                           AND business_date < :before
                         ORDER BY business_date DESC
                         LIMIT 1
@@ -244,10 +251,10 @@ public class SearchRunJdbcRepository {
                 .optional();
     }
 
-    public Optional<SearchRun> latestSuccessful(long searchQueryId) {
+    public Optional<SearchRun> latestSnapshot(long searchQueryId) {
         return jdbcClient.sql("""
                         SELECT * FROM search_run
-                        WHERE search_query_id = :searchQueryId AND status = 'SUCCESS'
+                        WHERE search_query_id = :searchQueryId AND snapshot_at IS NOT NULL
                         ORDER BY business_date DESC
                         LIMIT 1
                         """)
