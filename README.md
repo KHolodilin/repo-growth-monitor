@@ -9,8 +9,6 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![self-hosted](https://img.shields.io/badge/self--hosted-no%20SaaS-0A0A0A)](https://github.com/KHolodilin/repo-growth-monitor#quick-start)
-[![GitHub stars](https://img.shields.io/github/stars/KHolodilin/repo-growth-monitor?style=social)](https://github.com/KHolodilin/repo-growth-monitor/stargazers)
 
 Self-hosted GitHub repository growth analytics: traffic, search rankings, and a foundation for competitor discovery.
 
