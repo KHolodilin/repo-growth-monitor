@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/kholodilin/repo-growth-monitor:${{ steps.version.outputs.version }}
+            ghcr.io/kholodilin/repo-growth-monitor:latest
+
+      - name: Prepare Release assets
+        run: |
+          mkdir -p dist-release
+          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.5.0|ghcr.io/kholodilin/repo-growth-monitor:${{ steps.version.outputs.version }}|" \
+            deploy/docker-compose.yml > dist-release/docker-compose.yml
+          cp deploy/.env.example dist-release/.env.example
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: |
+            dist-release/docker-compose.yml
+            dist-release/.env.example
+          body: |
+            Download `docker-compose.yml` and `.env.example`. Java, Node, and a git clone are not required.
+
+            ```bash
+            mkdir repo-growth-monitor && cd repo-growth-monitor
+            # save the two files from this Release into the folder
+            cp .env.example .env
+            # set GITHUB_TOKEN (Contents/Metadata Read; Traffic needs Administration: Read)
+            # set POSTGRES_PASSWORD
+            docker compose up -d
+            ```
+
+            Open http://localhost:8080
+
+            1. Open **Repositories** and enable tracking.
+            2. Click **Collect now**, or wait for the planner window (`10:00–18:00` UTC by default).
+            3. View the **Dashboard** and repository details.
+
+            The first start creates an empty database. Stop with `docker compose down`. Data stays in the `pgdata` volume.
+            Upgrade by replacing `docker-compose.yml` with the file from a newer Release and running `docker compose up -d` again.
