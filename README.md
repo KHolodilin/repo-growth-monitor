@@ -14,7 +14,7 @@ PowerShell:
 Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml -OutFile docker-compose.yml
 Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example -OutFile env.example
 Copy-Item env.example .env
-# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
+# set GITHUB_TOKEN — see "Create a GitHub token" below
 # set POSTGRES_PASSWORD
 docker compose up -d
 ```
@@ -25,7 +25,7 @@ bash:
 curl -fsSL -o docker-compose.yml https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml
 curl -fsSL -o env.example https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example
 cp env.example .env
-# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
+# set GITHUB_TOKEN — see "Create a GitHub token" below
 # set POSTGRES_PASSWORD
 docker compose up -d
 ```
@@ -50,6 +50,34 @@ Stop with `docker compose down`. Data stays in the `pgdata` volume. Wipe everyth
 To upgrade, replace `docker-compose.yml` with the file from a newer Release and run
 `docker compose up -d` again. Migrations apply on startup.
 
+### 2. Create a GitHub token
+
+Use a [Fine-grained personal access token](https://github.com/settings/personal-access-tokens/new).
+A classic PAT is not required.
+
+1. Open [GitHub → Settings → Developer settings → Fine-grained tokens](https://github.com/settings/personal-access-tokens).
+2. Click **Generate new token**.
+3. Set a name and an expiration.
+4. **Resource owner**: your user, or the organization that owns the repositories.
+   An organization must allow fine-grained tokens in its settings.
+5. **Repository access**: **Only select repositories** and pick the ones you will track,
+   or **All repositories** if you want the Repositories page to list everything the token can see.
+6. Under **Repository permissions**, set:
+
+   | Permission | Access | Why |
+   |---|---|---|
+   | **Metadata** | Read | Required by GitHub for every fine-grained token. Often selected automatically. |
+   | **Contents** | Read | Repository files, README, and releases. |
+   | **Administration** | Read | GitHub Traffic: views, clones, referrers, popular paths. Without this the rest of the app works, but traffic stays empty. |
+   | **Issues** | Read | Growth Events from issues. |
+   | **Pull requests** | Read | Growth Events from pull requests. |
+
+   Leave every other permission at **No access**. Account permissions stay empty.
+7. Generate the token and paste it into `.env` as `GITHUB_TOKEN`. The value starts with `github_pat_`.
+   GitHub shows it once.
+
+The token is never stored in PostgreSQL and never returned by the API. Do not commit `.env`.
+
 ## Local development
 
 ### Production-like stack (build from source)
@@ -59,7 +87,7 @@ downloadable release: it builds the image on the machine.
 
 ```bash
 cp .env.example .env
-# set GITHUB_TOKEN — Contents/Metadata Read; Traffic needs Administration: Read
+# set GITHUB_TOKEN — see "Create a GitHub token" above
 docker compose up -d --build
 ```
 
@@ -103,7 +131,7 @@ Vite proxies `/api` to `http://localhost:8080`.
 
 | Variable | Description |
 |---|---|
-| `GITHUB_TOKEN` | Fine-grained PAT. Never stored in PostgreSQL or returned by REST. |
+| `GITHUB_TOKEN` | Fine-grained PAT. See [Create a GitHub token](#2-create-a-github-token). Never stored in PostgreSQL or returned by REST. |
 | `POSTGRES_PASSWORD` | Required by the downloadable Compose file. Used by Postgres and the app. |
 | `SPRING_DATASOURCE_URL` | JDBC URL (set automatically in Compose). |
 | `APP_TIMEZONE` | Timezone for `business_date` and the planner window. Default `UTC`. |
