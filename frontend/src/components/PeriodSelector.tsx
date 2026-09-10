@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cn } from "../lib/utils";
+import { readCookie, readJsonCookie, writeCookie, writeJsonCookie } from "../lib/cookies";
 
 export const PERIODS = ["1d", "7d", "30d", "90d", "1y", "all"] as const;
 export type Period = (typeof PERIODS)[number];
@@ -7,20 +8,6 @@ export type Period = (typeof PERIODS)[number];
 const PERIOD_COOKIE = "rgm-period";
 const REPO_PERIODS_COOKIE = "rgm-period-repos";
 const DEFAULT_PERIOD: Period = "30d";
-const PERIOD_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
-
-function cookieAttributes() {
-  return `path=/; max-age=${PERIOD_COOKIE_MAX_AGE}; SameSite=Lax`;
-}
-
-function readCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function writeCookie(name: string, value: string) {
-  document.cookie = `${name}=${encodeURIComponent(value)}; ${cookieAttributes()}`;
-}
 
 function isPeriod(value: string): value is Period {
   return (PERIODS as readonly string[]).includes(value);
@@ -35,26 +22,21 @@ export function writeStoredPeriod(period: Period) {
   writeCookie(PERIOD_COOKIE, period);
 }
 
+function parseRepoPeriodMap(parsed: unknown): Record<string, Period> | null {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const result: Record<string, Period> = {};
+  for (const [repoId, value] of Object.entries(parsed)) {
+    if (typeof value === "string" && isPeriod(value)) {
+      result[repoId] = value;
+    }
+  }
+  return result;
+}
+
 function readRepoPeriodMap(): Record<string, Period> {
-  const raw = readCookie(REPO_PERIODS_COOKIE);
-  if (!raw) {
-    return {};
-  }
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    const result: Record<string, Period> = {};
-    for (const [repoId, value] of Object.entries(parsed)) {
-      if (typeof value === "string" && isPeriod(value)) {
-        result[repoId] = value;
-      }
-    }
-    return result;
-  } catch {
-    return {};
-  }
+  return readJsonCookie(REPO_PERIODS_COOKIE, parseRepoPeriodMap) ?? {};
 }
 
 export function readStoredRepoPeriod(repoId: string): Period {
@@ -64,7 +46,7 @@ export function readStoredRepoPeriod(repoId: string): Period {
 export function writeStoredRepoPeriod(repoId: string, period: Period) {
   const map = readRepoPeriodMap();
   map[repoId] = period;
-  writeCookie(REPO_PERIODS_COOKIE, JSON.stringify(map));
+  writeJsonCookie(REPO_PERIODS_COOKIE, map);
 }
 
 function periodFor(repoId: string | undefined): Period {

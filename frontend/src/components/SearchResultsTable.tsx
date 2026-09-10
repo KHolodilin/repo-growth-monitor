@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { type SearchRunResults } from "../lib/api";
 import {
   activityClass,
@@ -8,9 +8,14 @@ import {
   formatPositionDelta,
   formatSyncTime,
 } from "../lib/utils";
+import { useTableSort } from "../lib/tableSortPrefs";
 
 type ResultRow = SearchRunResults["rows"][number];
-type SortKey = "position" | "fullName" | "stars" | "watchers" | "forks" | "contributors" | "activity" | "delta";
+
+const SORT_KEYS = ["position", "fullName", "stars", "watchers", "forks", "contributors", "activity", "delta"] as const;
+const ASC_FIRST_KEYS = ["position", "fullName"] as const;
+
+type SortKey = (typeof SORT_KEYS)[number];
 
 const STATUS_RANK: Record<string, number> = {
   ACTIVE: 3,
@@ -21,24 +26,22 @@ const STATUS_RANK: Record<string, number> = {
 
 export function SearchResultsTable({
   rows,
+  repositoryId,
   trackedGithubId,
   trackedPosition,
 }: {
   rows: ResultRow[];
+  repositoryId: number;
   trackedGithubId?: number;
   trackedPosition?: number | null;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  function toggle(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((current) => (current === "desc" ? "asc" : "desc"));
-      return;
-    }
-    setSortKey(key);
-    setSortDir(key === "fullName" || key === "position" ? "asc" : "desc");
-  }
+  const { sortKey, sortDir, toggle } = useTableSort({
+    tableId: "search-results",
+    scope: repositoryId,
+    keys: SORT_KEYS,
+    initial: { key: null, dir: "desc" },
+    ascFirst: ASC_FIRST_KEYS,
+  });
 
   const sorted = useMemo(() => {
     if (!sortKey) {

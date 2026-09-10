@@ -6,8 +6,11 @@ import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
+import { useTableSort } from "../lib/tableSortPrefs";
 
-type SortKey = "visitors" | "views" | "clones" | "stars" | "growth";
+const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth"] as const;
+
+type SortKey = (typeof SORT_KEYS)[number];
 
 const JOB_LABELS: Record<string, string> = {
   TRAFFIC: "Traffic",
@@ -268,17 +271,11 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
 
 function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
   const navigate = useNavigate();
-  const [sortKey, setSortKey] = useState<SortKey>("visitors");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  function toggle(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((current) => (current === "desc" ? "asc" : "desc"));
-      return;
-    }
-    setSortKey(key);
-    setSortDir("desc");
-  }
+  const { sortKey, sortDir, toggle } = useTableSort({
+    tableId: "dashboard-repositories",
+    keys: SORT_KEYS,
+    initial: { key: "visitors", dir: "desc" },
+  });
 
   const sorted = useMemo(() => {
     const copy = [...rows];

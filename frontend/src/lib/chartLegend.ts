@@ -1,5 +1,6 @@
+import { readJsonCookie, writeJsonCookie } from "./cookies";
+
 const COOKIE = "rgm-chart-legend";
-const MAX_AGE = 60 * 60 * 24 * 365;
 
 export const TRAFFIC_SERIES = [
   { key: "Views", name: "Views" },
@@ -19,46 +20,28 @@ export function repoSearchChartId(repoId: number | string) {
   return `${repoId}:search`;
 }
 
-function cookieAttributes() {
-  return `path=/; max-age=${MAX_AGE}; SameSite=Lax`;
-}
-
-function readCookie(name: string): string | null {
-  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-function writeCookie(name: string, value: string) {
-  document.cookie = `${name}=${encodeURIComponent(value)}; ${cookieAttributes()}`;
+function parseAll(parsed: unknown): Record<string, Record<string, boolean>> | null {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  const result: Record<string, Record<string, boolean>> = {};
+  for (const [chartId, value] of Object.entries(parsed)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      continue;
+    }
+    const selected: Record<string, boolean> = {};
+    for (const [key, flag] of Object.entries(value)) {
+      if (typeof flag === "boolean") {
+        selected[key] = flag;
+      }
+    }
+    result[chartId] = selected;
+  }
+  return result;
 }
 
 function readAll(): Record<string, Record<string, boolean>> {
-  const raw = readCookie(COOKIE);
-  if (!raw) {
-    return {};
-  }
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    const result: Record<string, Record<string, boolean>> = {};
-    for (const [chartId, value] of Object.entries(parsed)) {
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
-        continue;
-      }
-      const selected: Record<string, boolean> = {};
-      for (const [key, flag] of Object.entries(value)) {
-        if (typeof flag === "boolean") {
-          selected[key] = flag;
-        }
-      }
-      result[chartId] = selected;
-    }
-    return result;
-  } catch {
-    return {};
-  }
+  return readJsonCookie(COOKIE, parseAll) ?? {};
 }
 
 export function readChartSelection(chartId: string): Record<string, boolean> | null {
@@ -77,7 +60,7 @@ export function writeChartSelection(chartId: string, selected: Record<string, bo
   } else {
     all[chartId] = cleaned;
   }
-  writeCookie(COOKIE, JSON.stringify(all));
+  writeJsonCookie(COOKIE, all);
 }
 
 export function pruneChartSelection(chartId: string, remainingKeys: string[]) {

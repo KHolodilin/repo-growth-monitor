@@ -159,6 +159,7 @@ export function QueryDetailsPage() {
         ) : (
           <SearchResultsTable
             rows={results.rows}
+            repositoryId={repo.id}
             trackedGithubId={repo.githubId}
           />
         )}
