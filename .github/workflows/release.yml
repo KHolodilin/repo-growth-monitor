@@ -49,14 +49,25 @@ jobs:
             dist-release/docker-compose.yml
             dist-release/env.example
           body: |
-            Download `docker-compose.yml` and `env.example`. Java, Node, and a git clone are not required.
+            Download the compose file and start. Java, Node, and a git clone are not required.
+
+            PowerShell:
+
+            ```powershell
+            Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml -OutFile docker-compose.yml
+            Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example -OutFile env.example
+            Copy-Item env.example .env
+            # set GITHUB_TOKEN and POSTGRES_PASSWORD
+            docker compose up -d
+            ```
+
+            bash:
 
             ```bash
-            mkdir repo-growth-monitor && cd repo-growth-monitor
-            # save the two files from this Release into the folder
+            curl -fsSL -o docker-compose.yml https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml
+            curl -fsSL -o env.example https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example
             cp env.example .env
-            # set GITHUB_TOKEN (Contents/Metadata Read; Traffic needs Administration: Read)
-            # set POSTGRES_PASSWORD
+            # set GITHUB_TOKEN and POSTGRES_PASSWORD
             docker compose up -d
             ```
 
