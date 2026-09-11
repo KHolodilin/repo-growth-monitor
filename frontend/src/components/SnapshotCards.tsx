@@ -1,10 +1,15 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { formatNumber, formatSyncTime } from "../lib/utils";
+import { cn, formatNumber, formatSyncTime } from "../lib/utils";
+import { useTableSort, type TableId } from "../lib/tableSortPrefs";
 import { ReferrerSourceIcon } from "./ReferrerSourceIcon";
 import { Card } from "./ui";
 
 const TOP_ROWS = 5;
+const SORT_KEYS = ["name", "visitors", "views"] as const;
+const ASC_FIRST_KEYS = ["name"] as const;
 
+type SortKey = (typeof SORT_KEYS)[number];
 type CardRow = { key: string; title: string; subtitle?: string; visitors: number; views: number };
 
 export function SnapshotCards({
@@ -37,6 +42,8 @@ export function SnapshotCards({
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <SnapshotCard
+        tableId="top-referrers"
+        repositoryId={repositoryId}
         title="Top Referrers"
         firstColumn="Source"
         rows={referrerRows}
@@ -45,6 +52,8 @@ export function SnapshotCards({
         historyTo={`/repositories/${repositoryId}/traffic/history?kind=referrers`}
       />
       <SnapshotCard
+        tableId="popular-paths"
+        repositoryId={repositoryId}
         title="Popular Paths"
         firstColumn="Path"
         rows={pathRows}
@@ -56,6 +65,8 @@ export function SnapshotCards({
 }
 
 function SnapshotCard({
+  tableId,
+  repositoryId,
   title,
   firstColumn,
   rows,
@@ -63,6 +74,8 @@ function SnapshotCard({
   historyTo,
   icons = false,
 }: {
+  tableId: TableId;
+  repositoryId: number;
   title: string;
   firstColumn: string;
   rows: CardRow[];
@@ -70,6 +83,26 @@ function SnapshotCard({
   historyTo: string;
   icons?: boolean;
 }) {
+  const { sortKey, sortDir, toggle } = useTableSort({
+    tableId,
+    scope: repositoryId,
+    keys: SORT_KEYS,
+    initial: { key: "views", dir: "desc" },
+    ascFirst: ASC_FIRST_KEYS,
+  });
+
+  const sorted = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((left, right) => {
+      const compared = compareCardRows(left, right, sortKey, sortDir);
+      if (compared !== 0) {
+        return compared;
+      }
+      return left.key.localeCompare(right.key);
+    });
+    return copy.slice(0, TOP_ROWS);
+  }, [rows, sortKey, sortDir]);
+
   return (
     <Card>
       <div className="mb-1 flex items-center justify-between gap-3">
@@ -85,13 +118,32 @@ function SnapshotCard({
         <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="text-left text-muted-foreground">
-              <th className="pr-3">{firstColumn}</th>
-              <th className="w-[4.75rem] whitespace-nowrap pl-2 text-right">Visitors</th>
-              <th className="w-16 whitespace-nowrap pl-2 text-right">Views</th>
+              <SortHeader
+                label={firstColumn}
+                align="left"
+                className="pr-3"
+                active={sortKey === "name"}
+                dir={sortDir}
+                onClick={() => toggle("name")}
+              />
+              <SortHeader
+                label="Visitors"
+                className="w-[4.75rem] whitespace-nowrap pl-2"
+                active={sortKey === "visitors"}
+                dir={sortDir}
+                onClick={() => toggle("visitors")}
+              />
+              <SortHeader
+                label="Views"
+                className="w-16 whitespace-nowrap pl-2"
+                active={sortKey === "views"}
+                dir={sortDir}
+                onClick={() => toggle("views")}
+              />
             </tr>
           </thead>
           <tbody>
-            {rows.slice(0, TOP_ROWS).map((row) => (
+            {sorted.map((row) => (
               <tr key={row.key} className="border-t">
                 <td className="max-w-0 py-2 pr-3 align-top">
                   <div className="flex items-start gap-2">
@@ -111,6 +163,43 @@ function SnapshotCard({
       </div>
     </Card>
   );
+}
+
+function SortHeader({
+  label,
+  active,
+  dir,
+  align = "right",
+  className,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir: "asc" | "desc";
+  align?: "left" | "right";
+  className?: string;
+  onClick: () => void;
+}) {
+  return (
+    <th className={cn(align === "right" && "text-right", className)}>
+      <button
+        type="button"
+        className={cn("font-medium hover:text-foreground", active && "text-foreground")}
+        onClick={onClick}
+      >
+        {label}
+        {active ? (dir === "desc" ? " ↓" : " ↑") : ""}
+      </button>
+    </th>
+  );
+}
+
+function compareCardRows(left: CardRow, right: CardRow, key: SortKey, dir: "asc" | "desc") {
+  const sign = dir === "desc" ? -1 : 1;
+  if (key === "name") {
+    return sign * left.title.localeCompare(right.title, undefined, { sensitivity: "base" });
+  }
+  return sign * (left[key] - right[key]);
 }
 
 function wrapPath(value: string) {
