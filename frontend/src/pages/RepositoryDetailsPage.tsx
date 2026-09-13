@@ -19,7 +19,7 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { SnapshotCards } from "../components/SnapshotCards";
 import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
-import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
+import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { useTableSort } from "../lib/tableSortPrefs";
@@ -706,7 +706,7 @@ function TrafficPanel({
         </div>
         <PersistentECharts
           chartId={repoTrafficChartId(repositoryId)}
-          series={TRAFFIC_SERIES}
+          series={REPO_TRAFFIC_SERIES}
           option={option}
           style={{ height: 360, width: "100%" }}
           onEvents={{
