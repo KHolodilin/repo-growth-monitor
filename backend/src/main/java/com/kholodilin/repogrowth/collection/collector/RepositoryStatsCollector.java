@@ -146,7 +146,8 @@ public class RepositoryStatsCollector implements Collector {
                     remote.stargazersCount(),
                     remote.watchers(),
                     remote.forksCount(),
-                    remote.openIssuesCount()
+                    remote.openIssuesCount(),
+                    resolvedContributors
             );
         });
     }

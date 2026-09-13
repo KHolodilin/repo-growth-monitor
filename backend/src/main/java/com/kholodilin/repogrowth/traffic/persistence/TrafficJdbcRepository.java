@@ -18,6 +18,14 @@ import java.util.Optional;
 @Repository
 public class TrafficJdbcRepository {
 
+    private static final RowMapper<RepositoryDailyStats> DAILY_STATS_MAPPER = (rs, rowNum) -> new RepositoryDailyStats(
+            rs.getObject("stat_date", LocalDate.class),
+            rs.getInt("stars"),
+            rs.getInt("watchers"),
+            rs.getInt("forks"),
+            rs.getInt("contributors")
+    );
+
     private static final RowMapper<TrafficDaily> TRAFFIC_MAPPER = (rs, rowNum) -> new TrafficDaily(
             rs.getLong("id"),
             rs.getLong("repository_id"),
@@ -64,15 +72,28 @@ public class TrafficJdbcRepository {
                 .update();
     }
 
-    public void upsertDailyStats(long repositoryId, LocalDate date, int stars, int watchers, int forks, int openIssues) {
+    public void upsertDailyStats(
+            long repositoryId,
+            LocalDate date,
+            int stars,
+            int watchers,
+            int forks,
+            int openIssues,
+            int contributors
+    ) {
         jdbcClient.sql("""
-                        INSERT INTO repository_daily_stats (repository_id, stat_date, stars, watchers, forks, open_issues)
-                        VALUES (:repositoryId, :statDate, :stars, :watchers, :forks, :openIssues)
+                        INSERT INTO repository_daily_stats (
+                            repository_id, stat_date, stars, watchers, forks, open_issues, contributors
+                        )
+                        VALUES (
+                            :repositoryId, :statDate, :stars, :watchers, :forks, :openIssues, :contributors
+                        )
                         ON CONFLICT (repository_id, stat_date) DO UPDATE SET
                             stars = EXCLUDED.stars,
                             watchers = EXCLUDED.watchers,
                             forks = EXCLUDED.forks,
-                            open_issues = EXCLUDED.open_issues
+                            open_issues = EXCLUDED.open_issues,
+                            contributors = EXCLUDED.contributors
                         """)
                 .param("repositoryId", repositoryId)
                 .param("statDate", date)
@@ -80,7 +101,44 @@ public class TrafficJdbcRepository {
                 .param("watchers", watchers)
                 .param("forks", forks)
                 .param("openIssues", openIssues)
+                .param("contributors", contributors)
                 .update();
+    }
+
+    public List<RepositoryDailyStats> dailyStatsHistory(long repositoryId, LocalDate fromInclusive) {
+        if (fromInclusive == null) {
+            return jdbcClient.sql("""
+                            SELECT stat_date, stars, watchers, forks, contributors
+                            FROM repository_daily_stats
+                            WHERE repository_id = :repositoryId
+                            ORDER BY stat_date
+                            """)
+                    .param("repositoryId", repositoryId)
+                    .query(DAILY_STATS_MAPPER)
+                    .list();
+        }
+        return jdbcClient.sql("""
+                        SELECT stat_date, stars, watchers, forks, contributors
+                        FROM repository_daily_stats
+                        WHERE repository_id = :repositoryId AND stat_date >= :fromDate
+                        ORDER BY stat_date
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("fromDate", fromInclusive)
+                .query(DAILY_STATS_MAPPER)
+                .list();
+    }
+
+    public Optional<LocalDate> earliestDailyStatsDate(long repositoryId) {
+        return jdbcClient.sql("""
+                        SELECT MIN(stat_date)
+                        FROM repository_daily_stats
+                        WHERE repository_id = :repositoryId
+                        """)
+                .param("repositoryId", repositoryId)
+                .query(LocalDate.class)
+                .optional()
+                .filter(date -> date != null);
     }
 
     public void insertReferrers(long repositoryId, Instant snapshotAt, String referrer, int views, int uniqueVisitors) {
@@ -569,6 +627,15 @@ public class TrafficJdbcRepository {
             boolean archived,
             Instant lastCommitAt,
             Instant githubPushedAt
+    ) {
+    }
+
+    public record RepositoryDailyStats(
+            LocalDate statDate,
+            int stars,
+            int watchers,
+            int forks,
+            int contributors
     ) {
     }
 

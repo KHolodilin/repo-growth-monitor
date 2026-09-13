@@ -150,6 +150,20 @@ export type SnapshotHistory = {
   rows: SnapshotHistoryRow[];
 };
 
+export type StatsHistoryPoint = {
+  date: string;
+  stars: number;
+  forks: number;
+  watchers: number;
+  contributors: number;
+};
+
+export type RepositoryStatsHistory = {
+  repositoryId: number;
+  period: string;
+  points: StatsHistoryPoint[];
+};
+
 export type RepositoryTraffic = {
   repository: Repository;
   owner: Owner;

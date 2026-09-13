@@ -43,4 +43,12 @@ public class AnalyticsController {
     ) {
         return analyticsService.snapshotHistory(id, kind, days);
     }
+
+    @GetMapping("/repositories/{id}/stats-history")
+    public AnalyticsService.RepositoryStatsHistory statsHistory(
+            @PathVariable long id,
+            @RequestParam(defaultValue = "30d") String period
+    ) {
+        return analyticsService.statsHistory(id, period);
+    }
 }

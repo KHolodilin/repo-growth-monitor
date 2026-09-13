@@ -103,8 +103,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(6), 50, 25, 5, 4);
         trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(4), 30, 15, 3, 2);
 
-        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0);
-        trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 0);
+        trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1, 0);
 
         CollectionRun kafkaRun = runRepository.insertIgnore(kafka.id(), today, 4);
         jobRepository.insertIgnore(kafkaRun.id(), kafka.id(), today, CollectionJobType.TRAFFIC);
@@ -250,6 +250,27 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(wide.kind()).isEqualTo("REFERRERS");
         assertThat(wide.days()).isEqualTo(14);
         assertThat(wide.from()).isEqualTo(today.minusDays(13));
+    }
+
+    @Test
+    void statsHistoryReturnsCollectedDaysInTheRequestedPeriod() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 4);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(3), 40, 9, 3, 0, 5);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today, 41, 10, 3, 0, 6);
+
+        AnalyticsService.RepositoryStatsHistory week = analyticsService.statsHistory(kafka.id(), "7d");
+        assertThat(week.period()).isEqualTo("7d");
+        assertThat(week.points()).containsExactly(
+                new AnalyticsService.StatsHistoryPoint(today.minusDays(3), 40, 3, 9, 5),
+                new AnalyticsService.StatsHistoryPoint(today, 41, 3, 10, 6)
+        );
+
+        AnalyticsService.RepositoryStatsHistory all = analyticsService.statsHistory(kafka.id(), "all");
+        assertThat(all.points()).extracting(AnalyticsService.StatsHistoryPoint::date)
+                .containsExactly(today.minusDays(10), today.minusDays(3), today);
+        assertThat(all.points().getFirst().contributors()).isEqualTo(4);
     }
 
     @Test

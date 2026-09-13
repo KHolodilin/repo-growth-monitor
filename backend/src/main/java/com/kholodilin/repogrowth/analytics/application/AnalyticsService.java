@@ -153,6 +153,24 @@ public class AnalyticsService {
         );
     }
 
+    public RepositoryStatsHistory statsHistory(long repositoryId, String periodParam) {
+        repositoryService.get(repositoryId);
+        DashboardPeriod period = periodForStats(repositoryId, periodParam);
+        List<TrafficJdbcRepository.RepositoryDailyStats> history =
+                trafficJdbcRepository.dailyStatsHistory(repositoryId, period.allTime() ? null : period.from());
+        List<StatsHistoryPoint> points = history.stream()
+                .filter(day -> !day.statDate().isAfter(period.to()))
+                .map(day -> new StatsHistoryPoint(
+                        day.statDate(),
+                        day.stars(),
+                        day.forks(),
+                        day.watchers(),
+                        day.contributors()
+                ))
+                .toList();
+        return new RepositoryStatsHistory(repositoryId, period.value(), points);
+    }
+
     /**
      * Both the chart and the table of the history page are served from this payload, so they cannot
      * disagree about a snapshot. The chart hides negative deltas itself; the table shows them.
@@ -214,6 +232,16 @@ public class AnalyticsService {
             return MAX_HISTORY_DAYS;
         }
         return Math.min(MAX_HISTORY_DAYS, Math.max(1, days));
+    }
+
+    private DashboardPeriod periodForStats(long repositoryId, String periodParam) {
+        LocalDate today = LocalDate.now(clock);
+        String normalized = DashboardPeriod.normalize(periodParam);
+        LocalDate earliest = null;
+        if ("all".equals(normalized)) {
+            earliest = trafficJdbcRepository.earliestDailyStatsDate(repositoryId).orElse(today);
+        }
+        return DashboardPeriod.of(periodParam, today, earliest);
     }
 
     private DashboardPeriod periodForRepository(long repositoryId, String periodParam) {
@@ -543,6 +571,22 @@ public class AnalyticsService {
             long views,
             long clones,
             int stars
+    ) {
+    }
+
+    public record RepositoryStatsHistory(
+            long repositoryId,
+            String period,
+            List<StatsHistoryPoint> points
+    ) {
+    }
+
+    public record StatsHistoryPoint(
+            LocalDate date,
+            int stars,
+            int forks,
+            int watchers,
+            int contributors
     ) {
     }
 

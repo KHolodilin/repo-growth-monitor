@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-daily-stats-contributors
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE repository_daily_stats
+                  ADD COLUMN contributors INTEGER NOT NULL DEFAULT 0;
