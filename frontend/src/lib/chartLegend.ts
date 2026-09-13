@@ -8,6 +8,12 @@ export const TRAFFIC_SERIES = [
   { key: "Clones", name: "Clones" },
 ] as const;
 
+export const REPO_TRAFFIC_SERIES = [
+  { key: "Views", name: "Views" },
+  { key: "Visitors", name: "Visitors" },
+  { key: "Clones", name: "Unique Cloners" },
+] as const;
+
 export function dashboardTrafficChartId() {
   return "dashboard:traffic";
 }

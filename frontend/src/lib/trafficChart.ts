@@ -128,7 +128,7 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
   const byDate = new Map(points.map((point) => [point.date, point]));
   const peak = Math.max(
     1,
-    ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.clones].filter((value): value is number => value != null)),
+    ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.uniqueCloners].filter((value): value is number => value != null)),
   );
   const { groups, markLine, markPoint } = eventMarkOverlays(dates, events, peak);
 
@@ -157,7 +157,7 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
         return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}${eventRows}</div>`;
       },
     },
-    legend: { data: ["Views", "Visitors", "Clones"] },
+    legend: { data: ["Views", "Visitors", "Unique Cloners"] },
     grid: {
       left: 48,
       right: 72,
@@ -197,12 +197,12 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
         data: dates.map((date) => byDate.get(date)?.uniqueVisitors ?? null),
       },
       {
-        name: "Clones",
+        name: "Unique Cloners",
         type: "line",
         showSymbol: true,
         symbolSize: 8,
         connectNulls: false,
-        data: dates.map((date) => byDate.get(date)?.clones ?? null),
+        data: dates.map((date) => byDate.get(date)?.uniqueCloners ?? null),
       },
       {
         name: "Events",
