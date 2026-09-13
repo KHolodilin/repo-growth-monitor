@@ -267,6 +267,10 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         assertThat(health.hasLicense()).isTrue();
         assertThat(health.hasSecurityPolicy()).isTrue();
         assertThat(health.homepage()).isEqualTo("https://example.com/demo");
+        assertThat(trafficJdbcRepository.dailyStatsHistory(repository.id(), null))
+                .containsExactly(new TrafficJdbcRepository.RepositoryDailyStats(
+                        planningWindow.businessDate(), 11, 5, 3, 4
+                ));
     }
 
     @Test

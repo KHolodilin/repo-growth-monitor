@@ -7,3 +7,5 @@ databaseChangeLog:
       file: db/changelog/003-growth-events.yaml
   - include:
       file: db/changelog/004-search-run-snapshot.yaml
+  - include:
+      file: db/changelog/005-daily-stats-contributors.yaml

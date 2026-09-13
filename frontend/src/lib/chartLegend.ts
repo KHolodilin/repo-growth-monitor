@@ -26,6 +26,17 @@ export function repoSearchChartId(repoId: number | string) {
   return `${repoId}:search`;
 }
 
+export const STATS_SERIES = [
+  { key: "Stars", name: "Stars" },
+  { key: "Forks", name: "Forks" },
+  { key: "Watchers", name: "Watchers" },
+  { key: "Contributors", name: "Contributors" },
+] as const;
+
+export function repoStatsChartId(repoId: number | string) {
+  return `${repoId}:stats`;
+}
+
 function parseAll(parsed: unknown): Record<string, Record<string, boolean>> | null {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;

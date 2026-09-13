@@ -16,6 +16,7 @@ import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
+import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
 import { SnapshotCards } from "../components/SnapshotCards";
 import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
@@ -24,17 +25,18 @@ import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { useTableSort } from "../lib/tableSortPrefs";
 
-type Tab = "overview" | "traffic" | "search" | "growth-events";
+type Tab = "overview" | "traffic" | "stats" | "search" | "growth-events";
 
 const TAB_LABEL: Record<Tab, string> = {
   traffic: "Traffic",
+  stats: "Stats",
   search: "Search Visibility",
   overview: "Overview",
   "growth-events": "Growth Events",
 };
 
 function parseTab(tabParam: string | null): Tab {
-  if (tabParam === "overview" || tabParam === "search" || tabParam === "growth-events") {
+  if (tabParam === "overview" || tabParam === "stats" || tabParam === "search" || tabParam === "growth-events") {
     return tabParam;
   }
   if (tabParam === "settings") {
@@ -295,6 +297,7 @@ export function RepositoryDetailsPage() {
       <div className="inline-flex rounded-lg border bg-muted p-1">
         {([
           ["traffic", "Traffic"],
+          ["stats", "Stats"],
           ["search", "Search Visibility"],
           ["overview", "Overview"],
           ["growth-events", "Growth Events"],
@@ -325,6 +328,9 @@ export function RepositoryDetailsPage() {
       )}
       {tab === "traffic" && (
         <TrafficPanel repositoryId={repo.id} traffic={traffic} period={period} onPeriod={setPeriod} />
+      )}
+      {tab === "stats" && (
+        <RepositoryStatsPanel repositoryId={repo.id} period={period} onPeriod={setPeriod} />
       )}
       {tab === "search" && (
         <SearchPanel
