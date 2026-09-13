@@ -7,7 +7,12 @@ const GLOBAL_SCOPE = "global";
 export type SortDirection = "asc" | "desc";
 
 /** Every table owns a cookie so the tables of one page cannot overwrite each other. */
-export type TableId = "dashboard-repositories" | "search-queries" | "search-results";
+export type TableId =
+  | "dashboard-repositories"
+  | "search-queries"
+  | "search-results"
+  | "top-referrers"
+  | "popular-paths";
 
 export type TableSort<K extends string> = {
   key: K;
