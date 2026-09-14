@@ -17,31 +17,39 @@ class ServicePathClassifierTest {
     @ValueSource(strings = {
             "/acme/demo/graphs/traffic",
             "/acme/demo/pulse",
-            "/acme/demo/issues",
-            "/acme/demo/issues/50",
-            "/acme/demo/pull/51/files",
             "/acme/demo/settings/secrets/actions",
+            "/acme/demo/stargazers",
+            "/acme/demo/network/members",
     })
-    void recognizesRepositoryTabs(String path) {
+    void recognizesAdministrationPages(String path) {
         assertThat(classifier.isServicePath(path)).isTrue();
     }
 
+    /**
+     * Issues, pull requests and discussions are read by outsiders, so they count as real traffic
+     * even though GitHub serves them under a repository tab.
+     */
     @ParameterizedTest
     @ValueSource(strings = {
             "/acme/demo",
             "/acme/demo/",
+            "/acme/demo/issues",
+            "/acme/demo/issues/50",
+            "/acme/demo/pulls",
+            "/acme/demo/pull/51/files",
+            "/acme/demo/discussions",
             "/acme/demo/blob/main/README.md",
             "/acme/demo/tree/main/docs",
             "/acme",
             "/",
     })
-    void leavesLandingPagesAlone(String path) {
+    void leavesPagesAReaderArrivesAtAlone(String path) {
         assertThat(classifier.isServicePath(path)).isFalse();
     }
 
     @Test
     void ignoresTheQueryStringAndLetterCase() {
-        assertThat(classifier.isServicePath("/acme/demo/Issues?q=is%3Aopen")).isTrue();
+        assertThat(classifier.isServicePath("/acme/demo/Pulse?period=monthly")).isTrue();
         assertThat(classifier.isServicePath("/acme/demo?tab=readme-ov-file")).isFalse();
     }
 
@@ -51,8 +59,8 @@ class ServicePathClassifierTest {
      */
     @Test
     void onlyLooksAtTheSegmentAfterTheRepository() {
-        assertThat(classifier.isServicePath("/acme/demo/tree/main/issues")).isFalse();
-        assertThat(classifier.isServicePath("/acme/issues")).isFalse();
+        assertThat(classifier.isServicePath("/acme/demo/tree/main/settings")).isFalse();
+        assertThat(classifier.isServicePath("/acme/settings")).isFalse();
     }
 
     @Test

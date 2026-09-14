@@ -40,15 +40,12 @@ search:
     low-activity-days: 180
 
 traffic:
+  # Administration pages the owner opens, not pages a reader arrives at. Issues, pull requests and
+  # discussions stay visible: outsiders read them, and their visitor counts show it.
   service-paths:
     - graphs
     - pulse
-    - pulls
-    - pull
-    - issues
     - actions
-    - commits
-    - commit
     - settings
     - network
     - stargazers

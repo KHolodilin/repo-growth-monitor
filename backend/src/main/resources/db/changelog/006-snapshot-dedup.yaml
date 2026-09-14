@@ -52,7 +52,7 @@ databaseChangeLog:
               UPDATE traffic_path_snapshot
               SET service_path = TRUE
               WHERE regexp_replace(path, '^/[^/]+/[^/]+', '') ~
-                    '^/(graphs|pulse|pulls|pull|issues|actions|commits|commit|settings|network|stargazers|watchers|branches|tags|compare|security|community|activity|forks|deployments|wiki)(/|$)';
+                    '^/(graphs|pulse|actions|settings|network|stargazers|watchers|branches|tags|compare|security|community|activity|forks|deployments|wiki)(/|$)';
 
               CREATE INDEX idx_path_snapshot_service
                   ON traffic_path_snapshot (repository_id, snapshot_date)
