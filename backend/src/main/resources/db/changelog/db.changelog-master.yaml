@@ -9,3 +9,5 @@ databaseChangeLog:
       file: db/changelog/004-search-run-snapshot.yaml
   - include:
       file: db/changelog/005-daily-stats-contributors.yaml
+  - include:
+      file: db/changelog/006-snapshot-dedup.yaml

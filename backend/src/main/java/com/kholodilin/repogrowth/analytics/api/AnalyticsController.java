@@ -30,18 +30,20 @@ public class AnalyticsController {
     @GetMapping("/repositories/{id}/traffic")
     public AnalyticsService.RepositoryTrafficSnapshot traffic(
             @PathVariable long id,
-            @RequestParam(defaultValue = "30d") String period
+            @RequestParam(defaultValue = "30d") String period,
+            @RequestParam(defaultValue = "false") boolean includeServicePaths
     ) {
-        return analyticsService.traffic(id, period);
+        return analyticsService.traffic(id, period, includeServicePaths);
     }
 
     @GetMapping("/repositories/{id}/traffic-history")
     public AnalyticsService.SnapshotHistoryResponse trafficHistory(
             @PathVariable long id,
             @RequestParam(required = false) String kind,
-            @RequestParam(required = false) Integer days
+            @RequestParam(required = false) Integer days,
+            @RequestParam(defaultValue = "false") boolean includeServicePaths
     ) {
-        return analyticsService.snapshotHistory(id, kind, days);
+        return analyticsService.snapshotHistory(id, kind, days, includeServicePaths);
     }
 
     @GetMapping("/repositories/{id}/stats-history")

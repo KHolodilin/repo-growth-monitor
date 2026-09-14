@@ -26,6 +26,7 @@ import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
 import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
@@ -38,6 +39,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -232,7 +235,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
     }
 
     @Test
-    void collectNowStoresAFresherSnapshotForTheSameDay() {
+    void collectNowReplacesTheSnapshotOfTheDayInsteadOfAppendingToIt() {
         LocalDate date = planningWindow.businessDate();
         collectionPlanner.planRepository(repository.id(), date);
         drainCollection(10);
@@ -243,12 +246,35 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         Instant second = trafficJdbcRepository.latestReferrerSnapshot(repository.id()).snapshotAt();
 
         assertThat(second).isAfter(first);
-        LocalDate snapshotDate = second.atZone(ZoneOffset.UTC).toLocalDate();
-        assertThat(trafficJdbcRepository.referrerSnapshotsForDelta(
-                repository.id(), snapshotDate, snapshotDate, ZoneOffset.UTC
-        ))
+        assertThat(trafficJdbcRepository.referrerSnapshotsForDelta(repository.id(), date, date))
                 .extracting(Observation::snapshotDate, Observation::key)
-                .containsExactly(tuple(snapshotDate, "github.com"));
+                .containsExactly(tuple(date, "github.com"));
+        assertThat(countRows("traffic_referrer_snapshot")).isEqualTo(1);
+        assertThat(countRows("traffic_path_snapshot")).isEqualTo(2);
+    }
+
+    @Test
+    void servicePathsAreStoredButLeftOutOfTheDefaultReads() {
+        LocalDate date = planningWindow.businessDate();
+        collectionPlanner.planRepository(repository.id(), date);
+        drainCollection(10);
+
+        assertThat(trafficJdbcRepository.latestPathSnapshot(repository.id(), false).rows())
+                .extracting(TrafficJdbcRepository.PathRow::path, TrafficJdbcRepository.PathRow::servicePath)
+                .containsExactly(tuple("/acme/demo", false));
+        assertThat(trafficJdbcRepository.latestPathSnapshot(repository.id(), true).rows())
+                .extracting(TrafficJdbcRepository.PathRow::path, TrafficJdbcRepository.PathRow::servicePath)
+                .containsExactlyInAnyOrder(tuple("/acme/demo", false), tuple("/acme/demo/graphs/traffic", true));
+        assertThat(trafficJdbcRepository.pathSnapshotsForDelta(repository.id(), date, date, false))
+                .extracting(Observation::key)
+                .containsExactly("/acme/demo");
+        assertThat(trafficJdbcRepository.pathSnapshotsForDelta(repository.id(), date, date, true))
+                .extracting(Observation::key)
+                .containsExactlyInAnyOrder("/acme/demo", "/acme/demo/graphs/traffic");
+    }
+
+    private int countRows(String table) {
+        return jdbcClient.sql("SELECT COUNT(*) FROM " + table).query(Integer.class).single();
     }
 
     @Test
@@ -298,6 +324,32 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         assertThat(searchRunJdbcRepository.find(second.id(), date)).isPresent();
         searchPlanner.planAll(date);
         assertThat(searchRunJdbcRepository.find(first.id(), date)).isPresent();
+    }
+
+    @Test
+    void searchPlannerMarksDaysItNeverRanAndLeavesThemForNobody() {
+        var query = searchQueryJdbcRepository.insert(repository.id(), "q1", "outbox", true, 50);
+        LocalDate date = planningWindow.businessDate();
+        jdbcClient.sql("UPDATE search_query SET created_at = :createdAt WHERE id = :id")
+                .param("createdAt", Timestamp.from(date.minusDays(3).atStartOfDay(ZoneOffset.UTC).toInstant()))
+                .param("id", query.id())
+                .update();
+
+        searchPlanner.planAll(date);
+
+        assertThat(searchRunJdbcRepository.missedDates(query.id()))
+                .containsExactly(date.minusDays(3), date.minusDays(2), date.minusDays(1));
+        assertThat(searchRunJdbcRepository.find(query.id(), date).orElseThrow().status())
+                .isEqualTo(SearchRunStatus.READY);
+        assertThat(searchRunJdbcRepository.latest(query.id()).orElseThrow().businessDate()).isEqualTo(date);
+
+        searchPlanner.planAll(date);
+        assertThat(searchRunJdbcRepository.missedDates(query.id())).hasSize(3);
+
+        // The worker takes today's READY run and never touches the MISSED ones.
+        Duration lease = Duration.ofMinutes(5);
+        assertThat(searchRunJdbcRepository.claim("test-worker", lease).orElseThrow().businessDate()).isEqualTo(date);
+        assertThat(searchRunJdbcRepository.claim("test-worker", lease)).isEmpty();
     }
 
     @Test
@@ -373,8 +425,10 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         ));
         when(gitHubClient.getReferrers(anyString(), anyString()))
                 .thenReturn(List.of(new GitHubReferrerResponse("github.com", 4, 2)));
-        when(gitHubClient.getPopularPaths(anyString(), anyString()))
-                .thenReturn(List.of(new GitHubPathResponse("/acme/demo", "demo", 4, 2)));
+        when(gitHubClient.getPopularPaths(anyString(), anyString())).thenReturn(List.of(
+                new GitHubPathResponse("/acme/demo", "demo", 4, 2),
+                new GitHubPathResponse("/acme/demo/graphs/traffic", "Traffic", 90, 1)
+        ));
         when(gitHubClient.getRepository(anyString(), anyString())).thenReturn(new GitHubRepositoryResponse(
                 200L, "demo", "acme/demo", "demo repo", false, "public", "main", "Java", false, false,
                 11, 5, 3, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), Instant.now(), owner,

@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import ReactECharts from "echarts-for-react";
 import { api, type Repository, type SearchHistory, type SearchRunResults } from "../lib/api";
-import { formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
-import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
+import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { SearchResultsTable } from "../components/SearchResultsTable";
@@ -72,7 +72,7 @@ export function QueryDetailsPage() {
     if (!history) {
       return null;
     }
-    const dates = datesFromHistory([history.points]);
+    const dates = datesFromHistory([history.points], history.missedDates);
     return rankHistoryOption({
       dates,
       series: [
@@ -80,6 +80,7 @@ export function QueryDetailsPage() {
           name: history.query.name,
           points: history.points,
           limit: history.query.resultLimit,
+          missedDates: history.missedDates,
         },
       ],
     });
@@ -98,6 +99,7 @@ export function QueryDetailsPage() {
   }
 
   const busy = running || searchBusy;
+  const recentMissed = recentMissedDates(history.missedDates);
 
   return (
     <div className="space-y-6">
@@ -148,6 +150,12 @@ export function QueryDetailsPage() {
       {option && (
         <Card>
           <h2 className="mb-3 font-medium">Rank History</h2>
+          {recentMissed.length > 0 && (
+            <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
+              ranking, so these days stay empty.
+            </p>
+          )}
           <ReactECharts option={option} style={{ height: 360, width: "100%" }} />
         </Card>
       )}

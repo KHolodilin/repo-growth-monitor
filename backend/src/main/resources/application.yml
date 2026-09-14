@@ -34,9 +34,34 @@ search:
   workers: 1
   default-result-limit: 50
   enrichment-ttl: 24h
+  gap-lookback-days: 30
   activity:
     active-days: 30
     low-activity-days: 180
+
+traffic:
+  service-paths:
+    - graphs
+    - pulse
+    - pulls
+    - pull
+    - issues
+    - actions
+    - commits
+    - commit
+    - settings
+    - network
+    - stargazers
+    - watchers
+    - branches
+    - tags
+    - compare
+    - security
+    - community
+    - activity
+    - forks
+    - deployments
+    - wiki
 
 management:
   endpoints:

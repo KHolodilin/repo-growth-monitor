@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import type { PathSnapshotRow } from "../lib/api";
 import { cn, formatNumber, formatSyncTime } from "../lib/utils";
 import { useTableSort, type TableId } from "../lib/tableSortPrefs";
 import { ReferrerSourceIcon } from "./ReferrerSourceIcon";
+import { ServicePathBadge, ServicePathToggle } from "./ServicePaths";
 import { Card } from "./ui";
 
 const TOP_ROWS = 5;
@@ -10,7 +12,14 @@ const SORT_KEYS = ["name", "visitors", "views"] as const;
 const ASC_FIRST_KEYS = ["name"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
-type CardRow = { key: string; title: string; subtitle?: string; visitors: number; views: number };
+type CardRow = {
+  key: string;
+  title: string;
+  subtitle?: string;
+  visitors: number;
+  views: number;
+  servicePath?: boolean;
+};
 
 export function SnapshotCards({
   repositoryId,
@@ -18,12 +27,16 @@ export function SnapshotCards({
   referrerSnapshotAt,
   paths,
   pathSnapshotAt,
+  showServicePaths,
+  onShowServicePathsChange,
 }: {
   repositoryId: number;
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   referrerSnapshotAt?: string;
-  paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
+  paths: PathSnapshotRow[];
   pathSnapshotAt?: string;
+  showServicePaths: boolean;
+  onShowServicePathsChange: (next: boolean) => void;
 }) {
   const referrerRows = referrers.map((row) => ({
     key: row.referrer,
@@ -37,6 +50,7 @@ export function SnapshotCards({
     subtitle: row.title,
     visitors: row.uniqueVisitors,
     views: row.views,
+    servicePath: row.servicePath,
   }));
 
   return (
@@ -59,6 +73,7 @@ export function SnapshotCards({
         rows={pathRows}
         snapshotAt={pathSnapshotAt}
         historyTo={`/repositories/${repositoryId}/traffic/history?kind=paths`}
+        toolbar={<ServicePathToggle checked={showServicePaths} onChange={onShowServicePathsChange} />}
       />
     </div>
   );
@@ -73,6 +88,7 @@ function SnapshotCard({
   snapshotAt,
   historyTo,
   icons = false,
+  toolbar,
 }: {
   tableId: TableId;
   repositoryId: number;
@@ -82,6 +98,7 @@ function SnapshotCard({
   snapshotAt?: string;
   historyTo: string;
   icons?: boolean;
+  toolbar?: ReactNode;
 }) {
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId,
@@ -111,8 +128,9 @@ function SnapshotCard({
           History →
         </Link>
       </div>
-      <div className="mb-3 text-xs text-muted-foreground">
-        {snapshotAt ? `Snapshot: ${formatSyncTime(snapshotAt)}` : "No snapshot yet"}
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{snapshotAt ? `Snapshot: ${formatSyncTime(snapshotAt)}` : "No snapshot yet"}</span>
+        {toolbar}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full table-fixed text-sm">
@@ -149,7 +167,10 @@ function SnapshotCard({
                   <div className="flex items-start gap-2">
                     {icons && <ReferrerSourceIcon source={row.title} />}
                     <div>
-                      <div className="[overflow-wrap:anywhere]">{wrapPath(row.title)}</div>
+                      <div className="[overflow-wrap:anywhere]">
+                        {wrapPath(row.title)}
+                        {row.servicePath && <ServicePathBadge />}
+                      </div>
                       {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
                     </div>
                   </div>

@@ -4,6 +4,7 @@ import com.kholodilin.repogrowth.common.config.AppProperties;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
 import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
+import com.kholodilin.repogrowth.common.config.TrafficProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -15,7 +16,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         AppProperties.class,
         GitHubProperties.class,
         CollectionProperties.class,
-        SearchProperties.class
+        SearchProperties.class,
+        TrafficProperties.class
 })
 public class RepoGrowthMonitorApplication {
 

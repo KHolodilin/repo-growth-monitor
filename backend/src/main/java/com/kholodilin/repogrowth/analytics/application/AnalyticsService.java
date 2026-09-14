@@ -130,7 +130,7 @@ public class AnalyticsService {
         );
     }
 
-    public RepositoryTrafficSnapshot traffic(long repositoryId, String periodParam) {
+    public RepositoryTrafficSnapshot traffic(long repositoryId, String periodParam, boolean includeServicePaths) {
         Repository repository = repositoryService.get(repositoryId);
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
         DashboardPeriod period = periodForRepository(repositoryId, periodParam);
@@ -138,7 +138,7 @@ public class AnalyticsService {
         TrafficTotals totals = trafficJdbcRepository.totals(repositoryId, period.allTime() ? null : period.from());
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
         ReferrerSnapshot referrers = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
-        PathSnapshot paths = trafficJdbcRepository.latestPathSnapshot(repositoryId);
+        PathSnapshot paths = trafficJdbcRepository.latestPathSnapshot(repositoryId, includeServicePaths);
         return new RepositoryTrafficSnapshot(
                 repository,
                 owner,
@@ -175,15 +175,20 @@ public class AnalyticsService {
      * Both the chart and the table of the history page are served from this payload, so they cannot
      * disagree about a snapshot. The chart hides negative deltas itself; the table shows them.
      */
-    public SnapshotHistoryResponse snapshotHistory(long repositoryId, String kindParam, Integer daysParam) {
+    public SnapshotHistoryResponse snapshotHistory(
+            long repositoryId,
+            String kindParam,
+            Integer daysParam,
+            boolean includeServicePaths
+    ) {
         repositoryService.get(repositoryId);
         SnapshotKind kind = snapshotKind(kindParam);
         int days = historyDays(daysParam);
         LocalDate to = LocalDate.now(clock);
         LocalDate from = to.minusDays(days - 1L);
         List<Observation> snapshots = kind == SnapshotKind.PATHS
-                ? trafficJdbcRepository.pathSnapshotsForDelta(repositoryId, from, to, clock.getZone())
-                : trafficJdbcRepository.referrerSnapshotsForDelta(repositoryId, from, to, clock.getZone());
+                ? trafficJdbcRepository.pathSnapshotsForDelta(repositoryId, from, to, includeServicePaths)
+                : trafficJdbcRepository.referrerSnapshotsForDelta(repositoryId, from, to);
         SnapshotHistoryMath.Result history = SnapshotHistoryMath.pivot(snapshots, from, to);
         return new SnapshotHistoryResponse(
                 repositoryId,
@@ -253,7 +258,7 @@ public class AnalyticsService {
                     .map(TrafficDaily::trafficDate)
                     .min(LocalDate::compareTo)
                     .orElse(null);
-            LocalDate earliestReferrer = trafficJdbcRepository.earliestReferrerSnapshotDate(repositoryId, clock.getZone())
+            LocalDate earliestReferrer = trafficJdbcRepository.earliestReferrerSnapshotDate(repositoryId)
                     .orElse(null);
             if (earliest == null) {
                 earliest = earliestReferrer;

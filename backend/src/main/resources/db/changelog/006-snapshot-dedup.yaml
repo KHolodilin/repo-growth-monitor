@@ -1,0 +1,59 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-snapshot-dedup
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE traffic_referrer_snapshot
+                  ADD COLUMN snapshot_date DATE;
+              ALTER TABLE traffic_path_snapshot
+                  ADD COLUMN snapshot_date DATE;
+
+              UPDATE traffic_referrer_snapshot
+              SET snapshot_date = (snapshot_at AT TIME ZONE 'UTC')::date
+              WHERE snapshot_date IS NULL;
+              UPDATE traffic_path_snapshot
+              SET snapshot_date = (snapshot_at AT TIME ZONE 'UTC')::date
+              WHERE snapshot_date IS NULL;
+
+              DELETE FROM traffic_referrer_snapshot s
+              WHERE s.id NOT IN (
+                  SELECT DISTINCT ON (repository_id, snapshot_date, referrer) id
+                  FROM traffic_referrer_snapshot
+                  ORDER BY repository_id, snapshot_date, referrer, snapshot_at DESC, id DESC
+              );
+              DELETE FROM traffic_path_snapshot s
+              WHERE s.id NOT IN (
+                  SELECT DISTINCT ON (repository_id, snapshot_date, path) id
+                  FROM traffic_path_snapshot
+                  ORDER BY repository_id, snapshot_date, path, snapshot_at DESC, id DESC
+              );
+
+              ALTER TABLE traffic_referrer_snapshot
+                  ALTER COLUMN snapshot_date SET NOT NULL;
+              ALTER TABLE traffic_path_snapshot
+                  ALTER COLUMN snapshot_date SET NOT NULL;
+
+              CREATE UNIQUE INDEX uq_referrer_snapshot_repo_date_referrer
+                  ON traffic_referrer_snapshot (repository_id, snapshot_date, referrer);
+              CREATE UNIQUE INDEX uq_path_snapshot_repo_date_path
+                  ON traffic_path_snapshot (repository_id, snapshot_date, path);
+
+  - changeSet:
+      id: 006-service-paths
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE traffic_path_snapshot
+                  ADD COLUMN service_path BOOLEAN NOT NULL DEFAULT FALSE;
+
+              UPDATE traffic_path_snapshot
+              SET service_path = TRUE
+              WHERE regexp_replace(path, '^/[^/]+/[^/]+', '') ~
+                    '^/(graphs|pulse|pulls|pull|issues|actions|commits|commit|settings|network|stargazers|watchers|branches|tags|compare|security|community|activity|forks|deployments|wiki)(/|$)';
+
+              CREATE INDEX idx_path_snapshot_service
+                  ON traffic_path_snapshot (repository_id, snapshot_date)
+                  WHERE service_path = FALSE;

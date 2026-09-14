@@ -23,6 +23,7 @@ import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
+import { useServicePaths } from "../lib/servicePathPrefs";
 import { useTableSort } from "../lib/tableSortPrefs";
 
 type Tab = "overview" | "traffic" | "stats" | "search" | "growth-events";
@@ -59,6 +60,7 @@ export function RepositoryDetailsPage() {
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
   const [period, setPeriod] = usePeriod(id);
+  const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
@@ -84,13 +86,15 @@ export function RepositoryDetailsPage() {
     }
     const [repository, trafficData, searchData] = await Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
-      api<RepositoryTraffic>(`/api/v1/repositories/${id}/traffic?period=${period}`),
+      api<RepositoryTraffic>(
+        `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
+      ),
       api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
     ]);
     setRepo(repository);
     setTraffic(trafficData);
     setVisibility(searchData);
-  }, [id, period]);
+  }, [id, period, showServicePaths]);
 
   useEffect(() => {
     let cancelled = false;
@@ -327,7 +331,14 @@ export function RepositoryDetailsPage() {
         <GrowthEventsTab repositoryId={repo.id} period={period} onPeriod={setPeriod} />
       )}
       {tab === "traffic" && (
-        <TrafficPanel repositoryId={repo.id} traffic={traffic} period={period} onPeriod={setPeriod} />
+        <TrafficPanel
+          repositoryId={repo.id}
+          traffic={traffic}
+          period={period}
+          onPeriod={setPeriod}
+          showServicePaths={showServicePaths}
+          onShowServicePathsChange={setShowServicePaths}
+        />
       )}
       {tab === "stats" && (
         <RepositoryStatsPanel repositoryId={repo.id} period={period} onPeriod={setPeriod} />
@@ -653,11 +664,15 @@ function TrafficPanel({
   traffic,
   period,
   onPeriod,
+  showServicePaths,
+  onShowServicePathsChange,
 }: {
   repositoryId: number;
   traffic: RepositoryTraffic;
   period: Period;
   onPeriod: (period: Period) => void;
+  showServicePaths: boolean;
+  onShowServicePathsChange: (next: boolean) => void;
 }) {
   const [events, setEvents] = useState<GrowthEvent[]>([]);
   const [filter, setFilter] = useState<EventFilter>("all");
@@ -731,6 +746,8 @@ function TrafficPanel({
         referrerSnapshotAt={traffic.referrerSnapshotAt}
         paths={traffic.paths}
         pathSnapshotAt={traffic.pathSnapshotAt}
+        showServicePaths={showServicePaths}
+        onShowServicePathsChange={onShowServicePathsChange}
       />
       <div className="text-xs text-muted-foreground">
         <div>
@@ -1049,7 +1066,10 @@ function CombinedRankChart({
   highlightQueryId: number | null;
 }) {
   const option = useMemo(() => {
-    const dates = datesFromHistory(visibility.map((item) => item.points));
+    const dates = datesFromHistory(
+      visibility.map((item) => item.points),
+      visibility.flatMap((item) => item.missedDates ?? []),
+    );
     return rankHistoryOption({
       dates,
       legend: true,
@@ -1057,6 +1077,7 @@ function CombinedRankChart({
         name: item.query.name,
         points: item.points,
         limit: item.query.resultLimit,
+        missedDates: item.missedDates,
         highlighted: highlightQueryId === item.query.id,
         dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
       })),

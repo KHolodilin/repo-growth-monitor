@@ -55,6 +55,30 @@ public class SearchRunJdbcRepository {
                 .update();
     }
 
+    /**
+     * Records every past day an enabled query never got a run for. Today is left alone because its
+     * run may still be waiting in the queue. {@code claim} only picks up READY, RETRY and stale
+     * RUNNING, so these rows never reach a worker.
+     */
+    public int markMissedDays(LocalDate businessDate, int lookbackDays) {
+        return jdbcClient.sql("""
+                        INSERT INTO search_run (search_query_id, repository_id, business_date, status)
+                        SELECT q.id, q.repository_id, day::date, 'MISSED'
+                        FROM search_query q
+                        JOIN repository r ON r.id = q.repository_id
+                        CROSS JOIN LATERAL generate_series(
+                                GREATEST(q.created_at::date, :fromDate),
+                                :businessDate - 1,
+                                INTERVAL '1 day') day
+                        WHERE q.enabled = TRUE
+                          AND r.account_accessible = TRUE
+                        ON CONFLICT (search_query_id, business_date) DO NOTHING
+                        """)
+                .param("fromDate", businessDate.minusDays(lookbackDays))
+                .param("businessDate", businessDate)
+                .update();
+    }
+
     public Optional<SearchRun> find(long searchQueryId, LocalDate businessDate) {
         return jdbcClient.sql("""
                         SELECT * FROM search_run
@@ -239,16 +263,31 @@ public class SearchRunJdbcRepository {
                 .optional();
     }
 
+    /**
+     * MISSED is excluded so a gap in the collection never becomes the status shown on the query card.
+     */
     public Optional<SearchRun> latest(long searchQueryId) {
         return jdbcClient.sql("""
                         SELECT * FROM search_run
                         WHERE search_query_id = :searchQueryId
+                          AND status <> 'MISSED'
                         ORDER BY business_date DESC, id DESC
                         LIMIT 1
                         """)
                 .param("searchQueryId", searchQueryId)
                 .query(MAPPER)
                 .optional();
+    }
+
+    public List<LocalDate> missedDates(long searchQueryId) {
+        return jdbcClient.sql("""
+                        SELECT business_date FROM search_run
+                        WHERE search_query_id = :searchQueryId AND status = 'MISSED'
+                        ORDER BY business_date
+                        """)
+                .param("searchQueryId", searchQueryId)
+                .query(LocalDate.class)
+                .list();
     }
 
     public Optional<SearchRun> latestSnapshot(long searchQueryId) {

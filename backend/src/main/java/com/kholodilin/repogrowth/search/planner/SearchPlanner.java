@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.search.planner;
 
+import com.kholodilin.repogrowth.common.config.SearchProperties;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
@@ -17,10 +18,16 @@ public class SearchPlanner {
 
     private final SearchQueryJdbcRepository queryRepository;
     private final SearchRunJdbcRepository runRepository;
+    private final SearchProperties searchProperties;
 
-    public SearchPlanner(SearchQueryJdbcRepository queryRepository, SearchRunJdbcRepository runRepository) {
+    public SearchPlanner(
+            SearchQueryJdbcRepository queryRepository,
+            SearchRunJdbcRepository runRepository,
+            SearchProperties searchProperties
+    ) {
         this.queryRepository = queryRepository;
         this.runRepository = runRepository;
+        this.searchProperties = searchProperties;
     }
 
     @Transactional
@@ -29,7 +36,13 @@ public class SearchPlanner {
         for (SearchQuery query : queries) {
             runRepository.insertIgnore(query.id(), query.repositoryId(), businessDate);
         }
-        log.info("Search planner processed queries={} businessDate={}", queries.size(), businessDate);
+        int missed = runRepository.markMissedDays(businessDate, searchProperties.gapLookbackDays());
+        log.info(
+                "Search planner processed queries={} missedDays={} businessDate={}",
+                queries.size(),
+                missed,
+                businessDate
+        );
         return queries.size();
     }
 
