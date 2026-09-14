@@ -21,6 +21,7 @@
         <java.version>21</java.version>
         <springdoc.version>3.1.0</springdoc.version>
         <wiremock.version>3.13.1</wiremock.version>
+        <jacoco.version>0.8.15</jacoco.version>
     </properties>
 
     <dependencyManagement>
@@ -136,6 +137,34 @@
                             <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <excludes>
+                        <!-- Records and enums carry no branches worth measuring. -->
+                        <exclude>com/kholodilin/repogrowth/**/domain/**</exclude>
+                        <exclude>com/kholodilin/repogrowth/**/model/**</exclude>
+                        <exclude>com/kholodilin/repogrowth/RepoGrowthMonitorApplication.class</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>
