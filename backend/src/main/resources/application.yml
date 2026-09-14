@@ -34,9 +34,31 @@ search:
   workers: 1
   default-result-limit: 50
   enrichment-ttl: 24h
+  gap-lookback-days: 30
   activity:
     active-days: 30
     low-activity-days: 180
+
+traffic:
+  # Administration pages the owner opens, not pages a reader arrives at. Issues, pull requests and
+  # discussions stay visible: outsiders read them, and their visitor counts show it.
+  service-paths:
+    - graphs
+    - pulse
+    - actions
+    - settings
+    - network
+    - stargazers
+    - watchers
+    - branches
+    - tags
+    - compare
+    - security
+    - community
+    - activity
+    - forks
+    - deployments
+    - wiki
 
 management:
   endpoints:

@@ -49,3 +49,6 @@ Thumbs.db
 
 # Testcontainers
 .cache/
+
+# Local database dumps
+backups/

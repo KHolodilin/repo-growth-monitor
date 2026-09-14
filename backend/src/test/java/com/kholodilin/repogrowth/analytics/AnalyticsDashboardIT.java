@@ -173,26 +173,30 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(4), 37, 2, 0, 0);
         trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(1), 6, 1, 0, 0);
 
-        trafficJdbcRepository.insertReferrers(kafka.id(), before, "github.com", 40, 2);
-        trafficJdbcRepository.insertReferrers(kafka.id(), latest, "github.com", 81, 3);
-        trafficJdbcRepository.insertReferrers(kafka.id(), latest, "mvnrepository.com", 1, 1);
-        trafficJdbcRepository.insertPath(kafka.id(), before, "/readme", "README", 20, 2);
-        trafficJdbcRepository.insertPath(kafka.id(), latest, "/readme", "README", 38, 5);
-        trafficJdbcRepository.insertPath(kafka.id(), latest, "/pulse", "Pulse", 17, 1);
+        LocalDate beforeDate = today.minusDays(3);
+        trafficJdbcRepository.insertReferrers(kafka.id(), beforeDate, before, "github.com", 40, 2);
+        trafficJdbcRepository.insertReferrers(kafka.id(), today, latest, "github.com", 81, 3);
+        trafficJdbcRepository.insertReferrers(kafka.id(), today, latest, "mvnrepository.com", 1, 1);
+        trafficJdbcRepository.insertPath(kafka.id(), beforeDate, before, "/readme", "README", 20, 2, false);
+        trafficJdbcRepository.insertPath(kafka.id(), today, latest, "/readme", "README", 38, 5, false);
+        trafficJdbcRepository.insertPath(kafka.id(), today, latest, "/pulse", "Pulse", 17, 1, true);
 
-        AnalyticsService.RepositoryTrafficSnapshot sevenDays = analyticsService.traffic(kafka.id(), "7d");
+        AnalyticsService.RepositoryTrafficSnapshot sevenDays = analyticsService.traffic(kafka.id(), "7d", false);
         assertThat(sevenDays.referrers()).containsExactly(
                 new TrafficJdbcRepository.ReferrerRow("github.com", 81, 3),
                 new TrafficJdbcRepository.ReferrerRow("mvnrepository.com", 1, 1)
         );
         assertThat(sevenDays.paths()).containsExactly(
-                new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5),
-                new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 17, 1)
+                new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5, false)
+        );
+        assertThat(analyticsService.traffic(kafka.id(), "7d", true).paths()).containsExactly(
+                new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5, false),
+                new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 17, 1, true)
         );
         assertThat(sevenDays.referrerSnapshotAt()).isEqualTo(latest);
         assertThat(sevenDays.pathSnapshotAt()).isEqualTo(latest);
 
-        AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d");
+        AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d", false);
         assertThat(oneDay.referrers()).isEqualTo(sevenDays.referrers());
         assertThat(oneDay.paths()).isEqualTo(sevenDays.paths());
     }
@@ -203,15 +207,17 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         LocalDate today = LocalDate.now(clock);
         Instant before = today.minusDays(3).atTime(12, 0).atZone(clock.getZone()).toInstant();
         Instant current = today.minusDays(1).atTime(12, 0).atZone(clock.getZone()).toInstant();
-        trafficJdbcRepository.insertReferrers(kafka.id(), before, "github.com", 215, 4);
-        trafficJdbcRepository.insertReferrers(kafka.id(), current, "github.com", 230, 6);
-        trafficJdbcRepository.insertReferrers(kafka.id(), current, "doubao.com", 1, 1);
-        trafficJdbcRepository.insertPath(kafka.id(), before, "/readme", "README", 38, 5);
-        trafficJdbcRepository.insertPath(kafka.id(), current, "/readme", "README", 50, 8);
-        trafficJdbcRepository.insertPath(kafka.id(), current, "/pulse", "Pulse", 17, 1);
+        LocalDate beforeDate = today.minusDays(3);
+        LocalDate currentDate = today.minusDays(1);
+        trafficJdbcRepository.insertReferrers(kafka.id(), beforeDate, before, "github.com", 215, 4);
+        trafficJdbcRepository.insertReferrers(kafka.id(), currentDate, current, "github.com", 230, 6);
+        trafficJdbcRepository.insertReferrers(kafka.id(), currentDate, current, "doubao.com", 1, 1);
+        trafficJdbcRepository.insertPath(kafka.id(), beforeDate, before, "/readme", "README", 38, 5, false);
+        trafficJdbcRepository.insertPath(kafka.id(), currentDate, current, "/readme", "README", 50, 8, false);
+        trafficJdbcRepository.insertPath(kafka.id(), currentDate, current, "/pulse", "Pulse", 17, 1, false);
 
         AnalyticsService.SnapshotHistoryResponse referrers =
-                analyticsService.snapshotHistory(kafka.id(), "referrers", 2);
+                analyticsService.snapshotHistory(kafka.id(), "referrers", 2, false);
         assertThat(referrers.kind()).isEqualTo("REFERRERS");
         assertThat(referrers.from()).isEqualTo(today.minusDays(1));
         assertThat(referrers.dates()).containsExactly(today.minusDays(1));
@@ -225,7 +231,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         );
 
         AnalyticsService.SnapshotHistoryResponse paths =
-                analyticsService.snapshotHistory(kafka.id(), "paths", 14);
+                analyticsService.snapshotHistory(kafka.id(), "paths", 14, false);
         assertThat(paths.dates()).containsExactly(today.minusDays(3), today.minusDays(1));
         assertThat(paths.rows()).containsExactly(
                 new AnalyticsService.SnapshotHistoryRow("/readme", "README", List.of(
@@ -245,7 +251,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         LocalDate today = LocalDate.now(clock);
 
         AnalyticsService.SnapshotHistoryResponse wide =
-                analyticsService.snapshotHistory(kafka.id(), null, 90);
+                analyticsService.snapshotHistory(kafka.id(), null, 90, false);
 
         assertThat(wide.kind()).isEqualTo("REFERRERS");
         assertThat(wide.days()).isEqualTo(14);
@@ -277,7 +283,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     void trafficHistoryRejectsAnUnknownKind() {
         createRepos();
 
-        assertThatThrownBy(() -> analyticsService.snapshotHistory(kafka.id(), "sources", 7))
+        assertThatThrownBy(() -> analyticsService.snapshotHistory(kafka.id(), "sources", 7, false))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("sources");
     }

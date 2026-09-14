@@ -17,7 +17,7 @@ services:
       retries: 10
 
   repo-growth-monitor:
-    image: ghcr.io/kholodilin/repo-growth-monitor:0.7.0
+    image: ghcr.io/kholodilin/repo-growth-monitor:0.8.0
     restart: unless-stopped
     ports:
       - "8080:8080"

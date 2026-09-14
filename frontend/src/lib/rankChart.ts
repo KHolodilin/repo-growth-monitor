@@ -1,6 +1,7 @@
 import { calendarDates, formatChartAxisDate } from "./utils";
 
 const COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
+const MISSED_COLOR = "#9ca3af";
 
 export type RankHistoryPoint = { date: string; position: number | null };
 
@@ -8,11 +9,16 @@ export type RankHistorySeries = {
   name: string;
   points: RankHistoryPoint[];
   limit: number;
+  /** Days the planner never ran. GitHub Search cannot be replayed, so they stay empty forever. */
+  missedDates?: string[];
   highlighted?: boolean;
   dimmed?: boolean;
 };
 
-export function rankTooltipText(point: RankHistoryPoint | undefined, limit: number) {
+export function rankTooltipText(point: RankHistoryPoint | undefined, limit: number, missed = false) {
+  if (missed) {
+    return "Not collected";
+  }
   if (!point) {
     return "no data";
   }
@@ -43,7 +49,8 @@ export function rankHistoryOption({
         const rows = series
           .map((item) => {
             const point = item.points.find((entry) => entry.date === date);
-            return `${item.name}: ${rankTooltipText(point, item.limit)}`;
+            const missed = item.missedDates?.includes(date) ?? false;
+            return `${item.name}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
         return `<div>${formatChartAxisDate(date)}<br/>${rows}</div>`;
@@ -76,6 +83,7 @@ export function rankHistoryOption({
     series: series.flatMap((item, index) => {
       const color = COLORS[index % COLORS.length];
       const byDate = new Map(item.points.map((point) => [point.date, point]));
+      const missed = new Set(item.missedDates ?? []);
       return [
         {
           name: item.name,
@@ -114,11 +122,33 @@ export function rankHistoryOption({
             return maxLimit + 1;
           }),
         },
+        // A day nobody collected is not the same as a day the repository fell out of the results,
+        // so it gets its own grey marker instead of an unexplained break in the line.
+        {
+          name: item.name,
+          type: "scatter",
+          symbol: "circle",
+          symbolSize: 7,
+          tooltip: { show: false },
+          itemStyle: { color: MISSED_COLOR, opacity: item.dimmed ? 0.25 : 0.8 },
+          data: dates.map((date) => (missed.has(date) ? maxLimit + 1 : null)),
+        },
       ];
     }),
   };
 }
 
-export function datesFromHistory(points: RankHistoryPoint[][]) {
-  return calendarDates(points.flatMap((list) => list.map((point) => point.date)));
+export function datesFromHistory(points: RankHistoryPoint[][], extraDates: string[] = []) {
+  return calendarDates([...points.flatMap((list) => list.map((point) => point.date)), ...extraDates]);
+}
+
+/** Old gaps are history; a gap in the last week means the collection is broken right now. */
+export function recentMissedDates(missedDates: string[] | undefined, days = 7) {
+  if (!missedDates || missedDates.length === 0) {
+    return [];
+  }
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - days);
+  const from = cutoff.toISOString().slice(0, 10);
+  return missedDates.filter((date) => date >= from);
 }

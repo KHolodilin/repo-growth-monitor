@@ -15,7 +15,7 @@ class ActivityClassifierTest {
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-08-28T12:00:00Z"), ZoneOffset.UTC);
     private final ActivityClassifier classifier = new ActivityClassifier(
-            new SearchProperties(1, 50, Duration.ofHours(24), new SearchProperties.Activity(30, 180)),
+            new SearchProperties(1, 50, Duration.ofHours(24), 30, new SearchProperties.Activity(30, 180)),
             clock
     );
 

@@ -3,7 +3,9 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type SnapshotHistory } from "../lib/api";
 import type { SnapshotChartKind } from "../lib/snapshotChartPrefs";
 import { cn } from "../lib/utils";
+import { useServicePaths } from "../lib/servicePathPrefs";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
+import { ServicePathToggle } from "../components/ServicePaths";
 import { SnapshotHistoryChart } from "../components/SnapshotHistoryChart";
 import { SnapshotHistoryTable } from "../components/SnapshotHistoryTable";
 import { Skeleton } from "../components/ui";
@@ -35,6 +37,8 @@ export function TrafficHistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const kind = parseKind(searchParams.get("kind"));
   const days = parseDays(searchParams.get("days"));
+  const { showServicePaths, setShowServicePaths } = useServicePaths(id);
+  const includeService = kind === "paths" && showServicePaths;
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SnapshotHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +51,9 @@ export function TrafficHistoryPage() {
     setError(null);
     Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
-      api<SnapshotHistory>(`/api/v1/repositories/${id}/traffic-history?kind=${kind}&days=${days}`),
+      api<SnapshotHistory>(
+        `/api/v1/repositories/${id}/traffic-history?kind=${kind}&days=${days}&includeServicePaths=${includeService}`,
+      ),
     ])
       .then(([repository, data]) => {
         if (!cancelled) {
@@ -63,7 +69,7 @@ export function TrafficHistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, kind, days]);
+  }, [id, kind, days, includeService]);
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -113,20 +119,27 @@ export function TrafficHistoryPage() {
             </button>
           ))}
         </div>
-        <div className="inline-flex rounded-lg border bg-muted p-1">
-          {DAYS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium",
-                days === option ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-              )}
-              onClick={() => setSearchParams({ kind, days: String(option) }, { replace: true })}
-            >
-              {option}d
-            </button>
-          ))}
+        <div className="flex items-center gap-4">
+          {kind === "paths" && (
+            <div className="text-xs text-muted-foreground">
+              <ServicePathToggle checked={showServicePaths} onChange={setShowServicePaths} />
+            </div>
+          )}
+          <div className="inline-flex rounded-lg border bg-muted p-1">
+            {DAYS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  days === option ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => setSearchParams({ kind, days: String(option) }, { replace: true })}
+              >
+                {option}d
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <SnapshotHistoryChart title={CHART_TITLE[kind]} kind={kind} history={history} />

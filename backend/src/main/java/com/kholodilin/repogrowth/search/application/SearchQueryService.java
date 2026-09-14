@@ -148,7 +148,8 @@ public class SearchQueryService {
                 lastChecked,
                 searchStatus,
                 enrichmentStatus,
-                totalResults
+                totalResults,
+                runRepository.missedDates(searchQueryId)
         );
     }
 
@@ -221,7 +222,8 @@ public class SearchQueryService {
             Instant lastChecked,
             String searchStatus,
             String enrichmentStatus,
-            Integer totalResults
+            Integer totalResults,
+            List<LocalDate> missedDates
     ) {
     }
 

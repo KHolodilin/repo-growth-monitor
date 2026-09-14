@@ -10,8 +10,6 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -141,12 +139,47 @@ public class TrafficJdbcRepository {
                 .filter(date -> date != null);
     }
 
-    public void insertReferrers(long repositoryId, Instant snapshotAt, String referrer, int views, int uniqueVisitors) {
+    /**
+     * A day holds one row per referrer. A repeated collection clears the day first, so the numbers
+     * are replaced instead of appended and a plain sum over the table stays meaningful.
+     */
+    public void deleteReferrerSnapshot(long repositoryId, LocalDate snapshotDate) {
         jdbcClient.sql("""
-                        INSERT INTO traffic_referrer_snapshot (repository_id, snapshot_at, referrer, views, unique_visitors)
-                        VALUES (:repositoryId, :snapshotAt, :referrer, :views, :uniqueVisitors)
+                        DELETE FROM traffic_referrer_snapshot
+                        WHERE repository_id = :repositoryId AND snapshot_date = :snapshotDate
                         """)
                 .param("repositoryId", repositoryId)
+                .param("snapshotDate", snapshotDate)
+                .update();
+    }
+
+    public void deletePathSnapshot(long repositoryId, LocalDate snapshotDate) {
+        jdbcClient.sql("""
+                        DELETE FROM traffic_path_snapshot
+                        WHERE repository_id = :repositoryId AND snapshot_date = :snapshotDate
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("snapshotDate", snapshotDate)
+                .update();
+    }
+
+    public void insertReferrers(
+            long repositoryId,
+            LocalDate snapshotDate,
+            Instant snapshotAt,
+            String referrer,
+            int views,
+            int uniqueVisitors
+    ) {
+        jdbcClient.sql("""
+                        INSERT INTO traffic_referrer_snapshot (
+                            repository_id, snapshot_date, snapshot_at, referrer, views, unique_visitors
+                        ) VALUES (
+                            :repositoryId, :snapshotDate, :snapshotAt, :referrer, :views, :uniqueVisitors
+                        )
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("snapshotDate", snapshotDate)
                 .param("snapshotAt", SqlTime.ts(snapshotAt))
                 .param("referrer", referrer)
                 .param("views", views)
@@ -156,22 +189,29 @@ public class TrafficJdbcRepository {
 
     public void insertPath(
             long repositoryId,
+            LocalDate snapshotDate,
             Instant snapshotAt,
             String path,
             String title,
             int views,
-            int uniqueVisitors
+            int uniqueVisitors,
+            boolean servicePath
     ) {
         jdbcClient.sql("""
-                        INSERT INTO traffic_path_snapshot (repository_id, snapshot_at, path, title, views, unique_visitors)
-                        VALUES (:repositoryId, :snapshotAt, :path, :title, :views, :uniqueVisitors)
+                        INSERT INTO traffic_path_snapshot (
+                            repository_id, snapshot_date, snapshot_at, path, title, views, unique_visitors, service_path
+                        ) VALUES (
+                            :repositoryId, :snapshotDate, :snapshotAt, :path, :title, :views, :uniqueVisitors, :servicePath
+                        )
                         """)
                 .param("repositoryId", repositoryId)
+                .param("snapshotDate", snapshotDate)
                 .param("snapshotAt", SqlTime.ts(snapshotAt))
                 .param("path", path)
                 .param("title", title)
                 .param("views", views)
                 .param("uniqueVisitors", uniqueVisitors)
+                .param("servicePath", servicePath)
                 .update();
     }
 
@@ -420,51 +460,25 @@ public class TrafficJdbcRepository {
     public List<Observation> referrerSnapshotsForDelta(
             long repositoryId,
             LocalDate fromInclusive,
-            LocalDate toInclusive,
-            ZoneId zone
+            LocalDate toInclusive
     ) {
-        String tz = postgresTimeZone(zone);
         return jdbcClient.sql("""
-                        WITH dated AS (
-                            SELECT
-                                (snapshot_at AT TIME ZONE :tz)::date AS snapshot_date,
-                                snapshot_at,
-                                referrer,
-                                views,
-                                unique_visitors
+                        WITH predecessor AS (
+                            SELECT MAX(snapshot_date) AS snapshot_date
                             FROM traffic_referrer_snapshot
                             WHERE repository_id = :repositoryId
-                        ),
-                        latest AS (
-                            SELECT snapshot_date, MAX(snapshot_at) AS snapshot_at
-                            FROM dated
-                            GROUP BY snapshot_date
-                        ),
-                        predecessor AS (
-                            SELECT MAX(snapshot_date) AS snapshot_date
-                            FROM latest
-                            WHERE snapshot_date < :fromDate
-                        ),
-                        wanted AS (
-                            SELECT snapshot_date
-                            FROM latest
-                            WHERE snapshot_date >= :fromDate
-                              AND snapshot_date <= :toDate
-                            UNION
-                            SELECT snapshot_date
-                            FROM predecessor
-                            WHERE snapshot_date IS NOT NULL
+                              AND snapshot_date < :fromDate
                         )
-                        SELECT d.snapshot_date, d.referrer, d.views, d.unique_visitors
-                        FROM dated d
-                        JOIN latest l
-                          ON l.snapshot_date = d.snapshot_date
-                         AND l.snapshot_at = d.snapshot_at
-                        JOIN wanted w ON w.snapshot_date = d.snapshot_date
-                        ORDER BY d.snapshot_date, d.referrer
+                        SELECT s.snapshot_date, s.referrer, s.views, s.unique_visitors
+                        FROM traffic_referrer_snapshot s
+                        WHERE s.repository_id = :repositoryId
+                          AND (
+                              (s.snapshot_date >= :fromDate AND s.snapshot_date <= :toDate)
+                              OR s.snapshot_date = (SELECT snapshot_date FROM predecessor)
+                          )
+                        ORDER BY s.snapshot_date, s.referrer
                         """)
                 .param("repositoryId", repositoryId)
-                .param("tz", tz)
                 .param("fromDate", fromInclusive)
                 .param("toDate", toInclusive)
                 .query((rs, rowNum) -> new Observation(
@@ -481,53 +495,30 @@ public class TrafficJdbcRepository {
             long repositoryId,
             LocalDate fromInclusive,
             LocalDate toInclusive,
-            ZoneId zone
+            boolean includeService
     ) {
-        String tz = postgresTimeZone(zone);
         return jdbcClient.sql("""
-                        WITH dated AS (
-                            SELECT
-                                (snapshot_at AT TIME ZONE :tz)::date AS snapshot_date,
-                                snapshot_at,
-                                path,
-                                title,
-                                views,
-                                unique_visitors
+                        WITH visible AS (
+                            SELECT snapshot_date, path, title, views, unique_visitors
                             FROM traffic_path_snapshot
                             WHERE repository_id = :repositoryId
-                        ),
-                        latest AS (
-                            SELECT snapshot_date, MAX(snapshot_at) AS snapshot_at
-                            FROM dated
-                            GROUP BY snapshot_date
+                              AND (:includeService OR service_path = FALSE)
                         ),
                         predecessor AS (
                             SELECT MAX(snapshot_date) AS snapshot_date
-                            FROM latest
+                            FROM visible
                             WHERE snapshot_date < :fromDate
-                        ),
-                        wanted AS (
-                            SELECT snapshot_date
-                            FROM latest
-                            WHERE snapshot_date >= :fromDate
-                              AND snapshot_date <= :toDate
-                            UNION
-                            SELECT snapshot_date
-                            FROM predecessor
-                            WHERE snapshot_date IS NOT NULL
                         )
-                        SELECT d.snapshot_date, d.path, d.title, d.views, d.unique_visitors
-                        FROM dated d
-                        JOIN latest l
-                          ON l.snapshot_date = d.snapshot_date
-                         AND l.snapshot_at = d.snapshot_at
-                        JOIN wanted w ON w.snapshot_date = d.snapshot_date
-                        ORDER BY d.snapshot_date, d.path
+                        SELECT v.snapshot_date, v.path, v.title, v.views, v.unique_visitors
+                        FROM visible v
+                        WHERE (v.snapshot_date >= :fromDate AND v.snapshot_date <= :toDate)
+                           OR v.snapshot_date = (SELECT snapshot_date FROM predecessor)
+                        ORDER BY v.snapshot_date, v.path
                         """)
                 .param("repositoryId", repositoryId)
-                .param("tz", tz)
                 .param("fromDate", fromInclusive)
                 .param("toDate", toInclusive)
+                .param("includeService", includeService)
                 .query((rs, rowNum) -> new Observation(
                         rs.getObject("snapshot_date", LocalDate.class),
                         rs.getString("path"),
@@ -538,14 +529,13 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
-    public Optional<LocalDate> earliestReferrerSnapshotDate(long repositoryId, ZoneId zone) {
+    public Optional<LocalDate> earliestReferrerSnapshotDate(long repositoryId) {
         return jdbcClient.sql("""
-                        SELECT MIN((snapshot_at AT TIME ZONE :tz)::date)
+                        SELECT MIN(snapshot_date)
                         FROM traffic_referrer_snapshot
                         WHERE repository_id = :repositoryId
                         """)
                 .param("repositoryId", repositoryId)
-                .param("tz", postgresTimeZone(zone))
                 .query(LocalDate.class)
                 .optional()
                 .filter(date -> date != null);
@@ -558,13 +548,13 @@ public class TrafficJdbcRepository {
     public ReferrerSnapshot latestReferrerSnapshot(long repositoryId) {
         List<TimedReferrer> rows = jdbcClient.sql("""
                         WITH latest AS (
-                            SELECT MAX(snapshot_at) AS snapshot_at
+                            SELECT MAX(snapshot_date) AS snapshot_date
                             FROM traffic_referrer_snapshot
                             WHERE repository_id = :repositoryId
                         )
                         SELECT s.snapshot_at, s.referrer, s.views, s.unique_visitors
                         FROM traffic_referrer_snapshot s
-                        JOIN latest l ON l.snapshot_at = s.snapshot_at
+                        JOIN latest l ON l.snapshot_date = s.snapshot_date
                         WHERE s.repository_id = :repositoryId
                         ORDER BY s.unique_visitors DESC, s.views DESC, s.referrer
                         """)
@@ -584,27 +574,33 @@ public class TrafficJdbcRepository {
         );
     }
 
-    public PathSnapshot latestPathSnapshot(long repositoryId) {
+    public PathSnapshot latestPathSnapshot(long repositoryId, boolean includeService) {
         List<TimedPath> rows = jdbcClient.sql("""
-                        WITH latest AS (
-                            SELECT MAX(snapshot_at) AS snapshot_at
+                        WITH visible AS (
+                            SELECT snapshot_date, snapshot_at, path, title, views, unique_visitors, service_path
                             FROM traffic_path_snapshot
                             WHERE repository_id = :repositoryId
+                              AND (:includeService OR service_path = FALSE)
+                        ),
+                        latest AS (
+                            SELECT MAX(snapshot_date) AS snapshot_date
+                            FROM visible
                         )
-                        SELECT s.snapshot_at, s.path, s.title, s.views, s.unique_visitors
-                        FROM traffic_path_snapshot s
-                        JOIN latest l ON l.snapshot_at = s.snapshot_at
-                        WHERE s.repository_id = :repositoryId
-                        ORDER BY s.unique_visitors DESC, s.views DESC, s.path
+                        SELECT v.snapshot_at, v.path, v.title, v.views, v.unique_visitors, v.service_path
+                        FROM visible v
+                        JOIN latest l ON l.snapshot_date = v.snapshot_date
+                        ORDER BY v.unique_visitors DESC, v.views DESC, v.path
                         """)
                 .param("repositoryId", repositoryId)
+                .param("includeService", includeService)
                 .query((rs, rowNum) -> new TimedPath(
                         toInstant(rs.getTimestamp("snapshot_at")),
                         new PathRow(
                                 rs.getString("path"),
                                 rs.getString("title"),
                                 rs.getInt("views"),
-                                rs.getInt("unique_visitors")
+                                rs.getInt("unique_visitors"),
+                                rs.getBoolean("service_path")
                         )
                 ))
                 .list();
@@ -645,7 +641,7 @@ public class TrafficJdbcRepository {
     public record ReferrerRow(String referrer, int views, int uniqueVisitors) {
     }
 
-    public record PathRow(String path, String title, int views, int uniqueVisitors) {
+    public record PathRow(String path, String title, int views, int uniqueVisitors, boolean servicePath) {
     }
 
     public record ReferrerSnapshot(Instant snapshotAt, List<ReferrerRow> rows) {
@@ -662,13 +658,5 @@ public class TrafficJdbcRepository {
 
     private static Instant toInstant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
-    }
-
-    private static String postgresTimeZone(ZoneId zone) {
-        if (zone == null || ZoneOffset.UTC.equals(zone.normalized())) {
-            return "UTC";
-        }
-        String id = zone.getId();
-        return "Z".equals(id) ? "UTC" : id;
     }
 }

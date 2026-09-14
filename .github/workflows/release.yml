@@ -38,7 +38,7 @@ jobs:
       - name: Prepare Release assets
         run: |
           mkdir -p dist-release
-          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.7.0|ghcr.io/kholodilin/repo-growth-monitor:${{ steps.version.outputs.version }}|" \
+          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.8.0|ghcr.io/kholodilin/repo-growth-monitor:${{ steps.version.outputs.version }}|" \
             deploy/docker-compose.yml > dist-release/docker-compose.yml
           cp deploy/.env.example dist-release/env.example
 

@@ -9,11 +9,15 @@ public record SearchProperties(
         int workers,
         int defaultResultLimit,
         Duration enrichmentTtl,
+        int gapLookbackDays,
         Activity activity
 ) {
     public SearchProperties {
         if (enrichmentTtl == null) {
             enrichmentTtl = Duration.ofHours(24);
+        }
+        if (gapLookbackDays <= 0) {
+            gapLookbackDays = 30;
         }
         if (activity == null) {
             activity = new Activity(30, 180);

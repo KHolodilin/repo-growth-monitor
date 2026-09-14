@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 @Component
@@ -39,10 +40,16 @@ public class ReferrerCollector implements Collector {
                 context.repository().name()
         );
         Instant snapshotAt = Instant.now();
+        LocalDate snapshotDate = context.job().businessDate();
+        long repositoryId = context.repository().id();
         transactionTemplate.executeWithoutResult(status -> {
+            // Clearing the day rather than upserting, otherwise referrers that dropped out of the
+            // GitHub top ten would linger with their stale numbers.
+            trafficJdbcRepository.deleteReferrerSnapshot(repositoryId, snapshotDate);
             for (GitHubReferrerResponse referrer : referrers) {
                 trafficJdbcRepository.insertReferrers(
-                        context.repository().id(),
+                        repositoryId,
+                        snapshotDate,
                         snapshotAt,
                         referrer.referrer(),
                         referrer.count(),

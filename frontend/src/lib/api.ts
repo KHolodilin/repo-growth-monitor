@@ -172,9 +172,17 @@ export type RepositoryTraffic = {
   traffic: TrafficPoint[];
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   referrerSnapshotAt?: string;
-  paths: { path: string; title?: string; views: number; uniqueVisitors: number }[];
+  paths: PathSnapshotRow[];
   pathSnapshotAt?: string;
   lastCollection?: CollectionRun;
+};
+
+export type PathSnapshotRow = {
+  path: string;
+  title?: string;
+  views: number;
+  uniqueVisitors: number;
+  servicePath: boolean;
 };
 
 export type SearchQuery = {
@@ -204,6 +212,8 @@ export type SearchHistory = {
   searchStatus?: string | null;
   enrichmentStatus?: string | null;
   totalResults?: number | null;
+  /** Days the planner never queued a run. They cannot be backfilled, GitHub only serves today. */
+  missedDates: string[];
 };
 
 export type GrowthEvent = {
