@@ -9,6 +9,7 @@ import {
   type RepositoryHealth,
   type RepositoryTraffic,
   type SearchHistory,
+  type TopicHistory,
 } from "../lib/api";
 import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
@@ -20,24 +21,36 @@ import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
 import { SnapshotCards } from "../components/SnapshotCards";
 import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
-import { pruneChartSelection, repoSearchChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
+import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { useTableSort } from "../lib/tableSortPrefs";
 
-type Tab = "overview" | "traffic" | "stats" | "search" | "growth-events";
+type Tab = "overview" | "traffic" | "stats" | "search" | "topics" | "growth-events";
+type TopicScope = "all" | "language";
 
 const TAB_LABEL: Record<Tab, string> = {
   traffic: "Traffic",
   stats: "Stats",
   search: "Search Visibility",
+  topics: "Topics Visibility",
   overview: "Overview",
   "growth-events": "Growth Events",
 };
 
+function parseScope(value: string | null): TopicScope {
+  return value === "language" ? "language" : "all";
+}
+
 function parseTab(tabParam: string | null): Tab {
-  if (tabParam === "overview" || tabParam === "stats" || tabParam === "search" || tabParam === "growth-events") {
+  if (
+    tabParam === "overview"
+    || tabParam === "stats"
+    || tabParam === "search"
+    || tabParam === "topics"
+    || tabParam === "growth-events"
+  ) {
     return tabParam;
   }
   if (tabParam === "settings") {
@@ -59,11 +72,13 @@ export function RepositoryDetailsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
+  const scope = parseScope(searchParams.get("scope"));
   const [period, setPeriod] = usePeriod(id);
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
+  const [topicsVisibility, setTopicsVisibility] = useState<TopicHistory[]>([]);
   const [queryText, setQueryText] = useState("");
   const [queryError, setQueryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,24 +92,34 @@ export function RepositoryDetailsPage() {
       setSearchParams({}, { replace: true });
       return;
     }
+    if (next === "topics") {
+      setSearchParams(scope === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
+      return;
+    }
     setSearchParams({ tab: next }, { replace: true });
+  }
+
+  function setScope(next: TopicScope) {
+    setSearchParams(next === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
   }
 
   const load = useCallback(async () => {
     if (!id) {
       return;
     }
-    const [repository, trafficData, searchData] = await Promise.all([
+    const [repository, trafficData, searchData, topicData] = await Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
       api<RepositoryTraffic>(
         `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
       ),
       api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
+      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=${scope}`),
     ]);
     setRepo(repository);
     setTraffic(trafficData);
     setVisibility(searchData);
-  }, [id, period, showServicePaths]);
+    setTopicsVisibility(topicData);
+  }, [id, period, showServicePaths, scope]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,23 +146,27 @@ export function RepositoryDetailsPage() {
     const status = item.searchStatus;
     return status === "RUNNING" || status === "READY" || status === "RETRY";
   });
+  const topicsActive = topicsVisibility.some((item) => {
+    const status = item.searchStatus;
+    return status === "RUNNING" || status === "READY" || status === "RETRY";
+  });
 
   useEffect(() => {
     if (!runActive) {
       setCollecting(false);
     }
-    if (!searchActive) {
+    if (!searchActive && !topicsActive) {
       setRunningQueryId(null);
       setRunningAll(false);
     }
-    if (!runActive && !searchActive) {
+    if (!runActive && !searchActive && !topicsActive) {
       return;
     }
     const timer = window.setInterval(() => {
       void load().catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [runActive, searchActive, load]);
+  }, [runActive, searchActive, topicsActive, load]);
 
   async function collect() {
     if (!id || collecting || runActive) {
@@ -205,6 +234,33 @@ export function RepositoryDetailsPage() {
     }
   }
 
+  async function runTopicWatch(watchId: number) {
+    if (runningQueryId != null || runningAll || topicsActive) {
+      return;
+    }
+    setRunningQueryId(watchId);
+    try {
+      await api(`/api/v1/topic-watches/${watchId}/run`, { method: "POST" });
+      await load();
+    } finally {
+      setRunningQueryId(null);
+    }
+  }
+
+  async function runAllTopics() {
+    if (!id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
+      return;
+    }
+    setRunningAll(true);
+    try {
+      await api(`/api/v1/repositories/${id}/topic-watches/run?scope=${scope}`, { method: "POST" });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+      setRunningAll(false);
+    }
+  }
+
   async function deleteQuery(queryId: number) {
     if (!id) {
       return;
@@ -256,7 +312,11 @@ export function RepositoryDetailsPage() {
               repoSwitcher: {
                 currentId: repo.id,
                 hrefFor: (repositoryId) =>
-                  tab === "traffic" ? `/repositories/${repositoryId}` : `/repositories/${repositoryId}?tab=${tab}`,
+                  tab === "traffic"
+                    ? `/repositories/${repositoryId}`
+                    : tab === "topics" && scope === "language"
+                      ? `/repositories/${repositoryId}?tab=topics&scope=language`
+                      : `/repositories/${repositoryId}?tab=${tab}`,
               },
             },
             { label: TAB_LABEL[tab] },
@@ -303,6 +363,7 @@ export function RepositoryDetailsPage() {
           ["traffic", "Traffic"],
           ["stats", "Stats"],
           ["search", "Search Visibility"],
+          ["topics", "Topics Visibility"],
           ["overview", "Overview"],
           ["growth-events", "Growth Events"],
         ] as const).map(([key, label]) => (
@@ -342,6 +403,19 @@ export function RepositoryDetailsPage() {
       )}
       {tab === "stats" && (
         <RepositoryStatsPanel repositoryId={repo.id} period={period} onPeriod={setPeriod} />
+      )}
+      {tab === "topics" && (
+        <TopicsPanel
+          repositoryId={repo.id}
+          language={repo.language}
+          scope={scope}
+          onScope={setScope}
+          visibility={topicsVisibility}
+          runningQueryId={runningQueryId}
+          runningAll={runningAll}
+          onRun={runTopicWatch}
+          onRunAll={() => void runAllTopics()}
+        />
       )}
       {tab === "search" && (
         <SearchPanel
@@ -791,6 +865,261 @@ type QuerySortKey = (typeof QUERY_SORT_KEYS)[number];
 
 function normalizeSearchQuery(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function TopicsPanel({
+  repositoryId,
+  language,
+  scope,
+  onScope,
+  visibility,
+  runningQueryId,
+  runningAll,
+  onRun,
+  onRunAll,
+}: {
+  repositoryId: number;
+  language?: string;
+  scope: TopicScope;
+  onScope: (scope: TopicScope) => void;
+  visibility: TopicHistory[];
+  runningQueryId: number | null;
+  runningAll: boolean;
+  onRun: (id: number) => void;
+  onRunAll: () => void;
+}) {
+  const [hoveredWatchId, setHoveredWatchId] = useState<number | null>(null);
+  const { sortKey, sortDir, toggle } = useTableSort({
+    tableId: "topic-watches",
+    scope: repositoryId,
+    keys: QUERY_SORT_KEYS,
+    initial: { key: null, dir: "asc" },
+    ascFirst: QUERY_ASC_FIRST_KEYS,
+  });
+
+  const sorted = useMemo(() => {
+    if (!sortKey) {
+      return visibility;
+    }
+    const copy = [...visibility];
+    copy.sort((left, right) => {
+      const compared = compareTopicRows(left, right, sortKey, sortDir);
+      if (compared !== 0) {
+        return compared;
+      }
+      return left.watch.id - right.watch.id;
+    });
+    return copy;
+  }, [visibility, sortKey, sortDir]);
+
+  const searchBusy =
+    runningAll
+    || runningQueryId != null
+    || visibility.some(
+      (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
+    );
+  const languageLabel = language || "Language";
+  const scopeQuery = scope === "language" ? "?scope=language" : "";
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-medium">Topics</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            {language && (
+              <div className="inline-flex rounded-lg border bg-muted p-1">
+                {(["all", "language"] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium",
+                      scope === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => onScope(key)}
+                  >
+                    {key === "all" ? "All" : languageLabel}
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button
+              className="bg-muted text-foreground"
+              disabled={visibility.length === 0 || searchBusy}
+              onClick={onRunAll}
+            >
+              {searchBusy ? "Running..." : "Run all"}
+            </Button>
+          </div>
+        </div>
+        {visibility.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {language && scope === "language"
+              ? "No language-scoped topic watches yet."
+              : "No topics yet. Add topics to the repository on GitHub."}
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-muted-foreground">
+                <QuerySortHeader
+                  label="Topic"
+                  align="left"
+                  className="py-2 pr-4"
+                  active={sortKey === "name"}
+                  dir={sortDir}
+                  onClick={() => toggle("name")}
+                />
+                <QuerySortHeader label="Rank" active={sortKey === "rank"} dir={sortDir} onClick={() => toggle("rank")} />
+                <QuerySortHeader label="Change" active={sortKey === "change"} dir={sortDir} onClick={() => toggle("change")} />
+                <QuerySortHeader label="7d" active={sortKey === "change7d"} dir={sortDir} onClick={() => toggle("change7d")} />
+                <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
+                <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
+                <QuerySortHeader label="Results" active={sortKey === "results"} dir={sortDir} onClick={() => toggle("results")} />
+                <QuerySortHeader label="Updated" active={sortKey === "updated"} dir={sortDir} onClick={() => toggle("updated")} />
+                <th className="py-2 pl-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((item) => {
+                const running =
+                  runningQueryId === item.watch.id
+                  || item.searchStatus === "RUNNING"
+                  || item.searchStatus === "READY"
+                  || item.searchStatus === "RETRY";
+                const rankChange = formatQueryRankChange(item.change);
+                return (
+                  <tr
+                    key={item.watch.id}
+                    className={cn("border-t", hoveredWatchId === item.watch.id && "bg-muted/60")}
+                    onMouseEnter={() => setHoveredWatchId(item.watch.id)}
+                    onMouseLeave={() => setHoveredWatchId(null)}
+                  >
+                    <td className="py-3 pr-4">
+                      <Link
+                        className="text-primary hover:underline"
+                        to={`/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
+                      >
+                        {item.watch.topic}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.watch.resultLimit)}</td>
+                    <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
+                      {rankChange.label}
+                    </td>
+                    <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
+                    <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
+                    <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.watch.resultLimit)}</td>
+                    <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
+                      {formatSyncTime(item.lastChecked) ?? "—"}
+                    </td>
+                    <td className="py-3 pl-3">
+                      <div className="flex justify-end">
+                        <Button
+                          className="bg-muted text-foreground"
+                          disabled={running || searchBusy}
+                          onClick={() => onRun(item.watch.id)}
+                        >
+                          {running || runningAll ? "Running..." : "Run"}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </Card>
+      <CombinedTopicRankChart repositoryId={repositoryId} scope={scope} visibility={visibility} highlightWatchId={hoveredWatchId} />
+    </div>
+  );
+}
+
+function compareTopicRows(left: TopicHistory, right: TopicHistory, key: QuerySortKey, dir: "asc" | "desc"): number {
+  if (key === "name") {
+    const compared = left.watch.topic.localeCompare(right.watch.topic, undefined, { sensitivity: "base" });
+    return dir === "desc" ? -compared : compared;
+  }
+  const asSearch = topicAsSearchHistory(left);
+  const asSearchRight = topicAsSearchHistory(right);
+  return compareQueryRows(asSearch, asSearchRight, key, dir);
+}
+
+function topicAsSearchHistory(item: TopicHistory): SearchHistory {
+  return {
+    query: {
+      id: item.watch.id,
+      repositoryId: item.watch.repositoryId,
+      name: item.watch.topic,
+      query: item.watch.topic,
+      enabled: item.watch.enabled,
+      resultLimit: item.watch.resultLimit,
+    },
+    currentRank: item.currentRank,
+    change: item.change,
+    change7d: item.change7d,
+    change30d: item.change30d,
+    bestRank: item.bestRank,
+    points: item.points.map((point) => ({ date: point.date, position: point.position, searchRunId: point.topicRunId })),
+    lastChecked: item.lastChecked,
+    searchStatus: item.searchStatus,
+    totalResults: item.totalResults,
+    missedDates: item.missedDates,
+  };
+}
+
+function CombinedTopicRankChart({
+  repositoryId,
+  scope,
+  visibility,
+  highlightWatchId,
+}: {
+  repositoryId: number;
+  scope: TopicScope;
+  visibility: TopicHistory[];
+  highlightWatchId: number | null;
+}) {
+  const option = useMemo(() => {
+    const dates = datesFromHistory(
+      visibility.map((item) => item.points),
+      visibility.flatMap((item) => item.missedDates ?? []),
+    );
+    return rankHistoryOption({
+      dates,
+      legend: true,
+      series: visibility.map((item) => ({
+        name: item.watch.topic,
+        points: item.points,
+        limit: item.watch.resultLimit,
+        missedDates: item.missedDates,
+        highlighted: highlightWatchId === item.watch.id,
+        dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
+      })),
+    });
+  }, [visibility, highlightWatchId]);
+
+  const series = useMemo(
+    () => visibility.map((item) => ({ key: String(item.watch.id), name: item.watch.topic })),
+    [visibility],
+  );
+
+  if (visibility.length === 0) {
+    return null;
+  }
+  return (
+    <Card>
+      <h2 className="mb-3 font-medium">Rank History</h2>
+      <PersistentECharts
+        chartId={repoTopicsChartId(repositoryId, scope)}
+        series={series}
+        option={option}
+        style={{ height: 360, width: "100%" }}
+      />
+    </Card>
+  );
 }
 
 function SearchPanel({

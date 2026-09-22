@@ -4,6 +4,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { RepositoriesPage } from "./pages/RepositoriesPage";
 import { RepositoryDetailsPage } from "./pages/RepositoryDetailsPage";
 import { QueryDetailsPage } from "./pages/QueryDetailsPage";
+import { TopicDetailsPage } from "./pages/TopicDetailsPage";
 import { SearchResultsPage } from "./pages/SearchResultsPage";
 import { TrafficHistoryPage } from "./pages/TrafficHistoryPage";
 
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
         <Route path="/repositories/:id/traffic/history" element={<TrafficHistoryPage />} />
         <Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+        <Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
         <Route path="/search-runs/:id" element={<SearchResultsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

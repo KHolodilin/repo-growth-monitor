@@ -11,3 +11,5 @@ databaseChangeLog:
       file: db/changelog/005-daily-stats-contributors.yaml
   - include:
       file: db/changelog/006-snapshot-dedup.yaml
+  - include:
+      file: db/changelog/007-topic-visibility.yaml

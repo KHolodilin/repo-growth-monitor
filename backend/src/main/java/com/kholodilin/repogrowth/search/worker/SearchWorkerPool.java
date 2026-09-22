@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.search.worker;
 
 import com.kholodilin.repogrowth.common.config.SearchProperties;
+import com.kholodilin.repogrowth.topic.worker.TopicWorker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -17,12 +18,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SearchWorkerPool {
 
     private final SearchWorker searchWorker;
+    private final TopicWorker topicWorker;
     private final SearchProperties properties;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private ExecutorService executor;
 
-    public SearchWorkerPool(SearchWorker searchWorker, SearchProperties properties) {
+    public SearchWorkerPool(SearchWorker searchWorker, TopicWorker topicWorker, SearchProperties properties) {
         this.searchWorker = searchWorker;
+        this.topicWorker = topicWorker;
         this.properties = properties;
     }
 
@@ -50,7 +53,7 @@ public class SearchWorkerPool {
     private void loop(String workerId) {
         while (running.get()) {
             try {
-                boolean worked = searchWorker.poll(workerId);
+                boolean worked = searchWorker.poll(workerId) || topicWorker.poll(workerId);
                 if (!worked) {
                     TimeUnit.SECONDS.sleep(1);
                 }

@@ -336,15 +336,26 @@ public class GitHubClient {
     }
 
     public GitHubSearchResponse searchRepositories(String query, int limit) {
+        return searchRepositories(query, limit, null, null);
+    }
+
+    public GitHubSearchResponse searchRepositories(String query, int limit, String sort, String order) {
         requireToken();
         int remaining = Math.max(1, limit);
         int page = 1;
         int totalCount = 0;
         List<GitHubSearchItem> items = new ArrayList<>();
+        boolean ranked = sort != null && !sort.isBlank();
         while (remaining > 0) {
             int perPage = Math.min(MAX_PER_PAGE, remaining);
-            String path = "/search/repositories?q={query}&per_page={perPage}&page={page}";
-            ResponseEntity<byte[]> response = executeSearch(query, perPage, page, path);
+            ResponseEntity<byte[]> response;
+            if (ranked) {
+                String path = "/search/repositories?q={query}&sort={sort}&order={order}&per_page={perPage}&page={page}";
+                response = executeSearch(query, perPage, page, path, sort, order == null || order.isBlank() ? "desc" : order);
+            } else {
+                String path = "/search/repositories?q={query}&per_page={perPage}&page={page}";
+                response = executeSearch(query, perPage, page, path, null, null);
+            }
             GitHubSearchResponse parsed = read(response.getBody(), GitHubSearchResponse.class);
             totalCount = parsed.totalCount();
             List<GitHubSearchItem> pageItems = parsed.itemsOrEmpty();
@@ -369,16 +380,25 @@ public class GitHubClient {
         return token.substring(0, Math.min(11, token.length() - 4)) + "****" + token.substring(token.length() - 4);
     }
 
-    private ResponseEntity<byte[]> executeSearch(String query, int perPage, int page, String uriTemplate) {
+    private ResponseEntity<byte[]> executeSearch(
+            String query,
+            int perPage,
+            int page,
+            String uriTemplate,
+            String sort,
+            String order
+    ) {
         requireToken();
         Timer.Sample sample = metrics.startTimer();
         long started = System.nanoTime();
         try {
-            ResponseEntity<byte[]> response = restClient.get()
-                    .uri(uriTemplate, query, perPage, page)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, this::handleError)
-                    .toEntity(byte[].class);
+            ResponseEntity<byte[]> response = sort == null
+                    ? restClient.get().uri(uriTemplate, query, perPage, page).retrieve()
+                            .onStatus(HttpStatusCode::isError, this::handleError)
+                            .toEntity(byte[].class)
+                    : restClient.get().uri(uriTemplate, query, sort, order, perPage, page).retrieve()
+                            .onStatus(HttpStatusCode::isError, this::handleError)
+                            .toEntity(byte[].class);
             metrics.githubRequest("search", true);
             log.info("GitHub request durationMs={} operation=search", durationMs(started));
             return response;

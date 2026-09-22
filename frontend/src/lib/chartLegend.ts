@@ -26,6 +26,10 @@ export function repoSearchChartId(repoId: number | string) {
   return `${repoId}:search`;
 }
 
+export function repoTopicsChartId(repoId: number | string, scope: string) {
+  return `${repoId}:topics:${scope}`;
+}
+
 export const STATS_SERIES = [
   { key: "Stars", name: "Stars" },
   { key: "Forks", name: "Forks" },
