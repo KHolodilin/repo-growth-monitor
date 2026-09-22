@@ -5,6 +5,7 @@ import com.kholodilin.repogrowth.collection.collector.GrowthEventsCollector;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
+import com.kholodilin.repogrowth.event.detect.CandidateEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEventCatalog;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
@@ -92,6 +93,30 @@ class GrowthEventCollectionIT extends AbstractPostgresTest {
         collect();
         List<GrowthEvent> events = eventJdbcRepository.findRecent(repository.id(), 20);
         assertThat(events).extracting(GrowthEvent::type).containsExactly(GrowthEventCatalog.DESCRIPTION_CHANGED);
+        assertThat(events).extracting(GrowthEvent::eventAt).containsExactly(Instant.parse("2026-09-21T19:00:00Z"));
+    }
+
+    @Test
+    void readmeChangeUsesCommitTimeAndCorrectsLateEvents() {
+        collect();
+        eventJdbcRepository.insertIgnore(repository.id(), new CandidateEvent(
+                Instant.parse("2026-09-22T12:00:00Z"),
+                GrowthEventCatalog.CATEGORY_DISCOVERABILITY,
+                GrowthEventCatalog.README_SIGNIFICANTLY_CHANGED,
+                "README significantly changed",
+                null,
+                null,
+                GrowthEventCatalog.SOURCE_GITHUB,
+                "readme:old-sha"
+        ));
+
+        stubGithub("new description", "# demo\n\n" + "changed ".repeat(40), Instant.parse("2026-09-21T18:05:00Z"));
+        collect();
+        List<GrowthEvent> events = eventJdbcRepository.findRecent(repository.id(), 20);
+        assertThat(events)
+                .filteredOn(event -> GrowthEventCatalog.README_SIGNIFICANTLY_CHANGED.equals(event.type()))
+                .extracting(GrowthEvent::eventAt)
+                .containsOnly(Instant.parse("2026-09-21T18:05:00Z"));
     }
 
     @Test
@@ -115,14 +140,21 @@ class GrowthEventCollectionIT extends AbstractPostgresTest {
     }
 
     private void stubGithub(String description) {
+        stubGithub(description, "# demo", Instant.parse("2026-09-21T18:05:00Z"));
+    }
+
+    private void stubGithub(String description, String readme, Instant readmeCommittedAt) {
         GitHubOwnerResponse owner = new GitHubOwnerResponse(100L, "acme", "User", null, null);
         when(gitHubClient.getRepository(anyString(), anyString())).thenReturn(new GitHubRepositoryResponse(
                 200L, "demo", "acme/demo", description, false, "public", "main", "Java", false, false,
-                10, 5, 2, 1, "https://github.com/acme/demo", Instant.parse("2024-01-01T00:00:00Z"), Instant.now(), Instant.now(), owner,
-                List.of("java"), null, new GitHubLicenseResponse("mit", "MIT License", "MIT")
+                10, 5, 2, 1, "https://github.com/acme/demo",
+                Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-09-21T19:00:00Z"), Instant.parse("2026-09-21T18:05:00Z"),
+                owner, List.of("java"), null, new GitHubLicenseResponse("mit", "MIT License", "MIT")
         ));
         when(gitHubClient.getReadmeDetails(anyString(), anyString()))
-                .thenReturn(Optional.of(new GitHubReadmeResponse("sha1", "# demo", "utf-8", "README.md")));
+                .thenReturn(Optional.of(new GitHubReadmeResponse("sha1", readme, "utf-8", "README.md")));
+        when(gitHubClient.latestCommitAt(anyString(), anyString(), anyString()))
+                .thenReturn(Optional.of(readmeCommittedAt));
         when(gitHubClient.listIssues(anyString(), anyString())).thenReturn(List.of());
         when(gitHubClient.listPulls(anyString(), anyString())).thenReturn(List.of());
         when(gitHubClient.listReleases(anyString(), anyString())).thenReturn(List.of());

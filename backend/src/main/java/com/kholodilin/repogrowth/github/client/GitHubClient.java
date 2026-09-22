@@ -37,6 +37,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -179,13 +180,17 @@ public class GitHubClient {
     }
 
     public Optional<Instant> latestCommitAt(String owner, String name) {
+        return latestCommitAt(owner, name, null);
+    }
+
+    public Optional<Instant> latestCommitAt(String owner, String name, String path) {
         requireToken();
         try {
-            ResponseEntity<byte[]> response = execute(
-                    "latestCommit",
-                    "GET",
-                    "/repos/" + owner + "/" + name + "/commits?per_page=1"
-            );
+            String uri = "/repos/" + owner + "/" + name + "/commits?per_page=1";
+            if (path != null && !path.isBlank()) {
+                uri += "&path=" + URLEncoder.encode(path, StandardCharsets.UTF_8);
+            }
+            ResponseEntity<byte[]> response = execute("latestCommit", "GET", uri);
             byte[] body = response.getBody();
             if (body == null || body.length == 0) {
                 return Optional.empty();
@@ -202,7 +207,7 @@ public class GitHubClient {
                     || ex.retryable()) {
                 throw ex;
             }
-            log.warn("Latest commit lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
+            log.warn("Latest commit lookup failed owner={} name={} path={} error={}", owner, name, path, ex.errorCode());
             return Optional.empty();
         }
     }

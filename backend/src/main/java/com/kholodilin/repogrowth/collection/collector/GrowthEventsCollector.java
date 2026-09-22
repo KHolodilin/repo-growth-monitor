@@ -4,6 +4,7 @@ import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.event.detect.CandidateEvent;
 import com.kholodilin.repogrowth.event.detect.GitHubActivitySnapshot;
 import com.kholodilin.repogrowth.event.detect.GrowthEventDetections;
+import com.kholodilin.repogrowth.event.domain.GrowthEventCatalog;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
 import com.kholodilin.repogrowth.event.domain.GrowthEventState;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
@@ -60,10 +61,14 @@ public class GrowthEventsCollector implements Collector {
         String name = context.repository().name();
         GitHubRepositoryResponse remote = gitHubClient.getRepository(owner, name);
         GitHubReadmeResponse readme = gitHubClient.getReadmeDetails(owner, name).orElse(null);
+        Instant readmeCommittedAt = readme == null || readme.name() == null || readme.name().isBlank()
+                ? null
+                : gitHubClient.latestCommitAt(owner, name, readme.name()).orElse(null);
         GitHubActivitySnapshot snapshot = new GitHubActivitySnapshot(
                 remote,
                 readme == null ? null : readme.decodedText(),
                 readme == null ? null : readme.sha(),
+                readmeCommittedAt,
                 gitHubClient.listIssues(owner, name),
                 gitHubClient.listPulls(owner, name),
                 gitHubClient.listReleases(owner, name),
@@ -81,6 +86,30 @@ public class GrowthEventsCollector implements Collector {
                     continue;
                 }
                 eventRepository.insertIgnore(context.repository().id(), candidate);
+            }
+            if (readmeCommittedAt != null) {
+                eventRepository.pullEventAtBack(
+                        context.repository().id(),
+                        GrowthEventCatalog.README_SIGNIFICANTLY_CHANGED,
+                        readmeCommittedAt
+                );
+            }
+            if (remote.updatedAt() != null) {
+                eventRepository.pullEventAtBack(
+                        context.repository().id(),
+                        GrowthEventCatalog.DESCRIPTION_CHANGED,
+                        remote.updatedAt()
+                );
+                eventRepository.pullEventAtBack(
+                        context.repository().id(),
+                        GrowthEventCatalog.TOPICS_CHANGED,
+                        remote.updatedAt()
+                );
+                eventRepository.pullEventAtBack(
+                        context.repository().id(),
+                        GrowthEventCatalog.HOMEPAGE_CHANGED,
+                        remote.updatedAt()
+                );
             }
             stateRepository.upsert(
                     context.repository().id(),

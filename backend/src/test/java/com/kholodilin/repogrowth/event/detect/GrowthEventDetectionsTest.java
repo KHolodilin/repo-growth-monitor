@@ -56,6 +56,42 @@ class GrowthEventDetectionsTest {
     }
 
     @Test
+    void discoverabilityEventsUseGithubTimestamps() {
+        GrowthEventState previous = new GrowthEventState(
+                true, "A".repeat(80), "old-sha", "old", List.of("java"), null,
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of("acme"),
+                5, 0, 1, true, true, List.of(), List.of(), List.of()
+        );
+        Instant committed = Instant.parse("2026-09-21T18:00:00Z");
+        Instant updated = Instant.parse("2026-09-21T19:00:00Z");
+        GitHubActivitySnapshot current = snapshot(
+                new GitHubRepositoryResponse(
+                        200L, "demo", "acme/demo", "new", false, "public", "main", "Java",
+                        false, false, 5, 0, 0, 0, "https://github.com/acme/demo",
+                        Instant.parse("2024-01-01T00:00:00Z"), updated, updated,
+                        new GitHubOwnerResponse(100L, "acme", "User", null, null),
+                        List.of("java"), null, new GitHubLicenseResponse("mit", "MIT License", "MIT")
+                ),
+                "B".repeat(80),
+                "new-sha",
+                committed,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
+        );
+        List<CandidateEvent> events = GrowthEventDetections.detect(previous, current, "acme", NOW);
+        assertThat(events)
+                .filteredOn(event -> GrowthEventCatalog.README_SIGNIFICANTLY_CHANGED.equals(event.type()))
+                .extracting(CandidateEvent::eventAt)
+                .containsExactly(committed);
+        assertThat(events)
+                .filteredOn(event -> GrowthEventCatalog.DESCRIPTION_CHANGED.equals(event.type()))
+                .extracting(CandidateEvent::eventAt)
+                .containsExactly(updated);
+    }
+
+    @Test
     void initializedStateDetectsDescriptionAndExternalPr() {
         GrowthEventState previous = new GrowthEventState(
                 true, "readme", "sha", "old", List.of("java"), null,
@@ -169,7 +205,20 @@ class GrowthEventDetectionsTest {
             List<GitHubReleaseItem> releases,
             List<GitHubContributorItem> contributors
     ) {
-        return new GitHubActivitySnapshot(repository, readme, "sha", issues, pulls, releases, contributors);
+        return snapshot(repository, readme, "sha", null, issues, pulls, releases, contributors);
+    }
+
+    private static GitHubActivitySnapshot snapshot(
+            GitHubRepositoryResponse repository,
+            String readme,
+            String readmeSha,
+            Instant readmeCommittedAt,
+            List<GitHubIssueItem> issues,
+            List<GitHubPullItem> pulls,
+            List<GitHubReleaseItem> releases,
+            List<GitHubContributorItem> contributors
+    ) {
+        return new GitHubActivitySnapshot(repository, readme, readmeSha, readmeCommittedAt, issues, pulls, releases, contributors);
     }
 
     private static GitHubRepositoryResponse repo(String description, List<String> topics, String homepage, int stars, int forks) {

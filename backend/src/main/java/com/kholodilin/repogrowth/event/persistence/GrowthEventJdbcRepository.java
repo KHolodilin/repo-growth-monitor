@@ -118,6 +118,22 @@ public class GrowthEventJdbcRepository {
                 .update() > 0;
     }
 
+    public int pullEventAtBack(long repositoryId, String type, Instant eventAt) {
+        return jdbcClient.sql("""
+                        UPDATE growth_event
+                        SET event_at = :eventAt,
+                            updated_at = NOW()
+                        WHERE repository_id = :repositoryId
+                          AND type = :type
+                          AND source <> 'MANUAL'
+                          AND event_at > :eventAt
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("type", type)
+                .param("eventAt", SqlTime.ts(eventAt))
+                .update();
+    }
+
     public Optional<GrowthEvent> findById(long id) {
         return jdbcClient.sql("SELECT * FROM growth_event WHERE id = :id")
                 .param("id", id)

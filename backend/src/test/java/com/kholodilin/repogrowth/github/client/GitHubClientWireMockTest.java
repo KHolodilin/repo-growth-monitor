@@ -219,6 +219,18 @@ class GitHubClientWireMockTest {
     }
 
     @Test
+    void readsLatestCommitTimestampForPath() {
+        wireMock.stubFor(get("/repos/acme/a/commits?per_page=1&path=README.md")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"sha":"def","commit":{"author":{"date":"2026-09-21T18:00:00Z"},"committer":{"date":"2026-09-21T18:05:00Z"}}}]
+                                """)));
+        assertThat(client.latestCommitAt("acme", "a", "README.md"))
+                .contains(java.time.Instant.parse("2026-09-21T18:05:00Z"));
+    }
+
+    @Test
     void detectsIssueTemplatesDirectory() {
         wireMock.stubFor(get("/repos/acme/a/contents/.github/ISSUE_TEMPLATE")
                 .willReturn(aResponse()

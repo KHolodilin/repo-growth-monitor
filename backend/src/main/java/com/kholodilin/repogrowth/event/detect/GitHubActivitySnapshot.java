@@ -6,12 +6,14 @@ import com.kholodilin.repogrowth.github.model.GitHubPullItem;
 import com.kholodilin.repogrowth.github.model.GitHubReleaseItem;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 
+import java.time.Instant;
 import java.util.List;
 
 public record GitHubActivitySnapshot(
         GitHubRepositoryResponse repository,
         String readmeText,
         String readmeSha,
+        Instant readmeCommittedAt,
         List<GitHubIssueItem> issues,
         List<GitHubPullItem> pulls,
         List<GitHubReleaseItem> releases,

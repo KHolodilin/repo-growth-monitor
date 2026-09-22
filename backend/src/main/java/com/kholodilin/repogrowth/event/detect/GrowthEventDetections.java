@@ -92,9 +92,11 @@ public final class GrowthEventDetections {
 
     static List<CandidateEvent> discoverability(GrowthEventState previous, GitHubActivitySnapshot current, Instant collectedAt) {
         List<CandidateEvent> events = new ArrayList<>();
+        Instant readmeAt = occurredAt(current.readmeCommittedAt(), collectedAt);
+        Instant metadataAt = occurredAt(current.repository().updatedAt(), collectedAt);
         if (ReadmeSignificance.significant(previous.readmeText(), current.readmeText())) {
             events.add(new CandidateEvent(
-                    collectedAt,
+                    readmeAt,
                     GrowthEventCatalog.CATEGORY_DISCOVERABILITY,
                     GrowthEventCatalog.README_SIGNIFICANTLY_CHANGED,
                     "README significantly changed",
@@ -107,7 +109,7 @@ public final class GrowthEventDetections {
         GitHubRepositoryResponse repository = current.repository();
         if (!Objects.equals(normalize(previous.description()), normalize(repository.description()))) {
             events.add(new CandidateEvent(
-                    collectedAt,
+                    metadataAt,
                     GrowthEventCatalog.CATEGORY_DISCOVERABILITY,
                     GrowthEventCatalog.DESCRIPTION_CHANGED,
                     "Repository description changed",
@@ -119,7 +121,7 @@ public final class GrowthEventDetections {
         }
         if (!previous.topicsOrEmpty().equals(repository.topicsOrEmpty())) {
             events.add(new CandidateEvent(
-                    collectedAt,
+                    metadataAt,
                     GrowthEventCatalog.CATEGORY_DISCOVERABILITY,
                     GrowthEventCatalog.TOPICS_CHANGED,
                     "Repository topics changed",
@@ -131,7 +133,7 @@ public final class GrowthEventDetections {
         }
         if (!Objects.equals(normalize(previous.homepage()), normalize(repository.homepage()))) {
             events.add(new CandidateEvent(
-                    collectedAt,
+                    metadataAt,
                     GrowthEventCatalog.CATEGORY_DISCOVERABILITY,
                     GrowthEventCatalog.HOMEPAGE_CHANGED,
                     "Repository homepage changed",
@@ -335,6 +337,10 @@ public final class GrowthEventDetections {
         Set<String> merged = new HashSet<>(previous);
         merged.addAll(current);
         return merged.stream().sorted().toList();
+    }
+
+    private static Instant occurredAt(Instant actual, Instant collectedAt) {
+        return actual != null ? actual : collectedAt;
     }
 
     private static String normalize(String value) {
