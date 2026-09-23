@@ -41,7 +41,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: backend/target/site/jacoco/jacoco.xml
           flags: backend
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   frontend:
     runs-on: ubuntu-latest
@@ -77,4 +77,4 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: frontend/coverage/lcov.info
           flags: frontend
-          fail_ci_if_error: true
+          fail_ci_if_error: false

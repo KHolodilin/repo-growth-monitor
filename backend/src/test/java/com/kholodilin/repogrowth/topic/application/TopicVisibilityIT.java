@@ -60,25 +60,7 @@ class TopicVisibilityIT extends AbstractPostgresTest {
 
     @BeforeEach
     void seed() {
-        jdbcClient.sql("DELETE FROM topic_result").update();
-        jdbcClient.sql("DELETE FROM topic_run").update();
-        jdbcClient.sql("DELETE FROM topic_watch").update();
-        jdbcClient.sql("DELETE FROM search_result").update();
-        jdbcClient.sql("DELETE FROM search_run").update();
-        jdbcClient.sql("DELETE FROM search_query").update();
-        jdbcClient.sql("DELETE FROM growth_event").update();
-        jdbcClient.sql("DELETE FROM growth_event_setting").update();
-        jdbcClient.sql("DELETE FROM growth_event_state").update();
-        jdbcClient.sql("DELETE FROM collection_job").update();
-        jdbcClient.sql("DELETE FROM collection_run").update();
-        jdbcClient.sql("DELETE FROM traffic_path_snapshot").update();
-        jdbcClient.sql("DELETE FROM traffic_referrer_snapshot").update();
-        jdbcClient.sql("DELETE FROM traffic_daily").update();
-        jdbcClient.sql("DELETE FROM repository_daily_stats").update();
-        jdbcClient.sql("DELETE FROM repository_health").update();
-        jdbcClient.sql("DELETE FROM repository_topics").update();
-        jdbcClient.sql("DELETE FROM repository").update();
-        jdbcClient.sql("DELETE FROM github_owner").update();
+        wipeRepositoryData(jdbcClient);
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
                 null, 301L, owner.id(), "kafka-starter", "acme/kafka-starter", "demo", "PUBLIC", "main", "Java",
