@@ -1,0 +1,16 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+    patch:
+      default:
+        target: auto
+
+flags:
+  backend:
+    paths:
+      - backend/
+  frontend:
+    paths:
+      - frontend/

@@ -45,16 +45,7 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
 
     @BeforeEach
     void seed() {
-        jdbcClient.sql("DELETE FROM search_result").update();
-        jdbcClient.sql("DELETE FROM search_run").update();
-        jdbcClient.sql("DELETE FROM search_query").update();
-        jdbcClient.sql("DELETE FROM growth_event").update();
-        jdbcClient.sql("DELETE FROM growth_event_setting").update();
-        jdbcClient.sql("DELETE FROM growth_event_state").update();
-        jdbcClient.sql("DELETE FROM repository_health").update();
-        jdbcClient.sql("DELETE FROM repository_topics").update();
-        jdbcClient.sql("DELETE FROM repository").update();
-        jdbcClient.sql("DELETE FROM github_owner").update();
+        wipeRepositoryData(jdbcClient);
         GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
         kafka = track(owner, 301L, "kafka-starter", "acme/kafka-starter");
         outbox = track(owner, 302L, "spring-outbox", "acme/spring-outbox");

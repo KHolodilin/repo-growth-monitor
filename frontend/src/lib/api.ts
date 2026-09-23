@@ -245,6 +245,58 @@ export type ManualGrowthEventRequest = {
   description?: string;
 };
 
+export type TopicWatch = {
+  id: number;
+  repositoryId: number;
+  topic: string;
+  language?: string | null;
+  sort: string;
+  sortOrder: string;
+  enabled: boolean;
+  resultLimit: number;
+};
+
+export type TopicHistory = {
+  watch: TopicWatch;
+  currentRank: number | null;
+  change: QueryRankChange;
+  change7d: number | null;
+  change30d: number | null;
+  bestRank: number | null;
+  points: { date: string; position: number | null; topicRunId: number }[];
+  lastChecked?: string | null;
+  searchStatus?: string | null;
+  totalResults?: number | null;
+  missedDates: string[];
+};
+
+export type TopicRunResults = {
+  run: {
+    id: number;
+    businessDate: string;
+    totalCount: number | null;
+    trackedRepositoryPosition: number | null;
+    status: string;
+    completedAt?: string | null;
+  };
+  watch: TopicWatch;
+  rows: {
+    result: {
+      position: number;
+      githubRepositoryId: number;
+      fullName: string;
+      owner: string;
+      stars: number;
+      watchers: number;
+      forks: number;
+      language?: string;
+      description?: string;
+      htmlUrl?: string;
+    };
+    positionDelta: number | null;
+  }[];
+};
+
 export type SearchRunResults = {
   run: {
     id: number;

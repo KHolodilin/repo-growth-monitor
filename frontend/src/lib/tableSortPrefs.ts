@@ -11,6 +11,8 @@ export type TableId =
   | "dashboard-repositories"
   | "search-queries"
   | "search-results"
+  | "topic-watches"
+  | "topic-results"
   | "top-referrers"
   | "popular-paths";
 

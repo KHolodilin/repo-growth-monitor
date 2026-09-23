@@ -153,6 +153,20 @@ class GitHubClientWireMockTest {
     }
 
     @Test
+    void searchesRepositoriesWithSortAndOrder() {
+        wireMock.stubFor(get(urlPathEqualTo("/search/repositories"))
+                .withQueryParam("q", equalTo("topic:spring-boot"))
+                .withQueryParam("sort", equalTo("stars"))
+                .withQueryParam("order", equalTo("desc"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"total_count":1,"items":[{"id":1,"full_name":"acme/a","stargazers_count":9,"forks_count":1}]}
+                                """)));
+        assertThat(client.searchRepositories("topic:spring-boot", 10, "stars", "desc").totalCount()).isEqualTo(1);
+    }
+
+    @Test
     void serverErrorIsRetryable() {
         wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(500).withBody("oops")));
         assertThatThrownBy(() -> client.getRepository("acme", "a"))

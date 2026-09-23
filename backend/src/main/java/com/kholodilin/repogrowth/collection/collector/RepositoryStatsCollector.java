@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthEvaluator;
 import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -21,17 +22,20 @@ public class RepositoryStatsCollector implements Collector {
     private final GitHubClient gitHubClient;
     private final RepositoryJdbcRepository repositoryJdbcRepository;
     private final TrafficJdbcRepository trafficJdbcRepository;
+    private final TopicWatchSync topicWatchSync;
     private final TransactionTemplate transactionTemplate;
 
     public RepositoryStatsCollector(
             GitHubClient gitHubClient,
             RepositoryJdbcRepository repositoryJdbcRepository,
             TrafficJdbcRepository trafficJdbcRepository,
+            TopicWatchSync topicWatchSync,
             TransactionTemplate transactionTemplate
     ) {
         this.gitHubClient = gitHubClient;
         this.repositoryJdbcRepository = repositoryJdbcRepository;
         this.trafficJdbcRepository = trafficJdbcRepository;
+        this.topicWatchSync = topicWatchSync;
         this.transactionTemplate = transactionTemplate;
     }
 
@@ -136,6 +140,7 @@ public class RepositoryStatsCollector implements Collector {
                     remote.archived()
             );
             repositoryJdbcRepository.replaceTopics(context.repository().id(), remote.topicsOrEmpty());
+            topicWatchSync.sync(context.repository().id());
             repositoryJdbcRepository.upsertHealth(context.repository().id(), healthFacts);
             if (resolvedReleaseFetched) {
                 repositoryJdbcRepository.updateLastReleaseAt(context.repository().id(), resolvedLastReleaseAt);

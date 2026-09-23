@@ -1,5 +1,7 @@
 # Repo Growth Monitor
 
+[![CI](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/KHolodilin/repo-growth-monitor/branch/main/graph/badge.svg)](https://codecov.io/gh/KHolodilin/repo-growth-monitor)
 [![Release](https://img.shields.io/github/v/release/KHolodilin/repo-growth-monitor)](https://github.com/KHolodilin/repo-growth-monitor/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/KHolodilin/repo-growth-monitor/release.yml?label=release)](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/release.yml)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fkholodilin%2Frepo--growth--monitor-blue)](https://github.com/KHolodilin/repo-growth-monitor/pkgs/container/repo-growth-monitor)
