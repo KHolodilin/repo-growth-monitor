@@ -1,5 +1,7 @@
 package com.kholodilin.repogrowth.common.api;
 
+import com.kholodilin.repogrowth.analytics.api.AnalyticsController;
+import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -11,7 +13,10 @@ import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcReposit
 import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
 import com.kholodilin.repogrowth.collection.planner.DailyPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
+import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.web.SpaController;
+import com.kholodilin.repogrowth.github.client.GitHubClient;
+import com.kholodilin.repogrowth.github.client.SystemStatusController;
 import com.kholodilin.repogrowth.event.api.GrowthEventController;
 import com.kholodilin.repogrowth.event.application.GrowthEventService;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
@@ -69,6 +74,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SearchQueryController.class,
         GrowthEventController.class,
         TopicVisibilityController.class,
+        AnalyticsController.class,
+        SystemStatusController.class,
         SpaController.class
 })
 class ApiControllersWebMvcTest {
@@ -98,6 +105,12 @@ class ApiControllersWebMvcTest {
     GrowthEventService growthEventService;
     @MockitoBean
     TopicVisibilityService topicVisibilityService;
+    @MockitoBean
+    AnalyticsService analyticsService;
+    @MockitoBean
+    GitHubProperties gitHubProperties;
+    @MockitoBean
+    GitHubClient gitHubClient;
 
     private Repository repository;
     private SearchQuery query;
@@ -172,6 +185,13 @@ class ApiControllersWebMvcTest {
         when(topicVisibilityService.historyByTopic(eq(13L), eq("outbox"), anyString())).thenReturn(history);
         when(topicVisibilityService.latestResultsByTopic(eq(13L), eq("outbox"), anyString())).thenReturn(topicResults);
         when(topicVisibilityService.results(3L)).thenReturn(topicResults);
+        when(analyticsService.dashboard(anyString())).thenReturn(null);
+        when(analyticsService.portfolio(anyString())).thenReturn(null);
+        when(analyticsService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
+        when(analyticsService.snapshotHistory(eq(13L), any(), any(), anyBoolean())).thenReturn(null);
+        when(analyticsService.statsHistory(eq(13L), anyString())).thenReturn(null);
+        when(gitHubProperties.tokenConfigured()).thenReturn(true);
+        when(gitHubClient.maskedToken()).thenReturn("gho_****");
     }
 
     @Test
@@ -229,6 +249,12 @@ class ApiControllersWebMvcTest {
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/history")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/topic-runs/3/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/dashboard")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/portfolio")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/repositories/13/traffic")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/repositories/13/traffic-history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/repositories/13/stats-history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk());
         mockMvc.perform(get("/dashboard")).andExpect(status().isNotFound());
     }
 
