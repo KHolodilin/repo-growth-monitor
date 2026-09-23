@@ -1,7 +1,9 @@
 # Repo Growth Monitor
 
+[![CI](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/ci.yml/badge.svg)](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/KHolodilin/repo-growth-monitor)](https://github.com/KHolodilin/repo-growth-monitor/releases/latest)
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/KHolodilin/repo-growth-monitor/release.yml?label=release)](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/KHolodilin/repo-growth-monitor/graph/badge.svg)](https://codecov.io/gh/KHolodilin/repo-growth-monitor)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fkholodilin%2Frepo--growth--monitor-blue)](https://github.com/KHolodilin/repo-growth-monitor/pkgs/container/repo-growth-monitor)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://github.com/KHolodilin/repo-growth-monitor/releases/latest)
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org)
