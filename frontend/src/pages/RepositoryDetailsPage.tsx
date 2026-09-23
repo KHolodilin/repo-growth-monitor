@@ -25,6 +25,7 @@ import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficC
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { useServicePaths } from "../lib/servicePathPrefs";
+import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/querySort";
 import { useTableSort } from "../lib/tableSortPrefs";
 
 type Tab = "overview" | "traffic" | "stats" | "search" | "topics" | "growth-events";
@@ -858,10 +859,7 @@ function Kpi({ label, value }: { label: string; value: number }) {
   );
 }
 
-const QUERY_SORT_KEYS = ["name", "rank", "change", "change7d", "change30d", "best", "results", "updated"] as const;
 const QUERY_ASC_FIRST_KEYS = ["name", "rank", "best"] as const;
-
-type QuerySortKey = (typeof QUERY_SORT_KEYS)[number];
 
 function normalizeSearchQuery(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
@@ -893,24 +891,14 @@ function TopicsPanel({
     tableId: "topic-watches",
     scope: repositoryId,
     keys: QUERY_SORT_KEYS,
-    initial: { key: null, dir: "asc" },
+    initial: { key: "rank", dir: "asc" },
     ascFirst: QUERY_ASC_FIRST_KEYS,
   });
 
-  const sorted = useMemo(() => {
-    if (!sortKey) {
-      return visibility;
-    }
-    const copy = [...visibility];
-    copy.sort((left, right) => {
-      const compared = compareTopicRows(left, right, sortKey, sortDir);
-      if (compared !== 0) {
-        return compared;
-      }
-      return left.watch.id - right.watch.id;
-    });
-    return copy;
-  }, [visibility, sortKey, sortDir]);
+  const sorted = useMemo(
+    () => sortTopicHistories(visibility, sortKey, sortDir),
+    [visibility, sortKey, sortDir],
+  );
 
   const searchBusy =
     runningAll
@@ -1036,39 +1024,6 @@ function TopicsPanel({
       <CombinedTopicRankChart repositoryId={repositoryId} scope={scope} visibility={visibility} highlightWatchId={hoveredWatchId} />
     </div>
   );
-}
-
-function compareTopicRows(left: TopicHistory, right: TopicHistory, key: QuerySortKey, dir: "asc" | "desc"): number {
-  if (key === "name") {
-    const compared = left.watch.topic.localeCompare(right.watch.topic, undefined, { sensitivity: "base" });
-    return dir === "desc" ? -compared : compared;
-  }
-  const asSearch = topicAsSearchHistory(left);
-  const asSearchRight = topicAsSearchHistory(right);
-  return compareQueryRows(asSearch, asSearchRight, key, dir);
-}
-
-function topicAsSearchHistory(item: TopicHistory): SearchHistory {
-  return {
-    query: {
-      id: item.watch.id,
-      repositoryId: item.watch.repositoryId,
-      name: item.watch.topic,
-      query: item.watch.topic,
-      enabled: item.watch.enabled,
-      resultLimit: item.watch.resultLimit,
-    },
-    currentRank: item.currentRank,
-    change: item.change,
-    change7d: item.change7d,
-    change30d: item.change30d,
-    bestRank: item.bestRank,
-    points: item.points.map((point) => ({ date: point.date, position: point.position, searchRunId: point.topicRunId })),
-    lastChecked: item.lastChecked,
-    searchStatus: item.searchStatus,
-    totalResults: item.totalResults,
-    missedDates: item.missedDates,
-  };
 }
 
 function CombinedTopicRankChart({
@@ -1322,67 +1277,6 @@ function QuerySortHeader({
       </button>
     </th>
   );
-}
-
-function compareQueryRows(left: SearchHistory, right: SearchHistory, key: QuerySortKey, dir: "asc" | "desc"): number {
-  if (key === "name") {
-    const compared = left.query.name.localeCompare(right.query.name, undefined, { sensitivity: "base" });
-    return dir === "desc" ? -compared : compared;
-  }
-  const leftValue = querySortValue(left, key);
-  const rightValue = querySortValue(right, key);
-  if (leftValue === null && rightValue === null) {
-    return 0;
-  }
-  if (leftValue === null) {
-    return 1;
-  }
-  if (rightValue === null) {
-    return -1;
-  }
-  return dir === "desc" ? rightValue - leftValue : leftValue - rightValue;
-}
-
-function queryChangeSortValue(item: SearchHistory): number | null {
-  const change = item.change;
-  if (!change || change.kind === "NONE") {
-    return null;
-  }
-  if (change.kind === "UNCHANGED") {
-    return 0;
-  }
-  if (change.kind === "IMPROVED") {
-    return change.amount;
-  }
-  if (change.kind === "DECLINED") {
-    return -change.amount;
-  }
-  if (change.kind === "ENTERED") {
-    return change.rank == null ? 1000 : 1000 - change.rank;
-  }
-  return -(1000 + change.amount);
-}
-
-function querySortValue(item: SearchHistory, key: Exclude<QuerySortKey, "name">): number | null {
-  if (key === "rank") {
-    return item.currentRank;
-  }
-  if (key === "change") {
-    return queryChangeSortValue(item);
-  }
-  if (key === "best") {
-    return item.bestRank;
-  }
-  if (key === "results") {
-    return item.totalResults ?? null;
-  }
-  if (key === "updated") {
-    return item.lastChecked ? Date.parse(item.lastChecked) : null;
-  }
-  if (key === "change7d") {
-    return item.change7d;
-  }
-  return item.change30d;
 }
 
 function CombinedRankChart({

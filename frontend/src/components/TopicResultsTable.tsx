@@ -125,14 +125,14 @@ function compareRows(left: ResultRow, right: ResultRow, key: SortKey, dir: "asc"
   return compareNumbers(left.result[key], right.result[key], dir);
 }
 
-function compareNumbers(left: number | null, right: number | null, dir: "asc" | "desc"): number {
-  if (left === null && right === null) {
+function compareNumbers(left: number | null | undefined, right: number | null | undefined, dir: "asc" | "desc"): number {
+  if (left == null && right == null) {
     return 0;
   }
-  if (left === null) {
+  if (left == null) {
     return 1;
   }
-  if (right === null) {
+  if (right == null) {
     return -1;
   }
   return dir === "desc" ? right - left : left - right;
