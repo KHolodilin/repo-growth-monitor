@@ -9,8 +9,15 @@ public record GitHubProperties(
         String token,
         String apiBaseUrl,
         Duration connectTimeout,
-        Duration readTimeout
+        Duration readTimeout,
+        String webBaseUrl
 ) {
+    public GitHubProperties {
+        if (webBaseUrl == null || webBaseUrl.isBlank()) {
+            webBaseUrl = "https://github.com";
+        }
+    }
+
     public boolean tokenConfigured() {
         return token != null && !token.isBlank();
     }

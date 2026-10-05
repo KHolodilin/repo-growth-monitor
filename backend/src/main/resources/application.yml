@@ -19,6 +19,7 @@ app:
 github:
   token: ${GITHUB_TOKEN:}
   api-base-url: https://api.github.com
+  web-base-url: https://github.com
   connect-timeout: 10s
   read-timeout: 30s
 

@@ -18,7 +18,7 @@ import java.time.Duration;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -39,7 +39,8 @@ class GitHubClientWireMockTest {
                 "test-token",
                 wireMock.baseUrl(),
                 Duration.ofSeconds(2),
-                Duration.ofSeconds(2)
+                Duration.ofSeconds(2),
+                wireMock.baseUrl()
         );
         HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
@@ -48,6 +49,8 @@ class GitHubClientWireMockTest {
                 .baseUrl(wireMock.baseUrl())
                 .requestFactory(factory)
                 .defaultHeader("Authorization", "Bearer test-token")
+                .defaultHeader("Accept", "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
                 .build();
         client = new GitHubClient(restClient, JsonMapper.builder().build(), properties, new AppMetrics(new SimpleMeterRegistry()));
     }
@@ -201,14 +204,19 @@ class GitHubClientWireMockTest {
     }
 
     @Test
-    void countsContributorsFromMentionableUsers() {
-        wireMock.stubFor(post("/graphql")
+    void countsContributorsFromRepositorySidebar() {
+        wireMock.stubFor(get(urlPathEqualTo("/acme/a/_sidebar"))
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
-                                {"data":{"repository":{"mentionableUsers":{"totalCount":4}}}}
+                                {"contributors":{"contributorCount":11,"contributors":[{"login":"magro"}]}}
                                 """)));
-        assertThat(client.countContributors("acme", "a")).isEqualTo(4);
+        assertThat(client.countContributors("acme", "a")).isEqualTo(11);
+        wireMock.verify(getRequestedFor(urlPathEqualTo("/acme/a/_sidebar"))
+                .withHeader("Accept", equalTo("*/*"))
+                .withHeader("X-Requested-With", equalTo("XMLHttpRequest"))
+                .withoutHeader("Authorization")
+                .withoutHeader("X-GitHub-Api-Version"));
     }
 
     @Test

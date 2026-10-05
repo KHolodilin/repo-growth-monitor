@@ -8,7 +8,6 @@ import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
 import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
 import com.kholodilin.repogrowth.github.model.GitHubContributorItem;
 import com.kholodilin.repogrowth.github.model.GitHubIssueItem;
-import com.kholodilin.repogrowth.github.model.GitHubGraphQlResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPathResponse;
 import com.kholodilin.repogrowth.github.model.GitHubPullItem;
 import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
@@ -18,6 +17,7 @@ import com.kholodilin.repogrowth.github.model.GitHubReleaseResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
 import com.kholodilin.repogrowth.github.model.GitHubSearchResponse;
+import com.kholodilin.repogrowth.github.model.GitHubSidebarResponse;
 import com.kholodilin.repogrowth.github.model.GitHubTrafficClonesResponse;
 import com.kholodilin.repogrowth.github.model.GitHubTrafficViewsResponse;
 import io.micrometer.core.instrument.Timer;
@@ -25,24 +25,27 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriUtils;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,15 +59,9 @@ public class GitHubClient {
     private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
     private static final int MAX_PER_PAGE = 100;
     private static final int MAX_LIST_PAGES = 5;
-    private static final String MENTIONABLE_USERS_QUERY = """
-            query($owner: String!, $name: String!) {
-              repository(owner: $owner, name: $name) {
-                mentionableUsers { totalCount }
-              }
-            }
-            """;
 
     private final RestClient restClient;
+    private final RestClient webClient;
     private final JsonMapper jsonMapper;
     private final GitHubProperties properties;
     private final AppMetrics metrics;
@@ -76,9 +73,24 @@ public class GitHubClient {
             AppMetrics metrics
     ) {
         this.restClient = gitHubRestClient;
+        this.webClient = webClient(properties);
         this.jsonMapper = jsonMapper;
         this.properties = properties;
         this.metrics = metrics;
+    }
+
+    private static RestClient webClient(GitHubProperties properties) {
+        Duration connectTimeout = properties.connectTimeout() == null ? Duration.ofSeconds(10) : properties.connectTimeout();
+        Duration readTimeout = properties.readTimeout() == null ? Duration.ofSeconds(30) : properties.readTimeout();
+        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(connectTimeout).build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(readTimeout);
+        return RestClient.builder()
+                .requestFactory(factory)
+                .defaultHeader(HttpHeaders.ACCEPT, "*/*")
+                .defaultHeader("X-Requested-With", "XMLHttpRequest")
+                .defaultHeader(HttpHeaders.USER_AGENT, "repo-growth-monitor")
+                .build();
     }
 
     public List<GitHubRepositoryResponse> listAccessibleRepositories() {
@@ -137,29 +149,30 @@ public class GitHubClient {
     public int countContributors(String owner, String name) {
         requireToken();
         try {
-            Integer mentionable = countMentionableUsers(owner, name);
-            if (mentionable != null) {
-                return mentionable;
+            Integer sidebar = countContributorsFromSidebar(owner, name);
+            if (sidebar != null) {
+                return sidebar;
             }
         } catch (RuntimeException ex) {
-            log.warn("Mentionable user count failed owner={} name={} error={}", owner, name, ex.getMessage());
+            log.warn("Sidebar contributor count failed owner={} name={} error={}", owner, name, ex.getMessage());
         }
         return countContributorsFromRest(owner, name);
     }
 
-    private Integer countMentionableUsers(String owner, String name) {
-        byte[] payload = jsonMapper.writeValueAsBytes(Map.of(
-                "query", MENTIONABLE_USERS_QUERY,
-                "variables", Map.of("owner", owner, "name", name)
-        ));
-        ResponseEntity<byte[]> response = executePost("mentionableUsers", "/graphql", payload);
-        GitHubGraphQlResponse parsed = read(response.getBody(), GitHubGraphQlResponse.class);
-        if (parsed.data() == null
-                || parsed.data().repository() == null
-                || parsed.data().repository().mentionableUsers() == null) {
+    private Integer countContributorsFromSidebar(String owner, String name) {
+        String base = properties.webBaseUrl();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        String uri = base + "/" + UriUtils.encodePathSegment(owner, StandardCharsets.UTF_8)
+                + "/" + UriUtils.encodePathSegment(name, StandardCharsets.UTF_8)
+                + "/_sidebar";
+        ResponseEntity<byte[]> response = executeAbsolute("repositorySidebar", uri);
+        GitHubSidebarResponse parsed = read(response.getBody(), GitHubSidebarResponse.class);
+        if (parsed.contributors() == null) {
             return null;
         }
-        return parsed.data().repository().mentionableUsers().totalCount();
+        return parsed.contributors().contributorCount();
     }
 
     private int countContributorsFromRest(String owner, String name) {
@@ -443,14 +456,12 @@ public class GitHubClient {
         }
     }
 
-    private ResponseEntity<byte[]> executePost(String operation, String path, byte[] body) {
+    private ResponseEntity<byte[]> executeAbsolute(String operation, String uri) {
         Timer.Sample sample = metrics.startTimer();
         long started = System.nanoTime();
         try {
-            ResponseEntity<byte[]> response = restClient.post()
-                    .uri(path)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(body)
+            ResponseEntity<byte[]> response = webClient.get()
+                    .uri(URI.create(uri))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, this::handleError)
                     .toEntity(byte[].class);
