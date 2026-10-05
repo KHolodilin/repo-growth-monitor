@@ -55,6 +55,25 @@ class GitHubClientWireMockTest {
         client = new GitHubClient(restClient, JsonMapper.builder().build(), properties, new AppMetrics(new SimpleMeterRegistry()));
     }
 
+    private GitHubClient clientFor(Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
+        GitHubProperties properties = new GitHubProperties(
+                "test-token",
+                wireMock.baseUrl(),
+                connectTimeout,
+                readTimeout,
+                webBaseUrl
+        );
+        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+        factory.setReadTimeout(Duration.ofSeconds(2));
+        RestClient restClient = RestClient.builder()
+                .baseUrl(wireMock.baseUrl())
+                .requestFactory(factory)
+                .defaultHeader("Authorization", "Bearer test-token")
+                .build();
+        return new GitHubClient(restClient, JsonMapper.builder().build(), properties, new AppMetrics(new SimpleMeterRegistry()));
+    }
+
     @Test
     void listsRepositoriesWithPagination() {
         wireMock.stubFor(get(urlPathEqualTo("/user/repos"))
@@ -217,6 +236,41 @@ class GitHubClientWireMockTest {
                 .withHeader("X-Requested-With", equalTo("XMLHttpRequest"))
                 .withoutHeader("Authorization")
                 .withoutHeader("X-GitHub-Api-Version"));
+    }
+
+    @Test
+    void countsContributorsWhenWebBaseUrlHasTrailingSlash() {
+        GitHubClient slashClient = clientFor(null, null, wireMock.baseUrl() + "/");
+        wireMock.stubFor(get(urlPathEqualTo("/acme/a/_sidebar"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"contributors":{"contributorCount":11,"contributors":[]}}
+                                """)));
+        assertThat(slashClient.countContributors("acme", "a")).isEqualTo(11);
+    }
+
+    @Test
+    void fallsBackWhenSidebarOmitsContributorCount() {
+        wireMock.stubFor(get(urlPathEqualTo("/acme/a/_sidebar"))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"contributors\":null}")));
+        wireMock.stubFor(get("/repos/acme/a/contributors?per_page=1&anon=true")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withHeader("Link", "<" + wireMock.baseUrl() + "/repos/acme/a/contributors?per_page=1&page=9>; rel=\"last\"")
+                        .withBody("[{\"login\":\"a\"}]")));
+        assertThat(client.countContributors("acme", "a")).isEqualTo(9);
+    }
+
+    @Test
+    void defaultsBlankWebBaseUrl() {
+        GitHubProperties blank = new GitHubProperties("test-token", wireMock.baseUrl(), null, null, " ");
+        GitHubProperties missing = new GitHubProperties("test-token", wireMock.baseUrl(), null, null, null);
+        assertThat(blank.webBaseUrl()).isEqualTo("https://github.com");
+        assertThat(missing.webBaseUrl()).isEqualTo("https://github.com");
+        clientFor(null, null, " ");
     }
 
     @Test
