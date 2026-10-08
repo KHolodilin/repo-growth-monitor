@@ -61,4 +61,49 @@ describe("trafficChart", () => {
     );
     expect(markLineEvents({ componentType: "markPoint" })).toEqual([]);
   });
+
+  it("keeps text on two distant days", () => {
+    const overlays = eventMarkOverlays(
+      ["2026-01-01", "2026-06-01"],
+      [event("2026-01-01", "A", 1), event("2026-06-01", "B", 2)],
+    );
+    expect(overlays.markLine.data.map((item) => item.label)).toEqual([
+      { offset: [0, 0] },
+      { offset: [0, 0] },
+    ]);
+  });
+
+  it("stacks neighbouring days on different rows", () => {
+    const overlays = eventMarkOverlays(days(30), [
+      event("2026-01-01", "A", 1),
+      event("2026-01-02", "B", 2),
+    ]);
+    expect(overlays.markLine.data.map((item) => item.label)).toEqual([
+      { offset: [0, 0] },
+      { offset: [0, -15] },
+    ]);
+  });
+
+  it("hides a label that has no free row and shows the count on its pin", () => {
+    const overlays = eventMarkOverlays(days(60), [
+      event("2026-01-01", "A", 1),
+      event("2026-01-02", "B", 2),
+      event("2026-01-03", "C", 3),
+      event("2026-01-04", "D", 4),
+      event("2026-01-05", "E", 5),
+    ]);
+    const hidden = overlays.markLine.data.find((item) => item.xAxis === "2026-01-05");
+    const pin = overlays.markPoint.data.find((item) => item.xAxis === "2026-01-05");
+    const visiblePin = overlays.markPoint.data.find((item) => item.xAxis === "2026-01-01");
+    expect(hidden?.label).toEqual({ show: false });
+    expect(overlays.markPoint.label.formatter({ data: pin })).toBe("1");
+    expect(overlays.markPoint.label.formatter({ data: visiblePin })).toBe("");
+  });
 });
+
+function days(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(2026, 0, 1 + index));
+    return date.toISOString().slice(0, 10);
+  });
+}
