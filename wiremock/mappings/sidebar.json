@@ -1,0 +1,67 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/acme/spring-outbox/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 4, "contributors": [{ "login": "acme" }] } }
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/acme/kafka-starter/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 3, "contributors": [{ "login": "acme" }] } }
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/competitor/outbox-kit/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 18, "contributors": [{ "login": "competitor" }] } }
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/another/spring-outbox/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 7, "contributors": [{ "login": "another" }] } }
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/labs/kafka-outbox/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 5, "contributors": [{ "login": "labs" }] } }
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "GET", "urlPath": "/oss/outbox-jdbc/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 3, "contributors": [{ "login": "oss" }] } }
+      }
+    },
+    {
+      "priority": 10,
+      "request": { "method": "GET", "urlPathPattern": "/[^/]+/[^/]+/_sidebar" },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "jsonBody": { "contributors": { "contributorCount": 2, "contributors": [{ "login": "acme" }] } }
+      }
+    }
+  ]
+}

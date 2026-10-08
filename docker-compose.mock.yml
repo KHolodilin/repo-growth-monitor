@@ -35,6 +35,7 @@ services:
     environment:
       GITHUB_TOKEN: mock-token
       GITHUB_API_BASE_URL: http://github-mock:8080
+      GITHUB_WEB_BASE_URL: http://github-mock:8080
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/repogrowth_mock
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
