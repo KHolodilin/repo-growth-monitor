@@ -17,13 +17,14 @@ const ASSUMED_PLOT_WIDTH = 760;
 /**
  * Every marker is labelled by its own day. Labels of days close together would be drawn on top of
  * each other, so a label moves one line up as long as the line below is still taken by the label to
- * its left. Label widths are estimated from the text, because "Reddit post" needs far less room
- * than "First external contributor".
+ * its left. A day with no free line keeps its dashed line, and its text stays hidden. Label widths
+ * are estimated from the text, because "Reddit post" needs far less room than "First external
+ * contributor".
  */
 function labelLines(dates: string[], groups: { date: string; events: GrowthEvent[] }[]) {
   const slot = ASSUMED_PLOT_WIDTH / Math.max(1, dates.length - 1);
   const takenUntil: number[] = [];
-  const lineByDate = new Map<string, number>();
+  const lineByDate = new Map<string, number | null>();
   const labels = groups
     .map((group) => ({
       date: group.date,
@@ -38,22 +39,13 @@ function labelLines(dates: string[], groups: { date: string; events: GrowthEvent
       line++;
     }
     if (line === LABEL_LINES) {
-      line = freestLine(takenUntil);
+      lineByDate.set(label.date, null);
+      continue;
     }
     takenUntil[line] = label.center + label.width / 2 + LABEL_GAP;
     lineByDate.set(label.date, line);
   }
   return lineByDate;
-}
-
-function freestLine(takenUntil: number[]) {
-  let freest = 0;
-  for (let line = 1; line < takenUntil.length; line++) {
-    if (takenUntil[line] < takenUntil[freest]) {
-      freest = line;
-    }
-  }
-  return freest;
 }
 
 export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak = 1) {
@@ -88,20 +80,26 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
       },
       lineStyle: { type: "dashed" as const, color: "#0969da", width: 1.5 },
       tooltip,
-      data: groups.map((group) => ({
-        xAxis: group.date,
-        name: eventMarkerLabel(group.events),
-        label: { offset: [0, -(lines.get(group.date) ?? 0) * LABEL_LINE_HEIGHT] },
-        events: group.events,
-      })),
+      data: groups.map((group) => {
+        const line = lines.get(group.date);
+        return {
+          xAxis: group.date,
+          name: eventMarkerLabel(group.events),
+          label: line == null ? { show: false } : { offset: [0, line === 0 ? 0 : -line * LABEL_LINE_HEIGHT] },
+          events: group.events,
+        };
+      }),
     },
     markPoint: {
       symbol: "pin",
       symbolSize: 42,
       silent: false,
       itemStyle: { color: "#0969da" },
-      label: { color: "#fff", fontSize: 11, formatter: (params: { data?: { events?: GrowthEvent[] } }) => {
+      label: { color: "#fff", fontSize: 11, formatter: (params: { data?: { events?: GrowthEvent[]; labelHidden?: boolean } }) => {
         const count = params.data?.events?.length ?? 0;
+        if (params.data?.labelHidden) {
+          return String(count);
+        }
         return count > 1 ? String(count) : "";
       } },
       tooltip,
@@ -110,6 +108,7 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
         yAxis: peak,
         name: group.events[0]?.title ?? "Events",
         events: group.events,
+        labelHidden: lines.get(group.date) == null,
       })),
     },
   };
