@@ -121,7 +121,7 @@ Planner window is always open. Stop with `docker compose -f docker-compose.mock.
 
 ### Backend and frontend without Docker
 
-Backend (Java 21, Maven):
+Backend (Java 25, Maven):
 
 ```bash
 cd backend

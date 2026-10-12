@@ -253,7 +253,7 @@ PostgreSQL используется одновременно как:
 
 # 7. Backend Stack
 
-- Java 21;
+- Java 25;
 - Spring Boot 4.1.x;
 - Maven;
 - Spring MVC;

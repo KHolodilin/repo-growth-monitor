@@ -13,7 +13,6 @@ import {
   searchResults,
   snapshotHistory,
   topicHistory,
-  topicResults,
   traffic,
 } from "../test/fixtures";
 import { QueryDetailsPage } from "./QueryDetailsPage";

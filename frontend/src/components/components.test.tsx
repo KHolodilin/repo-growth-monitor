@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import { growthEvent, repository, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
+import { growthEvent, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
 import { GrowthEventSettingsCard } from "./GrowthEventSettingsCard";
 import { EventDetailsDialog, GrowthEventsPanel } from "./GrowthEventsPanel";
 import { DashboardIcon, LogoMark, RepositoriesIcon, SettingsIcon } from "./icons";

@@ -4,12 +4,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest
 public abstract class AbstractPostgresTest {
 
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.4")
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:18.6")
             .withDatabaseName("repogrowth")
             .withUsername("postgres")
             .withPassword("postgres");
