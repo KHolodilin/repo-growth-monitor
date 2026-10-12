@@ -36,7 +36,7 @@ jobs:
           path: backend/target/surefire-reports/
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: backend/target/site/jacoco/jacoco.xml
@@ -72,7 +72,7 @@ jobs:
           path: frontend/coverage/
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: frontend/coverage/lcov.info
