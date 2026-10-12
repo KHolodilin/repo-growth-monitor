@@ -2,56 +2,77 @@ import type { GrowthEvent, TrafficPoint } from "./api";
 import { formatChartAxisDate, formatNumber } from "./utils";
 import { eventMarkerLabel, eventTypeLabel, eventUtcDate, groupEventsByUtcDate } from "./growthEvents";
 
-const LABEL_LINES = 4;
-const LABEL_LINE_HEIGHT = 15;
-/** The pin of a marker sits on the peak value, so labels have to clear it. */
-const LABEL_DISTANCE = 30;
-/** Room above the plot for the legend and for every label line. */
-const LABEL_HEADROOM = 50 + LABEL_LINES * LABEL_LINE_HEIGHT;
+/** One text row above the line. A label that does not fit is replaced by the event count. */
+const LABEL_DISTANCE = 18;
+const LABEL_HEADROOM = 64;
 /** Width of one character at the label font size, and the gap kept between two labels. */
-const LABEL_CHAR_WIDTH = 5.8;
-const LABEL_GAP = 8;
-/** Only the ratio between this and the number of dates matters when spacing labels. */
-const ASSUMED_PLOT_WIDTH = 760;
+const LABEL_CHAR_WIDTH = 8;
+const LABEL_GAP = 12;
+/**
+ * Narrower than the card so a long label such as "External pull request opened" is treated as
+ * overlapping the next days on a 30 day axis.
+ */
+const ASSUMED_PLOT_WIDTH = 640;
 
 /**
- * Every marker is labelled by its own day. Labels of days close together would be drawn on top of
- * each other, so a label moves one line up as long as the line below is still taken by the label to
- * its left. A day with no free line keeps its dashed line, and its text stays hidden. Label widths
- * are estimated from the text, because "Reddit post" needs far less room than "First external
- * contributor".
+ * Every marker is labelled by its own day, on a single line. A label that would cross the one to
+ * its left is replaced by the event count, which is only a few digits wide.
  */
-function labelLines(dates: string[], groups: { date: string; events: GrowthEvent[] }[]) {
+function labelTexts(dates: string[], groups: { date: string; text: string; countText: string }[]) {
   const slot = ASSUMED_PLOT_WIDTH / Math.max(1, dates.length - 1);
-  const takenUntil: number[] = [];
-  const lineByDate = new Map<string, number | null>();
+  const textByDate = new Map<string, string>();
+  let takenUntil = Number.NEGATIVE_INFINITY;
   const labels = groups
     .map((group) => ({
       date: group.date,
       center: dates.indexOf(group.date) * slot,
-      width: eventMarkerLabel(group.events).length * LABEL_CHAR_WIDTH,
+      text: group.text,
+      textWidth: group.text.length * LABEL_CHAR_WIDTH,
+      countText: group.countText,
+      countWidth: group.countText.length * LABEL_CHAR_WIDTH,
     }))
     .sort((left, right) => left.center - right.center);
   for (const label of labels) {
-    const start = label.center - label.width / 2;
-    let line = 0;
-    while (line < LABEL_LINES && takenUntil[line] !== undefined && takenUntil[line] > start) {
-      line++;
-    }
-    if (line === LABEL_LINES) {
-      lineByDate.set(label.date, null);
+    const textStart = label.center - label.textWidth / 2;
+    if (takenUntil <= textStart) {
+      textByDate.set(label.date, label.text);
+      takenUntil = label.center + label.textWidth / 2 + LABEL_GAP;
       continue;
     }
-    takenUntil[line] = label.center + label.width / 2 + LABEL_GAP;
-    lineByDate.set(label.date, line);
+    textByDate.set(label.date, label.countText);
+    takenUntil = Math.max(takenUntil, label.center + label.countWidth / 2 + LABEL_GAP);
   }
-  return lineByDate;
+  return textByDate;
 }
 
-export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak = 1) {
+/** 90 days, a year, and all write the event count. Shorter ranges keep the type text. */
+function eventMarkerKind(period?: string) {
+  if (period === "90d" || period === "1y" || period === "all") {
+    return "count" as const;
+  }
+  return "text" as const;
+}
+
+export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak = 1, period?: string) {
+  const kind = eventMarkerKind(period);
   const onAxis = new Set(dates);
   const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
-  const lines = labelLines(dates, groups);
+  const captions = new Map(
+    groups.map((group) => {
+      const countText = String(group.events.length);
+      return [group.date, kind === "count" ? countText : eventMarkerLabel(group.events)] as const;
+    }),
+  );
+  const visibleText = kind === "count"
+    ? captions
+    : labelTexts(
+        dates,
+        groups.map((group) => ({
+          date: group.date,
+          text: captions.get(group.date) ?? "",
+          countText: String(group.events.length),
+        })),
+      );
   const tooltip = {
     formatter: (params: { data?: { events?: GrowthEvent[] } }) => {
       const items = params.data?.events ?? [];
@@ -66,6 +87,7 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
   };
   return {
     groups,
+    kind,
     markLine: {
       symbol: "none",
       silent: false,
@@ -80,27 +102,24 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
       },
       lineStyle: { type: "dashed" as const, color: "#0969da", width: 1.5 },
       tooltip,
-      data: groups.map((group) => {
-        const line = lines.get(group.date);
-        return {
-          xAxis: group.date,
-          name: eventMarkerLabel(group.events),
-          label: line == null ? { show: false } : { offset: [0, line === 0 ? 0 : -line * LABEL_LINE_HEIGHT] },
-          events: group.events,
-        };
-      }),
+      data: groups.map((group) => ({
+        xAxis: group.date,
+        name: visibleText.get(group.date) ?? "",
+        label: { show: true, position: "end" as const, distance: LABEL_DISTANCE },
+        events: group.events,
+      })),
     },
     markPoint: {
       symbol: "pin",
       symbolSize: 42,
       silent: false,
       itemStyle: { color: "#0969da" },
-      label: { color: "#fff", fontSize: 11, formatter: (params: { data?: { events?: GrowthEvent[]; labelHidden?: boolean } }) => {
+      label: { color: "#fff", fontSize: 11, formatter: (params: { data?: { events?: GrowthEvent[]; countAsText?: boolean } }) => {
         const count = params.data?.events?.length ?? 0;
-        if (params.data?.labelHidden) {
-          return String(count);
+        if (kind === "count" || params.data?.countAsText || count <= 1) {
+          return "";
         }
-        return count > 1 ? String(count) : "";
+        return String(count);
       } },
       tooltip,
       data: groups.map((group) => ({
@@ -108,7 +127,7 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
         yAxis: peak,
         name: group.events[0]?.title ?? "Events",
         events: group.events,
-        labelHidden: lines.get(group.date) == null,
+        countAsText: kind === "count" || visibleText.get(group.date) === String(group.events.length),
       })),
     },
   };
@@ -122,14 +141,14 @@ export function chartDatesWithEvents(points: TrafficPoint[], events: GrowthEvent
   return [...dates].sort();
 }
 
-export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]) {
+export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[], period?: string) {
   const dates = chartDatesWithEvents(points, events);
   const byDate = new Map(points.map((point) => [point.date, point]));
   const peak = Math.max(
     1,
     ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.uniqueCloners].filter((value): value is number => value != null)),
   );
-  const { groups, markLine, markPoint } = eventMarkOverlays(dates, events, peak);
+  const { groups, markLine, markPoint } = eventMarkOverlays(dates, events, peak, period);
 
   return {
     tooltip: {

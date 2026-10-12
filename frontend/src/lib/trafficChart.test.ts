@@ -68,23 +68,21 @@ describe("trafficChart", () => {
       [event("2026-01-01", "A", 1), event("2026-06-01", "B", 2)],
     );
     expect(overlays.markLine.data.map((item) => item.label)).toEqual([
-      { offset: [0, 0] },
-      { offset: [0, 0] },
+      { show: true, position: "end", distance: 18 },
+      { show: true, position: "end", distance: 18 },
     ]);
   });
 
-  it("stacks neighbouring days on different rows", () => {
+  it("writes the count when a neighbouring label would cross the one on its left", () => {
     const overlays = eventMarkOverlays(days(30), [
       event("2026-01-01", "A", 1),
       event("2026-01-02", "B", 2),
     ]);
-    expect(overlays.markLine.data.map((item) => item.label)).toEqual([
-      { offset: [0, 0] },
-      { offset: [0, -15] },
-    ]);
+    expect(overlays.markLine.data.map((item) => item.name)).toEqual(["LinkedIn post", "1"]);
+    expect(overlays.markPoint.label.formatter({ data: overlays.markPoint.data[1] })).toBe("");
   });
 
-  it("hides a label that has no free row and shows the count on its pin", () => {
+  it("writes the count when crowded labels have no room for the full text", () => {
     const overlays = eventMarkOverlays(days(60), [
       event("2026-01-01", "A", 1),
       event("2026-01-02", "B", 2),
@@ -92,18 +90,80 @@ describe("trafficChart", () => {
       event("2026-01-04", "D", 4),
       event("2026-01-05", "E", 5),
     ]);
-    const hidden = overlays.markLine.data.find((item) => item.xAxis === "2026-01-05");
-    const pin = overlays.markPoint.data.find((item) => item.xAxis === "2026-01-05");
-    const visiblePin = overlays.markPoint.data.find((item) => item.xAxis === "2026-01-01");
-    expect(hidden?.label).toEqual({ show: false });
-    expect(overlays.markPoint.label.formatter({ data: pin })).toBe("1");
-    expect(overlays.markPoint.label.formatter({ data: visiblePin })).toBe("");
+    expect(overlays.markLine.data.map((item) => item.name)).toEqual(["LinkedIn post", "1", "1", "1", "1"]);
+    expect(overlays.markPoint.label.formatter({ data: overlays.markPoint.data[4] })).toBe("");
+  });
+
+  it("writes counts for long labels that would cross a neighbour on a 30 day axis", () => {
+    const github = (date: string, id: number): GrowthEvent => ({
+      ...event(date, "GitHub", id),
+      type: "EXTERNAL_PR_OPENED",
+      source: "GITHUB",
+    });
+    const overlays = eventMarkOverlays(daysFrom("2026-09-07", 30), [
+      github("2026-09-28", 1),
+      github("2026-10-01", 2),
+      github("2026-10-01", 3),
+      github("2026-10-01", 4),
+      github("2026-10-04", 5),
+      github("2026-10-05", 6),
+      github("2026-10-05", 7),
+    ]);
+    const names = new Map(overlays.markLine.data.map((item) => [item.xAxis, item.name]));
+    expect(names.get("2026-09-28")).toBe("External pull request opened");
+    expect(names.get("2026-10-01")).toBe("3");
+    expect(names.get("2026-10-04")).toBe("1");
+    expect(names.get("2026-10-05")).toBe("2");
+    const pin = (date: string) => overlays.markPoint.label.formatter({ data: overlays.markPoint.data.find((item) => item.xAxis === date) });
+    expect(pin("2026-10-01")).toBe("");
+    expect(pin("2026-10-05")).toBe("");
+  });
+
+  it("keeps count labels on one line across a dense range", () => {
+    const overlays = eventMarkOverlays(
+      daysFrom("2026-08-01", 90),
+      [
+        event("2026-08-01", "A", 1),
+        event("2026-08-02", "B", 2),
+        event("2026-08-02", "C", 3),
+        event("2026-08-03", "D", 4),
+      ],
+      1,
+      "90d",
+    );
+    expect(overlays.markLine.data.map((item) => item.label)).toEqual([
+      { show: true, position: "end", distance: 18 },
+      { show: true, position: "end", distance: 18 },
+      { show: true, position: "end", distance: 18 },
+    ]);
+  });
+
+  it("writes the event count above the line on a long range", () => {
+    for (const period of ["90d", "1y", "all"]) {
+      const overlays = eventMarkOverlays(
+        ["2026-09-01", "2026-09-02"],
+        [event("2026-09-01", "A", 1), event("2026-09-02", "B", 2), event("2026-09-02", "C", 3)],
+        1,
+        period,
+      );
+      expect(overlays.markLine.data.map((item) => item.name)).toEqual(["1", "2"]);
+      expect(overlays.markLine.data.map((item) => item.label)).toEqual([
+        { show: true, position: "end", distance: 18 },
+        { show: true, position: "end", distance: 18 },
+      ]);
+      expect(overlays.markPoint.label.formatter({ data: overlays.markPoint.data[0] })).toBe("");
+    }
   });
 });
 
 function days(count: number) {
+  return daysFrom("2026-01-01", count);
+}
+
+function daysFrom(start: string, count: number) {
+  const [year, month, day] = start.split("-").map(Number);
   return Array.from({ length: count }, (_, index) => {
-    const date = new Date(Date.UTC(2026, 0, 1 + index));
+    const date = new Date(Date.UTC(year, month - 1, day + index));
     return date.toISOString().slice(0, 10);
   });
 }
