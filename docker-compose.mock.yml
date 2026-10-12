@@ -19,7 +19,7 @@ services:
       retries: 10
 
   github-mock:
-    image: wiremock/wiremock:3.13.1
+    image: wiremock/wiremock:3.13.2-3
     restart: unless-stopped
     command: ["--global-response-templating"]
     ports:
