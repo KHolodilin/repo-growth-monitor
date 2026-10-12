@@ -6,11 +6,11 @@
 [![Release workflow](https://img.shields.io/github/actions/workflow/status/KHolodilin/repo-growth-monitor/release.yml?label=release)](https://github.com/KHolodilin/repo-growth-monitor/actions/workflows/release.yml)
 [![GHCR](https://img.shields.io/badge/GHCR-ghcr.io%2Fkholodilin%2Frepo--growth--monitor-blue)](https://github.com/KHolodilin/repo-growth-monitor/pkgs/container/repo-growth-monitor)
 [![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://github.com/KHolodilin/repo-growth-monitor/releases/latest)
-[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org)
+[![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
 Self-hosted GitHub repository growth analytics: traffic, search rankings, and a foundation for competitor discovery.
 
@@ -95,7 +95,14 @@ The token is never stored in PostgreSQL and never returned by the API. Do not co
 ### Production-like stack (build from source)
 
 Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is not the
-downloadable release: it builds the image on the machine.
+downloadable release: `docker compose up -d --build` builds `Dockerfile` on the machine.
+Release 0.11.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.11.0`.
+
+The image is three stages:
+
+1. `node:26-alpine` installs the frontend and runs `npm run build`.
+2. `maven:3.9-eclipse-temurin-26` compiles the backend for Java 25 and packs `frontend/dist` into the jar.
+3. `eclipse-temurin:25-jre-alpine` runs that jar. The final image has no Node and no JDK.
 
 ```bash
 cp .env.example .env
@@ -129,7 +136,7 @@ cd backend
 GITHUB_TOKEN=... mvn spring-boot:run
 ```
 
-Frontend:
+Frontend (Node 26):
 
 ```bash
 cd frontend
