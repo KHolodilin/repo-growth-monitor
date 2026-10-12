@@ -764,7 +764,7 @@ function TrafficPanel({
   }, [loadEvents]);
 
   const visibleEvents = useMemo(() => filterGrowthEvents(events, filter), [events, filter]);
-  const option = useMemo(() => trafficChartOption(traffic.traffic, visibleEvents), [traffic, visibleEvents]);
+  const option = useMemo(() => trafficChartOption(traffic.traffic, visibleEvents, period), [traffic, visibleEvents, period]);
 
   return (
     <div className="space-y-4">
