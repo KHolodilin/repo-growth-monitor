@@ -13,7 +13,7 @@ COPY backend/ ./
 COPY --from=frontend /frontend/dist ./src/main/resources/static
 RUN mvn -q -DskipTests package
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=backend /build/target/repo-growth-monitor-*.jar app.jar
