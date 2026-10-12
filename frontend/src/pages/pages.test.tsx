@@ -96,7 +96,7 @@ describe("pages", () => {
 
   it("lists repositories and toggles tracking", async () => {
     const user = userEvent.setup();
-    api.mockImplementation((path: string, init?: RequestInit) => {
+    api.mockImplementation((path: string, _init?: RequestInit) => {
       if (String(path).includes("/tracking")) {
         return json({ ...repository, trackingEnabled: false });
       }
