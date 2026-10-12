@@ -57,22 +57,18 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
   const kind = eventMarkerKind(period);
   const onAxis = new Set(dates);
   const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
-  const captions = new Map(
-    groups.map((group) => {
-      const countText = String(group.events.length);
-      return [group.date, kind === "count" ? countText : eventMarkerLabel(group.events)] as const;
-    }),
-  );
+  const labels = groups.map((group) => {
+    const countText = String(group.events.length);
+    return {
+      date: group.date,
+      text: kind === "count" ? countText : eventMarkerLabel(group.events),
+      countText,
+      events: group.events,
+    };
+  });
   const visibleText = kind === "count"
-    ? captions
-    : labelTexts(
-        dates,
-        groups.map((group) => ({
-          date: group.date,
-          text: captions.get(group.date) ?? "",
-          countText: String(group.events.length),
-        })),
-      );
+    ? new Map(labels.map((label) => [label.date, label.text]))
+    : labelTexts(dates, labels);
   const tooltip = {
     formatter: (params: { data?: { events?: GrowthEvent[] } }) => {
       const items = params.data?.events ?? [];
@@ -102,11 +98,11 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
       },
       lineStyle: { type: "dashed" as const, color: "#0969da", width: 1.5 },
       tooltip,
-      data: groups.map((group) => ({
-        xAxis: group.date,
-        name: visibleText.get(group.date) ?? "",
+      data: labels.map((label) => ({
+        xAxis: label.date,
+        name: visibleText.get(label.date)!,
         label: { show: true, position: "end" as const, distance: LABEL_DISTANCE },
-        events: group.events,
+        events: label.events,
       })),
     },
     markPoint: {

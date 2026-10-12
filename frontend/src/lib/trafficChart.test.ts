@@ -30,12 +30,15 @@ describe("trafficChart", () => {
       ],
     );
     expect(overlays.groups).toHaveLength(4);
+    expect(overlays.markLine.tooltip.formatter({})).toBe("");
     expect(overlays.markLine.tooltip.formatter({ data: {} })).toBe("");
     expect(overlays.markLine.tooltip.formatter({ data: { events: [event("2026-09-20", "A")] } })).toContain("A");
+    expect(overlays.markPoint.label.formatter({})).toBe("");
     expect(overlays.markPoint.label.formatter({ data: { events: [event("2026-09-20", "A"), event("2026-09-20", "B", 2)] } })).toBe(
       "2",
     );
     expect(overlays.markPoint.label.formatter({ data: {} })).toBe("");
+    expect(overlays.markPoint.label.formatter({ data: { events: [event("2026-09-20", "A")], countAsText: false } })).toBe("");
   });
 
   it("formats traffic tooltips and marker clicks", () => {
