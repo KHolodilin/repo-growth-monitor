@@ -80,9 +80,11 @@ describe("utils", () => {
     expect(formatRelativeTime("2026-09-10T01:00:00Z")).toBe("13d ago");
     expect(formatRelativeTime("2026-07-23T01:00:00Z")).toBe("2mo ago");
     expect(formatRelativeTime("2024-09-23T01:00:00Z")).toBe("2y ago");
-    expect(formatActivityPresentation(null)).toBe("Unknown");
-    expect(formatActivityPresentation("ARCHIVED", "2026-09-23T01:00:00Z")).toBe("Archived");
-    expect(formatActivityPresentation("ACTIVE", "2026-09-23T01:00:00Z")).toBe("Active · today");
+    expect(formatActivityPresentation(null)).toBe("—");
+    expect(formatActivityPresentation("ARCHIVED", "2026-09-23T01:00:00Z")).toBe("today");
+    expect(formatActivityPresentation("LOW_ACTIVITY", "2026-07-23T01:00:00Z")).toBe("2mo ago");
+    expect(formatActivityPresentation("INACTIVE")).toBe("—");
+    expect(formatActivityPresentation("ACTIVE", "2026-09-23T01:00:00Z")).toBe("today");
   });
 
   it("fills calendar gaps", () => {

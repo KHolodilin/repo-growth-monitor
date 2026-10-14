@@ -120,16 +120,8 @@ export function formatActivity(status?: string | null) {
   return "Unknown";
 }
 
-export function formatActivityPresentation(status?: string | null, iso?: string | null) {
-  const label = formatActivity(status);
-  if (label === "Unknown") {
-    return "Unknown";
-  }
-  const relative = formatRelativeTime(iso);
-  if (!iso || relative === "—" || label === "Archived") {
-    return label;
-  }
-  return `${label} · ${relative}`;
+export function formatActivityPresentation(_status?: string | null, iso?: string | null) {
+  return formatRelativeTime(iso);
 }
 
 export function activityClass(status?: string | null) {
