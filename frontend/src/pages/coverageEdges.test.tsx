@@ -163,7 +163,7 @@ describe("remaining coverage edges", () => {
     await user.click(screen.getByRole("button", { name: /Growth/ }));
     await user.click(screen.getByRole("button", { name: /Growth/ }));
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
-    await user.click(screen.getAllByText("Active · 1mo ago")[0]);
+    await user.click(screen.getAllByText("1mo ago")[0]);
     expect(await screen.findByText("opened")).toBeInTheDocument();
   });
 

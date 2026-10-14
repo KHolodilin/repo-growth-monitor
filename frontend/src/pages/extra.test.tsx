@@ -216,8 +216,6 @@ describe("extra coverage", () => {
     expect(await screen.findByText("stats down")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(screen.getByText(/successful/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
-    expect(await screen.findByText("collect failed")).toBeInTheDocument();
     details.unmount();
 
     const searchErrors = renderAt("/repositories/13?tab=search", <RepositoryDetailsPage />);
@@ -231,6 +229,24 @@ describe("extra coverage", () => {
     await user.click(screen.getByRole("button", { name: "Run all" }));
     expect(await screen.findByText("topics failed")).toBeInTheDocument();
     topicErrors.unmount();
+
+    api.mockImplementation(async (path: string) => {
+      if (String(path).includes("/collect")) {
+        throw new Error("collect failed");
+      }
+      if (String(path).endsWith("/repositories/13")) {
+        return repository;
+      }
+      if (String(path).includes("/traffic?")) {
+        return { ...traffic, lastCollection: undefined };
+      }
+      return [];
+    });
+    const collectView = renderAt("/repositories/13?tab=overview", <RepositoryDetailsPage />);
+    expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collect now" }));
+    expect(await screen.findByText("collect failed")).toBeInTheDocument();
+    collectView.unmount();
 
     api.mockImplementation(async (path: string) => {
       const url = String(path);

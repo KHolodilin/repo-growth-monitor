@@ -162,6 +162,7 @@ export const dashboardReady: Dashboard = {
       views: 10,
       clones: 2,
       stars: 21,
+      forks: 16,
       growthPercent: 12.5,
       collectionStatus: "PARTIAL",
       jobs: [

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
-import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
+import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -10,7 +10,7 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 
-const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth", "discoverability"] as const;
+const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
 
@@ -27,7 +27,6 @@ export function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [collecting, setCollecting] = useState(false);
 
   async function load() {
     const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}`);
@@ -67,22 +66,13 @@ export function DashboardPage() {
     return () => window.clearInterval(timer);
   }, [collectingFirst, period]);
 
-  async function collectNow() {
-    if (!data || collecting) {
-      return;
+  useEffect(() => {
+    function onCollected() {
+      void load().catch((err: Error) => setError(err.message));
     }
-    setCollecting(true);
-    try {
-      await Promise.all(
-        data.repositories.map((row) => api(`/api/v1/repositories/${row.id}/collect`, { method: "POST" })),
-      );
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setCollecting(false);
-    }
-  }
+    window.addEventListener("repos-collected", onCollected);
+    return () => window.removeEventListener("repos-collected", onCollected);
+  }, [period]);
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -96,7 +86,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <DashboardHeader data={data} period={period} onPeriod={setPeriod} onCollect={collectNow} collecting={collecting} />
+      <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard label="Repositories" value={data.summary.repositories} />
         <TrafficKpi label="Views" metric={data.summary.views} period={period} />
@@ -122,25 +112,19 @@ function DashboardHeader({
   data,
   period,
   onPeriod,
-  onCollect,
-  collecting,
 }: {
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
-  onCollect?: () => void;
-  collecting?: boolean;
 }) {
-  const sync = formatSyncTime(data?.lastSyncAt);
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <h1 className="text-2xl font-semibold">Portfolio</h1>
       <div className="flex flex-col items-end gap-3">
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        {(data?.collectionWarning || data?.partialData?.present) && (
           <div className="text-right text-sm text-muted-foreground">
-            {sync ? <div>Last sync: {sync}</div> : <div>Last sync: —</div>}
             {data?.collectionWarning && (
-              <div className="mt-1 text-amber-700">⚠ {data.collectionWarning.message}</div>
+              <div className="text-amber-700">⚠ {data.collectionWarning.message}</div>
             )}
             {data?.partialData?.present && (
               <div className="group relative mt-1 inline-block text-amber-700">
@@ -151,12 +135,7 @@ function DashboardHeader({
               </div>
             )}
           </div>
-          {onCollect && (
-            <Button disabled={collecting} onClick={onCollect}>
-              {collecting ? "Collecting..." : "Collect now"}
-            </Button>
-          )}
-        </div>
+        )}
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
     </div>
@@ -262,7 +241,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
         <h2 className="font-medium">Repositories</h2>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[1000px] text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
@@ -270,6 +249,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Views" active={sortKey === "views"} dir={sortDir} onClick={() => toggle("views")} />
               <SortHeader label="Clones" active={sortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
               <SortHeader label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
+              <SortHeader label="Forks" active={sortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
               <SortHeader label="Growth" active={sortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
               <SortHeader label="Disc." active={sortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
               <th className="px-5 py-2 font-medium">Activity</th>
@@ -300,6 +280,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.views)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.clones)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.stars)}</td>
+                  <td className="px-5 text-right tabular-nums">{formatNumber(row.forks)}</td>
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
                   </td>

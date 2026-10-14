@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Layout } from "../components/Layout";
 import App from "../App";
 import {
   dashboardReady,
@@ -66,10 +67,17 @@ describe("pages", () => {
     });
     render(
       <MemoryRouter>
-        <DashboardPage />
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<DashboardPage />} />
+          </Route>
+        </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByText("KHolodilin/spring-transactional-outbox-kafka")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Forks" })).toBeInTheDocument();
+    expect(screen.getByText("16")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Speed" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Growth/ }));
     await user.click(screen.getByRole("button", { name: /Collect now/ }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
@@ -193,7 +201,6 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "+ Add event" }));
     await user.type(screen.getByLabelText("Title"), "Posted");
     await user.click(screen.getByRole("button", { name: "Save" }));
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
   }, 20000);
 
   it("shows collection failure and load error on repository page", async () => {

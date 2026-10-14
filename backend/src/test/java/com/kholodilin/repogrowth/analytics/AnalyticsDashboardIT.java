@@ -75,6 +75,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.repositories()).hasSize(2);
         assertThat(dashboard.repositories()).extracting(DashboardResponse.RepositoryRow::fullName)
                 .containsExactlyInAnyOrder("acme/kafka-starter", "acme/spring-outbox");
+        assertThat(dashboard.repositories()).allMatch(row -> row.forks() == 2);
     }
 
     @Test
@@ -142,6 +143,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 .orElseThrow();
         assertThat(kafkaRow.visitors()).isEqualTo(100);
         assertThat(kafkaRow.growthPercent()).isEqualTo(100.0);
+        assertThat(kafkaRow.forks()).isEqualTo(2);
         assertThat(kafkaRow.discoverabilityPassed()).isEqualTo(8);
         assertThat(kafkaRow.collectionStatus()).isEqualTo("PARTIAL");
         assertThat(dashboard.repositories().stream().filter(row -> row.fullName().equals("acme/spring-outbox")).findFirst().orElseThrow().discoverabilityPassed()).isNull();

@@ -353,6 +353,7 @@ public class TrafficJdbcRepository {
                         SELECT r.id,
                                r.full_name,
                                r.stars,
+                               r.forks,
                                r.archived,
                                r.last_commit_at,
                                r.github_pushed_at,
@@ -365,7 +366,7 @@ public class TrafficJdbcRepository {
                          AND t.traffic_date >= :fromDate
                          AND t.traffic_date <= :toDate
                         WHERE r.tracking_enabled = TRUE
-                        GROUP BY r.id, r.full_name, r.stars, r.archived, r.last_commit_at, r.github_pushed_at
+                        GROUP BY r.id, r.full_name, r.stars, r.forks, r.archived, r.last_commit_at, r.github_pushed_at
                         ORDER BY unique_visitors DESC, r.full_name
                         """)
                 .param("fromDate", fromInclusive)
@@ -377,6 +378,7 @@ public class TrafficJdbcRepository {
                         rs.getLong("views"),
                         rs.getLong("clones"),
                         rs.getInt("stars"),
+                        rs.getInt("forks"),
                         rs.getBoolean("archived"),
                         toInstant(rs.getTimestamp("last_commit_at")),
                         toInstant(rs.getTimestamp("github_pushed_at"))
@@ -620,6 +622,7 @@ public class TrafficJdbcRepository {
             long views,
             long clones,
             int stars,
+            int forks,
             boolean archived,
             Instant lastCommitAt,
             Instant githubPushedAt

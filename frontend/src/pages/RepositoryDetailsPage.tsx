@@ -327,36 +327,31 @@ export function RepositoryDetailsPage() {
         {repo.description && (
           <p className="mt-3 border-t pt-3 text-sm font-normal text-muted-foreground">{repo.description}</p>
         )}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t pt-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <a
-              className="text-primary hover:underline"
-              href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Github Traffic
-            </a>
-            <span className="inline-flex items-center gap-1">
-              <StarIcon />
-              {formatNumber(repo.stars)} stars
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <ForkIcon />
-              {formatNumber(repo.forks)} forks
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <WatchIcon />
-              {formatNumber(repo.watchers)} watchers
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <ContributorsIcon />
-              {formatNumber(repo.contributors)} contributors
-            </span>
-          </div>
-          <Button className="shrink-0" disabled={busy} onClick={() => void collect()}>
-            {busy ? "Collecting..." : "Collect now"}
-          </Button>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-sm text-muted-foreground">
+          <a
+            className="text-primary hover:underline"
+            href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Github Traffic
+          </a>
+          <span className="inline-flex items-center gap-1">
+            <StarIcon />
+            {formatNumber(repo.stars)} stars
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <ForkIcon />
+            {formatNumber(repo.forks)} forks
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <WatchIcon />
+            {formatNumber(repo.watchers)} watchers
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <ContributorsIcon />
+            {formatNumber(repo.contributors)} contributors
+          </span>
         </div>
       </header>
       {repo.health && <HealthScoreRow health={repo.health} />}
