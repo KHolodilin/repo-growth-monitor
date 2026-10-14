@@ -91,6 +91,7 @@ export type Dashboard = {
     archived: boolean;
     activityAt?: string | null;
     activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
+    discoverabilityPassed: number | null;
   }[];
 };
 

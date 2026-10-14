@@ -443,5 +443,7 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         when(gitHubClient.searchRepositories(anyString(), anyInt())).thenReturn(
                 new com.kholodilin.repogrowth.github.model.GitHubSearchResponse(1, List.of())
         );
+        when(gitHubClient.getSocialPreview(anyString(), anyString()))
+                .thenReturn(new com.kholodilin.repogrowth.github.model.GitHubSocialPreview(true, "https://img/a.png"));
     }
 }

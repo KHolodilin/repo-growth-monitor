@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
-import { activityClass, cn, formatActivityPresentation, formatChartAxisDate, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
+import { dashboardTrafficOption } from "../lib/dashboardChart";
+import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 
-const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth"] as const;
+const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
 
@@ -212,48 +213,7 @@ function StarsKpi({ stars, period }: { stars: { total: number; change: number | 
 }
 
 function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
-  const option = useMemo(
-    () => ({
-      tooltip: {
-        trigger: "axis",
-        formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
-          if (!Array.isArray(params) || params.length === 0) {
-            return "";
-          }
-          const date = formatChartAxisDate(params[0].axisValue);
-          const rows = params
-            .map((item) => {
-              const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-              return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
-            })
-            .join("");
-          return `<div style="min-width:140px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
-        },
-      },
-      legend: { data: ["Views", "Visitors", "Clones"] },
-      grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
-      xAxis: {
-        type: "category",
-        data: traffic.map((point) => point.date),
-        boundaryGap: traffic.length < 2,
-        axisLabel: {
-          hideOverlap: true,
-          showMinLabel: true,
-          showMaxLabel: true,
-          alignMinLabel: "left",
-          alignMaxLabel: "right",
-          formatter: (value: string) => formatChartAxisDate(String(value)),
-        },
-      },
-      yAxis: { type: "value", name: "Metric value" },
-      series: [
-        { name: "Views", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.views ?? null) },
-        { name: "Visitors", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.visitors ?? null) },
-        { name: "Clones", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.clones ?? null) },
-      ],
-    }),
-    [traffic],
-  );
+  const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
   return (
     <Card>
@@ -302,7 +262,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
         <h2 className="font-medium">Repositories</h2>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[920px] text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
@@ -311,6 +271,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Clones" active={sortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
               <SortHeader label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
               <SortHeader label="Growth" active={sortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
+              <SortHeader label="Disc." active={sortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
               <th className="px-5 py-2 font-medium">Activity</th>
             </tr>
           </thead>
@@ -341,6 +302,9 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.stars)}</td>
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
+                  </td>
+                  <td className="px-5 text-right tabular-nums">
+                    {row.discoverabilityPassed == null ? "—" : row.discoverabilityPassed}
                   </td>
                   <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
                     {formatActivityPresentation(row.activityStatus, row.activityAt)}
@@ -396,6 +360,9 @@ function CollectionHint({ jobs }: { jobs: { jobType: string; status: string }[] 
 function sortValue(row: Dashboard["repositories"][number], key: SortKey): number | null {
   if (key === "growth") {
     return row.growthPercent;
+  }
+  if (key === "discoverability") {
+    return row.discoverabilityPassed;
   }
   return row[key];
 }

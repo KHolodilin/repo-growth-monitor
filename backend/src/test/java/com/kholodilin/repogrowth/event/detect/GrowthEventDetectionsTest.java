@@ -60,7 +60,7 @@ class GrowthEventDetectionsTest {
         GrowthEventState previous = new GrowthEventState(
                 true, "A".repeat(80), "old-sha", "old", List.of("java"), null,
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of("acme"),
-                5, 0, 1, true, true, List.of(), List.of(), List.of()
+                5, 0, 1, true, true, List.of(), List.of(), List.of(), Boolean.FALSE, null
         );
         Instant committed = Instant.parse("2026-09-21T18:00:00Z");
         Instant updated = Instant.parse("2026-09-21T19:00:00Z");
@@ -96,7 +96,7 @@ class GrowthEventDetectionsTest {
         GrowthEventState previous = new GrowthEventState(
                 true, "readme", "sha", "old", List.of("java"), null,
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of("acme"),
-                5, 0, 1, true, true, List.of(), List.of(), List.of()
+                5, 0, 1, true, true, List.of(), List.of(), List.of(), Boolean.FALSE, null
         );
         Instant opened = Instant.parse("2026-08-30T10:00:00Z");
         Instant merged = Instant.parse("2026-08-30T11:00:00Z");
@@ -125,7 +125,7 @@ class GrowthEventDetectionsTest {
         GrowthEventState previous = new GrowthEventState(
                 true, "readme", "sha", "demo", List.of(), null,
                 List.of(), List.of(9L), List.of(), List.of(), List.of(), List.of(),
-                1, 0, 1, true, true, List.of(), List.of(), List.of()
+                1, 0, 1, true, true, List.of(), List.of(), List.of(), Boolean.FALSE, null
         );
         GitHubIssueItem issue = new GitHubIssueItem(
                 9L, 1, "Starter", "open", "https://github.com/acme/demo/issues/1",
@@ -149,7 +149,7 @@ class GrowthEventDetectionsTest {
         GrowthEventState previous = new GrowthEventState(
                 true, "readme", "sha", "demo", List.of(), null,
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                9, 0, 1, true, true, List.of(), List.of(), List.of()
+                9, 0, 1, true, true, List.of(), List.of(), List.of(), Boolean.FALSE, null
         );
         List<CandidateEvent> events = GrowthEventDetections.detect(
                 previous,
@@ -189,11 +189,86 @@ class GrowthEventDetectionsTest {
         assertThat(second).extracting(CandidateEvent::type).doesNotContain(GrowthEventCatalog.RELEASE_PUBLISHED);
     }
 
+    @Test
+    void socialPreviewIsRememberedBeforeItIsCompared() {
+        GrowthEventState previous = initialized();
+        GitHubActivitySnapshot current = previewSnapshot(null, null);
+        assertThat(GrowthEventDetections.detect(previous, current, "acme", NOW)).extracting(CandidateEvent::type)
+                .doesNotContain(GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED);
+        GrowthEventState stored = GrowthEventDetections.snapshot(previous, previewSnapshot(true, "https://img/a.png"), "acme");
+        assertThat(stored.customSocialPreview()).isTrue();
+        assertThat(GrowthEventDetections.detect(stored, previewSnapshot(true, "https://img/a.png"), "acme", NOW))
+                .extracting(CandidateEvent::type)
+                .doesNotContain(GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED);
+    }
+
+    @Test
+    void socialPreviewSetChangeAndRemoval() {
+        GrowthEventState none = withPreview(false, null);
+        CandidateEvent set = GrowthEventDetections.detect(none, previewSnapshot(true, "https://img/a.png"), "acme", NOW)
+                .stream().filter(event -> GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED.equals(event.type())).findFirst().orElseThrow();
+        assertThat(set.title()).isEqualTo("Social preview set");
+
+        GrowthEventState custom = withPreview(true, "https://img/a.png");
+        CandidateEvent changed = GrowthEventDetections.detect(custom, previewSnapshot(true, "https://img/b.png"), "acme", NOW)
+                .stream().filter(event -> GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED.equals(event.type())).findFirst().orElseThrow();
+        assertThat(changed.title()).isEqualTo("Social preview changed");
+
+        CandidateEvent removed = GrowthEventDetections.detect(custom, previewSnapshot(false, "https://generated"), "acme", NOW)
+                .stream().filter(event -> GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED.equals(event.type())).findFirst().orElseThrow();
+        assertThat(removed.title()).isEqualTo("Social preview removed");
+
+        assertThat(GrowthEventDetections.detect(none, previewSnapshot(false, "https://generated"), "acme", NOW))
+                .extracting(CandidateEvent::type)
+                .doesNotContain(GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED);
+        assertThat(GrowthEventCatalog.automaticDefaults().get(GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED)).isTrue();
+    }
+
+    @Test
+    void oldStateJsonWithoutSocialPreviewDoesNotInventAValue() throws Exception {
+        String json = """
+                {"initialized":true,"readmeText":"readme","readmeSha":"sha","description":"demo","topics":[],
+                "stars":1,"forks":0,"contributors":1,"firstExternalContributorRecorded":true,"firstExternalForkRecorded":true}
+                """;
+        GrowthEventState state = tools.jackson.databind.json.JsonMapper.builder().build().readValue(json, GrowthEventState.class);
+        assertThat(state.customSocialPreview()).isNull();
+        assertThat(GrowthEventDetections.detect(state, previewSnapshot(true, "https://img/a.png"), "acme", NOW))
+                .extracting(CandidateEvent::type)
+                .doesNotContain(GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED);
+        assertThat(GrowthEventDetections.snapshot(state, previewSnapshot(true, "https://img/a.png"), "acme").customSocialPreview()).isTrue();
+    }
+
+    private static GitHubActivitySnapshot previewSnapshot(Boolean custom, String url) {
+        return new GitHubActivitySnapshot(
+                repo("demo", List.of(), null, 1, 0),
+                "readme",
+                "sha",
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                custom,
+                url
+        );
+    }
+
+    private static GrowthEventState withPreview(boolean custom, String url) {
+        GrowthEventState base = initialized();
+        return new GrowthEventState(
+                base.initialized(), base.readmeText(), base.readmeSha(), base.description(), base.topics(), base.homepage(),
+                base.gfiIssueIds(), base.issueIds(), base.openedPrIds(), base.mergedPrIds(), base.releaseIds(), base.contributorLogins(),
+                base.stars(), base.forks(), base.contributors(), base.firstExternalContributorRecorded(), base.firstExternalForkRecorded(),
+                base.firedStarMilestones(), base.firedForkMilestones(), base.firedContributorMilestones(),
+                custom, url
+        );
+    }
+
     private static GrowthEventState initialized() {
         return new GrowthEventState(
                 true, "readme", "sha", "demo", List.of(), null,
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                1, 0, 1, true, true, List.of(), List.of(), List.of()
+                1, 0, 1, true, true, List.of(), List.of(), List.of(), Boolean.FALSE, null
         );
     }
 
@@ -218,7 +293,9 @@ class GrowthEventDetectionsTest {
             List<GitHubReleaseItem> releases,
             List<GitHubContributorItem> contributors
     ) {
-        return new GitHubActivitySnapshot(repository, readme, readmeSha, readmeCommittedAt, issues, pulls, releases, contributors);
+        return new GitHubActivitySnapshot(
+                repository, readme, readmeSha, readmeCommittedAt, issues, pulls, releases, contributors, Boolean.FALSE, null
+        );
     }
 
     private static GitHubRepositoryResponse repo(String description, List<String> topics, String homepage, int stars, int forks) {

@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-social-preview
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE repository_health
+                  ADD COLUMN has_social_preview BOOLEAN NOT NULL DEFAULT FALSE;

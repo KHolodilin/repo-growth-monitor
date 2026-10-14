@@ -44,6 +44,7 @@ public class RepositoryHealthEvaluator {
                 new HealthCheckItem("README has H1", facts.readmeHasH1()),
                 new HealthCheckItem("README contains repository name / target terms", facts.readmeHasName()),
                 new HealthCheckItem("Homepage URL configured", facts.homepage() != null && !facts.homepage().isBlank()),
+                new HealthCheckItem("Social preview configured", facts.hasSocialPreview()),
                 new HealthCheckItem("License exists", facts.hasLicense()),
                 new HealthCheckItem("Repository not archived", !repository.archived()),
                 new HealthCheckItem("Recent commit <= 90 days", recentCommit),

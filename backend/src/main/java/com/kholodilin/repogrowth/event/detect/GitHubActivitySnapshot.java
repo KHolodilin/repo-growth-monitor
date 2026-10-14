@@ -17,7 +17,10 @@ public record GitHubActivitySnapshot(
         List<GitHubIssueItem> issues,
         List<GitHubPullItem> pulls,
         List<GitHubReleaseItem> releases,
-        List<GitHubContributorItem> contributors
+        List<GitHubContributorItem> contributors,
+        /** Null when this collection could not read the social preview. */
+        Boolean customSocialPreview,
+        String socialPreviewUrl
 ) {
     public List<GitHubIssueItem> issuesOrEmpty() {
         return issues == null ? List.of() : issues;

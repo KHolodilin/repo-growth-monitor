@@ -16,6 +16,7 @@ describe("statsChart", () => {
         { axisValue: "2026-09-23", seriesName: "Forks", data: null },
       ]),
     ).toContain("Stars");
+    expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(option.xAxis.boundaryGap).toBe(true);
   });

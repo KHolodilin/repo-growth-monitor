@@ -30,6 +30,10 @@ describe("snapshotHistory", () => {
     expect(latestValue(empty, "VISITORS")).toBe(0);
     expect(latestValue(github, "VISITORS")).toBe(3);
     expect(defaultTopKeys([other, github, empty], "VISITORS", 2)).toEqual(["github.com", "other"]);
+    const tied = { key: "aaa", cells: [cell({ visitors: 3, views: 1 })] };
+    const tiedLater = { key: "bbb", cells: [cell({ visitors: 3, views: 1 })] };
+    expect(defaultTopKeys([tiedLater, tied], "VISITORS", 2)).toEqual(["aaa", "bbb"]);
+    expect(defaultTopKeys([tiedLater, tied], "VIEWS", 1)).toEqual(["aaa"]);
   });
 
   it("formats snapshot deltas", () => {

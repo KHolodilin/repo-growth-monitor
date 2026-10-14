@@ -62,6 +62,7 @@ describe("sortTopicHistories rank", () => {
     expect(compareQueryRows(exited, unchanged, "change", "asc")).not.toBe(0);
     expect(compareQueryRows(unchanged, none, "change", "asc")).not.toBe(0);
     expect(compareQueryRows(improved, declined, "results", "asc")).toBeLessThan(0);
+    expect(compareQueryRows(entered, improved, "results", "asc")).not.toBe(0);
     expect(compareQueryRows(improved, declined, "name", "desc")).toBeGreaterThan(0);
     expect(compareQueryRows(improved, { ...declined, change7d: 4 }, "change7d", "asc")).toBeLessThan(0);
     expect(compareQueryRows(improved, { ...declined, change30d: 9 }, "change30d", "asc")).toBeLessThan(0);

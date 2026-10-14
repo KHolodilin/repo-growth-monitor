@@ -7,6 +7,7 @@ export const AUTOMATIC_SETTING_LABELS: { type: string; label: string }[] = [
   { type: "DESCRIPTION_CHANGED", label: "Description changed" },
   { type: "TOPICS_CHANGED", label: "Topics changed" },
   { type: "HOMEPAGE_CHANGED", label: "Homepage changed" },
+  { type: "SOCIAL_PREVIEW_CHANGED", label: "Social preview changed" },
   { type: "GOOD_FIRST_ISSUE_PUBLISHED", label: "Good first issue published" },
   { type: "EXTERNAL_ISSUE_OPENED", label: "External issue opened" },
   { type: "EXTERNAL_PR_OPENED", label: "External pull request opened" },

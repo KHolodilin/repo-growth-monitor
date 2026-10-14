@@ -86,7 +86,11 @@ public final class GrowthEventDetections {
                 firstFork,
                 crossed(previous.firedStarMilestonesOrEmpty(), previous.stars(), repository.stargazersCount(), GrowthEventCatalog.STAR_THRESHOLDS, previous.initialized()),
                 crossed(previous.firedForkMilestonesOrEmpty(), previous.forks(), repository.forksCount(), GrowthEventCatalog.FORK_THRESHOLDS, previous.initialized()),
-                crossed(previous.firedContributorMilestonesOrEmpty(), previous.contributors(), contributorLogins.size(), GrowthEventCatalog.CONTRIBUTOR_THRESHOLDS, previous.initialized())
+                crossed(previous.firedContributorMilestonesOrEmpty(), previous.contributors(), contributorLogins.size(), GrowthEventCatalog.CONTRIBUTOR_THRESHOLDS, previous.initialized()),
+                current.customSocialPreview() != null ? current.customSocialPreview() : previous.customSocialPreview(),
+                current.customSocialPreview() == null
+                        ? previous.socialPreviewUrl()
+                        : (Boolean.TRUE.equals(current.customSocialPreview()) ? blankToNull(current.socialPreviewUrl()) : null)
         );
     }
 
@@ -143,7 +147,46 @@ public final class GrowthEventDetections {
                     "homepage:" + Objects.requireNonNullElse(repository.homepage(), "")
             ));
         }
+        events.addAll(socialPreview(previous, current, collectedAt, repository.htmlUrl()));
         return events;
+    }
+
+    static List<CandidateEvent> socialPreview(
+            GrowthEventState previous,
+            GitHubActivitySnapshot current,
+            Instant collectedAt,
+            String repositoryUrl
+    ) {
+        Boolean previousCustom = previous.customSocialPreview();
+        Boolean currentCustom = current.customSocialPreview();
+        if (previousCustom == null || currentCustom == null) {
+            return List.of();
+        }
+        String previousUrl = normalize(previous.socialPreviewUrl());
+        String currentUrl = Boolean.TRUE.equals(currentCustom) ? normalize(current.socialPreviewUrl()) : null;
+        String title = null;
+        if (!previousCustom && currentCustom) {
+            title = "Social preview set";
+        } else if (previousCustom && currentCustom && !Objects.equals(previousUrl, currentUrl)) {
+            title = "Social preview changed";
+        } else if (previousCustom && !currentCustom) {
+            title = "Social preview removed";
+        }
+        if (title == null) {
+            return List.of();
+        }
+        String externalId = "social-preview:" + previousCustom + ":" + Objects.requireNonNullElse(previousUrl, "")
+                + ">" + currentCustom + ":" + Objects.requireNonNullElse(currentUrl, "");
+        return List.of(new CandidateEvent(
+                collectedAt,
+                GrowthEventCatalog.CATEGORY_DISCOVERABILITY,
+                GrowthEventCatalog.SOCIAL_PREVIEW_CHANGED,
+                title,
+                currentUrl,
+                repositoryUrl,
+                GrowthEventCatalog.SOURCE_GITHUB,
+                externalId
+        ));
     }
 
     static List<CandidateEvent> community(

@@ -86,6 +86,8 @@ describe("coverage gaps", () => {
     await user.click(screen.getByRole("button", { name: /Views/ }));
     await user.click(screen.getByRole("button", { name: /Clones/ }));
     await user.click(screen.getByRole("button", { name: /Stars/ }));
+    await user.click(screen.getByRole("button", { name: /Disc\./ }));
+    expect(screen.getAllByText("11").length).toBeGreaterThan(0);
     await user.click(screen.getByText("KHolodilin/other"));
     expect(await screen.findByText("opened")).toBeInTheDocument();
   });
@@ -151,6 +153,13 @@ describe("coverage gaps", () => {
     await user.click(screen.getByLabelText("Star milestones"));
     expect(await screen.findByText("save failed")).toBeInTheDocument();
     unmount();
+
+    api.mockResolvedValueOnce([{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }]);
+    render(<GrowthEventSettingsCard repositoryId={9} />);
+    expect(await screen.findByText("Star milestones")).toBeInTheDocument();
+    api.mockRejectedValueOnce("nope");
+    await user.click(screen.getByLabelText("Star milestones"));
+    expect(await screen.findByText("Failed to update settings")).toBeInTheDocument();
 
     api.mockRejectedValue(new Error("gone"));
     const missing = render(

@@ -90,6 +90,9 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
 
         trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 0);
         trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1, 0);
+        repositoryJdbcRepository.upsertHealth(kafka.id(), new com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts(
+                "https://example.com", true, true, true, true, true, true, true, true, true, true
+        ));
 
         CollectionRun kafkaRun = runRepository.insertIgnore(kafka.id(), today, 4);
         jobRepository.insertIgnore(kafkaRun.id(), kafka.id(), today, CollectionJobType.TRAFFIC);
@@ -139,7 +142,9 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 .orElseThrow();
         assertThat(kafkaRow.visitors()).isEqualTo(100);
         assertThat(kafkaRow.growthPercent()).isEqualTo(100.0);
+        assertThat(kafkaRow.discoverabilityPassed()).isEqualTo(8);
         assertThat(kafkaRow.collectionStatus()).isEqualTo("PARTIAL");
+        assertThat(dashboard.repositories().stream().filter(row -> row.fullName().equals("acme/spring-outbox")).findFirst().orElseThrow().discoverabilityPassed()).isNull();
         assertThat(kafkaRow.jobs()).extracting(DashboardResponse.JobStatus::jobType)
                 .contains("TRAFFIC", "POPULAR_PATHS");
 
@@ -271,6 +276,14 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThatThrownBy(() -> analyticsService.snapshotHistory(kafka.id(), "sources", 7, false))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("sources");
+        assertThat(analyticsService.snapshotHistory(kafka.id(), "paths", null, true).days()).isPositive();
+        assertThat(analyticsService.portfolio("7d").repositories()).isEqualTo(2);
+        assertThat(analyticsService.portfolio("all").stars()).isEqualTo(169);
+        assertThat(analyticsService.portfolio("1d").repositories()).isEqualTo(2);
+        assertThat(analyticsService.portfolio("90d").repositories()).isEqualTo(2);
+        assertThat(analyticsService.portfolio("1y").repositories()).isEqualTo(2);
+        assertThat(analyticsService.portfolio("nope").repositories()).isEqualTo(2);
+        assertThat(analyticsService.traffic(kafka.id(), "all", true).repository().id()).isEqualTo(kafka.id());
     }
 
     private void createRepos() {

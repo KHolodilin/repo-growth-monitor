@@ -57,6 +57,21 @@ describe("trafficChart", () => {
         { axisValue: "2026-09-23", seriesName: "Visitors", data: null },
       ]),
     ).toContain("Launch");
+    expect((option.tooltip.formatter as (params: unknown) => string)("nope")).toBe("");
+    expect(
+      (option.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null | undefined }[]) => string)([
+        { axisValue: "2026-09-01", seriesName: "Views", data: undefined },
+      ]),
+    ).not.toContain("Launch");
+    const sparse = trafficChartOption(
+      [{ date: "2026-09-23", views: 1, uniqueVisitors: 1, clones: 0, uniqueCloners: 0 }],
+      [{ ...event("2026-09-21", "Only"), title: undefined as unknown as string }],
+    );
+    expect(sparse.series[0].data).toContain(null);
+    expect(sparse.series[1].data).toContain(null);
+    expect(sparse.series[2].data).toContain(null);
+    expect(sparse.series[3].markPoint.data[0].name).toBe("Events");
+    expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(markLineEvents({ componentType: "series" })).toEqual([]);
     expect(markLineEvents({ componentType: "markLine", data: { events: [event("2026-09-23", "Launch")] } })).toHaveLength(

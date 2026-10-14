@@ -10,9 +10,10 @@ public record RepositoryHealthFacts(
         boolean hasContributing,
         boolean hasSecurityPolicy,
         boolean hasIssueTemplate,
-        boolean hasPullRequestTemplate
+        boolean hasPullRequestTemplate,
+        boolean hasSocialPreview
 ) {
     public static RepositoryHealthFacts empty() {
-        return new RepositoryHealthFacts(null, false, false, false, false, false, false, false, false, false);
+        return new RepositoryHealthFacts(null, false, false, false, false, false, false, false, false, false, false);
     }
 }

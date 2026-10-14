@@ -15,6 +15,9 @@ vi.mock("echarts-for-react", () => ({
       >
         legend
       </button>
+      <button type="button" onClick={() => onEvents?.legendselectchanged?.({})}>
+        legend-empty
+      </button>
       <button
         type="button"
         onClick={() =>

@@ -58,5 +58,16 @@ describe("api", () => {
       }),
     );
     await expect(api("/api/v1/x")).rejects.toThrow("Server Error");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: "",
+        json: async () => ({}),
+      }),
+    );
+    await expect(api("/api/v1/x")).rejects.toThrow("Request failed");
   });
 });

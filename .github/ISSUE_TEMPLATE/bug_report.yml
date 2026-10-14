@@ -1,0 +1,29 @@
+name: Bug report
+description: Something in Repo Growth Monitor does not behave as expected.
+title: ""
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include a GitHub token, database password, or the contents of `.env`.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: Release tag or commit, and whether this is Docker, the mock stack, or a local checkout.
+      placeholder: 0.11.1, docker compose
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant logs with secrets removed.
+      render: text

@@ -18,6 +18,7 @@ import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
+import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
@@ -66,6 +67,7 @@ public class AnalyticsService {
     private final CollectionJobJdbcRepository jobRepository;
     private final CollectionController collectionController;
     private final ActivityClassifier activityClassifier;
+    private final RepositoryHealthService healthService;
     private final Clock clock;
 
     public AnalyticsService(
@@ -75,6 +77,7 @@ public class AnalyticsService {
             CollectionJobJdbcRepository jobRepository,
             CollectionController collectionController,
             ActivityClassifier activityClassifier,
+            RepositoryHealthService healthService,
             Clock clock
     ) {
         this.repositoryService = repositoryService;
@@ -83,6 +86,7 @@ public class AnalyticsService {
         this.jobRepository = jobRepository;
         this.collectionController = collectionController;
         this.activityClassifier = activityClassifier;
+        this.healthService = healthService;
         this.clock = clock;
     }
 
@@ -301,9 +305,10 @@ public class AnalyticsService {
                         latestRuns.stream().map(CollectionRun::id).toList()
                 ).stream()
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
+        Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
         List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
                 .stream()
-                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun))
+                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability))
                 .toList();
         int partialCount = (int) latestRuns.stream()
                 .filter(run -> run.status() == CollectionRunStatus.PARTIAL)
@@ -338,6 +343,7 @@ public class AnalyticsService {
                 ).stream()
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
+        Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
         List<RepositoryRow> rows = tracked.stream()
                 .map(repository -> {
                     CollectionRun run = runByRepo.get(repository.id());
@@ -359,7 +365,8 @@ public class AnalyticsService {
                             jobs,
                             repository.archived(),
                             activityAt,
-                            activityClassifier.classify(repository.archived(), activityAt).name()
+                            activityClassifier.classify(repository.archived(), activityAt).name(),
+                            discoverability.get(repository.id())
                     );
                 })
                 .toList();
@@ -421,7 +428,8 @@ public class AnalyticsService {
             DashboardPeriod period,
             Map<Long, Long> previousVisitors,
             Map<Long, CollectionRun> runByRepo,
-            Map<Long, List<CollectionJob>> jobsByRun
+            Map<Long, List<CollectionJob>> jobsByRun,
+            Map<Long, Integer> discoverability
     ) {
         Double growth = period.allTime()
                 ? null
@@ -446,8 +454,17 @@ public class AnalyticsService {
                 jobs,
                 row.archived(),
                 activityAt,
-                activityStatus.name()
+                activityStatus.name(),
+                discoverability.get(row.repositoryId())
         );
+    }
+
+    private Map<Long, Integer> discoverabilityByRepo(List<Repository> tracked) {
+        Map<Long, Integer> scores = new HashMap<>();
+        for (Repository repository : tracked) {
+            scores.put(repository.id(), healthService.discoverabilityPassed(repository));
+        }
+        return scores;
     }
 
     private List<TrafficPoint> series(DashboardPeriod period) {

@@ -13,6 +13,7 @@ import com.kholodilin.repogrowth.event.persistence.GrowthEventStateJdbcRepositor
 import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
+import com.kholodilin.repogrowth.github.model.GitHubSocialPreview;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -64,6 +65,15 @@ public class GrowthEventsCollector implements Collector {
         Instant readmeCommittedAt = readme == null || readme.name() == null || readme.name().isBlank()
                 ? null
                 : gitHubClient.latestCommitAt(owner, name, readme.name()).orElse(null);
+        Boolean customPreview = null;
+        String previewUrl = null;
+        try {
+            GitHubSocialPreview preview = gitHubClient.getSocialPreview(owner, name);
+            customPreview = preview.custom();
+            previewUrl = preview.imageUrl();
+        } catch (RuntimeException ex) {
+            log.warn("Social preview lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
+        }
         GitHubActivitySnapshot snapshot = new GitHubActivitySnapshot(
                 remote,
                 readme == null ? null : readme.decodedText(),
@@ -72,7 +82,9 @@ public class GrowthEventsCollector implements Collector {
                 gitHubClient.listIssues(owner, name),
                 gitHubClient.listPulls(owner, name),
                 gitHubClient.listReleases(owner, name),
-                gitHubClient.listContributors(owner, name)
+                gitHubClient.listContributors(owner, name),
+                customPreview,
+                previewUrl
         );
         Instant collectedAt = Instant.now(clock);
         transactionTemplate.executeWithoutResult(status -> {
