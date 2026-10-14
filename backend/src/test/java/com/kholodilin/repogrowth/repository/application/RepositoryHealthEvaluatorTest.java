@@ -52,5 +52,9 @@ class RepositoryHealthEvaluatorTest {
         assertThat(health.discoverability()).filteredOn(item -> item.passed()).extracting(item -> item.label())
                 .containsExactly("Repository description exists");
         assertThat(health.communityStandards()).noneMatch(item -> item.passed());
+        assertThat(evaluator.competitorDiscoverability(null, 0, true, null, null, RepositoryHealthFacts.empty()))
+                .extracting(item -> item.label())
+                .doesNotContain("Search Queries configured")
+                .hasSize(12);
     }
 }

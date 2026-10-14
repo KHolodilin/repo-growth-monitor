@@ -15,3 +15,5 @@ databaseChangeLog:
       file: db/changelog/007-topic-visibility.yaml
   - include:
       file: db/changelog/008-social-preview.yaml
+  - include:
+      file: db/changelog/009-competitor-profile.yaml

@@ -1,0 +1,24 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-competitor-profile
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE competitor_profile (
+                  github_repository_id BIGINT PRIMARY KEY,
+                  full_name TEXT NOT NULL,
+                  description TEXT,
+                  html_url TEXT NOT NULL,
+                  topics TEXT NOT NULL,
+                  homepage TEXT,
+                  archived BOOLEAN NOT NULL,
+                  last_commit_at TIMESTAMP,
+                  last_release_at TIMESTAMP,
+                  has_readme BOOLEAN NOT NULL,
+                  readme_has_h1 BOOLEAN NOT NULL,
+                  readme_has_name BOOLEAN NOT NULL,
+                  has_license BOOLEAN NOT NULL,
+                  has_social_preview BOOLEAN NOT NULL,
+                  fetched_at TIMESTAMP NOT NULL
+              );

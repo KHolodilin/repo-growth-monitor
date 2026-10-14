@@ -302,6 +302,19 @@ public class SearchRunJdbcRepository {
                 .optional();
     }
 
+    public List<LocalDate> snapshotDates(long searchQueryId) {
+        return jdbcClient.sql("""
+                        SELECT business_date
+                        FROM search_run
+                        WHERE search_query_id = :searchQueryId
+                          AND snapshot_at IS NOT NULL
+                        ORDER BY business_date
+                        """)
+                .param("searchQueryId", searchQueryId)
+                .query((rs, rowNum) -> rs.getObject("business_date", LocalDate.class))
+                .list();
+    }
+
     public int countByStatus(SearchRunStatus status) {
         return jdbcClient.sql("SELECT COUNT(*) FROM search_run WHERE status = :status")
                 .param("status", status.name())

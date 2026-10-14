@@ -32,6 +32,7 @@ import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.search.api.SearchQueryController;
 import com.kholodilin.repogrowth.search.application.ActivityClassifier;
+import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
@@ -102,6 +103,8 @@ class ApiControllersWebMvcTest {
     @MockitoBean
     SearchQueryService searchQueryService;
     @MockitoBean
+    CompetitorCardService competitorCardService;
+    @MockitoBean
     GrowthEventService growthEventService;
     @MockitoBean
     TopicVisibilityService topicVisibilityService;
@@ -164,6 +167,15 @@ class ApiControllersWebMvcTest {
         when(searchQueryService.latestResults(5L)).thenReturn(results);
         when(searchQueryService.results(9L)).thenReturn(results);
         when(searchQueryService.series(5L)).thenReturn(new SearchQueryService.SearchSeries(List.of()));
+        when(competitorCardService.card(5L, 1L)).thenReturn(new CompetitorCardService.CompetitorCard(
+                1L,
+                "other/repo",
+                "A neighbor worth reading",
+                "https://github.com/other/repo",
+                List.of("kafka"),
+                List.of(new HealthCheckItem("Repository description exists", true)),
+                List.of(new CompetitorCardService.CompetitorPoint(LocalDate.of(2026, 9, 23), 10, 2))
+        ));
         GrowthEvent event = new GrowthEvent(1L, 13L, now, "PROMOTION", "LINKEDIN_POST", "Posted", null, null, "MANUAL", null, now, now);
         when(growthEventService.list(eq(13L), anyString())).thenReturn(List.of(event));
         when(growthEventService.createManual(eq(13L), any(), any(), any(), any(), any())).thenReturn(event);
@@ -228,6 +240,10 @@ class ApiControllersWebMvcTest {
         mockMvc.perform(get("/api/v1/search-queries/5/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/search-queries/5/series")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.series").isEmpty());
+        mockMvc.perform(get("/api/v1/search-queries/5/competitors/1")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("other/repo"))
+                .andExpect(jsonPath("$.discoverability[0].label").value("Repository description exists"))
+                .andExpect(jsonPath("$.points[0].stars").value(10));
         mockMvc.perform(get("/api/v1/search-runs/9/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/growth-events")).andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/repositories/13/growth-events")

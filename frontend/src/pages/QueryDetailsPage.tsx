@@ -206,6 +206,11 @@ export function QueryDetailsPage() {
             onToggle={(id) =>
               setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
             }
+            nameTo={(row) =>
+              row.result.githubRepositoryId === repo.githubId
+                ? null
+                : `/repositories/${repo.id}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
+            }
           />
         )}
       </Card>

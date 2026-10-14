@@ -33,6 +33,7 @@ public abstract class AbstractPostgresTest {
     }
 
     protected void wipeRepositoryData(JdbcClient jdbcClient) {
+        jdbcClient.sql("DELETE FROM competitor_profile").update();
         jdbcClient.sql("DELETE FROM topic_result").update();
         jdbcClient.sql("DELETE FROM topic_run").update();
         jdbcClient.sql("DELETE FROM topic_watch").update();

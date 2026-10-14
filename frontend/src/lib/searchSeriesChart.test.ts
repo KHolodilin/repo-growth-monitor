@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { queryChartLines, queryDetailsChart, searchMetricOption, searchSeriesFromPayload } from "./searchSeriesChart";
+import { queryChartLines, queryDetailsChart, searchMetricOption, searchSeriesFromPayload, storedCountOption } from "./searchSeriesChart";
 
 const lines = queryChartLines({
   snapshotDates: ["2026-09-22", "2026-09-23"],
@@ -141,5 +141,20 @@ describe("searchSeriesChart", () => {
     });
     expect(storedOurs?.series).toEqual([{ key: "99", name: "acme/app" }]);
     expect((storedOurs?.option.series as { data: (number | null)[] }[]).map((item) => item.data)).toEqual([[16]]);
+  });
+
+  it("leaves an empty point where the neighbor was outside the result limit", () => {
+    const option = storedCountOption({
+      dates: ["2026-09-22", "2026-09-23"],
+      series: [
+        { name: "Stars", data: [10, null] },
+        { name: "Forks", data: [1, null] },
+      ],
+    });
+    expect(option.series.map((item) => item.data)).toEqual([
+      [10, null],
+      [1, null],
+    ]);
+    expect(option.series.every((item) => item.connectNulls === false)).toBe(true);
   });
 });
