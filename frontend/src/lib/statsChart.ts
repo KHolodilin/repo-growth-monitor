@@ -21,7 +21,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
       },
     },
-    legend: { data: ["Stars", "Forks", "Watchers", "Contributors"] },
+    legend: { top: 0, data: ["Stars", "Forks", "Watchers", "Contributors"] },
     grid: {
       left: 48,
       right: 24,

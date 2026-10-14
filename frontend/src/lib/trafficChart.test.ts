@@ -57,6 +57,7 @@ describe("trafficChart", () => {
         { axisValue: "2026-09-23", seriesName: "Visitors", data: null },
       ]),
     ).toContain("Launch");
+    expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(markLineEvents({ componentType: "series" })).toEqual([]);
     expect(markLineEvents({ componentType: "markLine", data: { events: [event("2026-09-23", "Launch")] } })).toHaveLength(

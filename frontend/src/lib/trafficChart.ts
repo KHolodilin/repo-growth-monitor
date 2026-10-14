@@ -171,7 +171,7 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
         return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}${eventRows}</div>`;
       },
     },
-    legend: { data: ["Views", "Visitors", "Unique Cloners"] },
+    legend: { top: 0, data: ["Views", "Visitors", "Unique Cloners"] },
     grid: {
       left: 48,
       right: 72,

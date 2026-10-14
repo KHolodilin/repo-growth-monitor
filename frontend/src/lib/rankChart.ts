@@ -56,7 +56,7 @@ export function rankHistoryOption({
         return `<div>${formatChartAxisDate(date)}<br/>${rows}</div>`;
       },
     },
-    legend: legend ? { type: "scroll", data: series.map((item) => item.name) } : undefined,
+    legend: legend ? { top: 0, type: "scroll", data: series.map((item) => item.name) } : undefined,
     grid: { left: 48, right: 72, top: legend ? 48 : 24, bottom: 40, containLabel: false },
     xAxis: {
       type: "category",

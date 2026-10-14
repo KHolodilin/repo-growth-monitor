@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
-import { activityClass, cn, formatActivityPresentation, formatChartAxisDate, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
+import { dashboardTrafficOption } from "../lib/dashboardChart";
+import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -212,48 +213,7 @@ function StarsKpi({ stars, period }: { stars: { total: number; change: number | 
 }
 
 function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
-  const option = useMemo(
-    () => ({
-      tooltip: {
-        trigger: "axis",
-        formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
-          if (!Array.isArray(params) || params.length === 0) {
-            return "";
-          }
-          const date = formatChartAxisDate(params[0].axisValue);
-          const rows = params
-            .map((item) => {
-              const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-              return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
-            })
-            .join("");
-          return `<div style="min-width:140px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
-        },
-      },
-      legend: { data: ["Views", "Visitors", "Clones"] },
-      grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
-      xAxis: {
-        type: "category",
-        data: traffic.map((point) => point.date),
-        boundaryGap: traffic.length < 2,
-        axisLabel: {
-          hideOverlap: true,
-          showMinLabel: true,
-          showMaxLabel: true,
-          alignMinLabel: "left",
-          alignMaxLabel: "right",
-          formatter: (value: string) => formatChartAxisDate(String(value)),
-        },
-      },
-      yAxis: { type: "value", name: "Metric value" },
-      series: [
-        { name: "Views", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.views ?? null) },
-        { name: "Visitors", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.visitors ?? null) },
-        { name: "Clones", type: "line", showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.clones ?? null) },
-      ],
-    }),
-    [traffic],
-  );
+  const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
   return (
     <Card>

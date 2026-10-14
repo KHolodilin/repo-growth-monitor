@@ -33,6 +33,7 @@ describe("rankChart", () => {
     expect(option.yAxis.axisLabel.formatter(51)).toBe(">50");
     expect(option.yAxis.axisLabel.formatter(3)).toBe("#3");
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
+    expect(option.legend).toMatchObject({ top: 0 });
     expect(option.series).toHaveLength(3);
   });
 
