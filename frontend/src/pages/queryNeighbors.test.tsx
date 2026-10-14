@@ -59,7 +59,7 @@ describe("query neighbor chart", () => {
     );
     expect(screen.getByRole("link", { name: repository.fullName })).toHaveAttribute(
       "href",
-      repository.githubUrl,
+      `/repositories/13/search-queries/5/competitors/${repository.githubId}`,
     );
     expect(screen.queryByRole("checkbox", { name: `Show ${repository.fullName} on the chart` })).not.toBeInTheDocument();
     await user.click(neighbor);
