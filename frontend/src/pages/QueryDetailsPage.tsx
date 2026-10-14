@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import ReactECharts from "echarts-for-react";
 import { api, type Repository, type SearchHistory, type SearchRunResults } from "../lib/api";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
+import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { SearchResultsTable } from "../components/SearchResultsTable";
@@ -156,7 +156,12 @@ export function QueryDetailsPage() {
               ranking, so these days stay empty.
             </p>
           )}
-          <ReactECharts option={option} style={{ height: 360, width: "100%" }} />
+          <PersistentECharts
+            chartId={`${repo.id}:query:${history.query.id}`}
+            series={[{ key: String(history.query.id), name: history.query.name }]}
+            option={option}
+            style={{ height: 360, width: "100%" }}
+          />
         </Card>
       )}
 

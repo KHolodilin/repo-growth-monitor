@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import ReactECharts from "echarts-for-react";
 import { readChartSelection, writeChartSelection } from "../lib/chartLegend";
+import { chartCsv, chartExportBase, downloadChartCsv, downloadChartPng } from "../lib/chartExport";
 
 type SeriesRef = { key: string; name: string };
 
@@ -10,6 +11,7 @@ type Props = {
 } & ComponentProps<typeof ReactECharts>;
 
 export function PersistentECharts({ chartId, series, option, onEvents, ...rest }: Props) {
+  const chartRef = useRef<ReactECharts>(null);
   const [stored, setStored] = useState<Record<string, boolean> | null>(() => readChartSelection(chartId));
 
   useEffect(() => {
@@ -45,12 +47,35 @@ export function PersistentECharts({ chartId, series, option, onEvents, ...rest }
     setStored(next);
   }
 
+  const fileBase = chartExportBase(chartId);
+
   return (
-    <ReactECharts
-      option={mergedOption}
-      notMerge
-      onEvents={{ ...onEvents, legendselectchanged: onLegendSelectChanged }}
-      {...rest}
-    />
+    <div>
+      <div className="mb-2 flex justify-end gap-2">
+        <button
+          type="button"
+          className="rounded-md border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted"
+          aria-label="Download PNG"
+          onClick={() => downloadChartPng(chartRef.current, `${fileBase}.png`)}
+        >
+          PNG
+        </button>
+        <button
+          type="button"
+          className="rounded-md border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted"
+          aria-label="Download CSV"
+          onClick={() => downloadChartCsv(`${fileBase}.csv`, chartCsv(mergedOption))}
+        >
+          CSV
+        </button>
+      </div>
+      <ReactECharts
+        option={mergedOption}
+        notMerge
+        onEvents={{ ...onEvents, legendselectchanged: onLegendSelectChanged }}
+        {...rest}
+        ref={chartRef}
+      />
+    </div>
   );
 }
