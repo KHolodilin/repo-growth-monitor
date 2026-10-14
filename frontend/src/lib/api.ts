@@ -85,6 +85,8 @@ export type Dashboard = {
     views: number;
     clones: number;
     stars: number;
+    forks: number;
+    speed: number | null;
     growthPercent: number | null;
     collectionStatus: string | null;
     jobs: { jobType: string; status: string }[];

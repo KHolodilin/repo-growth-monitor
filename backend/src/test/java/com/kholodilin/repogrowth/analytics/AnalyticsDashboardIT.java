@@ -75,6 +75,21 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.repositories()).hasSize(2);
         assertThat(dashboard.repositories()).extracting(DashboardResponse.RepositoryRow::fullName)
                 .containsExactlyInAnyOrder("acme/kafka-starter", "acme/spring-outbox");
+        assertThat(dashboard.repositories()).allMatch(row -> row.forks() == 2 && row.speed() == null);
+
+        LocalDate today = LocalDate.now(clock);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(40), 41, 0, 2, 0, 0);
+        DashboardResponse withBaseline = analyticsService.dashboard("30d");
+        DashboardResponse.RepositoryRow steady = withBaseline.repositories().stream()
+                .filter(row -> row.fullName().equals("acme/kafka-starter"))
+                .findFirst()
+                .orElseThrow();
+        DashboardResponse.RepositoryRow missing = withBaseline.repositories().stream()
+                .filter(row -> row.fullName().equals("acme/spring-outbox"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(steady.speed()).isEqualTo(0.0);
+        assertThat(missing.speed()).isNull();
     }
 
     @Test
@@ -142,6 +157,13 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 .orElseThrow();
         assertThat(kafkaRow.visitors()).isEqualTo(100);
         assertThat(kafkaRow.growthPercent()).isEqualTo(100.0);
+        assertThat(kafkaRow.forks()).isEqualTo(2);
+        assertThat(kafkaRow.speed()).isEqualTo(6.0 / 7);
+        assertThat(dashboard.repositories().stream()
+                .filter(row -> row.fullName().equals("acme/spring-outbox"))
+                .findFirst()
+                .orElseThrow()
+                .speed()).isEqualTo(8.0 / 7);
         assertThat(kafkaRow.discoverabilityPassed()).isEqualTo(8);
         assertThat(kafkaRow.collectionStatus()).isEqualTo("PARTIAL");
         assertThat(dashboard.repositories().stream().filter(row -> row.fullName().equals("acme/spring-outbox")).findFirst().orElseThrow().discoverabilityPassed()).isNull();

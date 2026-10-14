@@ -10,7 +10,9 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -353,6 +355,7 @@ public class TrafficJdbcRepository {
                         SELECT r.id,
                                r.full_name,
                                r.stars,
+                               r.forks,
                                r.archived,
                                r.last_commit_at,
                                r.github_pushed_at,
@@ -365,7 +368,7 @@ public class TrafficJdbcRepository {
                          AND t.traffic_date >= :fromDate
                          AND t.traffic_date <= :toDate
                         WHERE r.tracking_enabled = TRUE
-                        GROUP BY r.id, r.full_name, r.stars, r.archived, r.last_commit_at, r.github_pushed_at
+                        GROUP BY r.id, r.full_name, r.stars, r.forks, r.archived, r.last_commit_at, r.github_pushed_at
                         ORDER BY unique_visitors DESC, r.full_name
                         """)
                 .param("fromDate", fromInclusive)
@@ -377,6 +380,7 @@ public class TrafficJdbcRepository {
                         rs.getLong("views"),
                         rs.getLong("clones"),
                         rs.getInt("stars"),
+                        rs.getInt("forks"),
                         rs.getBoolean("archived"),
                         toInstant(rs.getTimestamp("last_commit_at")),
                         toInstant(rs.getTimestamp("github_pushed_at"))
@@ -431,6 +435,27 @@ public class TrafficJdbcRepository {
                         """)
                 .query(LocalDate.class)
                 .optional();
+    }
+
+    public Map<Long, Integer> starBaselineBefore(LocalDate fromInclusive) {
+        Map<Long, Integer> baselines = new HashMap<>();
+        jdbcClient.sql("""
+                        SELECT DISTINCT ON (s.repository_id)
+                               s.repository_id,
+                               s.stars
+                        FROM repository_daily_stats s
+                        JOIN repository r ON r.id = s.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND s.stat_date < :fromDate
+                        ORDER BY s.repository_id, s.stat_date DESC
+                        """)
+                .param("fromDate", fromInclusive)
+                .query((rs, rowNum) -> {
+                    baselines.put(rs.getLong("repository_id"), rs.getInt("stars"));
+                    return rs.getLong("repository_id");
+                })
+                .list();
+        return baselines;
     }
 
     public Long starsChangeSince(LocalDate fromInclusive) {
@@ -620,6 +645,7 @@ public class TrafficJdbcRepository {
             long views,
             long clones,
             int stars,
+            int forks,
             boolean archived,
             Instant lastCommitAt,
             Instant githubPushedAt

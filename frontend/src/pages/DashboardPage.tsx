@@ -10,7 +10,7 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 
-const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth", "discoverability"] as const;
+const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "speed", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
 
@@ -262,7 +262,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
         <h2 className="font-medium">Repositories</h2>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[920px] text-sm">
+        <table className="w-full min-w-[1080px] text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
@@ -270,6 +270,8 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Views" active={sortKey === "views"} dir={sortDir} onClick={() => toggle("views")} />
               <SortHeader label="Clones" active={sortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
               <SortHeader label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
+              <SortHeader label="Forks" active={sortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
+              <SortHeader label="Speed" active={sortKey === "speed"} dir={sortDir} onClick={() => toggle("speed")} />
               <SortHeader label="Growth" active={sortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
               <SortHeader label="Disc." active={sortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
               <th className="px-5 py-2 font-medium">Activity</th>
@@ -300,6 +302,8 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.views)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.clones)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.stars)}</td>
+                  <td className="px-5 text-right tabular-nums">{formatNumber(row.forks)}</td>
+                  <td className="px-5 text-right tabular-nums">{formatNumber(row.speed)}</td>
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
                   </td>
@@ -363,6 +367,9 @@ function sortValue(row: Dashboard["repositories"][number], key: SortKey): number
   }
   if (key === "discoverability") {
     return row.discoverabilityPassed;
+  }
+  if (key === "speed") {
+    return row.speed;
   }
   return row[key];
 }

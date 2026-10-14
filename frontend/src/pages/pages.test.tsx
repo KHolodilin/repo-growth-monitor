@@ -70,6 +70,10 @@ describe("pages", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("KHolodilin/spring-transactional-outbox-kafka")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Forks" })).toBeInTheDocument();
+    expect(screen.getByText("16")).toBeInTheDocument();
+    expect(screen.getByText("0.4")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Speed" }));
     await user.click(screen.getByRole("button", { name: /Growth/ }));
     await user.click(screen.getByRole("button", { name: /Collect now/ }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));

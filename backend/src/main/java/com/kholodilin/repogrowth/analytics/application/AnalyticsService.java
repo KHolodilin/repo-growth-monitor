@@ -306,9 +306,10 @@ public class AnalyticsService {
                 ).stream()
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
+        Map<Long, Integer> starBaselines = trafficJdbcRepository.starBaselineBefore(period.from());
         List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
                 .stream()
-                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability))
+                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability, starBaselines))
                 .toList();
         int partialCount = (int) latestRuns.stream()
                 .filter(run -> run.status() == CollectionRunStatus.PARTIAL)
@@ -344,6 +345,7 @@ public class AnalyticsService {
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
         Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
+        Map<Long, Integer> starBaselines = trafficJdbcRepository.starBaselineBefore(period.from());
         List<RepositoryRow> rows = tracked.stream()
                 .map(repository -> {
                     CollectionRun run = runByRepo.get(repository.id());
@@ -360,6 +362,8 @@ public class AnalyticsService {
                             0,
                             0,
                             repository.stars(),
+                            repository.forks(),
+                            speed(repository.stars(), starBaselines.get(repository.id()), period.lengthDays()),
                             null,
                             run == null ? null : run.status().name(),
                             jobs,
@@ -429,7 +433,8 @@ public class AnalyticsService {
             Map<Long, Long> previousVisitors,
             Map<Long, CollectionRun> runByRepo,
             Map<Long, List<CollectionJob>> jobsByRun,
-            Map<Long, Integer> discoverability
+            Map<Long, Integer> discoverability,
+            Map<Long, Integer> starBaselines
     ) {
         Double growth = period.allTime()
                 ? null
@@ -449,6 +454,8 @@ public class AnalyticsService {
                 row.views(),
                 row.clones(),
                 row.stars(),
+                row.forks(),
+                speed(row.stars(), starBaselines.get(row.repositoryId()), period.lengthDays()),
                 growth,
                 run == null ? null : run.status().name(),
                 jobs,
@@ -457,6 +464,13 @@ public class AnalyticsService {
                 activityStatus.name(),
                 discoverability.get(row.repositoryId())
         );
+    }
+
+    private static Double speed(int currentStars, Integer baseline, long days) {
+        if (baseline == null || days <= 0) {
+            return null;
+        }
+        return (currentStars - baseline) / (double) days;
     }
 
     private Map<Long, Integer> discoverabilityByRepo(List<Repository> tracked) {
