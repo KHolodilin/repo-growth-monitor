@@ -16,6 +16,7 @@ import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
 import { SnapshotCards } from "../components/SnapshotCards";
@@ -771,9 +772,9 @@ function TrafficPanel({
         <Kpi label="Clones" value={traffic.totals.clones} />
         <Kpi label="Unique Cloners" value={traffic.totals.uniqueCloners} />
       </div>
-      <Card>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-medium">Traffic</h2>
+      <ChartCard
+        title="Traffic"
+        controls={
           <div className="inline-flex rounded-lg border bg-muted p-1">
             {([
               ["all", "All"],
@@ -793,7 +794,8 @@ function TrafficPanel({
               </button>
             ))}
           </div>
-        </div>
+        }
+      >
         <PersistentECharts
           chartId={repoTrafficChartId(repositoryId)}
           series={REPO_TRAFFIC_SERIES}
@@ -808,7 +810,7 @@ function TrafficPanel({
             },
           }}
         />
-      </Card>
+      </ChartCard>
       <SnapshotCards
         repositoryId={repositoryId}
         referrers={traffic.referrers}
@@ -1059,15 +1061,14 @@ function CombinedTopicRankChart({
     return null;
   }
   return (
-    <Card>
-      <h2 className="mb-3 font-medium">Rank History</h2>
+    <ChartCard title="Rank History">
       <PersistentECharts
         chartId={repoTopicsChartId(repositoryId, scope)}
         series={series}
         option={option}
         style={{ height: 360, width: "100%" }}
       />
-    </Card>
+    </ChartCard>
   );
 }
 
@@ -1310,15 +1311,14 @@ function CombinedRankChart({
     return null;
   }
   return (
-    <Card>
-      <h2 className="mb-3 font-medium">Rank History</h2>
+    <ChartCard title="Rank History">
       <PersistentECharts
         chartId={repoSearchChartId(repositoryId)}
         series={series}
         option={option}
         style={{ height: 360, width: "100%" }}
       />
-    </Card>
+    </ChartCard>
   );
 }
 

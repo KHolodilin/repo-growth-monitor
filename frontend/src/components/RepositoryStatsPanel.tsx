@@ -4,6 +4,7 @@ import { repoStatsChartId, STATS_SERIES } from "../lib/chartLegend";
 import { statsChartOption } from "../lib/statsChart";
 import { formatChartAxisDate, formatNumber } from "../lib/utils";
 import { type Period } from "./PeriodSelector";
+import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
 import { Card } from "./ui";
 
@@ -54,8 +55,7 @@ export function RepositoryStatsPanel({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <h2 className="mb-3 font-medium">Stats</h2>
+      <ChartCard title="Stats">
         {history.points.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
             <div className="font-medium text-foreground">No stats for this period.</div>
@@ -69,7 +69,7 @@ export function RepositoryStatsPanel({
             style={{ height: 360, width: "100%" }}
           />
         )}
-      </Card>
+      </ChartCard>
       {history.points.length > 0 && (
         <Card>
           <h2 className="mb-3 font-medium">Daily totals</h2>

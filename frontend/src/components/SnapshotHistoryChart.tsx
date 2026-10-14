@@ -9,9 +9,9 @@ import {
 } from "../lib/snapshotChartPrefs";
 import { OTHER_KEY, defaultTopKeys } from "../lib/snapshotHistory";
 import { cn } from "../lib/utils";
+import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
 import { ReferrerSourceIcon, referrerLineColor } from "./ReferrerSourceIcon";
-import { Card } from "./ui";
 
 const DEFAULT_LINES = 5;
 
@@ -54,9 +54,9 @@ export function SnapshotHistoryChart({
   const showIcons = kind === "referrers";
 
   return (
-    <Card>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-medium">{title}</h2>
+    <ChartCard
+      title={title}
+      controls={
         <div className="inline-flex rounded-lg border bg-muted p-1">
           <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>
             Visitors
@@ -65,7 +65,8 @@ export function SnapshotHistoryChart({
             Views
           </MetricButton>
         </div>
-      </div>
+      }
+    >
       {!enoughHistory && (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           <div className="font-medium text-foreground">Not enough history yet.</div>
@@ -132,7 +133,7 @@ export function SnapshotHistoryChart({
           </div>
         </>
       )}
-    </Card>
+    </ChartCard>
   );
 }
 

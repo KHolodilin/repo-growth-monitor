@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
-import { datesFromHistory, recentMissedDates } from "../lib/rankChart";
-import { queryChartLines, searchMetricOption, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
+import { recentMissedDates } from "../lib/rankChart";
+import { queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
+import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -77,40 +78,18 @@ export function QueryDetailsPage() {
     }
   }
 
-  const storedById = useMemo(() => new Map(series.map((item) => [item.githubRepositoryId, item])), [series]);
-
-  const option = useMemo(() => {
-    if (!history || !repo) {
-      return null;
-    }
-    const dates = datesFromHistory([history.points], history.missedDates);
-    const neighbors = selected.flatMap((id) => {
-      if (id === repo.githubId) {
-        return [];
-      }
-      const row = results?.rows.find((item) => item.result.githubRepositoryId === id);
-      if (!row) {
-        return [];
-      }
-      return [{ name: row.result.fullName, stored: storedById.get(id)?.points ?? [] }];
-    });
-    const lines = queryChartLines({
-      snapshotDates: history.points.map((point) => point.date),
-      ours: {
-        name: repo.fullName,
-        rank: history.points,
-        stored: storedById.get(repo.githubId)?.points ?? [],
-      },
-      neighbors,
-    });
-    return searchMetricOption({
-      metric,
-      dates,
-      missedDates: history.missedDates,
-      limit: history.query.resultLimit,
-      lines,
-    });
-  }, [history, repo, results, selected, metric, storedById]);
+  const chart = useMemo(
+    () =>
+      queryDetailsChart({
+        history,
+        repo,
+        rows: results?.rows ?? null,
+        series,
+        selected,
+        metric,
+      }),
+    [history, repo, results, series, selected, metric],
+  );
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -173,10 +152,10 @@ export function QueryDetailsPage() {
         <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
       </div>
 
-      {option && (
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-medium">Rank History</h2>
+      {chart && (
+        <ChartCard
+          title="Rank History"
+          controls={
             <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
               {([
                 ["place", "Place"],
@@ -197,7 +176,8 @@ export function QueryDetailsPage() {
                 </button>
               ))}
             </div>
-          </div>
+          }
+        >
           {recentMissed.length > 0 && (
             <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
@@ -206,20 +186,11 @@ export function QueryDetailsPage() {
           )}
           <PersistentECharts
             chartId={`${repo.id}:query:${history.query.id}`}
-            series={[
-              { key: String(repo.githubId), name: repo.fullName },
-              ...selected.flatMap((id) => {
-                const row = results?.rows.find((item) => item.result.githubRepositoryId === id);
-                if (!row || id === repo.githubId) {
-                  return [];
-                }
-                return [{ key: String(id), name: row.result.fullName }];
-              }),
-            ]}
-            option={option}
+            series={chart.series}
+            option={chart.option}
             style={{ height: 360, width: "100%" }}
           />
-        </Card>
+        </ChartCard>
       )}
 
       <Card>

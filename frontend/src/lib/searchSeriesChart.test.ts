@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { queryChartLines, searchMetricOption, searchSeriesFromPayload } from "./searchSeriesChart";
+import { queryChartLines, queryDetailsChart, searchMetricOption, searchSeriesFromPayload } from "./searchSeriesChart";
 
 const lines = queryChartLines({
   snapshotDates: ["2026-09-22", "2026-09-23"],
@@ -85,5 +85,61 @@ describe("searchSeriesChart", () => {
       [null, 3],
     ]);
     expect(searchMetricOption({ metric: "place", dates: [], missedDates: [], limit: 50, lines: [] }).legend).toBeUndefined();
+  });
+
+  it("drops our row and repos that left the result page", () => {
+    const history = {
+      points: [{ date: "2026-09-23", position: 4 }],
+      missedDates: [] as string[],
+      query: { resultLimit: 50 },
+    };
+    const repo = { githubId: 99, fullName: "acme/app" };
+    const rows = [
+      { result: { githubRepositoryId: 1, fullName: "other/repo" } },
+      { result: { githubRepositoryId: 7, fullName: "bare/repo" } },
+      { result: { githubRepositoryId: 99, fullName: "acme/app" } },
+    ];
+
+    expect(queryDetailsChart({ history: null, repo, rows, series: [], selected: [], metric: "place" })).toBeNull();
+    expect(queryDetailsChart({ history, repo: null, rows, series: [], selected: [], metric: "place" })).toBeNull();
+
+    const chart = queryDetailsChart({
+      history,
+      repo,
+      rows,
+      series: [
+        {
+          githubRepositoryId: 1,
+          fullName: "other/repo",
+          points: [{ date: "2026-09-23", position: 1, stars: 10, forks: 2 }],
+        },
+      ],
+      selected: [99, 1, 7, 404],
+      metric: "stars",
+    });
+    expect(chart?.series).toEqual([
+      { key: "99", name: "acme/app" },
+      { key: "1", name: "other/repo" },
+      { key: "7", name: "bare/repo" },
+    ]);
+    const drawn = chart?.option.series as { data: (number | null)[] }[];
+    expect(drawn.map((item) => item.data)).toEqual([[null], [10], [null]]);
+
+    const storedOurs = queryDetailsChart({
+      history,
+      repo,
+      rows: null,
+      series: [
+        {
+          githubRepositoryId: 99,
+          fullName: "acme/app",
+          points: [{ date: "2026-09-23", position: 4, stars: 21, forks: 16 }],
+        },
+      ],
+      selected: [1],
+      metric: "forks",
+    });
+    expect(storedOurs?.series).toEqual([{ key: "99", name: "acme/app" }]);
+    expect((storedOurs?.option.series as { data: (number | null)[] }[]).map((item) => item.data)).toEqual([[16]]);
   });
 });

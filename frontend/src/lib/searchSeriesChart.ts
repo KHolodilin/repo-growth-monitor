@@ -1,5 +1,5 @@
 import type { SearchSeries } from "./api";
-import { rankHistoryOption } from "./rankChart";
+import { datesFromHistory, rankHistoryOption } from "./rankChart";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
 export type SearchChartMetric = "place" | "stars" | "forks";
@@ -96,6 +96,68 @@ export function searchMetricOption({
       data: dates.map((date) => line.points.find((point) => point.date === date)?.[field] ?? null),
     })),
   });
+}
+
+type ChartRow = { result: { githubRepositoryId: number; fullName: string } };
+
+/** Skip our own id and repos that are no longer in the current result page. */
+export function queryDetailsChart({
+  history,
+  repo,
+  rows,
+  series,
+  selected,
+  metric,
+}: {
+  history: { points: { date: string; position: number | null }[]; missedDates: string[]; query: { resultLimit: number } } | null;
+  repo: { githubId: number; fullName: string } | null;
+  rows: ChartRow[] | null;
+  series: SearchSeries["series"];
+  selected: number[];
+  metric: SearchChartMetric;
+}) {
+  if (!history || !repo) {
+    return null;
+  }
+  const storedById = new Map(series.map((item) => [item.githubRepositoryId, item]));
+  const neighbors = selected.flatMap((id) => {
+    if (id === repo.githubId) {
+      return [];
+    }
+    const row = rows?.find((item) => item.result.githubRepositoryId === id);
+    if (!row) {
+      return [];
+    }
+    return [{ name: row.result.fullName, stored: storedById.get(id)?.points ?? [] }];
+  });
+  const lines = queryChartLines({
+    snapshotDates: history.points.map((point) => point.date),
+    ours: {
+      name: repo.fullName,
+      rank: history.points,
+      stored: storedById.get(repo.githubId)?.points ?? [],
+    },
+    neighbors,
+  });
+  return {
+    option: searchMetricOption({
+      metric,
+      dates: datesFromHistory([history.points], history.missedDates),
+      missedDates: history.missedDates,
+      limit: history.query.resultLimit,
+      lines,
+    }),
+    series: [
+      { key: String(repo.githubId), name: repo.fullName },
+      ...selected.flatMap((id) => {
+        const row = rows?.find((item) => item.result.githubRepositoryId === id);
+        if (!row || id === repo.githubId) {
+          return [];
+        }
+        return [{ key: String(id), name: row.result.fullName }];
+      }),
+    ],
+  };
 }
 
 function countHistoryOption({

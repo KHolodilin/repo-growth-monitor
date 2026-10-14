@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react
 import ReactECharts from "echarts-for-react";
 import { readChartSelection, writeChartSelection } from "../lib/chartLegend";
 import { chartCsv, chartExportBase, downloadChartCsv, downloadChartPng } from "../lib/chartExport";
+import { useRegisterChartExport } from "./ChartDownloadMenu";
 
 type SeriesRef = { key: string; name: string };
 
@@ -48,34 +49,18 @@ export function PersistentECharts({ chartId, series, option, onEvents, ...rest }
   }
 
   const fileBase = chartExportBase(chartId);
+  useRegisterChartExport({
+    downloadPng: () => downloadChartPng(chartRef.current, `${fileBase}.png`),
+    downloadCsv: () => downloadChartCsv(`${fileBase}.csv`, chartCsv(mergedOption)),
+  });
 
   return (
-    <div>
-      <div className="mb-2 flex justify-end gap-2">
-        <button
-          type="button"
-          className="rounded-md border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted"
-          aria-label="Download PNG"
-          onClick={() => downloadChartPng(chartRef.current, `${fileBase}.png`)}
-        >
-          PNG
-        </button>
-        <button
-          type="button"
-          className="rounded-md border bg-card px-2.5 py-1 text-xs font-medium hover:bg-muted"
-          aria-label="Download CSV"
-          onClick={() => downloadChartCsv(`${fileBase}.csv`, chartCsv(mergedOption))}
-        >
-          CSV
-        </button>
-      </div>
-      <ReactECharts
-        option={mergedOption}
-        notMerge
-        onEvents={{ ...onEvents, legendselectchanged: onLegendSelectChanged }}
-        {...rest}
-        ref={chartRef}
-      />
-    </div>
+    <ReactECharts
+      option={mergedOption}
+      notMerge
+      onEvents={{ ...onEvents, legendselectchanged: onLegendSelectChanged }}
+      {...rest}
+      ref={chartRef}
+    />
   );
 }

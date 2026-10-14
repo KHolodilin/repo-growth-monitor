@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
+import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -182,8 +183,7 @@ export function TopicDetailsPage() {
       </div>
 
       {option && (
-        <Card>
-          <h2 className="mb-3 font-medium">Rank History</h2>
+        <ChartCard title="Rank History">
           {recentMissed.length > 0 && (
             <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
@@ -196,7 +196,7 @@ export function TopicDetailsPage() {
             option={option}
             style={{ height: 360, width: "100%" }}
           />
-        </Card>
+        </ChartCard>
       )}
 
       <Card>
