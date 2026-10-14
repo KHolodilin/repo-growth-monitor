@@ -75,6 +75,11 @@ public class SearchQueryController {
         return searchQueryService.latestResults(id);
     }
 
+    @GetMapping("/search-queries/{id}/series")
+    public SearchQueryService.SearchSeries series(@PathVariable long id) {
+        return searchQueryService.series(id);
+    }
+
     @GetMapping("/search-runs/{id}/results")
     public SearchQueryService.SearchRunResults results(@PathVariable long id) {
         return searchQueryService.results(id);

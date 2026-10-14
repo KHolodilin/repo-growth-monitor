@@ -5,6 +5,7 @@ import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
@@ -216,8 +217,7 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
   const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
   return (
-    <Card>
-      <h2 className="mb-3 font-medium">Traffic</h2>
+    <ChartCard title="Traffic">
       <PersistentECharts
         chartId={dashboardTrafficChartId()}
         series={TRAFFIC_SERIES}
@@ -225,7 +225,7 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
         style={{ height: 360, width: "100%" }}
         opts={{ renderer: "canvas" }}
       />
-    </Card>
+    </ChartCard>
   );
 }
 

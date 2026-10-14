@@ -275,7 +275,7 @@ describe("extra coverage", () => {
     });
     const stats = render(
       <MemoryRouter>
-        <RepositoryStatsPanel repositoryId={13} period="30d" onPeriod={vi.fn()} />
+        <RepositoryStatsPanel repositoryId={13} period="30d" />
       </MemoryRouter>,
     );
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();

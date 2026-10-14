@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import type { GrowthEvent } from "./api";
 import { chartCsv, chartExportBase, downloadChartCsv, downloadChartPng } from "./chartExport";
@@ -139,22 +140,28 @@ describe("chartExport", () => {
     vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
 
     render(
-      <PersistentECharts
-        chartId="13:traffic"
-        series={[{ key: "Views", name: "Views" }]}
-        option={{
-          xAxis: { data: ["2026-09-23"] },
-          legend: {},
-          series: [
-            { name: "Views", type: "line", data: [4] },
-            { name: "Events", type: "line", data: [null] },
-          ],
-        }}
-      />,
+      <ChartCard title="Traffic">
+        <PersistentECharts
+          chartId="13:traffic"
+          series={[{ key: "Views", name: "Views" }]}
+          option={{
+            xAxis: { data: ["2026-09-23"] },
+            legend: {},
+            series: [
+              { name: "Views", type: "line", data: [4] },
+              { name: "Events", type: "line", data: [null] },
+            ],
+          }}
+        />
+      </ChartCard>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Download PNG" }));
-    await user.click(screen.getByRole("button", { name: "Download CSV" }));
+    const download = screen.getByRole("button", { name: "Download" });
+    await user.click(download);
+    await user.click(screen.getByRole("menuitem", { name: "PNG" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.click(download);
+    await user.click(screen.getByRole("menuitem", { name: "CSV" }));
     expect(downloads).toEqual(["13-traffic.png", "13-traffic.csv"]);
   });
 });
