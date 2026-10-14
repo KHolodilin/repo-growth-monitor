@@ -425,8 +425,38 @@ class GitHubClientWireMockTest {
                 .willReturn(aResponse()
                         .withHeader("Content-Type", "application/json")
                         .withBody("""
+                                {"data":{"repository":{"usesCustomOpenGraphImage":false,"openGraphImageUrl":"https://img/auto.png"}},"errors":[]}
+                                """)));
+        assertThat(client.getSocialPreview("acme", "a").custom()).isFalse();
+
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
                                 {"data":{"repository":null},"errors":[{"message":"Could not resolve"}]}
                                 """)));
         assertThatThrownBy(() -> client.getSocialPreview("acme", "missing")).isInstanceOf(GitHubException.class);
+
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"data\":null}")));
+        assertThatThrownBy(() -> client.getSocialPreview("acme", "gone")).isInstanceOf(GitHubException.class);
+
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"data\":{\"repository\":null}}")));
+        assertThatThrownBy(() -> client.getSocialPreview("acme", "gone")).isInstanceOf(GitHubException.class);
+
+        wireMock.stubFor(post("/graphql").willReturn(aResponse().withStatus(500).withBody("oops")));
+        assertThatThrownBy(() -> client.getSocialPreview("acme", "a"))
+                .isInstanceOf(GitHubException.class)
+                .extracting(ex -> ((GitHubException) ex).retryable())
+                .isEqualTo(true);
+
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse().withFixedDelay(5000).withStatus(200).withBody("{}")));
+        assertThatThrownBy(() -> client.getSocialPreview("acme", "a")).isInstanceOf(GitHubException.class);
     }
 }
