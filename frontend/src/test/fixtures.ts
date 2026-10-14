@@ -171,6 +171,7 @@ export const dashboardReady: Dashboard = {
       archived: false,
       activityAt: "2026-09-11T19:00:00Z",
       activityStatus: "ACTIVE",
+      discoverabilityPassed: 11,
     },
   ],
 };

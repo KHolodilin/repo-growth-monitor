@@ -47,6 +47,10 @@ describe("chart and table prefs", () => {
     expect(readSnapshotChartPrefs(13, "referrers")).toEqual({ metric: "VIEWS", keys: ["github.com"] });
     writeSnapshotChartPrefs(13, "paths", { metric: "VISITORS", keys: ["readme"] });
     expect(readSnapshotChartPrefs(13, "paths")?.metric).toBe("VISITORS");
+    document.cookie = `repo-growth.snapshot-chart.referrers.13=${encodeURIComponent(JSON.stringify({ metric: "NOPE", keys: [1, ""] }))}; path=/`;
+    expect(readSnapshotChartPrefs(13, "referrers")).toBeNull();
+    document.cookie = `repo-growth.snapshot-chart.referrers.13=${encodeURIComponent("[]")}; path=/`;
+    expect(readSnapshotChartPrefs(13, "referrers")).toBeNull();
   });
 
   it("restores table sort and toggles direction", () => {
@@ -57,6 +61,10 @@ describe("chart and table prefs", () => {
     expect(readTableSort("topic-watches", 13, ["name"] as const)).toBeNull();
     writeTableSort("topic-watches", undefined, { key: "name", dir: "desc" });
     expect(readTableSort("topic-watches", "", keys)?.key).toBe("name");
+    document.cookie = `repo-growth.table-sort.topic-watches=${encodeURIComponent(JSON.stringify({ a: null, b: [], c: { key: 1, dir: "asc" }, d: { key: "rank", dir: "sideways" } }))}; path=/`;
+    expect(readTableSort("topic-watches", "d", keys)).toBeNull();
+    document.cookie = `repo-growth.table-sort.topic-watches=${encodeURIComponent("[]")}; path=/`;
+    expect(readTableSort("topic-watches", "d", keys)).toBeNull();
 
     const { result, rerender } = renderHook(
       ({ scope }: { scope: number }) =>
@@ -83,6 +91,11 @@ describe("chart and table prefs", () => {
   it("restores global and per-repository periods", () => {
     writeCookie("rgm-period", "nope");
     writeJsonCookie("rgm-period-repos", ["bad"]);
+    renderHook(() => usePeriod("1"));
+    writeJsonCookie("rgm-period-repos", null);
+    renderHook(() => usePeriod("2"));
+    writeJsonCookie("rgm-period-repos", true);
+    renderHook(() => usePeriod("3"));
     const first = renderHook(() => usePeriod());
     expect(first.result.current[0]).toBe("30d");
     act(() => first.result.current[1]("7d"));
@@ -112,5 +125,13 @@ describe("chart and table prefs", () => {
     expect(result.current.showServicePaths).toBe(true);
     rerender({ id: 8 });
     expect(result.current.showServicePaths).toBe(false);
+    document.cookie = `repo-growth.service-paths=${encodeURIComponent(JSON.stringify(["x"]))}; path=/`;
+    rerender({ id: 4 });
+    expect(result.current.showServicePaths).toBe(false);
+    document.cookie = `repo-growth.service-paths=${encodeURIComponent(JSON.stringify({ "4": "yes", "5": true }))}; path=/`;
+    rerender({ id: 5 });
+    expect(result.current.showServicePaths).toBe(true);
+    const global = renderHook(() => useServicePaths(undefined));
+    expect(global.result.current.showServicePaths).toBe(false);
   });
 });

@@ -18,6 +18,8 @@ import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
 import com.kholodilin.repogrowth.github.model.GitHubSearchResponse;
 import com.kholodilin.repogrowth.github.model.GitHubSidebarResponse;
+import com.kholodilin.repogrowth.github.model.GitHubSocialPreview;
+import com.kholodilin.repogrowth.github.model.GitHubSocialPreviewResponse;
 import com.kholodilin.repogrowth.github.model.GitHubTrafficClonesResponse;
 import com.kholodilin.repogrowth.github.model.GitHubTrafficViewsResponse;
 import io.micrometer.core.instrument.Timer;
@@ -45,7 +47,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -110,6 +114,26 @@ public class GitHubClient {
         requireToken();
         ResponseEntity<byte[]> response = execute("getRepository", "GET", "/repos/" + owner + "/" + name);
         return read(response.getBody(), GitHubRepositoryResponse.class);
+    }
+
+    public GitHubSocialPreview getSocialPreview(String owner, String name) {
+        requireToken();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put(
+                "query",
+                "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){usesCustomOpenGraphImage openGraphImageUrl}}"
+        );
+        payload.put("variables", Map.of("owner", owner, "name", name));
+        ResponseEntity<byte[]> response = executePost("socialPreview", "/graphql", jsonMapper.writeValueAsString(payload));
+        GitHubSocialPreviewResponse parsed = read(response.getBody(), GitHubSocialPreviewResponse.class);
+        if (parsed.errors() != null && !parsed.errors().isEmpty()) {
+            throw GitHubException.api(200, false, null, parsed.errors().getFirst().message());
+        }
+        if (parsed.data() == null || parsed.data().repository() == null) {
+            throw GitHubException.notFound("GitHub repository not found");
+        }
+        GitHubSocialPreviewResponse.RepositoryNode repository = parsed.data().repository();
+        return new GitHubSocialPreview(repository.usesCustomOpenGraphImage(), repository.openGraphImageUrl());
     }
 
     public GitHubTrafficViewsResponse getViews(String owner, String name) {
@@ -435,6 +459,35 @@ public class GitHubClient {
         try {
             ResponseEntity<byte[]> response = restClient.get()
                     .uri(path)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, this::handleError)
+                    .toEntity(byte[].class);
+            metrics.githubRequest(operation, true);
+            log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+            return response;
+        } catch (GitHubException ex) {
+            metrics.githubRequest(operation, false);
+            log.info("GitHub request durationMs={} operation={} errorCategory={}",
+                    durationMs(started), operation, ex.errorCode());
+            throw ex;
+        } catch (ResourceAccessException ex) {
+            metrics.githubRequest(operation, false);
+            throw translateAccess(ex);
+        } finally {
+            sample.stop(io.micrometer.core.instrument.Timer.builder("github.api.duration")
+                    .tag("operation", operation)
+                    .register(io.micrometer.core.instrument.Metrics.globalRegistry));
+        }
+    }
+
+    private ResponseEntity<byte[]> executePost(String operation, String path, String json) {
+        Timer.Sample sample = metrics.startTimer();
+        long started = System.nanoTime();
+        try {
+            ResponseEntity<byte[]> response = restClient.post()
+                    .uri(path)
+                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                    .body(json)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, this::handleError)
                     .toEntity(byte[].class);

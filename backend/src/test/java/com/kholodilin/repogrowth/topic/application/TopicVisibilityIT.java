@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.topic.application;
 
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.model.GitHubOwnerResponse;
@@ -29,6 +30,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -141,6 +143,10 @@ class TopicVisibilityIT extends AbstractPostgresTest {
     void searchVisibilityQueriesStayUntouched() {
         topicVisibilityService.visibility(repository.id(), "all");
         assertThat(jdbcClient.sql("SELECT COUNT(*) FROM search_query").query(Integer.class).single()).isZero();
+        assertThat(topicVisibilityService.runAll(repository.id(), "language")).isNotEmpty();
+        assertThat(topicVisibilityService.historyByTopic(repository.id(), "kafka", "all").watch().topic()).isEqualTo("kafka");
+        assertThatThrownBy(() -> topicVisibilityService.visibility(repository.id(), "nope")).isInstanceOf(ApiException.class);
+        assertThatThrownBy(() -> topicVisibilityService.historyByTopic(repository.id(), "missing", "all")).isInstanceOf(ApiException.class);
     }
 
     private void storeSnapshot(long topicWatchId, LocalDate businessDate, Integer position, int totalCount) {

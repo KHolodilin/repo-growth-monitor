@@ -15,7 +15,7 @@ describe("snapshotChart", () => {
             cells: [
               {
                 date: "2026-09-20",
-                visitors: 1,
+                visitors: null,
                 views: 2,
                 visitorsDelta: 1,
                 viewsDelta: 1,
@@ -34,7 +34,7 @@ describe("snapshotChart", () => {
         ],
       },
       metric: "VISITORS",
-      selected: ["github.com"],
+      selected: ["github.com", "missing"],
     });
     const formatter = option.tooltip.formatter as (
       params: { axisValue: string; seriesName: string; data: number | null }[],
@@ -43,6 +43,6 @@ describe("snapshotChart", () => {
     expect(formatter([{ axisValue: "2026-09-23", seriesName: "github.com", data: 1 }])).toContain("Since previous");
     expect(formatter([{ axisValue: "2026-09-20", seriesName: "github.com", data: null }])).toContain("—");
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
-    expect(option.series.map((item) => item.name)).toEqual(["github.com", "Other"]);
+    expect(option.series.map((item) => item.name)).toEqual(["github.com", "missing", "Other"]);
   });
 });

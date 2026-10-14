@@ -112,6 +112,14 @@ public class RepositoryStatsCollector implements Collector {
         boolean resolvedReleaseFetched = releaseFetched;
 
         boolean hasReadme = files.hasReadme() || resolvedReadme != null;
+        boolean hasSocialPreview = repositoryJdbcRepository.findHealth(context.repository().id())
+                .map(RepositoryHealthFacts::hasSocialPreview)
+                .orElse(false);
+        try {
+            hasSocialPreview = gitHubClient.getSocialPreview(owner, name).custom();
+        } catch (RuntimeException ex) {
+            log.warn("Social preview lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
+        }
         RepositoryHealthFacts healthFacts = new RepositoryHealthFacts(
                 remote.hasHomepage() ? remote.homepage().trim() : null,
                 hasReadme,
@@ -122,7 +130,8 @@ public class RepositoryStatsCollector implements Collector {
                 files.hasContributing(),
                 resolvedSecurityPolicy,
                 resolvedIssueTemplate,
-                files.hasPullRequestTemplate()
+                files.hasPullRequestTemplate(),
+                hasSocialPreview
         );
 
         transactionTemplate.executeWithoutResult(status -> {

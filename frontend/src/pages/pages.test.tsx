@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -156,7 +156,10 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "legend" }));
     await user.click(screen.getByRole("button", { name: "mark" }));
     expect(await screen.findByText("Growth event")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    api.mockResolvedValueOnce({});
+    await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "GitHub" }));
     await user.click(screen.getByRole("button", { name: "Promotion" }));
     await user.click(screen.getByRole("button", { name: "Overview" }));
@@ -164,6 +167,12 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Search Visibility" }));
+    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByText(searchHistory.query.name));
+    fireEvent.mouseLeave(screen.getByText(searchHistory.query.name));
+    for (const name of ["Search Query", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
+      await user.click(screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]);
+    }
     await user.type(screen.getByPlaceholderText(/transactional outbox/), "new query language:java");
     await user.click(screen.getByRole("button", { name: "Add query" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);
@@ -171,6 +180,10 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText("outbox")).toBeInTheDocument();
+    for (const name of ["Topic", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
+      const buttons = screen.getAllByRole("button", { name: new RegExp(`^${name}`) });
+      await user.click(buttons[buttons.length - 1]);
+    }
     await user.click(screen.getByRole("button", { name: "Java" }));
     await user.click(screen.getByRole("button", { name: "All" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);

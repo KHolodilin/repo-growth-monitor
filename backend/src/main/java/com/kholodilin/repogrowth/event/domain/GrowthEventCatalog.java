@@ -20,6 +20,7 @@ public final class GrowthEventCatalog {
     public static final String DESCRIPTION_CHANGED = "DESCRIPTION_CHANGED";
     public static final String TOPICS_CHANGED = "TOPICS_CHANGED";
     public static final String HOMEPAGE_CHANGED = "HOMEPAGE_CHANGED";
+    public static final String SOCIAL_PREVIEW_CHANGED = "SOCIAL_PREVIEW_CHANGED";
     public static final String GOOD_FIRST_ISSUE_PUBLISHED = "GOOD_FIRST_ISSUE_PUBLISHED";
     public static final String EXTERNAL_ISSUE_OPENED = "EXTERNAL_ISSUE_OPENED";
     public static final String EXTERNAL_PR_OPENED = "EXTERNAL_PR_OPENED";
@@ -50,6 +51,7 @@ public final class GrowthEventCatalog {
             Map.entry(DESCRIPTION_CHANGED, true),
             Map.entry(TOPICS_CHANGED, true),
             Map.entry(HOMEPAGE_CHANGED, false),
+            Map.entry(SOCIAL_PREVIEW_CHANGED, true),
             Map.entry(GOOD_FIRST_ISSUE_PUBLISHED, true),
             Map.entry(EXTERNAL_ISSUE_OPENED, true),
             Map.entry(EXTERNAL_PR_OPENED, true),
@@ -79,6 +81,7 @@ public final class GrowthEventCatalog {
             Map.entry(DESCRIPTION_CHANGED, CATEGORY_DISCOVERABILITY),
             Map.entry(TOPICS_CHANGED, CATEGORY_DISCOVERABILITY),
             Map.entry(HOMEPAGE_CHANGED, CATEGORY_DISCOVERABILITY),
+            Map.entry(SOCIAL_PREVIEW_CHANGED, CATEGORY_DISCOVERABILITY),
             Map.entry(GOOD_FIRST_ISSUE_PUBLISHED, CATEGORY_COMMUNITY),
             Map.entry(EXTERNAL_ISSUE_OPENED, CATEGORY_COMMUNITY),
             Map.entry(EXTERNAL_PR_OPENED, CATEGORY_COMMUNITY),

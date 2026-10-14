@@ -25,7 +25,10 @@ public record GrowthEventState(
         boolean firstExternalForkRecorded,
         List<Integer> firedStarMilestones,
         List<Integer> firedForkMilestones,
-        List<Integer> firedContributorMilestones
+        List<Integer> firedContributorMilestones,
+        /** Null until a collection has observed the social preview. */
+        Boolean customSocialPreview,
+        String socialPreviewUrl
 ) {
     public static GrowthEventState empty() {
         return new GrowthEventState(
@@ -48,7 +51,9 @@ public record GrowthEventState(
                 false,
                 List.of(),
                 List.of(),
-                List.of()
+                List.of(),
+                null,
+                null
         );
     }
 

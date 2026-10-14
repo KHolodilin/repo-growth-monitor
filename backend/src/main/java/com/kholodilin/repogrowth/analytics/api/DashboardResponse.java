@@ -70,7 +70,8 @@ public record DashboardResponse(
             List<JobStatus> jobs,
             boolean archived,
             Instant activityAt,
-            String activityStatus
+            String activityStatus,
+            Integer discoverabilityPassed
     ) {
     }
 

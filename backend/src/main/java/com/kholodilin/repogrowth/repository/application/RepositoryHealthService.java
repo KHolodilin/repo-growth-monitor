@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.repository.application;
 
+import com.kholodilin.repogrowth.repository.api.HealthCheckItem;
 import com.kholodilin.repogrowth.repository.api.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
@@ -33,5 +34,19 @@ public class RepositoryHealthService {
                 searchQueryJdbcRepository.countByRepository(repository.id()),
                 facts
         );
+    }
+
+    /** Passed Discoverability checks, or null before the first stats collection stored health facts. */
+    public Integer discoverabilityPassed(Repository repository) {
+        if (repositoryJdbcRepository.findHealth(repository.id()).isEmpty()) {
+            return null;
+        }
+        int passed = 0;
+        for (HealthCheckItem item : forRepository(repository).discoverability()) {
+            if (item.passed()) {
+                passed++;
+            }
+        }
+        return passed;
     }
 }

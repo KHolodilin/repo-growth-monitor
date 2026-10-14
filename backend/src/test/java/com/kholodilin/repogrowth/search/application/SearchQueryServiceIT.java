@@ -122,6 +122,8 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
         assertThat(after.change().kind()).isEqualTo(RankChangeMath.Kind.IMPROVED);
         assertThat(after.change().amount()).isEqualTo(1);
         assertThat(after.totalResults()).isEqualTo(466);
+        assertThat(searchQueryService.latestResults(query.id()).rows()).isEmpty();
+        assertThatThrownBy(() -> searchQueryService.results(999_999L)).isInstanceOf(ApiException.class);
     }
 
     private void storeSnapshot(long searchQueryId, LocalDate businessDate, int position, int totalCount) {

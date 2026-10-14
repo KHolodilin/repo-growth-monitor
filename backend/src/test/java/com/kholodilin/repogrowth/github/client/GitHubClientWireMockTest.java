@@ -18,6 +18,7 @@ import java.time.Duration;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
@@ -357,5 +358,75 @@ class GitHubClientWireMockTest {
             assertThat(readme.sha()).isEqualTo("abc");
             assertThat(readme.decodedText()).isEqualTo("# demo");
         });
+    }
+
+    @Test
+    void readsClonesPathsReleasesAndMissingFiles() {
+        wireMock.stubFor(get("/repos/acme/a/traffic/clones")
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
+                        {"count":2,"uniques":1,"clones":[{"timestamp":"2026-08-20T00:00:00Z","count":2,"uniques":1}]}
+                        """)));
+        wireMock.stubFor(get("/repos/acme/a/traffic/popular/paths")
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
+                        [{"path":"/acme/a","title":"a","count":4,"uniques":2}]
+                        """)));
+        wireMock.stubFor(get("/repos/acme/a/commits?per_page=1")
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
+        wireMock.stubFor(get("/repos/acme/a/community/profile")
+                .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
+        wireMock.stubFor(get("/repos/acme/a/readme")
+                .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
+        wireMock.stubFor(get("/repos/acme/a/releases?per_page=1")
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
+        wireMock.stubFor(get("/repos/acme/a/contents/.github/SECURITY.md")
+                .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
+
+        assertThat(client.getClones("acme", "a").days()).hasSize(1);
+        assertThat(client.getPopularPaths("acme", "a")).hasSize(1);
+        assertThat(client.latestCommitAt("acme", "a")).isEmpty();
+        assertThat(client.getCommunityProfile("acme", "a").filesOrEmpty().hasReadme()).isFalse();
+        assertThat(client.getReadme("acme", "a")).isEmpty();
+        assertThat(client.latestReleaseAt("acme", "a")).isEmpty();
+        assertThat(client.fileExists("acme", "a", ".github/SECURITY.md")).isFalse();
+        assertThat(client.maskedToken()).contains("****");
+    }
+
+    @Test
+    void searchPagesWhenTheFirstPageIsFull() {
+        StringBuilder items = new StringBuilder("[");
+        for (int i = 0; i < 100; i++) {
+            if (i > 0) {
+                items.append(',');
+            }
+            items.append("{\"id\":").append(i)
+                    .append(",\"full_name\":\"acme/r").append(i)
+                    .append("\",\"stargazers_count\":1,\"forks_count\":0}");
+        }
+        items.append(']');
+        wireMock.stubFor(get(urlPathEqualTo("/search/repositories"))
+                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody(
+                        "{\"total_count\":101,\"items\":" + items + "}"
+                )));
+        assertThat(client.searchRepositories("demo", 101).itemsOrEmpty()).isNotEmpty();
+    }
+
+    @Test
+    void socialPreviewReadsTheCustomOpenGraphImage() {
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"data":{"repository":{"usesCustomOpenGraphImage":true,"openGraphImageUrl":"https://img/a.png"}}}
+                                """)));
+        assertThat(client.getSocialPreview("acme", "a").custom()).isTrue();
+        assertThat(client.getSocialPreview("acme", "a").imageUrl()).isEqualTo("https://img/a.png");
+
+        wireMock.stubFor(post("/graphql")
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                {"data":{"repository":null},"errors":[{"message":"Could not resolve"}]}
+                                """)));
+        assertThatThrownBy(() -> client.getSocialPreview("acme", "missing")).isInstanceOf(GitHubException.class);
     }
 }

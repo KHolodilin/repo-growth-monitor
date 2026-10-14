@@ -28,12 +28,14 @@ class RepositoryHealthEvaluatorTest {
         );
         RepositoryHealthFacts facts = new RepositoryHealthFacts(
                 "https://docs.acme.dev/kafka-starter",
-                true, true, true, true, true, true, true, true, true
+                true, true, true, true, true, true, true, true, true, true
         );
         var health = evaluator.evaluate(repository, List.of("kafka", "outbox", "spring-boot"), 2, facts);
         assertThat(health.discoverability()).allMatch(item -> item.passed());
         assertThat(health.communityStandards()).allMatch(item -> item.passed());
-        assertThat(health.discoverability()).hasSize(12);
+        assertThat(health.discoverability()).hasSize(13);
+        assertThat(health.discoverability()).filteredOn(item -> item.label().equals("Social preview configured"))
+                .allMatch(item -> item.passed());
         assertThat(health.communityStandards()).hasSize(5);
     }
 

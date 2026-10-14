@@ -269,11 +269,11 @@ public class RepositoryJdbcRepository {
                         INSERT INTO repository_health (
                             repository_id, homepage, has_readme, readme_has_h1, readme_has_name,
                             has_license, has_code_of_conduct, has_contributing, has_security_policy,
-                            has_issue_template, has_pull_request_template
+                            has_issue_template, has_pull_request_template, has_social_preview
                         ) VALUES (
                             :id, :homepage, :hasReadme, :readmeHasH1, :readmeHasName,
                             :hasLicense, :hasCodeOfConduct, :hasContributing, :hasSecurityPolicy,
-                            :hasIssueTemplate, :hasPullRequestTemplate
+                            :hasIssueTemplate, :hasPullRequestTemplate, :hasSocialPreview
                         )
                         ON CONFLICT (repository_id) DO UPDATE SET
                             homepage = EXCLUDED.homepage,
@@ -286,6 +286,7 @@ public class RepositoryJdbcRepository {
                             has_security_policy = EXCLUDED.has_security_policy,
                             has_issue_template = EXCLUDED.has_issue_template,
                             has_pull_request_template = EXCLUDED.has_pull_request_template,
+                            has_social_preview = EXCLUDED.has_social_preview,
                             updated_at = NOW()
                         """)
                 .param("id", repositoryId)
@@ -299,6 +300,7 @@ public class RepositoryJdbcRepository {
                 .param("hasSecurityPolicy", facts.hasSecurityPolicy())
                 .param("hasIssueTemplate", facts.hasIssueTemplate())
                 .param("hasPullRequestTemplate", facts.hasPullRequestTemplate())
+                .param("hasSocialPreview", facts.hasSocialPreview())
                 .update();
     }
 
@@ -306,7 +308,7 @@ public class RepositoryJdbcRepository {
         return jdbcClient.sql("""
                         SELECT homepage, has_readme, readme_has_h1, readme_has_name, has_license,
                                has_code_of_conduct, has_contributing, has_security_policy,
-                               has_issue_template, has_pull_request_template
+                               has_issue_template, has_pull_request_template, has_social_preview
                         FROM repository_health
                         WHERE repository_id = :id
                         """)
@@ -321,7 +323,8 @@ public class RepositoryJdbcRepository {
                         rs.getBoolean("has_contributing"),
                         rs.getBoolean("has_security_policy"),
                         rs.getBoolean("has_issue_template"),
-                        rs.getBoolean("has_pull_request_template")
+                        rs.getBoolean("has_pull_request_template"),
+                        rs.getBoolean("has_social_preview")
                 ))
                 .optional();
     }

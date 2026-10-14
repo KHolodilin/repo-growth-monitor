@@ -9,7 +9,7 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 
-const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth"] as const;
+const SORT_KEYS = ["visitors", "views", "clones", "stars", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
 
@@ -262,7 +262,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
         <h2 className="font-medium">Repositories</h2>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[920px] text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
@@ -271,6 +271,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Clones" active={sortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
               <SortHeader label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
               <SortHeader label="Growth" active={sortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
+              <SortHeader label="Disc." active={sortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
               <th className="px-5 py-2 font-medium">Activity</th>
             </tr>
           </thead>
@@ -301,6 +302,9 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.stars)}</td>
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
+                  </td>
+                  <td className="px-5 text-right tabular-nums">
+                    {row.discoverabilityPassed == null ? "—" : row.discoverabilityPassed}
                   </td>
                   <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
                     {formatActivityPresentation(row.activityStatus, row.activityAt)}
@@ -356,6 +360,9 @@ function CollectionHint({ jobs }: { jobs: { jobType: string; status: string }[] 
 function sortValue(row: Dashboard["repositories"][number], key: SortKey): number | null {
   if (key === "growth") {
     return row.growthPercent;
+  }
+  if (key === "discoverability") {
+    return row.discoverabilityPassed;
   }
   return row[key];
 }

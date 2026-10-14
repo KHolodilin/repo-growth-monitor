@@ -35,6 +35,12 @@ describe("rankChart", () => {
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(option.legend).toMatchObject({ top: 0 });
     expect(option.series).toHaveLength(3);
+    const withoutMisses = rankHistoryOption({
+      dates: ["2026-09-23"],
+      series: [{ name: "plain", limit: 50, points: [{ date: "2026-09-23", position: 2 }] }],
+    });
+    const plainTooltip = withoutMisses.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    expect(plainTooltip([{ axisValue: "2026-09-23" }])).toContain("#2");
   });
 
   it("collects dates and recent misses", () => {
