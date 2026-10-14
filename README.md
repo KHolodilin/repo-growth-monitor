@@ -12,11 +12,31 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-Self-hosted GitHub repository growth analytics: traffic, search rankings, and a foundation for competitor discovery.
+Track and understand how your GitHub repositories grow over time.
+
+**Repo Growth Monitor** is a self-hosted analytics platform that brings together repository traffic, stars, forks, search rankings, referral sources, and community activity in one dashboard.
+
+Discover where your visitors come from, how people find your projects on GitHub, and which activities contribute to their growth. Use historical data to identify trends, measure visibility, and make informed decisions about promoting your open-source projects.
 
 <p align="center">
   <img src="docs/hero.gif" alt="Tour of Repo Growth Monitor: portfolio, repositories, traffic, stats, search rank, topics, and growth events" width="960">
 </p>
+
+## Key Features
+
+**Understand how your GitHub repositories grow — and what drives that growth.**
+
+Repo Growth Monitor brings GitHub analytics into one self-hosted dashboard, helping you track visibility, discover trends, and make better decisions about growing your open-source projects.
+
+- **📊 Repository Analytics** — Track stars, forks, watchers, and repository activity over time.
+- **📈 Traffic Insights** — Analyze views, unique visitors, clones, referral sources, and popular content.
+- **🔎 GitHub Search Rankings** — Monitor where your repositories appear in GitHub search results and how their positions change.
+- **🏷️ Topic Analytics** — Explore GitHub topics and understand your repository's visibility in relevant niches.
+- **🚀 Growth Events** — Connect repository growth with issues, pull requests, and community contributions.
+- **📁 Portfolio Dashboard** — Monitor multiple repositories in one place and compare their performance.
+- **🔒 Self-Hosted & Private** — Run everything locally with Docker Compose. Your historical analytics stay in your own PostgreSQL database.
+
+**No external analytics service. No subscription. Your data, your infrastructure.**
 
 ## Quick start
 
@@ -100,7 +120,7 @@ The token is never stored in PostgreSQL and never returned by the API. Do not co
 
 Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is not the
 downloadable release: `docker compose up -d --build` builds `Dockerfile` on the machine.
-Release 0.13.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.13.0`.
+Release 0.14.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.14.0`.
 
 The image is three stages:
 

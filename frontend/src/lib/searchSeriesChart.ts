@@ -160,6 +160,16 @@ export function queryDetailsChart({
   };
 }
 
+export function storedCountOption({
+  dates,
+  series,
+}: {
+  dates: string[];
+  series: { name: string; data: (number | null)[] }[];
+}) {
+  return countHistoryOption({ dates, series });
+}
+
 function countHistoryOption({
   dates,
   series,

@@ -315,6 +315,16 @@ export type SearchSeries = {
   series: SearchSnapshotSeries[];
 };
 
+export type CompetitorCard = {
+  githubRepositoryId: number;
+  fullName: string;
+  description: string | null;
+  htmlUrl: string;
+  topics: string[];
+  discoverability: { label: string; passed: boolean }[];
+  points: { date: string; stars: number | null; forks: number | null }[];
+};
+
 export type SearchRunResults = {
   run: {
     id: number;

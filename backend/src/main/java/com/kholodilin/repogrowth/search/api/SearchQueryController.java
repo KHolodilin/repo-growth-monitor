@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.search.api;
 
+import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import jakarta.validation.Valid;
@@ -19,9 +20,11 @@ import java.util.List;
 public class SearchQueryController {
 
     private final SearchQueryService searchQueryService;
+    private final CompetitorCardService competitorCardService;
 
-    public SearchQueryController(SearchQueryService searchQueryService) {
+    public SearchQueryController(SearchQueryService searchQueryService, CompetitorCardService competitorCardService) {
         this.searchQueryService = searchQueryService;
+        this.competitorCardService = competitorCardService;
     }
 
     @GetMapping("/repositories/{id}/search-queries")
@@ -78,6 +81,14 @@ public class SearchQueryController {
     @GetMapping("/search-queries/{id}/series")
     public SearchQueryService.SearchSeries series(@PathVariable long id) {
         return searchQueryService.series(id);
+    }
+
+    @GetMapping("/search-queries/{id}/competitors/{githubRepositoryId}")
+    public CompetitorCardService.CompetitorCard competitor(
+            @PathVariable long id,
+            @PathVariable long githubRepositoryId
+    ) {
+        return competitorCardService.card(id, githubRepositoryId);
     }
 
     @GetMapping("/search-runs/{id}/results")

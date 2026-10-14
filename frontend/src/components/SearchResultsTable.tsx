@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { type SearchRunResults } from "../lib/api";
 import {
   activityClass,
@@ -31,6 +32,7 @@ export function SearchResultsTable({
   trackedPosition,
   selectedIds = [],
   onToggle,
+  nameTo,
 }: {
   rows: ResultRow[];
   repositoryId: number;
@@ -38,6 +40,7 @@ export function SearchResultsTable({
   trackedPosition?: number | null;
   selectedIds?: number[];
   onToggle?: (githubRepositoryId: number) => void;
+  nameTo?: (row: ResultRow) => string | null;
 }) {
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "search-results",
@@ -158,14 +161,7 @@ export function SearchResultsTable({
                 )}
                 <td className="whitespace-nowrap px-4 py-2.5 align-top">{row.result.position}</td>
                 <td className="max-w-0 px-4 py-2.5 align-top">
-                  <a
-                    className="break-words [overflow-wrap:anywhere] text-primary hover:underline"
-                    href={row.result.htmlUrl ?? `https://github.com/${row.result.fullName}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {row.result.fullName}
-                  </a>
+                  <RepositoryName row={row} to={nameTo?.(row) ?? null} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.stars)}</td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.watchers)}</td>
@@ -181,6 +177,27 @@ export function SearchResultsTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function RepositoryName({ row, to }: { row: ResultRow; to: string | null }) {
+  const className = "break-words [overflow-wrap:anywhere] text-primary hover:underline";
+  if (to) {
+    return (
+      <Link className={className} to={to}>
+        {row.result.fullName}
+      </Link>
+    );
+  }
+  return (
+    <a
+      className={className}
+      href={row.result.htmlUrl ?? `https://github.com/${row.result.fullName}`}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {row.result.fullName}
+    </a>
   );
 }
 
