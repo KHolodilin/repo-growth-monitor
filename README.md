@@ -14,6 +14,10 @@
 
 Self-hosted GitHub repository growth analytics: traffic, search rankings, and a foundation for competitor discovery.
 
+<p align="center">
+  <img src="docs/hero.gif" alt="Tour of Repo Growth Monitor: portfolio, repositories, traffic, stats, search rank, topics, and growth events" width="960">
+</p>
+
 ## Quick start
 
 A git clone, Java, and Node are not required. The first start creates an empty database.

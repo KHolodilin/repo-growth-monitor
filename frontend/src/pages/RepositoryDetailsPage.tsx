@@ -359,27 +359,32 @@ export function RepositoryDetailsPage() {
         </div>
       </header>
       {repo.health && <HealthScoreRow health={repo.health} />}
-      <div className="inline-flex rounded-lg border bg-muted p-1">
-        {([
-          ["traffic", "Traffic"],
-          ["stats", "Stats"],
-          ["search", "Search Visibility"],
-          ["topics", "Topics Visibility"],
-          ["overview", "Overview"],
-          ["growth-events", "Growth Events"],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium",
-              tab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-lg border bg-muted p-1">
+          {([
+            ["traffic", "Traffic"],
+            ["stats", "Stats"],
+            ["search", "Search Visibility"],
+            ["topics", "Topics Visibility"],
+            ["overview", "Overview"],
+            ["growth-events", "Growth Events"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium",
+                tab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => setTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {(tab === "traffic" || tab === "stats" || tab === "growth-events") && (
+          <PeriodSelector period={period} onPeriod={setPeriod} />
+        )}
       </div>
       {tab === "overview" && (
         <Overview
@@ -390,20 +395,19 @@ export function RepositoryDetailsPage() {
         />
       )}
       {tab === "growth-events" && (
-        <GrowthEventsTab repositoryId={repo.id} period={period} onPeriod={setPeriod} />
+        <GrowthEventsTab repositoryId={repo.id} period={period} />
       )}
       {tab === "traffic" && (
         <TrafficPanel
           repositoryId={repo.id}
           traffic={traffic}
           period={period}
-          onPeriod={setPeriod}
           showServicePaths={showServicePaths}
           onShowServicePathsChange={setShowServicePaths}
         />
       )}
       {tab === "stats" && (
-        <RepositoryStatsPanel repositoryId={repo.id} period={period} onPeriod={setPeriod} />
+        <RepositoryStatsPanel repositoryId={repo.id} period={period} />
       )}
       {tab === "topics" && (
         <TopicsPanel
@@ -705,11 +709,9 @@ function JobRow({ job }: { job: CollectionJob }) {
 function GrowthEventsTab({
   repositoryId,
   period,
-  onPeriod,
 }: {
   repositoryId: number;
   period: Period;
-  onPeriod: (period: Period) => void;
 }) {
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
@@ -725,9 +727,6 @@ function GrowthEventsTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <PeriodSelector period={period} onPeriod={onPeriod} />
-      </div>
       <GrowthEventsPanel repositoryId={repositoryId} events={events} onChanged={loadEvents} />
       <GrowthEventSettingsCard repositoryId={repositoryId} />
     </div>
@@ -738,14 +737,12 @@ function TrafficPanel({
   repositoryId,
   traffic,
   period,
-  onPeriod,
   showServicePaths,
   onShowServicePathsChange,
 }: {
   repositoryId: number;
   traffic: RepositoryTraffic;
   period: Period;
-  onPeriod: (period: Period) => void;
   showServicePaths: boolean;
   onShowServicePathsChange: (next: boolean) => void;
 }) {
@@ -768,9 +765,6 @@ function TrafficPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <PeriodSelector period={period} onPeriod={onPeriod} />
-      </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Kpi label="Visitors" value={traffic.totals.uniqueVisitors} />
         <Kpi label="Views" value={traffic.totals.views} />
