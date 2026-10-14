@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -179,6 +180,22 @@ public class SearchQueryService {
         return new SearchRunResults(run, query, rows);
     }
 
+    public SearchSeries series(long searchQueryId) {
+        getQuery(searchQueryId);
+        Map<Long, String> names = new LinkedHashMap<>();
+        Map<Long, List<SeriesPoint>> points = new LinkedHashMap<>();
+        for (SearchResultJdbcRepository.SnapshotValue row : resultRepository.findSnapshots(searchQueryId)) {
+            names.put(row.githubRepositoryId(), row.fullName());
+            points.computeIfAbsent(row.githubRepositoryId(), ignored -> new ArrayList<>())
+                    .add(new SeriesPoint(row.date(), row.position(), row.stars(), row.forks()));
+        }
+        List<SeriesLine> lines = new ArrayList<>();
+        for (Map.Entry<Long, String> entry : names.entrySet()) {
+            lines.add(new SeriesLine(entry.getKey(), entry.getValue(), points.get(entry.getKey())));
+        }
+        return new SearchSeries(lines);
+    }
+
     public List<SearchHistory> visibility(long repositoryId) {
         return list(repositoryId).stream().map(query -> history(query.id())).toList();
     }
@@ -231,5 +248,14 @@ public class SearchQueryService {
     }
 
     public record SearchRunResults(SearchRun run, SearchQuery query, List<SearchResultRow> rows) {
+    }
+
+    public record SeriesPoint(LocalDate date, int position, int stars, int forks) {
+    }
+
+    public record SeriesLine(long githubRepositoryId, String fullName, List<SeriesPoint> points) {
+    }
+
+    public record SearchSeries(List<SeriesLine> series) {
     }
 }

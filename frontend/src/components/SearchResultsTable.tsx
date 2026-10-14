@@ -29,11 +29,15 @@ export function SearchResultsTable({
   repositoryId,
   trackedGithubId,
   trackedPosition,
+  selectedIds = [],
+  onToggle,
 }: {
   rows: ResultRow[];
   repositoryId: number;
   trackedGithubId?: number;
   trackedPosition?: number | null;
+  selectedIds?: number[];
+  onToggle?: (githubRepositoryId: number) => void;
 }) {
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "search-results",
@@ -63,6 +67,7 @@ export function SearchResultsTable({
       <table className="w-full min-w-[760px] table-fixed text-sm">
         <thead>
           <tr className="text-left text-muted-foreground">
+            {onToggle && <th className="w-10 px-4 py-2" />}
             <SortHeader
               className="w-10"
               label="#"
@@ -139,6 +144,18 @@ export function SearchResultsTable({
                     : undefined
                 }
               >
+                {onToggle && (
+                  <td className="px-4 py-2.5 align-top">
+                    {mine ? null : (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(row.result.githubRepositoryId)}
+                        aria-label={`Show ${row.result.fullName} on the chart`}
+                        onChange={() => onToggle(row.result.githubRepositoryId)}
+                      />
+                    )}
+                  </td>
+                )}
                 <td className="whitespace-nowrap px-4 py-2.5 align-top">{row.result.position}</td>
                 <td className="max-w-0 px-4 py-2.5 align-top">
                   <a

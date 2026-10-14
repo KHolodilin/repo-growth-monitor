@@ -126,6 +126,37 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
         assertThatThrownBy(() -> searchQueryService.results(999_999L)).isInstanceOf(ApiException.class);
     }
 
+    @Test
+    void seriesJoinsStoredSnapshotsByGithubRepository() {
+        SearchQuery query = searchQueryService.create(kafka.id(), "outbox", "transactional outbox", true, 50);
+        LocalDate today = planningWindow.businessDate();
+        storeSnapshot(query.id(), today.minusDays(1), 2, 10);
+        storeSnapshot(query.id(), today, 4, 12);
+        long older = runId(query.id(), today.minusDays(1));
+        long newer = runId(query.id(), today);
+        insertResult(older, 1, 500L, "other/repo", 10, 1);
+        insertResult(older, 2, kafka.githubId(), kafka.fullName(), 20, 2);
+        insertResult(newer, 1, 500L, "other/renamed", 11, 3);
+
+        SearchQueryService.SearchSeries series = searchQueryService.series(query.id());
+
+        assertThat(series.series()).extracting(SearchQueryService.SeriesLine::githubRepositoryId)
+                .containsExactly(500L, kafka.githubId());
+        SearchQueryService.SeriesLine neighbor = series.series().get(0);
+        assertThat(neighbor.fullName()).isEqualTo("other/renamed");
+        assertThat(neighbor.points()).extracting(SearchQueryService.SeriesPoint::date)
+                .containsExactly(today.minusDays(1), today);
+        assertThat(neighbor.points()).extracting(SearchQueryService.SeriesPoint::stars).containsExactly(10, 11);
+        assertThat(neighbor.points()).extracting(SearchQueryService.SeriesPoint::forks).containsExactly(1, 3);
+        assertThat(series.series().get(1).points()).hasSize(1);
+        assertThat(series.series().get(1).points().get(0).position()).isEqualTo(2);
+
+        SearchQuery empty = searchQueryService.create(outbox.id(), "plain", "plain query", true, 50);
+        storeSnapshot(empty.id(), today, 1, 1);
+        assertThat(searchQueryService.series(empty.id()).series()).isEmpty();
+        assertThatThrownBy(() -> searchQueryService.series(999_999L)).isInstanceOf(ApiException.class);
+    }
+
     private void storeSnapshot(long searchQueryId, LocalDate businessDate, int position, int totalCount) {
         Instant collectedAt = businessDate.atTime(9, 30).toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS);
         jdbcClient.sql("""
@@ -144,6 +175,35 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
                 .param("collectedAt", SqlTime.ts(collectedAt))
                 .param("totalCount", totalCount)
                 .param("position", position)
+                .update();
+    }
+
+    private long runId(long searchQueryId, LocalDate businessDate) {
+        return jdbcClient.sql("""
+                        SELECT id FROM search_run
+                        WHERE search_query_id = :searchQueryId AND business_date = :businessDate
+                        """)
+                .param("searchQueryId", searchQueryId)
+                .param("businessDate", businessDate)
+                .query(Long.class)
+                .single();
+    }
+
+    private void insertResult(long searchRunId, int position, long githubRepositoryId, String fullName, int stars, int forks) {
+        jdbcClient.sql("""
+                        INSERT INTO search_result (
+                            search_run_id, position, github_repository_id, full_name, owner, stars, forks
+                        ) VALUES (
+                            :searchRunId, :position, :githubRepositoryId, :fullName, :owner, :stars, :forks
+                        )
+                        """)
+                .param("searchRunId", searchRunId)
+                .param("position", position)
+                .param("githubRepositoryId", githubRepositoryId)
+                .param("fullName", fullName)
+                .param("owner", fullName.substring(0, fullName.indexOf('/')))
+                .param("stars", stars)
+                .param("forks", forks)
                 .update();
     }
 

@@ -163,6 +163,7 @@ class ApiControllersWebMvcTest {
         when(searchQueryService.visibility(13L)).thenReturn(List.of());
         when(searchQueryService.latestResults(5L)).thenReturn(results);
         when(searchQueryService.results(9L)).thenReturn(results);
+        when(searchQueryService.series(5L)).thenReturn(new SearchQueryService.SearchSeries(List.of()));
         GrowthEvent event = new GrowthEvent(1L, 13L, now, "PROMOTION", "LINKEDIN_POST", "Posted", null, null, "MANUAL", null, now, now);
         when(growthEventService.list(eq(13L), anyString())).thenReturn(List.of(event));
         when(growthEventService.createManual(eq(13L), any(), any(), any(), any(), any())).thenReturn(event);
@@ -225,6 +226,8 @@ class ApiControllersWebMvcTest {
         mockMvc.perform(get("/api/v1/search-queries/5/history")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/search-visibility")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/search-queries/5/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/search-queries/5/series")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.series").isEmpty());
         mockMvc.perform(get("/api/v1/search-runs/9/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/growth-events")).andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/repositories/13/growth-events")

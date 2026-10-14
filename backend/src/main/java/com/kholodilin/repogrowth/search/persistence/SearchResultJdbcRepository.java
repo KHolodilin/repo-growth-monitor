@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -118,6 +119,40 @@ public class SearchResultJdbcRepository {
                 .param("searchRunId", searchRunId)
                 .query(MAPPER)
                 .list();
+    }
+
+    /**
+     * One row per repository that was inside a stored snapshot. Days outside the result limit are absent.
+     */
+    public List<SnapshotValue> findSnapshots(long searchQueryId) {
+        return jdbcClient.sql("""
+                        SELECT r.business_date, s.github_repository_id, s.full_name, s.position, s.stars, s.forks
+                        FROM search_run r
+                        JOIN search_result s ON s.search_run_id = r.id
+                        WHERE r.search_query_id = :searchQueryId
+                          AND r.snapshot_at IS NOT NULL
+                        ORDER BY r.business_date, s.position
+                        """)
+                .param("searchQueryId", searchQueryId)
+                .query((rs, rowNum) -> new SnapshotValue(
+                        rs.getObject("business_date", LocalDate.class),
+                        rs.getLong("github_repository_id"),
+                        rs.getString("full_name"),
+                        rs.getInt("position"),
+                        rs.getInt("stars"),
+                        rs.getInt("forks")
+                ))
+                .list();
+    }
+
+    public record SnapshotValue(
+            LocalDate date,
+            long githubRepositoryId,
+            String fullName,
+            int position,
+            int stars,
+            int forks
+    ) {
     }
 
     private static ActivityStatus activityStatus(String value) {

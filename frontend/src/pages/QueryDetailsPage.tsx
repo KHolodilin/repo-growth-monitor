@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { api, type Repository, type SearchHistory, type SearchRunResults } from "../lib/api";
-import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
-import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
+import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
+import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
+import { datesFromHistory, recentMissedDates } from "../lib/rankChart";
+import { queryChartLines, searchMetricOption, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -13,6 +14,9 @@ export function QueryDetailsPage() {
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SearchHistory | null>(null);
   const [results, setResults] = useState<SearchRunResults | null>(null);
+  const [series, setSeries] = useState<SearchSnapshotSeries[]>([]);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [metric, setMetric] = useState<SearchChartMetric>("place");
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -30,6 +34,11 @@ export function QueryDetailsPage() {
       setResults(await api<SearchRunResults>(`/api/v1/search-queries/${queryId}/results`));
     } catch {
       setResults(null);
+    }
+    try {
+      setSeries(searchSeriesFromPayload(await api(`/api/v1/search-queries/${queryId}/series`)));
+    } catch {
+      setSeries([]);
     }
   }
 
@@ -68,23 +77,40 @@ export function QueryDetailsPage() {
     }
   }
 
+  const storedById = useMemo(() => new Map(series.map((item) => [item.githubRepositoryId, item])), [series]);
+
   const option = useMemo(() => {
-    if (!history) {
+    if (!history || !repo) {
       return null;
     }
     const dates = datesFromHistory([history.points], history.missedDates);
-    return rankHistoryOption({
-      dates,
-      series: [
-        {
-          name: history.query.name,
-          points: history.points,
-          limit: history.query.resultLimit,
-          missedDates: history.missedDates,
-        },
-      ],
+    const neighbors = selected.flatMap((id) => {
+      if (id === repo.githubId) {
+        return [];
+      }
+      const row = results?.rows.find((item) => item.result.githubRepositoryId === id);
+      if (!row) {
+        return [];
+      }
+      return [{ name: row.result.fullName, stored: storedById.get(id)?.points ?? [] }];
     });
-  }, [history]);
+    const lines = queryChartLines({
+      snapshotDates: history.points.map((point) => point.date),
+      ours: {
+        name: repo.fullName,
+        rank: history.points,
+        stored: storedById.get(repo.githubId)?.points ?? [],
+      },
+      neighbors,
+    });
+    return searchMetricOption({
+      metric,
+      dates,
+      missedDates: history.missedDates,
+      limit: history.query.resultLimit,
+      lines,
+    });
+  }, [history, repo, results, selected, metric, storedById]);
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -149,7 +175,29 @@ export function QueryDetailsPage() {
 
       {option && (
         <Card>
-          <h2 className="mb-3 font-medium">Rank History</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-medium">Rank History</h2>
+            <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
+              {([
+                ["place", "Place"],
+                ["stars", "Stars"],
+                ["forks", "Forks"],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium",
+                    metric === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                  aria-pressed={metric === key}
+                  onClick={() => setMetric(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {recentMissed.length > 0 && (
             <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
@@ -158,7 +206,16 @@ export function QueryDetailsPage() {
           )}
           <PersistentECharts
             chartId={`${repo.id}:query:${history.query.id}`}
-            series={[{ key: String(history.query.id), name: history.query.name }]}
+            series={[
+              { key: String(repo.githubId), name: repo.fullName },
+              ...selected.flatMap((id) => {
+                const row = results?.rows.find((item) => item.result.githubRepositoryId === id);
+                if (!row || id === repo.githubId) {
+                  return [];
+                }
+                return [{ key: String(id), name: row.result.fullName }];
+              }),
+            ]}
             option={option}
             style={{ height: 360, width: "100%" }}
           />
@@ -174,6 +231,10 @@ export function QueryDetailsPage() {
             rows={results.rows}
             repositoryId={repo.id}
             trackedGithubId={repo.githubId}
+            selectedIds={selected}
+            onToggle={(id) =>
+              setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+            }
           />
         )}
       </Card>

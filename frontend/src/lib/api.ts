@@ -298,6 +298,23 @@ export type TopicRunResults = {
   }[];
 };
 
+export type SearchSnapshotPoint = {
+  date: string;
+  position: number;
+  stars: number;
+  forks: number;
+};
+
+export type SearchSnapshotSeries = {
+  githubRepositoryId: number;
+  fullName: string;
+  points: SearchSnapshotPoint[];
+};
+
+export type SearchSeries = {
+  series: SearchSnapshotSeries[];
+};
+
 export type SearchRunResults = {
   run: {
     id: number;
