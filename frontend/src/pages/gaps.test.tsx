@@ -70,7 +70,7 @@ describe("coverage gaps", () => {
       summary: { ...dashboardReady.summary, stars: { total: 21, change: 0 } },
       repositories: [
         dashboardReady.repositories[0],
-        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null, speed: null },
+        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null },
       ],
     });
     render(
@@ -87,7 +87,6 @@ describe("coverage gaps", () => {
     await user.click(screen.getByRole("button", { name: /Clones/ }));
     await user.click(screen.getByRole("button", { name: /Stars/ }));
     await user.click(screen.getByRole("button", { name: "Forks" }));
-    await user.click(screen.getByRole("button", { name: "Speed" }));
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
     expect(screen.getAllByText("11").length).toBeGreaterThan(0);
     await user.click(screen.getByText("KHolodilin/other"));

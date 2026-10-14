@@ -10,9 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -435,27 +433,6 @@ public class TrafficJdbcRepository {
                         """)
                 .query(LocalDate.class)
                 .optional();
-    }
-
-    public Map<Long, Integer> starBaselineBefore(LocalDate fromInclusive) {
-        Map<Long, Integer> baselines = new HashMap<>();
-        jdbcClient.sql("""
-                        SELECT DISTINCT ON (s.repository_id)
-                               s.repository_id,
-                               s.stars
-                        FROM repository_daily_stats s
-                        JOIN repository r ON r.id = s.repository_id
-                        WHERE r.tracking_enabled = TRUE
-                          AND s.stat_date < :fromDate
-                        ORDER BY s.repository_id, s.stat_date DESC
-                        """)
-                .param("fromDate", fromInclusive)
-                .query((rs, rowNum) -> {
-                    baselines.put(rs.getLong("repository_id"), rs.getInt("stars"));
-                    return rs.getLong("repository_id");
-                })
-                .list();
-        return baselines;
     }
 
     public Long starsChangeSince(LocalDate fromInclusive) {

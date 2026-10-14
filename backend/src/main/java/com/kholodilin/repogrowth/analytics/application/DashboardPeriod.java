@@ -41,10 +41,6 @@ public record DashboardPeriod(
         return "all".equals(value);
     }
 
-    public long lengthDays() {
-        return ChronoUnit.DAYS.between(from, to) + 1;
-    }
-
     public static String normalize(String raw) {
         if (raw == null || raw.isBlank()) {
             return "30d";

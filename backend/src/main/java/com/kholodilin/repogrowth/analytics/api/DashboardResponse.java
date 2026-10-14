@@ -66,7 +66,6 @@ public record DashboardResponse(
             long clones,
             int stars,
             int forks,
-            Double speed,
             Double growthPercent,
             String collectionStatus,
             List<JobStatus> jobs,
