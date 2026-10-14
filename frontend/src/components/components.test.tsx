@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import { growthEvent, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
+import { dashboardReady, growthEvent, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
 import { GrowthEventSettingsCard } from "./GrowthEventSettingsCard";
 import { EventDetailsDialog, GrowthEventsPanel } from "./GrowthEventsPanel";
 import { DashboardIcon, LogoMark, RepositoriesIcon, SettingsIcon } from "./icons";
@@ -48,6 +48,145 @@ describe("components", () => {
     expect(screen.getByText("Repo Growth")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "7d" }));
     expect(onPeriod).toHaveBeenCalledWith("7d");
+  });
+
+  it("collects from the header and reports sync failures", async () => {
+    const user = userEvent.setup();
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return {};
+      }
+      return dashboardReady;
+    });
+    const ready = render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<p>dash</p>} />
+            <Route path="/repositories" element={<p>repos</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collect now" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+    );
+    await user.click(screen.getByRole("link", { name: "Repositories" }));
+    expect(screen.getByText("repos")).toBeInTheDocument();
+    ready.unmount();
+
+    let hold = true;
+    const waiters: Array<(value: unknown) => void> = [];
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return {};
+      }
+      if (!hold) {
+        return dashboardReady;
+      }
+      return new Promise((resolve) => {
+        waiters.push(resolve);
+      });
+    });
+    const pending = render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<p>home</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole("button", { name: "Collect now" }));
+    expect(screen.getByRole("button", { name: "Collecting..." })).toBeInTheDocument();
+    hold = false;
+    waiters.forEach((resolve) => resolve(dashboardReady));
+    expect(await screen.findByRole("button", { name: "Collect now" })).toBeInTheDocument();
+    pending.unmount();
+
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        throw new Error("busy");
+      }
+      return dashboardReady;
+    });
+    const failed = render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<p>home</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    expect(await screen.findByText("busy")).toBeInTheDocument();
+    failed.unmount();
+
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        throw "nope";
+      }
+      return { lastSyncAt: null };
+    });
+    const empty = render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<p>home</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    expect(screen.getByText("Last sync: —")).toBeInTheDocument();
+    empty.unmount();
+
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        throw "nope";
+      }
+      return dashboardReady;
+    });
+    const plain = render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<p>home</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    expect(await screen.findByText("Collect failed")).toBeInTheDocument();
+    plain.unmount();
+
+    let rejectStatus: (reason: Error) => void = () => undefined;
+    api.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectStatus = reject;
+        }),
+    );
+    const hanging = render(
+      <MemoryRouter>
+        <Layout />
+      </MemoryRouter>,
+    );
+    hanging.unmount();
+    await act(async () => {
+      rejectStatus(new Error("late"));
+    });
+
+    api.mockRejectedValue(new Error("down"));
+    render(
+      <MemoryRouter>
+        <Layout />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("Last sync: —")).toBeInTheDocument();
   });
 
   it("maps referrer icons and colors", () => {

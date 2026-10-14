@@ -35,9 +35,6 @@ export function Layout() {
   }, [location.pathname]);
 
   async function collectNow() {
-    if (collecting) {
-      return;
-    }
     setCollecting(true);
     setError(null);
     try {
