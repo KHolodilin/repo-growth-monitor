@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dashboardReady, repository, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
+import { Layout } from "../components/Layout";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { SearchResultsTable } from "../components/SearchResultsTable";
 import { SnapshotHistoryChart } from "../components/SnapshotHistoryChart";
@@ -51,8 +52,10 @@ describe("coverage gaps", () => {
     render(
       <MemoryRouter>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/repositories/:id" element={<p>opened</p>} />
+          <Route element={<Layout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/repositories/:id" element={<p>opened</p>} />
+          </Route>
         </Routes>
       </MemoryRouter>,
     );
@@ -233,6 +236,7 @@ describe("coverage gaps", () => {
     await user.click(screen.getByRole("button", { name: "1d" }));
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collect now" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText(/No topics yet/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Java" }));

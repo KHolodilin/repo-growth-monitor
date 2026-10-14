@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
-import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, formatSyncTime, growthClass } from "../lib/utils";
+import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -27,7 +27,6 @@ export function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [collecting, setCollecting] = useState(false);
 
   async function load() {
     const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}`);
@@ -67,22 +66,13 @@ export function DashboardPage() {
     return () => window.clearInterval(timer);
   }, [collectingFirst, period]);
 
-  async function collectNow() {
-    if (!data || collecting) {
-      return;
+  useEffect(() => {
+    function onCollected() {
+      void load().catch((err: Error) => setError(err.message));
     }
-    setCollecting(true);
-    try {
-      await Promise.all(
-        data.repositories.map((row) => api(`/api/v1/repositories/${row.id}/collect`, { method: "POST" })),
-      );
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setCollecting(false);
-    }
-  }
+    window.addEventListener("repos-collected", onCollected);
+    return () => window.removeEventListener("repos-collected", onCollected);
+  }, [period]);
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -96,7 +86,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <DashboardHeader data={data} period={period} onPeriod={setPeriod} onCollect={collectNow} collecting={collecting} />
+      <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard label="Repositories" value={data.summary.repositories} />
         <TrafficKpi label="Views" metric={data.summary.views} period={period} />
@@ -122,25 +112,19 @@ function DashboardHeader({
   data,
   period,
   onPeriod,
-  onCollect,
-  collecting,
 }: {
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
-  onCollect?: () => void;
-  collecting?: boolean;
 }) {
-  const sync = formatSyncTime(data?.lastSyncAt);
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <h1 className="text-2xl font-semibold">Portfolio</h1>
       <div className="flex flex-col items-end gap-3">
-        <div className="flex flex-wrap items-center justify-end gap-3">
+        {(data?.collectionWarning || data?.partialData?.present) && (
           <div className="text-right text-sm text-muted-foreground">
-            {sync ? <div>Last sync: {sync}</div> : <div>Last sync: —</div>}
             {data?.collectionWarning && (
-              <div className="mt-1 text-amber-700">⚠ {data.collectionWarning.message}</div>
+              <div className="text-amber-700">⚠ {data.collectionWarning.message}</div>
             )}
             {data?.partialData?.present && (
               <div className="group relative mt-1 inline-block text-amber-700">
@@ -151,12 +135,7 @@ function DashboardHeader({
               </div>
             )}
           </div>
-          {onCollect && (
-            <Button disabled={collecting} onClick={onCollect}>
-              {collecting ? "Collecting..." : "Collect now"}
-            </Button>
-          )}
-        </div>
+        )}
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
     </div>
