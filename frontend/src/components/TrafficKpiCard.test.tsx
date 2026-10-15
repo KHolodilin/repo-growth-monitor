@@ -15,11 +15,15 @@ describe("TrafficKpiCard", () => {
   });
 
   it("colors a decline red and omits a sparkline when the series is empty", () => {
-    const { container } = render(
+    const { container, rerender } = render(
       <TrafficKpiCard label="Clones" value={2} growthPercent={-4} period="7d" series={[]} />,
     );
     expect(screen.getByText("↓ 4%")).toHaveClass("text-red-700");
     expect(screen.getByText("vs prev 7d")).toBeInTheDocument();
+    expect(container.querySelector("polyline")).toBeNull();
+
+    rerender(<TrafficKpiCard label="Clones" value={2} growthPercent={-4} period="7d" />);
+    expect(screen.getByText("↓ 4%")).toBeInTheDocument();
     expect(container.querySelector("polyline")).toBeNull();
   });
 
