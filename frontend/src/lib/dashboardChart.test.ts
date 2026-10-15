@@ -28,10 +28,10 @@ describe("dashboardTrafficOption", () => {
         date: "2026-10-08",
         views: 40,
         visitors: 12,
-        clones: 0,
+        clones: 6,
         viewsLeader: { fullName: "owner/outbox", value: 35 },
         visitorsLeader: { fullName: "owner/other", value: 8 },
-        clonesLeader: { fullName: "owner/outbox", value: 0 },
+        clonesLeader: { fullName: "owner/outbox", value: 5 },
       },
     ]);
     const formatter = option.tooltip.formatter;
@@ -45,9 +45,14 @@ describe("dashboardTrafficOption", () => {
     expect(text).toContain("+12 visitors, 8 of them from owner/other");
     expect(text).not.toContain("+0 clones");
     expect(text).not.toContain("+1 other");
-    const clicked = formatter({ name: "2026-10-08", seriesName: "Clones", data: 0 });
-    expect(clicked).toContain("+40 views, 35 of them from owner/outbox");
-    expect(clicked).toContain("+12 visitors, 8 of them from owner/other");
+    const views = formatter({ name: "2026-10-08", seriesName: "Views", data: 40 });
+    expect(views).toContain("+40 views, 35 of them from owner/outbox");
+    expect(views).not.toContain("Visitors");
+    expect(views).not.toContain("Clones");
+    const clones = formatter({ name: "2026-10-08", seriesName: "Clones", data: 6 });
+    expect(clones).toContain("+6 clones, 5 of them from owner/outbox");
+    expect(clones).not.toContain("Views");
+    expect(clones).not.toContain("Visitors");
     expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).not.toContain("of them from");
     expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).not.toContain("of them from");
     expect(formatter({ seriesName: "Views", data: 1 })).toBe("");

@@ -47,14 +47,6 @@ function tooltipItems(raw: unknown): TooltipItem[] | null {
   return null;
 }
 
-function dayItems(point: DashboardTrafficPoint): TooltipItem[] {
-  return [
-    { axisValue: point.date, seriesName: "Views", data: point.views },
-    { axisValue: point.date, seriesName: "Visitors", data: point.visitors },
-    { axisValue: point.date, seriesName: "Clones", data: point.clones },
-  ];
-}
-
 export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
   const byDate = new Map(traffic.map((point) => [point.date, point]));
   return {
@@ -71,7 +63,7 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
           return "";
         }
         const point = byDate.get(dateKey);
-        const rows = (point && !Array.isArray(raw) ? dayItems(point) : items)
+        const rows = items
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             const share = increaseLine(item.data, item.seriesName.toLowerCase(), leaderFor(point, item.seriesName));
