@@ -82,9 +82,9 @@ export type Dashboard = {
     views: number | null;
     visitors: number | null;
     clones: number | null;
-    viewsLeader?: { fullName: string; value: number } | null;
-    visitorsLeader?: { fullName: string; value: number } | null;
-    clonesLeader?: { fullName: string; value: number } | null;
+    viewsLeaders?: { fullName: string; value: number }[] | null;
+    visitorsLeaders?: { fullName: string; value: number }[] | null;
+    clonesLeaders?: { fullName: string; value: number }[] | null;
   }[];
   repositories: {
     id: number;

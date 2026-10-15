@@ -7,32 +7,36 @@ type DashboardTrafficPoint = {
   views: number | null;
   visitors: number | null;
   clones: number | null;
-  viewsLeader?: TrafficLeader | null;
-  visitorsLeader?: TrafficLeader | null;
-  clonesLeader?: TrafficLeader | null;
+  viewsLeaders?: TrafficLeader[] | null;
+  visitorsLeaders?: TrafficLeader[] | null;
+  clonesLeaders?: TrafficLeader[] | null;
 };
 
-function leaderFor(point: DashboardTrafficPoint | undefined, seriesName: string) {
+function leadersFor(point: DashboardTrafficPoint | undefined, seriesName: string) {
   if (!point) {
     return undefined;
   }
   if (seriesName === "Views") {
-    return point.viewsLeader;
+    return point.viewsLeaders;
   }
   if (seriesName === "Visitors") {
-    return point.visitorsLeader;
+    return point.visitorsLeaders;
   }
   if (seriesName === "Clones") {
-    return point.clonesLeader;
+    return point.clonesLeaders;
   }
   return undefined;
 }
 
-function increaseLine(total: number | null | undefined, metric: string, leader: TrafficLeader | null | undefined) {
-  if (total == null || total <= 0 || leader == null || leader.value <= 0) {
+function shareLines(total: number | null | undefined, leaders: TrafficLeader[] | null | undefined) {
+  if (total == null || total <= 0 || leaders == null || leaders.length === 0) {
     return "";
   }
-  return `<div>+${formatNumber(total)} ${metric}, ${formatNumber(leader.value)} of them from ${leader.fullName}</div>`;
+  const rows = leaders.filter((leader) => leader.value > 0).slice(0, 3);
+  if (rows.length === 0) {
+    return "";
+  }
+  return rows.map((leader) => `<div>${formatNumber(leader.value)} from ${leader.fullName}</div>`).join("");
 }
 
 type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | null };
@@ -66,7 +70,7 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
         const rows = items
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-            const share = increaseLine(item.data, item.seriesName.toLowerCase(), leaderFor(point, item.seriesName));
+            const share = shareLines(item.data, leadersFor(point, item.seriesName));
             return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>${share}`;
           })
           .join("");

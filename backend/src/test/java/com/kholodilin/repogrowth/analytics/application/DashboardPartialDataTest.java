@@ -81,16 +81,25 @@ class DashboardPartialDataTest {
                 new RepositoryDayTotals(day, "owner/alpha", 35, 9, 4),
                 new RepositoryDayTotals(day, "owner/beta", 35, 2, 1)
         );
-        assertThat(AnalyticsService.topShare(rows, RepositoryDayTotals::views))
-                .isEqualTo(new TrafficLeader("owner/alpha", 35));
-        assertThat(AnalyticsService.topShare(rows, RepositoryDayTotals::uniqueVisitors))
-                .isEqualTo(new TrafficLeader("owner/alpha", 9));
-        assertThat(AnalyticsService.topShare(rows, RepositoryDayTotals::clones))
-                .isEqualTo(new TrafficLeader("owner/alpha", 4));
-        assertThat(AnalyticsService.topShare(List.of(), RepositoryDayTotals::views)).isNull();
-        assertThat(AnalyticsService.topShare(
+        assertThat(AnalyticsService.topShares(rows, RepositoryDayTotals::views)).containsExactly(
+                new TrafficLeader("owner/alpha", 35),
+                new TrafficLeader("owner/beta", 35),
+                new TrafficLeader("owner/outbox", 35)
+        );
+        assertThat(AnalyticsService.topShares(rows, RepositoryDayTotals::uniqueVisitors)).containsExactly(
+                new TrafficLeader("owner/alpha", 9),
+                new TrafficLeader("owner/beta", 2),
+                new TrafficLeader("owner/zeta", 1)
+        );
+        assertThat(AnalyticsService.topShares(rows, RepositoryDayTotals::clones)).containsExactly(
+                new TrafficLeader("owner/alpha", 4),
+                new TrafficLeader("owner/outbox", 4),
+                new TrafficLeader("owner/beta", 1)
+        );
+        assertThat(AnalyticsService.topShares(List.of(), RepositoryDayTotals::views)).isEmpty();
+        assertThat(AnalyticsService.topShares(
                 List.of(new RepositoryDayTotals(day, "owner/quiet", 0, 0, 0)),
                 RepositoryDayTotals::views
-        )).isNull();
+        )).isEmpty();
     }
 }

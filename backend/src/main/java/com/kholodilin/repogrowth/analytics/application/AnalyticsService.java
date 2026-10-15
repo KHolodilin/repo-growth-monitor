@@ -493,32 +493,26 @@ public class AnalyticsService {
                     views,
                     visitors,
                     clones,
-                    topShare(entry.getValue(), RepositoryDayTotals::views),
-                    topShare(entry.getValue(), RepositoryDayTotals::uniqueVisitors),
-                    topShare(entry.getValue(), RepositoryDayTotals::clones)
+                    topShares(entry.getValue(), RepositoryDayTotals::views),
+                    topShares(entry.getValue(), RepositoryDayTotals::uniqueVisitors),
+                    topShares(entry.getValue(), RepositoryDayTotals::clones)
             ));
         }
         return points;
     }
 
-    /** The tracked repository with the largest positive share. Equal shares keep the earlier name. */
-    static TrafficLeader topShare(List<RepositoryDayTotals> rows, ToLongFunction<RepositoryDayTotals> metric) {
-        RepositoryDayTotals best = null;
-        long bestValue = 0;
+    /** Up to three tracked repositories with the largest positive share. Equal shares keep the earlier name. */
+    static List<TrafficLeader> topShares(List<RepositoryDayTotals> rows, ToLongFunction<RepositoryDayTotals> metric) {
+        List<TrafficLeader> shares = new ArrayList<>();
         for (RepositoryDayTotals row : rows) {
             long value = metric.applyAsLong(row);
             if (value <= 0) {
                 continue;
             }
-            if (best == null || value > bestValue || (value == bestValue && row.fullName().compareTo(best.fullName()) < 0)) {
-                best = row;
-                bestValue = value;
-            }
+            shares.add(new TrafficLeader(row.fullName(), value));
         }
-        if (best == null) {
-            return null;
-        }
-        return new TrafficLeader(best.fullName(), bestValue);
+        shares.sort(Comparator.comparingLong(TrafficLeader::value).reversed().thenComparing(TrafficLeader::fullName));
+        return List.copyOf(shares.subList(0, Math.min(3, shares.size())));
     }
 
     static <T> List<T> dropTrailingGaps(List<T> points, Function<T, Long> views) {

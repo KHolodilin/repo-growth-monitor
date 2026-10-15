@@ -62,12 +62,12 @@ public record DashboardResponse(
             Long views,
             Long visitors,
             Long clones,
-            TrafficLeader viewsLeader,
-            TrafficLeader visitorsLeader,
-            TrafficLeader clonesLeader
+            List<TrafficLeader> viewsLeaders,
+            List<TrafficLeader> visitorsLeaders,
+            List<TrafficLeader> clonesLeaders
     ) {
         public TrafficPoint(LocalDate date, Long views, Long visitors, Long clones) {
-            this(date, views, visitors, clones, null, null, null);
+            this(date, views, visitors, clones, List.of(), List.of(), List.of());
         }
     }
 
