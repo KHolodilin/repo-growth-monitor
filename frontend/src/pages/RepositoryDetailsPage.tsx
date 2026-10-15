@@ -16,6 +16,7 @@ import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
@@ -88,6 +89,7 @@ export function RepositoryDetailsPage() {
   const [collecting, setCollecting] = useState(false);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
   const [runningAll, setRunningAll] = useState(false);
+  const [focusHealth, setFocusHealth] = useState(false);
 
   function setTab(next: Tab) {
     if (next === "traffic") {
@@ -130,6 +132,14 @@ export function RepositoryDetailsPage() {
     window.addEventListener("repos-collected", onCollected);
     return () => window.removeEventListener("repos-collected", onCollected);
   }, [load]);
+
+  useEffect(() => {
+    if (tab !== "overview" || !focusHealth) {
+      return;
+    }
+    document.getElementById("repository-health")?.scrollIntoView({ block: "start" });
+    setFocusHealth(false);
+  }, [focusHealth, tab]);
 
   useEffect(() => {
     let cancelled = false;
@@ -312,7 +322,7 @@ export function RepositoryDetailsPage() {
   const busy = collecting || runActive;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <header className="space-y-0">
         <PageBreadcrumb
           items={[
@@ -335,7 +345,7 @@ export function RepositoryDetailsPage() {
         {repo.description && (
           <p className="mt-3 border-t pt-3 text-sm font-normal text-muted-foreground">{repo.description}</p>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-sm text-muted-foreground">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-3 text-sm text-muted-foreground">
           <a
             className="text-primary hover:underline"
             href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
@@ -360,9 +370,28 @@ export function RepositoryDetailsPage() {
             <ContributorsIcon />
             {formatNumber(repo.contributors)} contributors
           </span>
+          {repo.health && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-l border-border pl-4">
+              <HealthScoreLink
+                title="Discoverability"
+                items={repo.health.discoverability}
+                onClick={() => {
+                  setFocusHealth(true);
+                  setTab("overview");
+                }}
+              />
+              <HealthScoreLink
+                title="Community Standards"
+                items={repo.health.communityStandards}
+                onClick={() => {
+                  setFocusHealth(true);
+                  setTab("overview");
+                }}
+              />
+            </div>
+          )}
         </div>
       </header>
-      {repo.health && <HealthScoreRow health={repo.health} />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg border bg-muted p-1">
           {([
@@ -569,34 +598,32 @@ function TopicsCard({ topics }: { topics: string[] }) {
   );
 }
 
-function HealthScoreRow({ health }: { health: RepositoryHealth }) {
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <HealthScoreCard title="Discoverability" items={health.discoverability} />
-      <HealthScoreCard title="Community Standards" items={health.communityStandards} />
-    </div>
-  );
-}
-
-function HealthScoreCard({ title, items }: { title: string; items: { label: string; passed: boolean }[] }) {
+function HealthScoreLink({
+  title,
+  items,
+  onClick,
+}: {
+  title: string;
+  items: { label: string; passed: boolean }[];
+  onClick: () => void;
+}) {
   const passed = items.filter((item) => item.passed).length;
   const percent = items.length === 0 ? 0 : Math.round((passed / items.length) * 100);
   return (
-    <Card>
-      <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="mt-1 text-2xl font-semibold">
-        {passed} / {items.length}
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} />
-      </div>
-    </Card>
+    <button type="button" onClick={onClick} className="inline-flex min-w-16 flex-col items-start gap-1 text-left text-sm text-foreground">
+      <span>
+        {title} {passed}/{items.length}
+      </span>
+      <span className="h-1 w-16 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+        <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} />
+      </span>
+    </button>
   );
 }
 
 function RepositoryHealthSection({ health }: { health: RepositoryHealth }) {
   return (
-    <Card>
+    <Card id="repository-health">
       <h2 className="mb-4 font-medium">Repository Health</h2>
       <div className="grid items-start gap-8 md:grid-cols-2">
         <HealthCheckList title="Discoverability" items={health.discoverability} />
@@ -768,12 +795,36 @@ function TrafficPanel({
   const option = useMemo(() => trafficChartOption(traffic.traffic, visibleEvents, period), [traffic, visibleEvents, period]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Kpi label="Visitors" value={traffic.totals.uniqueVisitors} />
-        <Kpi label="Views" value={traffic.totals.views} />
-        <Kpi label="Clones" value={traffic.totals.clones} />
-        <Kpi label="Unique Cloners" value={traffic.totals.uniqueCloners} />
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <TrafficKpiCard
+          label="Visitors"
+          value={traffic.totals.uniqueVisitors.value}
+          growthPercent={traffic.totals.uniqueVisitors.growthPercent}
+          period={period}
+          series={traffic.traffic.map((point) => point.uniqueVisitors)}
+        />
+        <TrafficKpiCard
+          label="Views"
+          value={traffic.totals.views.value}
+          growthPercent={traffic.totals.views.growthPercent}
+          period={period}
+          series={traffic.traffic.map((point) => point.views)}
+        />
+        <TrafficKpiCard
+          label="Clones"
+          value={traffic.totals.clones.value}
+          growthPercent={traffic.totals.clones.growthPercent}
+          period={period}
+          series={traffic.traffic.map((point) => point.clones)}
+        />
+        <TrafficKpiCard
+          label="Unique Cloners"
+          value={traffic.totals.uniqueCloners.value}
+          growthPercent={traffic.totals.uniqueCloners.growthPercent}
+          period={period}
+          series={traffic.traffic.map((point) => point.uniqueCloners)}
+        />
       </div>
       <ChartCard
         title="Traffic"
@@ -846,15 +897,6 @@ function TrafficPanel({
         />
       )}
     </div>
-  );
-}
-
-function Kpi({ label, value }: { label: string; value: number }) {
-  return (
-    <Card>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{formatNumber(value)}</div>
-    </Card>
   );
 }
 

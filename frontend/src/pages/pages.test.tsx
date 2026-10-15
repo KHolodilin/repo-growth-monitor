@@ -158,6 +158,12 @@ describe("pages", () => {
     });
     renderPath("/repositories/13", <RepositoryDetailsPage />);
     expect(await screen.findByText("Github Traffic")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discoverability 1/2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Community Standards 1/1" })).toBeInTheDocument();
+    expect(screen.queryByText("1 / 2")).not.toBeInTheDocument();
+    expect(screen.getByText("↑ 25%")).toBeInTheDocument();
+    expect(screen.getByText("↓ 50%")).toBeInTheDocument();
+    expect(screen.getAllByText("vs prev 30d")).toHaveLength(3);
     await user.click(screen.getByLabelText("Switch repository"));
     expect(await screen.findByPlaceholderText("Search repositories")).toBeInTheDocument();
     expect(await screen.findByText("other")).toBeInTheDocument();
@@ -170,6 +176,9 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "GitHub" }));
     await user.click(screen.getByRole("button", { name: "Promotion" }));
+    await user.click(screen.getByRole("button", { name: "Discoverability 1/2" }));
+    expect(screen.getByRole("heading", { name: "Repository Health" })).toBeInTheDocument();
+    expect(screen.getByText("Description")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(screen.getByText("Collection Status")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Stats" }));
