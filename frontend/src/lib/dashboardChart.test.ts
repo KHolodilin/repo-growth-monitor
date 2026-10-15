@@ -14,7 +14,70 @@ describe("dashboardTrafficOption", () => {
       { axisValue: "2026-10-08", seriesName: "Views", data: null },
       { axisValue: "2026-10-08", seriesName: "Visitors", data: 3 },
     ])).toContain("Visitors");
+    expect(option.tooltip.trigger).toBe("item");
+    expect(option.tooltip.triggerOn).toBe("click");
     expect(option.xAxis.boundaryGap).toBe(false);
+    expect(option.series).toHaveLength(3);
+    expect(formatter({})).toBe("");
     expect(dashboardTrafficOption([{ date: "2026-10-08", views: 1, visitors: 1, clones: 1 }]).xAxis.boundaryGap).toBe(true);
+  });
+
+  it("names the repository that contributed the largest share of the day", () => {
+    const option = dashboardTrafficOption([
+      {
+        date: "2026-10-08",
+        views: 40,
+        visitors: 12,
+        clones: 6,
+        viewsLeaders: [
+          { fullName: "owner/outbox", value: 35 },
+          { fullName: "owner/zeta", value: 0 },
+          { fullName: "owner/tiny", value: 10 },
+          { fullName: "owner/beta", value: 4 },
+          { fullName: "owner/extra", value: 1 },
+        ],
+        visitorsLeaders: [{ fullName: "owner/other", value: 8 }],
+        clonesLeaders: [{ fullName: "owner/outbox", value: 5 }],
+      },
+    ]);
+    const formatter = option.tooltip.formatter;
+    const text = formatter([
+      { axisValue: "2026-10-08", seriesName: "Views", data: 40 },
+      { axisValue: "2026-10-08", seriesName: "Visitors", data: 12 },
+      { axisValue: "2026-10-08", seriesName: "Clones", data: 0 },
+      { axisValue: "2026-10-08", seriesName: "Other", data: 1 },
+    ]);
+    expect(text).toContain("Views - 40");
+    expect(text).toContain("owner/outbox - 35");
+    expect(text).toContain("owner/tiny - 10");
+    expect(text).toContain("owner/beta - 4");
+    expect(text).toContain("owner/other - 8");
+    expect(text).not.toContain("owner/extra");
+    expect(text).not.toContain("owner/zeta");
+    expect(text).not.toContain("owner/outbox - 5");
+    expect(text).not.toContain("from");
+    const views = formatter({ name: "2026-10-08", seriesName: "Views", data: 40 });
+    expect(views).toContain("Views - 40");
+    expect(views).toContain("owner/outbox - 35");
+    expect(views).not.toContain("Visitors");
+    expect(views).not.toContain("Clones");
+    const clones = formatter({ name: "2026-10-08", seriesName: "Clones", data: 6 });
+    expect(clones).toContain("Clones - 6");
+    expect(clones).toContain("owner/outbox - 5");
+    expect(clones).not.toContain("Views");
+    expect(clones).not.toContain("Visitors");
+    expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
+    expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
+    expect(formatter({ seriesName: "Views", data: 1 })).toBe("");
+    expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: undefined as unknown as null }])).toContain("Views - —");
+
+    const zeroShare = dashboardTrafficOption([
+      { date: "2026-10-08", views: 40, visitors: 1, clones: 1, viewsLeaders: [{ fullName: "owner/outbox", value: 0 }] },
+    ]);
+    expect(zeroShare.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain("owner/outbox");
+    const none = dashboardTrafficOption([
+      { date: "2026-10-08", views: 40, visitors: 1, clones: 1, viewsLeaders: [] },
+    ]);
+    expect(none.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain("owner/outbox");
   });
 });

@@ -411,6 +411,32 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
+    public List<RepositoryDayTotals> dailyByRepository(LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT t.traffic_date,
+                               r.full_name,
+                               t.views,
+                               t.unique_visitors,
+                               t.clones
+                        FROM traffic_daily t
+                        JOIN repository r ON r.id = t.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND t.traffic_date >= :fromDate
+                          AND t.traffic_date <= :toDate
+                        ORDER BY t.traffic_date, r.full_name
+                        """)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new RepositoryDayTotals(
+                        rs.getObject("traffic_date", LocalDate.class),
+                        rs.getString("full_name"),
+                        rs.getLong("views"),
+                        rs.getLong("unique_visitors"),
+                        rs.getLong("clones")
+                ))
+                .list();
+    }
+
     public boolean hasTrackedTraffic() {
         return jdbcClient.sql("""
                         SELECT EXISTS (
@@ -639,6 +665,15 @@ public class TrafficJdbcRepository {
     }
 
     public record DailyTotals(LocalDate date, long views, long uniqueVisitors, long clones) {
+    }
+
+    public record RepositoryDayTotals(
+            LocalDate date,
+            String fullName,
+            long views,
+            long uniqueVisitors,
+            long clones
+    ) {
     }
 
     public record ReferrerRow(String referrer, int views, int uniqueVisitors) {

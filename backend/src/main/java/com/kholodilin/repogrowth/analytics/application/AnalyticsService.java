@@ -11,6 +11,7 @@ import com.kholodilin.repogrowth.analytics.api.DashboardResponse.MetricValue;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.PartialData;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.RepositoryRow;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StarsMetric;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficLeader;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
@@ -32,6 +33,7 @@ import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.PathSnapshot;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.ReferrerSnapshot;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryDayTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.TrafficTotals;
 import org.slf4j.Logger;
@@ -50,7 +52,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
 @Service
@@ -470,9 +474,45 @@ public class AnalyticsService {
     }
 
     private List<TrafficPoint> series(DashboardPeriod period) {
-        return trafficJdbcRepository.dailyPortfolio(period.from(), period.to()).stream()
-                .map(day -> new TrafficPoint(day.date(), day.views(), day.uniqueVisitors(), day.clones()))
-                .toList();
+        Map<LocalDate, List<RepositoryDayTotals>> byDate = new TreeMap<>();
+        for (RepositoryDayTotals row : trafficJdbcRepository.dailyByRepository(period.from(), period.to())) {
+            byDate.computeIfAbsent(row.date(), date -> new ArrayList<>()).add(row);
+        }
+        List<TrafficPoint> points = new ArrayList<>();
+        for (Map.Entry<LocalDate, List<RepositoryDayTotals>> entry : byDate.entrySet()) {
+            long views = 0;
+            long visitors = 0;
+            long clones = 0;
+            for (RepositoryDayTotals row : entry.getValue()) {
+                views += row.views();
+                visitors += row.uniqueVisitors();
+                clones += row.clones();
+            }
+            points.add(new TrafficPoint(
+                    entry.getKey(),
+                    views,
+                    visitors,
+                    clones,
+                    topShares(entry.getValue(), RepositoryDayTotals::views),
+                    topShares(entry.getValue(), RepositoryDayTotals::uniqueVisitors),
+                    topShares(entry.getValue(), RepositoryDayTotals::clones)
+            ));
+        }
+        return points;
+    }
+
+    /** Up to three tracked repositories with the largest positive share. Equal shares keep the earlier name. */
+    static List<TrafficLeader> topShares(List<RepositoryDayTotals> rows, ToLongFunction<RepositoryDayTotals> metric) {
+        List<TrafficLeader> shares = new ArrayList<>();
+        for (RepositoryDayTotals row : rows) {
+            long value = metric.applyAsLong(row);
+            if (value <= 0) {
+                continue;
+            }
+            shares.add(new TrafficLeader(row.fullName(), value));
+        }
+        shares.sort(Comparator.comparingLong(TrafficLeader::value).reversed().thenComparing(TrafficLeader::fullName));
+        return List.copyOf(shares.subList(0, Math.min(3, shares.size())));
     }
 
     static <T> List<T> dropTrailingGaps(List<T> points, Function<T, Long> views) {

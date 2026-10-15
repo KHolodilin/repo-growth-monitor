@@ -77,7 +77,15 @@ export type Dashboard = {
     clones: { value: number; growthPercent: number | null };
     stars: { total: number; change: number | null };
   };
-  traffic: { date: string; views: number | null; visitors: number | null; clones: number | null }[];
+  traffic: {
+    date: string;
+    views: number | null;
+    visitors: number | null;
+    clones: number | null;
+    viewsLeaders?: { fullName: string; value: number }[] | null;
+    visitorsLeaders?: { fullName: string; value: number }[] | null;
+    clonesLeaders?: { fullName: string; value: number }[] | null;
+  }[];
   repositories: {
     id: number;
     fullName: string;

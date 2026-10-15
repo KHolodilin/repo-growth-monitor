@@ -134,6 +134,22 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
 
         assertThat(dashboard.traffic()).extracting(DashboardResponse.TrafficPoint::date)
                 .containsExactly(today.minusDays(6), today.minusDays(4));
+        DashboardResponse.TrafficPoint firstDay = dashboard.traffic().getFirst();
+        assertThat(firstDay.views()).isEqualTo(170);
+        assertThat(firstDay.visitors()).isEqualTo(85);
+        assertThat(firstDay.clones()).isEqualTo(17);
+        assertThat(firstDay.viewsLeaders()).containsExactly(
+                new DashboardResponse.TrafficLeader("acme/kafka-starter", 120),
+                new DashboardResponse.TrafficLeader("acme/spring-outbox", 50)
+        );
+        assertThat(firstDay.visitorsLeaders()).containsExactly(
+                new DashboardResponse.TrafficLeader("acme/kafka-starter", 60),
+                new DashboardResponse.TrafficLeader("acme/spring-outbox", 25)
+        );
+        assertThat(firstDay.clonesLeaders()).containsExactly(
+                new DashboardResponse.TrafficLeader("acme/kafka-starter", 12),
+                new DashboardResponse.TrafficLeader("acme/spring-outbox", 5)
+        );
         assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today.minusDays(5)));
         assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today));
 
