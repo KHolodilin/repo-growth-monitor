@@ -32,10 +32,12 @@ export function rankHistoryOption({
   dates,
   series,
   legend = false,
+  formatAxis = formatChartAxisDate,
 }: {
   dates: string[];
   series: RankHistorySeries[];
   legend?: boolean;
+  formatAxis?: (value: string) => string;
 }) {
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
   return {
@@ -53,7 +55,7 @@ export function rankHistoryOption({
             return `${item.name}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
-        return `<div>${formatChartAxisDate(date)}<br/>${rows}</div>`;
+        return `<div>${formatAxis(date)}<br/>${rows}</div>`;
       },
     },
     legend: legend ? { top: 0, type: "scroll", data: series.map((item) => item.name) } : undefined,
@@ -68,7 +70,7 @@ export function rankHistoryOption({
         showMaxLabel: true,
         alignMinLabel: "left",
         alignMaxLabel: "right",
-        formatter: (value: string) => formatChartAxisDate(String(value)),
+        formatter: (value: string) => formatAxis(String(value)),
       },
     },
     yAxis: {
