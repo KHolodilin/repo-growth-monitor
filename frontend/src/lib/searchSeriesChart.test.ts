@@ -213,4 +213,28 @@ describe("searchSeriesChart", () => {
     const tooltip = stars.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
     expect(tooltip([{ axisValue: "1", seriesName: "acme/app", data: 20 }])).toContain("Day 1");
   });
+
+  it("does not start a timeline day for a repository with no snapshot", () => {
+    const built = queryChartLines({
+      snapshotDates: ["2026-09-22"],
+      ours: {
+        name: "acme/app",
+        rank: [{ date: "2026-09-22", position: 2 }],
+        stored: [{ date: "2026-09-22", stars: 20, forks: 4 }],
+      },
+      neighbors: [{ name: "ghost/repo", stored: [] }],
+    });
+    const place = searchMetricOption({
+      metric: "place",
+      axis: "timeline",
+      dates: ["2026-09-22"],
+      missedDates: [],
+      limit: 50,
+      lines: built,
+    });
+    expect(place.xAxis.data).toEqual(["1"]);
+    const series = place.series as { data: (number | null)[] }[];
+    expect(series[0].data).toEqual([2]);
+    expect(series[2].data).toEqual([null]);
+  });
 });
