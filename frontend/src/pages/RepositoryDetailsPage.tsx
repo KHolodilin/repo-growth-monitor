@@ -874,17 +874,6 @@ function TrafficPanel({
         showServicePaths={showServicePaths}
         onShowServicePathsChange={onShowServicePathsChange}
       />
-      <div className="text-xs text-muted-foreground">
-        <div>
-          <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
-          paths show the latest GitHub snapshot; History has the change between snapshots.
-        </div>
-        {(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt) && (
-          <div className="mt-1">
-            Last updated: {formatSyncTime(traffic.lastCollection?.completedAt ?? traffic.lastCollection?.createdAt)}
-          </div>
-        )}
-      </div>
       {markerEvents && (
         <EventDetailsDialog
           events={markerEvents}

@@ -144,10 +144,6 @@ export function TrafficHistoryPage() {
       </div>
       <SnapshotHistoryChart title={CHART_TITLE[kind]} kind={kind} history={history} />
       <SnapshotHistoryTable kind={kind} history={history} />
-      <div className="text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">About data.</span> GitHub reports referrers and paths as a rolling
-        14-day window, so the table shows the stored snapshot values and the chart shows what each snapshot gained.
-      </div>
     </div>
   );
 }
