@@ -332,7 +332,7 @@ describe("remaining coverage edges", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/repositories/13")) {
-        return Promise.resolve(repository);
+        return Promise.resolve({ ...repository, description: undefined, health: undefined });
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve({
@@ -362,7 +362,8 @@ describe("remaining coverage edges", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Github Traffic")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "GitHub Traffic" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Discoverability/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(await screen.findByText(/MYSTERY/)).toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByText(/MYSTERY/));

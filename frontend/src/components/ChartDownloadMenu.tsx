@@ -73,7 +73,7 @@ export function ChartCard({
       <Card>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">{title}</h2>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-nowrap items-center justify-end gap-2">
             {controls}
             <ChartDownloadMenu />
           </div>
@@ -140,25 +140,27 @@ export function ChartDownloadMenu() {
     <div ref={rootRef} className="group relative">
       <button
         type="button"
-        className="inline-flex items-center gap-0.5 rounded-md border bg-card px-1.5 py-1 hover:bg-muted"
+        className="inline-flex shrink-0 items-center rounded-lg border bg-card p-1 hover:bg-muted"
         aria-label="Download"
         aria-describedby={open ? undefined : tipId}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
-          <path
-            d="M8 2.5v7.5M5 7.5 8 10.5 11 7.5M3 13h10"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
-          <path d="M4.5 6.5 8 10l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <span className="inline-flex min-h-8 items-center gap-0.5 px-1.5 py-1.5">
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
+            <path
+              d="M8 2.5v7.5M5 7.5 8 10.5 11 7.5M3 13h10"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
+            <path d="M4.5 6.5 8 10l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </button>
       {!open && (
         <span

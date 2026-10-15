@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ExternalLink } from "lucide-react";
 import {
   api,
   type CollectionJob,
@@ -15,6 +16,7 @@ import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, forma
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
+import { RepoSwitcher } from "../components/RepoSwitcher";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -304,11 +306,11 @@ export function RepositoryDetailsPage() {
     return (
       <div className="space-y-4">
         <div className="space-y-3">
-          <Skeleton className="h-7 w-72" />
-          <Skeleton className="h-4 w-full max-w-2xl" />
-          <div className="flex items-center justify-between gap-4 border-t pt-3">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-4 w-72" />
+          <div className="flex items-center justify-between gap-4 border-b pb-3">
             <Skeleton className="h-4 w-64" />
-            <Skeleton className="h-9 w-28" />
+            <Skeleton className="h-4 w-28" />
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -327,33 +329,24 @@ export function RepositoryDetailsPage() {
         <PageBreadcrumb
           items={[
             { label: "Portfolio", to: "/dashboard" },
-            {
-              label: repo.fullName,
-              repoSwitcher: {
-                currentId: repo.id,
-                hrefFor: (repositoryId) =>
-                  tab === "traffic"
-                    ? `/repositories/${repositoryId}`
-                    : tab === "topics" && scope === "language"
-                      ? `/repositories/${repositoryId}?tab=topics&scope=language`
-                      : `/repositories/${repositoryId}?tab=${tab}`,
-              },
-            },
             { label: TAB_LABEL[tab] },
           ]}
         />
-        {repo.description && (
-          <p className="mt-3 border-t pt-3 text-sm font-normal text-muted-foreground">{repo.description}</p>
-        )}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-3 text-sm text-muted-foreground">
-          <a
-            className="text-primary hover:underline"
-            href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Github Traffic
-          </a>
+        <div className="mt-2 text-sm">
+          <RepoSwitcher
+            currentId={repo.id}
+            currentLabel={repo.fullName}
+            description={repo.description}
+            hrefFor={(repositoryId) =>
+              tab === "traffic"
+                ? `/repositories/${repositoryId}`
+                : tab === "topics" && scope === "language"
+                  ? `/repositories/${repositoryId}?tab=topics&scope=language`
+                  : `/repositories/${repositoryId}?tab=${tab}`
+            }
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <StarIcon />
             {formatNumber(repo.stars)} stars
@@ -371,25 +364,43 @@ export function RepositoryDetailsPage() {
             {formatNumber(repo.contributors)} contributors
           </span>
           {repo.health && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-l border-border pl-4">
-              <HealthScoreLink
-                title="Discoverability"
-                items={repo.health.discoverability}
-                onClick={() => {
-                  setFocusHealth(true);
-                  setTab("overview");
-                }}
-              />
-              <HealthScoreLink
-                title="Community Standards"
-                items={repo.health.communityStandards}
-                onClick={() => {
-                  setFocusHealth(true);
-                  setTab("overview");
-                }}
-              />
-            </div>
+            <>
+              <div className="flex items-center gap-4">
+                <StatDivider />
+                <HealthScoreLink
+                  title="Discoverability"
+                  items={repo.health.discoverability}
+                  onClick={() => {
+                    setFocusHealth(true);
+                    setTab("overview");
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-4">
+                <StatDivider />
+                <HealthScoreLink
+                  title="Community Standards"
+                  items={repo.health.communityStandards}
+                  onClick={() => {
+                    setFocusHealth(true);
+                    setTab("overview");
+                  }}
+                />
+              </div>
+            </>
           )}
+          <div className="ml-auto flex items-center gap-4">
+            <StatDivider />
+            <a
+              className="inline-flex items-center gap-1 text-primary hover:underline"
+              href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
+              GitHub Traffic
+            </a>
+          </div>
         </div>
       </header>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -477,6 +488,10 @@ export function RepositoryDetailsPage() {
   );
 }
 
+function StatDivider() {
+  return <span className="w-px shrink-0 self-stretch bg-border" aria-hidden="true" />;
+}
+
 function StarIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-4 w-4 shrink-0" aria-hidden="true">
@@ -532,8 +547,15 @@ function Overview({
   busy: boolean;
   onCollect: () => void;
 }) {
+  const about = repo.description?.trim();
   return (
     <div className="space-y-4">
+      {about && (
+        <Card>
+          <h2 className="mb-4 font-medium">About this repository</h2>
+          <p className="text-sm font-normal text-muted-foreground">{about}</p>
+        </Card>
+      )}
       <div className="grid items-start gap-4 md:grid-cols-2">
         <Card>
           <h2 className="mb-4 font-medium">Overview</h2>
