@@ -189,6 +189,60 @@ describe("components", () => {
     expect(await screen.findByText("Last sync: —")).toBeInTheDocument();
   });
 
+  it("collects one repository from its page and every repository from the list", async () => {
+    const user = userEvent.setup();
+    const portfolio = {
+      ...dashboardReady,
+      repositories: [
+        dashboardReady.repositories[0],
+        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other" },
+      ],
+    };
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return {};
+      }
+      return portfolio;
+    });
+    const repo = render(
+      <MemoryRouter initialEntries={["/repositories/13/traffic/history"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/repositories/:id/traffic/history" element={<p>history</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+    );
+    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" });
+    repo.unmount();
+
+    api.mockClear();
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return {};
+      }
+      return portfolio;
+    });
+    render(
+      <MemoryRouter initialEntries={["/repositories"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/repositories" element={<p>list</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" }),
+    );
+    expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" });
+  });
+
   it("maps referrer icons and colors", () => {
     const { rerender } = render(<ReferrerSourceIcon source="Other" />);
     for (const source of [

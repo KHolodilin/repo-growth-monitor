@@ -38,11 +38,16 @@ export function Layout() {
     setCollecting(true);
     setError(null);
     try {
-      const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
-      const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
-      await Promise.all(ids.map((id) => api(`/api/v1/repositories/${id}/collect`, { method: "POST" })));
-      if (dashboard?.repositories) {
-        setSync(dashboard.lastSyncAt);
+      const onlyId = repositoryIdFromPath(location.pathname);
+      if (onlyId != null) {
+        await api(`/api/v1/repositories/${onlyId}/collect`, { method: "POST" });
+      } else {
+        const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+        const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
+        await Promise.all(ids.map((id) => api(`/api/v1/repositories/${id}/collect`, { method: "POST" })));
+        if (dashboard?.repositories) {
+          setSync(dashboard.lastSyncAt);
+        }
       }
       window.dispatchEvent(new Event("repos-collected"));
       await refreshStatus();
@@ -97,6 +102,14 @@ export function Layout() {
       </footer>
     </div>
   );
+}
+
+function repositoryIdFromPath(pathname: string): number | null {
+  const match = pathname.match(/^\/repositories\/(\d+)(?:\/|$)/);
+  if (!match) {
+    return null;
+  }
+  return Number(match[1]);
 }
 
 function navClass({ isActive }: { isActive: boolean }) {
