@@ -53,8 +53,22 @@ public record DashboardResponse(
     public record StarsMetric(long total, Long change) {
     }
 
+    public record TrafficLeader(String fullName, long value) {
+    }
+
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record TrafficPoint(LocalDate date, Long views, Long visitors, Long clones) {
+    public record TrafficPoint(
+            LocalDate date,
+            Long views,
+            Long visitors,
+            Long clones,
+            TrafficLeader viewsLeader,
+            TrafficLeader visitorsLeader,
+            TrafficLeader clonesLeader
+    ) {
+        public TrafficPoint(LocalDate date, Long views, Long visitors, Long clones) {
+            this(date, views, visitors, clones, null, null, null);
+        }
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)

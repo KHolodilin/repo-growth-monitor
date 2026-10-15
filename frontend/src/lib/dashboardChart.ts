@@ -1,13 +1,42 @@
 import { formatChartAxisDate, formatNumber } from "./utils";
 
+type TrafficLeader = { fullName: string; value: number };
+
 type DashboardTrafficPoint = {
   date: string;
   views: number | null;
   visitors: number | null;
   clones: number | null;
+  viewsLeader?: TrafficLeader | null;
+  visitorsLeader?: TrafficLeader | null;
+  clonesLeader?: TrafficLeader | null;
 };
 
+function leaderFor(point: DashboardTrafficPoint | undefined, seriesName: string) {
+  if (!point) {
+    return undefined;
+  }
+  if (seriesName === "Views") {
+    return point.viewsLeader;
+  }
+  if (seriesName === "Visitors") {
+    return point.visitorsLeader;
+  }
+  if (seriesName === "Clones") {
+    return point.clonesLeader;
+  }
+  return undefined;
+}
+
+function increaseLine(total: number | null | undefined, metric: string, leader: TrafficLeader | null | undefined) {
+  if (total == null || total <= 0 || leader == null || leader.value <= 0) {
+    return "";
+  }
+  return `<div>+${formatNumber(total)} ${metric}, ${formatNumber(leader.value)} of them from ${leader.fullName}</div>`;
+}
+
 export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
+  const byDate = new Map(traffic.map((point) => [point.date, point]));
   return {
     tooltip: {
       trigger: "axis" as const,
@@ -16,10 +45,12 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
           return "";
         }
         const date = formatChartAxisDate(params[0].axisValue);
+        const point = byDate.get(String(params[0].axisValue));
         const rows = params
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-            return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
+            const share = increaseLine(item.data, item.seriesName.toLowerCase(), leaderFor(point, item.seriesName));
+            return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>${share}`;
           })
           .join("");
         return `<div style="min-width:140px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
