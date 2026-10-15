@@ -157,4 +157,84 @@ describe("searchSeriesChart", () => {
     ]);
     expect(option.series.every((item) => item.connectNulls === false)).toBe(true);
   });
+
+  it("starts each repository at day 1 and keeps a later gap empty", () => {
+    const built = queryChartLines({
+      snapshotDates: ["2026-09-22", "2026-09-23", "2026-09-24"],
+      ours: {
+        name: "acme/app",
+        rank: [
+          { date: "2026-09-22", position: 4 },
+          { date: "2026-09-23", position: null },
+          { date: "2026-09-24", position: 2 },
+        ],
+        stored: [
+          { date: "2026-09-22", stars: 20, forks: 4 },
+          { date: "2026-09-24", stars: 22, forks: 5 },
+        ],
+      },
+      neighbors: [
+        {
+          name: "other/repo",
+          stored: [
+            { date: "2026-09-23", position: 1, stars: 11, forks: 3 },
+            { date: "2026-09-24", position: 3, stars: 12, forks: 4 },
+          ],
+        },
+      ],
+    });
+    const place = searchMetricOption({
+      metric: "place",
+      axis: "timeline",
+      dates: ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"],
+      missedDates: ["2026-09-21"],
+      limit: 50,
+      lines: built,
+    });
+    expect(place.xAxis.data).toEqual(["1", "2", "3"]);
+    expect(place.xAxis.axisLabel.formatter("2")).toBe("Day 2");
+    const series = place.series as { data: (number | null)[] }[];
+    expect(series[0].data).toEqual([4, null, 2]);
+    expect(series[1].data[1]).toBe(51);
+    expect(series[3].data).toEqual([1, 3, null]);
+
+    const stars = searchMetricOption({
+      metric: "stars",
+      axis: "timeline",
+      dates: ["2026-09-22", "2026-09-23", "2026-09-24"],
+      missedDates: [],
+      limit: 50,
+      lines: built,
+    });
+    expect(stars.series.map((item) => item.data)).toEqual([
+      [20, null, 22],
+      [11, 12, null],
+    ]);
+    const tooltip = stars.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
+    expect(tooltip([{ axisValue: "1", seriesName: "acme/app", data: 20 }])).toContain("Day 1");
+  });
+
+  it("does not start a timeline day for a repository with no snapshot", () => {
+    const built = queryChartLines({
+      snapshotDates: ["2026-09-22"],
+      ours: {
+        name: "acme/app",
+        rank: [{ date: "2026-09-22", position: 2 }],
+        stored: [{ date: "2026-09-22", stars: 20, forks: 4 }],
+      },
+      neighbors: [{ name: "ghost/repo", stored: [] }],
+    });
+    const place = searchMetricOption({
+      metric: "place",
+      axis: "timeline",
+      dates: ["2026-09-22"],
+      missedDates: [],
+      limit: 50,
+      lines: built,
+    });
+    expect(place.xAxis.data).toEqual(["1"]);
+    const series = place.series as { data: (number | null)[] }[];
+    expect(series[0].data).toEqual([2]);
+    expect(series[2].data).toEqual([null]);
+  });
 });

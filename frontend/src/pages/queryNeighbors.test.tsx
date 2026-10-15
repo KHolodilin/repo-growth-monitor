@@ -74,5 +74,13 @@ describe("query neighbor chart", () => {
     expect(within(metric).getByRole("button", { name: "Stars" })).toHaveAttribute("aria-pressed", "true");
     await user.click(within(metric).getByRole("button", { name: "Forks" }));
     expect(within(metric).getByRole("button", { name: "Place" })).toHaveAttribute("aria-pressed", "false");
+
+    const axis = screen.getByRole("group", { name: "Chart axis" });
+    expect(within(axis).getByRole("button", { name: "Calendar" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(axis).getByRole("button", { name: "Timeline" }));
+    expect(within(axis).getByRole("button", { name: "Timeline" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(metric).getByRole("button", { name: "Forks" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(axis).getByRole("button", { name: "Calendar" }));
+    expect(within(axis).getByRole("button", { name: "Calendar" })).toHaveAttribute("aria-pressed", "true");
   });
 });

@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
 import { recentMissedDates } from "../lib/rankChart";
-import { queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
+import { queryDetailsChart, searchSeriesFromPayload, type SearchChartAxis, type SearchChartMetric } from "../lib/searchSeriesChart";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -18,6 +18,7 @@ export function QueryDetailsPage() {
   const [series, setSeries] = useState<SearchSnapshotSeries[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
   const [metric, setMetric] = useState<SearchChartMetric>("place");
+  const [axis, setAxis] = useState<SearchChartAxis>("calendar");
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -87,8 +88,9 @@ export function QueryDetailsPage() {
         series,
         selected,
         metric,
+        axis,
       }),
-    [history, repo, results, series, selected, metric],
+    [history, repo, results, series, selected, metric, axis],
   );
 
   if (error) {
@@ -156,26 +158,47 @@ export function QueryDetailsPage() {
         <ChartCard
           title="Rank History"
           controls={
-            <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
-              {([
-                ["place", "Place"],
-                ["stars", "Stars"],
-                ["forks", "Forks"],
-              ] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium",
-                    metric === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-                  )}
-                  aria-pressed={metric === key}
-                  onClick={() => setMetric(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
+                {([
+                  ["place", "Place"],
+                  ["stars", "Stars"],
+                  ["forks", "Forks"],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium",
+                      metric === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    )}
+                    aria-pressed={metric === key}
+                    onClick={() => setMetric(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart axis">
+                {([
+                  ["calendar", "Calendar"],
+                  ["timeline", "Timeline"],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium",
+                      axis === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                    )}
+                    aria-pressed={axis === key}
+                    onClick={() => setAxis(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </>
           }
         >
           {recentMissed.length > 0 && (
