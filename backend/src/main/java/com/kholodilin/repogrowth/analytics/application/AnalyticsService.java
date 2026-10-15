@@ -143,7 +143,18 @@ public class AnalyticsService {
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
         DashboardPeriod period = periodForRepository(repositoryId, periodParam);
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
-        TrafficTotals totals = trafficJdbcRepository.totals(repositoryId, period.allTime() ? null : period.from());
+        TrafficTotals current = period.allTime()
+                ? trafficJdbcRepository.totals(repositoryId, null)
+                : trafficJdbcRepository.totalsInRange(repositoryId, period.from(), period.to());
+        TrafficTotals previous = period.allTime()
+                ? new TrafficTotals(0, 0, 0, 0)
+                : trafficJdbcRepository.totalsInRange(repositoryId, period.previousFrom(), period.previousTo());
+        RepositoryTrafficTotals totals = new RepositoryTrafficTotals(
+                metric(current.views(), previous.views(), period),
+                metric(current.uniqueVisitors(), previous.uniqueVisitors(), period),
+                metric(current.clones(), previous.clones(), period),
+                metric(current.uniqueCloners(), previous.uniqueCloners(), period)
+        );
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
         ReferrerSnapshot referrers = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
         PathSnapshot paths = trafficJdbcRepository.latestPathSnapshot(repositoryId, includeServicePaths);
@@ -683,11 +694,19 @@ public class AnalyticsService {
     ) {
     }
 
+    public record RepositoryTrafficTotals(
+            MetricValue views,
+            MetricValue uniqueVisitors,
+            MetricValue clones,
+            MetricValue uniqueCloners
+    ) {
+    }
+
     public record RepositoryTrafficSnapshot(
             Repository repository,
             GitHubOwner owner,
             String period,
-            TrafficJdbcRepository.TrafficTotals totals,
+            RepositoryTrafficTotals totals,
             List<TrafficChartPoint> traffic,
             List<TrafficJdbcRepository.ReferrerRow> referrers,
             Instant referrerSnapshotAt,

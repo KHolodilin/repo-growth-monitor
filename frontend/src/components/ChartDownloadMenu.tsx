@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Card } from "./ui";
 
 type ExportActions = {
@@ -89,6 +89,7 @@ export function ChartDownloadMenu() {
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const tipId = useId();
 
   useEffect(() => {
     if (!registry) {
@@ -136,10 +137,12 @@ export function ChartDownloadMenu() {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="group relative">
       <button
         type="button"
-        className="inline-flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-muted"
+        className="inline-flex items-center gap-0.5 rounded-md border bg-card px-1.5 py-1 hover:bg-muted"
+        aria-label="Download"
+        aria-describedby={open ? undefined : tipId}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -153,11 +156,19 @@ export function ChartDownloadMenu() {
             strokeLinejoin="round"
           />
         </svg>
-        Download
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
           <path d="M4.5 6.5 8 10l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
+      {!open && (
+        <span
+          id={tipId}
+          role="tooltip"
+          className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden whitespace-nowrap rounded-md border bg-card px-2 py-1 text-xs text-foreground shadow group-hover:block"
+        >
+          Download
+        </span>
+      )}
       {open && (
         <div
           role="menu"

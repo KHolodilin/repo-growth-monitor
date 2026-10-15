@@ -210,6 +210,28 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     }
 
     @Test
+    void trafficTotalsCompareWithThePreviousPeriod() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(20), 100, 50, 20, 10);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(8), 20, 10, 4, 2);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(1), 40, 5, 8, 1);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today, 7, 1, 1, 1);
+
+        AnalyticsService.RepositoryTrafficSnapshot week = analyticsService.traffic(kafka.id(), "7d", false);
+        assertThat(week.totals().views()).isEqualTo(new DashboardResponse.MetricValue(47, 135.0));
+        assertThat(week.totals().uniqueVisitors()).isEqualTo(new DashboardResponse.MetricValue(6, -40.0));
+        assertThat(week.totals().clones()).isEqualTo(new DashboardResponse.MetricValue(9, 125.0));
+        assertThat(week.totals().uniqueCloners()).isEqualTo(new DashboardResponse.MetricValue(2, 0.0));
+
+        AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d", false);
+        assertThat(oneDay.totals().views()).isEqualTo(new DashboardResponse.MetricValue(40, null));
+
+        AnalyticsService.RepositoryTrafficSnapshot all = analyticsService.traffic(kafka.id(), "all", false);
+        assertThat(all.totals().views()).isEqualTo(new DashboardResponse.MetricValue(167, null));
+    }
+
+    @Test
     void trafficHistoryReturnsSnapshotValuesWithSignedDeltas() {
         createRepos();
         LocalDate today = LocalDate.now(clock);

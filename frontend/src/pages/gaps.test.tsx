@@ -85,6 +85,7 @@ describe("coverage gaps", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("KHolodilin/other")).toBeInTheDocument();
+    expect(screen.getByText("0 in 30d")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Visitors/ }));
     await user.click(screen.getByRole("button", { name: /Views/ }));
     await user.click(screen.getByRole("button", { name: /Clones/ }));
@@ -94,6 +95,21 @@ describe("coverage gaps", () => {
     expect(screen.getAllByText("11").length).toBeGreaterThan(0);
     await user.click(screen.getByText("KHolodilin/other"));
     expect(await screen.findByText("opened")).toBeInTheDocument();
+  });
+
+  it("shows a dash when the star change has no baseline", async () => {
+    api.mockResolvedValue({
+      ...dashboardReady,
+      summary: { ...dashboardReady.summary, stars: { total: 21, change: null } },
+    });
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+    const stars = (await screen.findAllByText("Stars")).find((element) => element.tagName === "DIV");
+    expect(stars?.parentElement?.textContent).toContain("—");
+    expect(stars?.parentElement?.textContent).not.toContain("in 30d");
   });
 
   it("sorts every results column and opens snapshot source picker", async () => {
@@ -212,7 +228,12 @@ describe("coverage gaps", () => {
     api.mockImplementation(async (path: string) => {
       const url = String(path);
       if (url.endsWith("/repositories/13")) {
-        return { ...repository, language: "Java", topics: [] };
+        return {
+          ...repository,
+          language: "Java",
+          topics: [],
+          health: { discoverability: [], communityStandards: repository.health?.communityStandards ?? [] },
+        };
       }
       if (url.includes("/traffic?")) {
         return { ...traffic, lastCollection: undefined, pathSnapshotAt: undefined, referrerSnapshotAt: undefined };

@@ -287,6 +287,29 @@ public class TrafficJdbcRepository {
                 .single();
     }
 
+    public TrafficTotals totalsInRange(long repositoryId, LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT COALESCE(SUM(views), 0) AS views,
+                               COALESCE(SUM(unique_visitors), 0) AS unique_visitors,
+                               COALESCE(SUM(clones), 0) AS clones,
+                               COALESCE(SUM(unique_cloners), 0) AS unique_cloners
+                        FROM traffic_daily
+                        WHERE repository_id = :repositoryId
+                          AND traffic_date >= :fromDate
+                          AND traffic_date <= :toDate
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new TrafficTotals(
+                        rs.getLong("views"),
+                        rs.getLong("unique_visitors"),
+                        rs.getLong("clones"),
+                        rs.getLong("unique_cloners")
+                ))
+                .single();
+    }
+
     public TrafficTotals portfolioTotals(LocalDate fromInclusive) {
         if (fromInclusive == null) {
             return jdbcClient.sql("""

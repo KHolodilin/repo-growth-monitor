@@ -95,9 +95,13 @@ export function Layout() {
         <Outlet />
       </main>
       <footer className="mt-auto border-t bg-card">
-        <div className="mx-auto max-w-6xl px-6 py-4 text-sm text-muted-foreground">
+        <div className="mx-auto max-w-6xl space-y-1 px-6 py-4 text-xs text-muted-foreground">
+          <div>
+            <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
+            paths show the latest GitHub snapshot; History has the change between snapshots.
+          </div>
           <div>Last sync: {syncLabel}</div>
-          {error && <div className="mt-1 text-red-600">{error}</div>}
+          {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
       </footer>
     </div>

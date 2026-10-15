@@ -178,7 +178,12 @@ export type RepositoryTraffic = {
   repository: Repository;
   owner: Owner;
   period: string;
-  totals: { views: number; uniqueVisitors: number; clones: number; uniqueCloners: number };
+  totals: {
+    views: { value: number; growthPercent: number | null };
+    uniqueVisitors: { value: number; growthPercent: number | null };
+    clones: { value: number; growthPercent: number | null };
+    uniqueCloners: { value: number; growthPercent: number | null };
+  };
   traffic: TrafficPoint[];
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   referrerSnapshotAt?: string;

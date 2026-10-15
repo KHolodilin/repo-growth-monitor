@@ -54,7 +54,12 @@ export const traffic: RepositoryTraffic = {
   repository,
   owner,
   period: "30d",
-  totals: { views: 10, uniqueVisitors: 4, clones: 2, uniqueCloners: 1 },
+  totals: {
+    views: { value: 10, growthPercent: 25 },
+    uniqueVisitors: { value: 4, growthPercent: -50 },
+    clones: { value: 2, growthPercent: 0 },
+    uniqueCloners: { value: 1, growthPercent: null },
+  },
   traffic: [
     { date: "2026-09-22", views: 5, uniqueVisitors: 2, clones: 1, uniqueCloners: 1 },
     { date: "2026-09-23", views: 5, uniqueVisitors: 2, clones: 1, uniqueCloners: 0 },

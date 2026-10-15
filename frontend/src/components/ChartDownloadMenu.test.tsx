@@ -38,8 +38,11 @@ describe("ChartDownloadMenu", () => {
 
     view.rerender(<Host showChart />);
     const download = await screen.findByRole("button", { name: "Download" });
+    expect(download).not.toHaveTextContent("Download");
+    expect(screen.getByRole("tooltip", { name: "Download" })).toHaveClass("group-hover:block");
     expect(download).toHaveAttribute("aria-expanded", "false");
     await user.click(download);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(download).toHaveAttribute("aria-expanded", "true");
     await user.keyboard("a");
     expect(screen.getByRole("menu", { name: "Download format" })).toBeInTheDocument();

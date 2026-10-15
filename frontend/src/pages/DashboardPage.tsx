@@ -5,6 +5,7 @@ import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
@@ -85,13 +86,31 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard label="Repositories" value={data.summary.repositories} />
-        <TrafficKpi label="Views" metric={data.summary.views} period={period} />
-        <TrafficKpi label="Visitors" metric={data.summary.visitors} period={period} />
-        <TrafficKpi label="Clones" metric={data.summary.clones} period={period} />
+        <TrafficKpiCard
+          label="Views"
+          value={data.summary.views.value}
+          growthPercent={data.summary.views.growthPercent}
+          period={period}
+          series={data.traffic.map((point) => point.views)}
+        />
+        <TrafficKpiCard
+          label="Visitors"
+          value={data.summary.visitors.value}
+          growthPercent={data.summary.visitors.growthPercent}
+          period={period}
+          series={data.traffic.map((point) => point.visitors)}
+        />
+        <TrafficKpiCard
+          label="Clones"
+          value={data.summary.clones.value}
+          growthPercent={data.summary.clones.growthPercent}
+          period={period}
+          series={data.traffic.map((point) => point.clones)}
+        />
         <StarsKpi stars={data.summary.stars} period={period} />
       </div>
       {data.state === "FIRST_COLLECTION" && (
@@ -144,33 +163,9 @@ function DashboardHeader({
 
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <Card>
+    <Card className="p-3">
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{formatNumber(value)}</div>
-    </Card>
-  );
-}
-
-function TrafficKpi({
-  label,
-  metric,
-  period,
-}: {
-  label: string;
-  metric: { value: number; growthPercent: number | null };
-  period: Period;
-}) {
-  const growth = formatGrowth(metric.growthPercent);
-  return (
-    <Card>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{formatNumber(metric.value)}</div>
-      {period !== "all" && (
-        <div className={cn("mt-2 text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
-          {growth?.label ?? "—"}
-          {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}
-        </div>
-      )}
+      <div className="mt-1 text-2xl font-semibold">{formatNumber(value)}</div>
     </Card>
   );
 }
@@ -178,13 +173,13 @@ function TrafficKpi({
 function StarsKpi({ stars, period }: { stars: { total: number; change: number | null }; period: Period }) {
   const change = stars.change;
   return (
-    <Card>
+    <Card className="p-3">
       <div className="text-sm text-muted-foreground">Stars</div>
-      <div className="mt-2 text-2xl font-semibold">
+      <div className="mt-1 text-2xl font-semibold">
         {formatNumber(stars.total)} <span className="text-sm font-normal text-muted-foreground">total</span>
       </div>
       {period !== "all" && (
-        <div className={cn("mt-2 text-sm font-medium", (change ?? 0) > 0 ? "text-emerald-700" : (change ?? 0) < 0 ? "text-red-700" : "text-muted-foreground")}>
+        <div className={cn("mt-1 text-sm font-medium", (change ?? 0) > 0 ? "text-emerald-700" : (change ?? 0) < 0 ? "text-red-700" : "text-muted-foreground")}>
           {change !== null && change !== undefined ? `${change > 0 ? "+" : ""}${formatNumber(change)} in ${period}` : "—"}
         </div>
       )}

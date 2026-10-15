@@ -69,6 +69,8 @@ describe("components", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
+    expect(screen.getByText(/About data/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last updated/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Collect now" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
