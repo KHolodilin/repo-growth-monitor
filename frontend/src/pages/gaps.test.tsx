@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -236,6 +236,12 @@ describe("coverage gaps", () => {
     await user.click(screen.getByRole("button", { name: "1d" }));
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
+    const loadsBefore = api.mock.calls.filter((call) => String(call[0]).endsWith("/repositories/13")).length;
+    window.dispatchEvent(new Event("repos-collected"));
+    await waitFor(() => {
+      const loadsAfter = api.mock.calls.filter((call) => String(call[0]).endsWith("/repositories/13")).length;
+      expect(loadsAfter).toBeGreaterThan(loadsBefore);
+    });
     await user.click(screen.getByRole("button", { name: "Collect now" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText(/No topics yet/)).toBeInTheDocument();

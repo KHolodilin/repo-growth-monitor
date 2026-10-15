@@ -124,6 +124,14 @@ export function RepositoryDetailsPage() {
   }, [id, period, showServicePaths, scope]);
 
   useEffect(() => {
+    function onCollected() {
+      void load().catch((err: Error) => setError(err.message));
+    }
+    window.addEventListener("repos-collected", onCollected);
+    return () => window.removeEventListener("repos-collected", onCollected);
+  }, [load]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     load()
