@@ -14,8 +14,11 @@ describe("dashboardTrafficOption", () => {
       { axisValue: "2026-10-08", seriesName: "Views", data: null },
       { axisValue: "2026-10-08", seriesName: "Visitors", data: 3 },
     ])).toContain("Visitors");
+    expect(option.tooltip.trigger).toBe("item");
+    expect(option.tooltip.triggerOn).toBe("click");
     expect(option.xAxis.boundaryGap).toBe(false);
     expect(option.series).toHaveLength(3);
+    expect(formatter({})).toBe("");
     expect(dashboardTrafficOption([{ date: "2026-10-08", views: 1, visitors: 1, clones: 1 }]).xAxis.boundaryGap).toBe(true);
   });
 
@@ -42,7 +45,12 @@ describe("dashboardTrafficOption", () => {
     expect(text).toContain("+12 visitors, 8 of them from owner/other");
     expect(text).not.toContain("+0 clones");
     expect(text).not.toContain("+1 other");
+    const clicked = formatter({ name: "2026-10-08", seriesName: "Clones", data: 0 });
+    expect(clicked).toContain("+40 views, 35 of them from owner/outbox");
+    expect(clicked).toContain("+12 visitors, 8 of them from owner/other");
     expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).not.toContain("of them from");
+    expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).not.toContain("of them from");
+    expect(formatter({ seriesName: "Views", data: 1 })).toBe("");
     expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: undefined as unknown as null }])).toContain("—");
 
     const zeroShare = dashboardTrafficOption([

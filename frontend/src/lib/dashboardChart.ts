@@ -35,25 +35,50 @@ function increaseLine(total: number | null | undefined, metric: string, leader: 
   return `<div>+${formatNumber(total)} ${metric}, ${formatNumber(leader.value)} of them from ${leader.fullName}</div>`;
 }
 
+type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | null };
+
+function tooltipItems(raw: unknown): TooltipItem[] | null {
+  if (Array.isArray(raw)) {
+    return raw.length === 0 ? null : raw;
+  }
+  if (raw && typeof raw === "object" && "seriesName" in raw) {
+    return [raw as TooltipItem];
+  }
+  return null;
+}
+
+function dayItems(point: DashboardTrafficPoint): TooltipItem[] {
+  return [
+    { axisValue: point.date, seriesName: "Views", data: point.views },
+    { axisValue: point.date, seriesName: "Visitors", data: point.visitors },
+    { axisValue: point.date, seriesName: "Clones", data: point.clones },
+  ];
+}
+
 export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
   const byDate = new Map(traffic.map((point) => [point.date, point]));
   return {
     tooltip: {
-      trigger: "axis" as const,
-      formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
-        if (!Array.isArray(params) || params.length === 0) {
+      trigger: "item" as const,
+      triggerOn: "click" as const,
+      formatter: (raw: unknown) => {
+        const items = tooltipItems(raw);
+        if (!items) {
           return "";
         }
-        const date = formatChartAxisDate(params[0].axisValue);
-        const point = byDate.get(String(params[0].axisValue));
-        const rows = params
+        const dateKey = String(items[0].axisValue ?? items[0].name ?? "");
+        if (!dateKey) {
+          return "";
+        }
+        const point = byDate.get(dateKey);
+        const rows = (point && !Array.isArray(raw) ? dayItems(point) : items)
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             const share = increaseLine(item.data, item.seriesName.toLowerCase(), leaderFor(point, item.seriesName));
             return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>${share}`;
           })
           .join("");
-        return `<div style="min-width:140px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
+        return `<div style="min-width:140px"><div style="margin-bottom:6px">${formatChartAxisDate(dateKey)}</div>${rows}</div>`;
       },
     },
     legend: { top: 0, data: ["Views", "Visitors", "Clones"] },
