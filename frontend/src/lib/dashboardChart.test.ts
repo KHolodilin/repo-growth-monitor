@@ -47,33 +47,37 @@ describe("dashboardTrafficOption", () => {
       { axisValue: "2026-10-08", seriesName: "Clones", data: 0 },
       { axisValue: "2026-10-08", seriesName: "Other", data: 1 },
     ]);
-    expect(text).toContain("35 from owner/outbox");
-    expect(text).toContain("10 from owner/tiny");
-    expect(text).toContain("4 from owner/beta");
-    expect(text).toContain("8 from owner/other");
+    expect(text).toContain("Views - 40");
+    expect(text).toContain("owner/outbox - 35");
+    expect(text).toContain("owner/tiny - 10");
+    expect(text).toContain("owner/beta - 4");
+    expect(text).toContain("owner/other - 8");
     expect(text).not.toContain("owner/extra");
     expect(text).not.toContain("owner/zeta");
-    expect(text).not.toContain("from owner/outbox</div><div>5 from");
+    expect(text).not.toContain("owner/outbox - 5");
+    expect(text).not.toContain("from");
     const views = formatter({ name: "2026-10-08", seriesName: "Views", data: 40 });
-    expect(views).toContain("35 from owner/outbox");
+    expect(views).toContain("Views - 40");
+    expect(views).toContain("owner/outbox - 35");
     expect(views).not.toContain("Visitors");
     expect(views).not.toContain("Clones");
     const clones = formatter({ name: "2026-10-08", seriesName: "Clones", data: 6 });
-    expect(clones).toContain("5 from owner/outbox");
+    expect(clones).toContain("Clones - 6");
+    expect(clones).toContain("owner/outbox - 5");
     expect(clones).not.toContain("Views");
     expect(clones).not.toContain("Visitors");
-    expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).not.toContain(" from ");
-    expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).not.toContain(" from ");
+    expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
+    expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
     expect(formatter({ seriesName: "Views", data: 1 })).toBe("");
-    expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: undefined as unknown as null }])).toContain("—");
+    expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: undefined as unknown as null }])).toContain("Views - —");
 
     const zeroShare = dashboardTrafficOption([
       { date: "2026-10-08", views: 40, visitors: 1, clones: 1, viewsLeaders: [{ fullName: "owner/outbox", value: 0 }] },
     ]);
-    expect(zeroShare.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain(" from ");
+    expect(zeroShare.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain("owner/outbox");
     const none = dashboardTrafficOption([
       { date: "2026-10-08", views: 40, visitors: 1, clones: 1, viewsLeaders: [] },
     ]);
-    expect(none.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain(" from ");
+    expect(none.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain("owner/outbox");
   });
 });

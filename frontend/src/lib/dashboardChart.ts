@@ -36,7 +36,7 @@ function shareLines(total: number | null | undefined, leaders: TrafficLeader[] |
   if (rows.length === 0) {
     return "";
   }
-  return rows.map((leader) => `<div>${formatNumber(leader.value)} from ${leader.fullName}</div>`).join("");
+  return rows.map((leader) => `<div>${leader.fullName} - ${formatNumber(leader.value)}</div>`).join("");
 }
 
 type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | null };
@@ -71,10 +71,10 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             const share = shareLines(item.data, leadersFor(point, item.seriesName));
-            return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>${share}`;
+            return `<div>${item.seriesName} - ${value}</div>${share}`;
           })
           .join("");
-        return `<div style="min-width:140px"><div style="margin-bottom:6px">${formatChartAxisDate(dateKey)}</div>${rows}</div>`;
+        return `<div><div>${formatChartAxisDate(dateKey)}</div>${rows}</div>`;
       },
     },
     legend: { top: 0, data: ["Views", "Visitors", "Clones"] },
