@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Book, Check, ChevronDown, Lock, Search } from "lucide-react";
 import { api, type Repository } from "../lib/api";
@@ -8,12 +8,15 @@ type RepoSwitcherProps = {
   currentId: number;
   currentLabel: string;
   hrefFor: (repositoryId: number) => string;
+  description?: string;
 };
 
-export function RepoSwitcher({ currentId, currentLabel, hrefFor }: RepoSwitcherProps) {
+export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: RepoSwitcherProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const rootRef = useRef<HTMLSpanElement>(null);
+  const tipId = useId();
+  const tipText = description?.trim() ?? "";
   const searchRef = useRef<HTMLInputElement>(null);
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -117,10 +120,11 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor }: RepoSwitcherP
     <span ref={rootRef} className="relative inline-block max-w-full align-bottom">
       <button
         type="button"
-        className="inline-flex max-w-full items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
+        className="group relative inline-flex max-w-full items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Switch repository"
+        aria-describedby={tipText && !open ? tipId : undefined}
         onClick={() => {
           if (open) {
             setOpen(false);
@@ -131,6 +135,15 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor }: RepoSwitcherP
       >
         <span className="break-all text-left">{currentLabel}</span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
+        {tipText && !open && (
+          <span
+            id={tipId}
+            role="tooltip"
+            className="pointer-events-none invisible absolute left-0 top-full z-20 mt-1 w-72 max-w-[calc(100vw-2.5rem)] whitespace-normal break-words rounded-md border bg-card px-2 py-1 text-left text-xs font-normal text-foreground opacity-0 shadow-md transition-opacity delay-300 duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+          >
+            {tipText}
+          </span>
+        )}
       </button>
       {open && (
         <div className="absolute left-0 z-50 mt-1 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border bg-card shadow-lg">

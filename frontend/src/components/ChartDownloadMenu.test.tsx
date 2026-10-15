@@ -39,6 +39,8 @@ describe("ChartDownloadMenu", () => {
     view.rerender(<Host showChart />);
     const download = await screen.findByRole("button", { name: "Download" });
     expect(download).not.toHaveTextContent("Download");
+    expect(download).toHaveClass("rounded-lg", "p-1");
+    expect(download.firstElementChild).toHaveClass("min-h-8", "py-1.5");
     expect(screen.getByRole("tooltip", { name: "Download" })).toHaveClass("group-hover:block");
     expect(download).toHaveAttribute("aria-expanded", "false");
     await user.click(download);

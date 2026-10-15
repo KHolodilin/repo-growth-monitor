@@ -157,7 +157,16 @@ describe("pages", () => {
       return json([]);
     });
     renderPath("/repositories/13", <RepositoryDetailsPage />);
-    expect(await screen.findByText("Github Traffic")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "GitHub Traffic" })).toHaveAttribute(
+      "href",
+      "https://github.com/KHolodilin/spring-transactional-outbox-kafka/graphs/traffic",
+    );
+    expect(screen.getByRole("link", { name: "GitHub Traffic" }).parentElement).toHaveClass("ml-auto");
+    expect(screen.getByRole("tooltip", { hidden: true, name: repository.description })).toHaveClass(
+      "delay-300",
+      "w-72",
+      "whitespace-normal",
+    );
     expect(screen.getByRole("button", { name: "Discoverability 1/2" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Community Standards 1/1" })).toBeInTheDocument();
     expect(screen.queryByText("1 / 2")).not.toBeInTheDocument();
@@ -167,6 +176,7 @@ describe("pages", () => {
     await user.click(screen.getByLabelText("Switch repository"));
     expect(await screen.findByPlaceholderText("Search repositories")).toBeInTheDocument();
     expect(await screen.findByText("other")).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "legend" }));
     await user.click(screen.getByRole("button", { name: "mark" }));
     expect(await screen.findByText("Growth event")).toBeInTheDocument();
@@ -182,7 +192,12 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Community Standards 1/1" }));
     expect(screen.getByText("README")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
+    expect(screen.getByRole("heading", { name: "About this repository" }).parentElement).toHaveTextContent(
+      repository.description ?? "",
+    );
     expect(screen.getByText("Collection Status")).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Search Visibility" }));
@@ -204,6 +219,8 @@ describe("pages", () => {
       await user.click(buttons[buttons.length - 1]);
     }
     await user.click(screen.getByRole("button", { name: "Java" }));
+    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "All" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);
     await user.click(screen.getByRole("button", { name: "Run all" }));
@@ -218,7 +235,14 @@ describe("pages", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/repositories/13")) {
-        return json({ ...repository, topics: [], language: undefined, health: { discoverability: [], communityStandards: [] } });
+        return json({
+          ...repository,
+          description: "  ",
+          githubUrl: undefined,
+          topics: [],
+          language: undefined,
+          health: { discoverability: [], communityStandards: [] },
+        });
       }
       if (url.includes("/traffic?")) {
         return json({
@@ -237,6 +261,8 @@ describe("pages", () => {
     });
     renderPath("/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText("Collection failed")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "About this repository" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tooltip", { hidden: true })).not.toBeInTheDocument();
     expect(screen.getByText("No topics yet.")).toBeInTheDocument();
 
     api.mockRejectedValueOnce(new Error("missing"));
