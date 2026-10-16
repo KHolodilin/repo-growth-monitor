@@ -212,6 +212,7 @@ describe("pages", () => {
     );
     expect(syntax).toHaveAttribute("target", "_blank");
     expect(syntax).toHaveAttribute("rel", "noreferrer");
+    expect(syntax).toHaveClass("text-primary", "underline");
     expect(syntax.parentElement).toHaveTextContent("Search Queries");
     expect(syntax.parentElement?.querySelector("input")).toBeNull();
     expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
