@@ -1152,7 +1152,17 @@ function SearchPanel({
   return (
     <div className="space-y-4">
       <Card>
-        <h2 className="mb-3 font-medium">Search Queries</h2>
+        <div className="mb-3 flex items-baseline gap-3">
+          <h2 className="font-medium">Search Queries</h2>
+          <a
+            className="text-sm font-normal text-muted-foreground hover:underline"
+            href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Search syntax tips
+          </a>
+        </div>
         <div className="mb-4">
           <div className="flex gap-2">
             <input
