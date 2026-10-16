@@ -135,6 +135,16 @@ describe("repository filters", () => {
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
     expect(calls.filter((url) => url.includes("refresh=true"))).toHaveLength(1);
     expect(screen.getByRole("button", { name: "All", pressed: true })).toBeInTheDocument();
+
+    api.mockImplementation(async (path: string) => {
+      if (String(path).includes("/system/status")) {
+        return { tokenState: "MISSING", rateLimitReset: null };
+      }
+      return [];
+    });
+    const empty = renderRepos();
+    expect(await screen.findByText("No repositories yet. Configure GITHUB_TOKEN and refresh.")).toBeInTheDocument();
+    empty.unmount();
   });
 
   it("shows token banners and does not start collection", async () => {
@@ -394,6 +404,34 @@ describe("repository filters", () => {
     expect(await screen.findByText(TOKEN_REJECTED)).toBeInTheDocument();
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
     details.unmount();
+
+    let releaseDetails: (value: unknown) => void = () => undefined;
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/system/status")) {
+        return new Promise((resolve) => {
+          releaseDetails = resolve;
+        });
+      }
+      if (url.endsWith("/repositories/13")) {
+        return Promise.resolve({ ...repository, accessible: true, trafficPermissionMissing: true });
+      }
+      if (url.includes("/traffic?")) {
+        return Promise.resolve({ ...traffic, lastCollection: undefined });
+      }
+      return Promise.resolve([]);
+    });
+    const pendingDetails = render(
+      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+        <Routes>
+          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
+    pendingDetails.unmount();
+    releaseDetails({ tokenState: "OK", rateLimitReset: null });
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     api.mockImplementation(async (path: string) => {
       if (String(path).includes("/system/status")) {

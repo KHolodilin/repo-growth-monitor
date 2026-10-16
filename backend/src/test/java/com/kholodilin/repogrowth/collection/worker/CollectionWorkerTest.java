@@ -87,10 +87,36 @@ class CollectionWorkerTest {
         worker.poll("worker");
         verify(jobs).markRetry(eq(1L), any(), eq("GITHUB_API_ERROR"), eq("down"));
 
+        doThrow(new IllegalStateException("boom")).when(collector).collect(any());
+        worker.poll("worker");
+        verify(jobs).markRetry(eq(1L), any(), eq("INTERNAL_ERROR"), eq("boom"));
+
         org.mockito.Mockito.doNothing().when(collector).collect(any());
         worker.poll("worker");
         verify(repositories).setTrafficPermissionMissing(13L, false);
         verify(jobs).markSuccess(1L);
+
+        Collector referrers = mock(Collector.class);
+        when(referrers.type()).thenReturn(CollectionJobType.REFERRERS);
+        CollectionWorker other = new CollectionWorker(
+                jobs,
+                runs,
+                repositories,
+                owners,
+                new CollectorRegistry(List.of(referrers)),
+                lock,
+                new RetryPolicy(),
+                new CollectionProperties(1, Duration.ofMinutes(5),
+                        new CollectionProperties.Planner(LocalTime.of(3, 0), LocalTime.of(6, 0), Duration.ofHours(24))),
+                transactions
+        );
+        when(transactions.execute(any())).thenReturn(Optional.of(new CollectionJob(
+                2L, 1L, 13L, CollectionJobType.REFERRERS, LocalDate.parse("2026-09-23"),
+                CollectionJobStatus.RUNNING, 1, now, "worker", now.plusSeconds(30), now, null,
+                null, null
+        )));
+        other.poll("worker");
+        verify(repositories, org.mockito.Mockito.times(1)).setTrafficPermissionMissing(13L, false);
         verify(runs, org.mockito.Mockito.atLeastOnce()).refreshAggregates(1L);
     }
 
