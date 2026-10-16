@@ -109,6 +109,11 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
         assertThat(repositoryService.topics(repository.id())).isEmpty();
         assertThat(repositoryService.tracked()).hasSize(1);
         assertThat(repositoryService.list(false)).hasSize(1);
+        repositoryJdbcRepository.setTrafficPermissionMissing(repository.id(), true);
+        assertThat(repositoryJdbcRepository.signalsFor(List.of(repository.id())).get(repository.id()).trafficPermissionMissing()).isTrue();
+        assertThat(repositoryJdbcRepository.signalsFor(List.of())).isEmpty();
+        repositoryJdbcRepository.markInaccessibleExcept(List.of());
+        assertThat(repositoryJdbcRepository.isAccountAccessible(repository.id())).isFalse();
         assertThatThrownBy(() -> repositoryService.get(999_999L)).hasMessageContaining("Repository");
         assertThatThrownBy(() -> repositoryService.owner(999_999L)).hasMessageContaining("Owner");
     }
@@ -120,9 +125,11 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
                 remote(301L, "org-repo", "org/org-repo", new GitHubOwnerResponse(400L, "org", "Organization", "https://img", "https://github.com/org"))
         ));
         assertThat(repositoryService.list(true)).extracting(Repository::fullName).contains("acme/extra", "org/org-repo");
+        assertThat(repositoryJdbcRepository.isAccountAccessible(repository.id())).isFalse();
         Repository disabled = repositoryService.setTracking(repository.id(), false);
         assertThat(disabled.trackingEnabled()).isFalse();
-        assertThat(repositoryService.setTracking(repository.id(), true).trackingEnabled()).isTrue();
+        assertThatThrownBy(() -> repositoryService.setTracking(repository.id(), true))
+                .hasMessageContaining("Only repositories available");
     }
 
     @Test

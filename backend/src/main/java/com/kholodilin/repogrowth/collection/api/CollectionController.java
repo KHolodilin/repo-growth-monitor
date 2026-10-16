@@ -8,6 +8,9 @@ import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
 import com.kholodilin.repogrowth.collection.planner.DailyPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.common.config.GitHubProperties;
+import com.kholodilin.repogrowth.github.client.GitHubClient;
+import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +30,8 @@ public class CollectionController {
     private final RepositoryService repositoryService;
     private final CollectionRunJdbcRepository runRepository;
     private final CollectionJobJdbcRepository jobRepository;
+    private final GitHubProperties gitHubProperties;
+    private final GitHubClient gitHubClient;
 
     public CollectionController(
             CollectionPlanner collectionPlanner,
@@ -34,7 +39,9 @@ public class CollectionController {
             DailyPlanner dailyPlanner,
             RepositoryService repositoryService,
             CollectionRunJdbcRepository runRepository,
-            CollectionJobJdbcRepository jobRepository
+            CollectionJobJdbcRepository jobRepository,
+            GitHubProperties gitHubProperties,
+            GitHubClient gitHubClient
     ) {
         this.collectionPlanner = collectionPlanner;
         this.planningWindow = planningWindow;
@@ -42,10 +49,18 @@ public class CollectionController {
         this.repositoryService = repositoryService;
         this.runRepository = runRepository;
         this.jobRepository = jobRepository;
+        this.gitHubProperties = gitHubProperties;
+        this.gitHubClient = gitHubClient;
     }
 
     @PostMapping("/repositories/{id}/collect")
     public CollectionRunResponse collect(@PathVariable long id) {
+        if (!gitHubProperties.tokenConfigured()) {
+            throw GitHubException.auth(401, "GitHub token is not configured");
+        }
+        if (gitHubClient.tokenRejected()) {
+            throw GitHubException.auth(401, "GitHub rejected the token");
+        }
         repositoryService.get(id);
         CollectionRun run = collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
         return toResponse(run);

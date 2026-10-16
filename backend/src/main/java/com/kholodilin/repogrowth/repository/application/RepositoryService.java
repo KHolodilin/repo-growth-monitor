@@ -3,7 +3,9 @@ package com.kholodilin.repogrowth.repository.application;
 import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
+import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.model.GitHubOwnerResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
@@ -12,15 +14,21 @@ import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class RepositoryService {
 
     private final GitHubClient gitHubClient;
+    private final GitHubProperties gitHubProperties;
     private final GitHubOwnerJdbcRepository ownerRepository;
     private final RepositoryJdbcRepository repositoryJdbcRepository;
     private final AppMetrics metrics;
@@ -29,6 +37,7 @@ public class RepositoryService {
 
     public RepositoryService(
             GitHubClient gitHubClient,
+            GitHubProperties gitHubProperties,
             GitHubOwnerJdbcRepository ownerRepository,
             RepositoryJdbcRepository repositoryJdbcRepository,
             AppMetrics metrics,
@@ -36,6 +45,7 @@ public class RepositoryService {
             PlanningWindow planningWindow
     ) {
         this.gitHubClient = gitHubClient;
+        this.gitHubProperties = gitHubProperties;
         this.ownerRepository = ownerRepository;
         this.repositoryJdbcRepository = repositoryJdbcRepository;
         this.metrics = metrics;
@@ -45,12 +55,22 @@ public class RepositoryService {
 
     @Transactional
     public List<Repository> list(boolean refresh) {
+        if (!gitHubProperties.tokenConfigured()) {
+            return List.of();
+        }
         if (refresh) {
+            if (gitHubClient.tokenRejected()) {
+                throw GitHubException.auth(401, "GitHub rejected the token");
+            }
             syncFromGitHub();
         }
-        List<Repository> repositories = repositoryJdbcRepository.findAccountAccessible();
+        List<Repository> repositories = repositoryJdbcRepository.findListed();
         metrics.setTrackedRepositories(repositoryJdbcRepository.countTracked());
         return repositories;
+    }
+
+    public Map<Long, RepositorySignals> signalsFor(Collection<Long> ids) {
+        return repositoryJdbcRepository.signalsFor(ids);
     }
 
     public Repository get(long id) {
@@ -85,7 +105,9 @@ public class RepositoryService {
     }
 
     private void syncFromGitHub() {
-        for (GitHubRepositoryResponse remote : gitHubClient.listAccessibleRepositories()) {
+        List<GitHubRepositoryResponse> remoteRepositories = gitHubClient.listAccessibleRepositories();
+        Set<Long> seen = new HashSet<>();
+        for (GitHubRepositoryResponse remote : remoteRepositories) {
             GitHubOwnerResponse ownerResponse = remote.owner();
             OwnerType ownerType = "Organization".equalsIgnoreCase(ownerResponse.type())
                     ? OwnerType.ORGANIZATION
@@ -126,7 +148,9 @@ public class RepositoryService {
             ));
             repositoryJdbcRepository.markAccountAccessible(stored.id());
             repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
+            seen.add(stored.id());
         }
+        repositoryJdbcRepository.markInaccessibleExcept(seen);
     }
 
     public List<String> topics(long repositoryId) {

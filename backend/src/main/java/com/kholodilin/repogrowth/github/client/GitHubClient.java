@@ -69,6 +69,9 @@ public class GitHubClient {
     private final JsonMapper jsonMapper;
     private final GitHubProperties properties;
     private final AppMetrics metrics;
+    private volatile boolean accessKnown;
+    private volatile boolean tokenRejected;
+    private volatile Instant rateLimitReset;
 
     public GitHubClient(
             RestClient gitHubRestClient,
@@ -406,6 +409,35 @@ public class GitHubClient {
         return new GitHubSearchResponse(totalCount, items);
     }
 
+    public boolean tokenRejected() {
+        return tokenRejected;
+    }
+
+    public TokenStatus tokenStatus() {
+        if (!properties.tokenConfigured()) {
+            return new TokenStatus("MISSING", null);
+        }
+        if (!accessKnown) {
+            try {
+                execute("probeToken", "GET", "/user");
+            } catch (GitHubException ex) {
+                log.info("GitHub token probe failed category={}", ex.errorCode());
+            }
+            accessKnown = true;
+        }
+        if (tokenRejected) {
+            return new TokenStatus("REJECTED", null);
+        }
+        Instant reset = rateLimitReset;
+        if (reset != null && reset.isAfter(Instant.now())) {
+            return new TokenStatus("RATE_LIMITED", reset);
+        }
+        return new TokenStatus("OK", null);
+    }
+
+    public record TokenStatus(String state, Instant rateLimitReset) {
+    }
+
     public String maskedToken() {
         String token = properties.token();
         if (token == null || token.isBlank()) {
@@ -438,6 +470,7 @@ public class GitHubClient {
                             .toEntity(byte[].class);
             metrics.githubRequest("search", true);
             log.info("GitHub request durationMs={} operation=search", durationMs(started));
+            noteSuccess();
             return response;
         } catch (GitHubException ex) {
             metrics.githubRequest("search", false);
@@ -464,6 +497,7 @@ public class GitHubClient {
                     .toEntity(byte[].class);
             metrics.githubRequest(operation, true);
             log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+            noteSuccess();
             return response;
         } catch (GitHubException ex) {
             metrics.githubRequest(operation, false);
@@ -493,6 +527,7 @@ public class GitHubClient {
                     .toEntity(byte[].class);
             metrics.githubRequest(operation, true);
             log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+            noteSuccess();
             return response;
         } catch (GitHubException ex) {
             metrics.githubRequest(operation, false);
@@ -520,6 +555,7 @@ public class GitHubClient {
                     .toEntity(byte[].class);
             metrics.githubRequest(operation, true);
             log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+            noteSuccess();
             return response;
         } catch (GitHubException ex) {
             metrics.githubRequest(operation, false);
@@ -544,12 +580,15 @@ public class GitHubClient {
         String message = Optional.ofNullable(body).filter(s -> !s.isBlank()).orElse("GitHub API error " + status);
 
         if (status == 401) {
+            noteRejected();
             throw GitHubException.auth(status, "GitHub authentication failed");
         }
         if (status == 403 && remainingZero) {
+            noteRateLimit(reset);
             throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
         }
         if (status == 403 && message.toLowerCase().contains("rate limit")) {
+            noteRateLimit(reset);
             throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
         }
         if (status == 404) {
@@ -560,9 +599,27 @@ public class GitHubClient {
         }
         boolean retryable = status >= 500 || status == 429;
         if (status == 429) {
+            noteRateLimit(reset);
             throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
         }
         throw GitHubException.api(status, retryable, reset, message);
+    }
+
+    private void noteSuccess() {
+        accessKnown = true;
+        tokenRejected = false;
+        rateLimitReset = null;
+    }
+
+    private void noteRejected() {
+        accessKnown = true;
+        tokenRejected = true;
+        rateLimitReset = null;
+    }
+
+    private void noteRateLimit(Instant reset) {
+        accessKnown = true;
+        rateLimitReset = reset;
     }
 
     private GitHubException translateAccess(ResourceAccessException ex) {

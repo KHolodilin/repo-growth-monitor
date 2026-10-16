@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
+import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { cn, formatSyncTime } from "../lib/utils";
 import { DashboardIcon, LogoMark, RepositoriesIcon } from "./icons";
 import { Button } from "./ui";
@@ -11,6 +12,7 @@ export function Layout() {
   const [sync, setSync] = useState<string | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [access, setAccess] = useState<GitHubAccess | null>(null);
   const syncLabel = formatSyncTime(sync) ?? "—";
 
   async function refreshStatus() {
@@ -29,12 +31,20 @@ export function Layout() {
         setSync(null);
       }
     });
+    void loadGitHubAccess().then((next) => {
+      if (!cancelled) {
+        setAccess(next);
+      }
+    });
     return () => {
       cancelled = true;
     };
   }, [location.pathname]);
 
   async function collectNow() {
+    if (collectionBlocked(access)) {
+      return;
+    }
     setCollecting(true);
     setError(null);
     try {
@@ -70,7 +80,7 @@ export function Layout() {
             </span>
           </NavLink>
           <nav className="flex items-center gap-6 text-sm">
-            <Button className="py-1.5" disabled={collecting} onClick={() => void collectNow()}>
+            <Button className="py-1.5" disabled={collecting || collectionBlocked(access)} onClick={() => void collectNow()}>
               {collecting ? "Collecting..." : "Collect now"}
             </Button>
             <NavLink
@@ -91,6 +101,11 @@ export function Layout() {
           </nav>
         </div>
       </header>
+      {tokenBanner(access) && (
+        <div className="border-b bg-amber-50 text-amber-950">
+          <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{tokenBanner(access)}</p>
+        </div>
+      )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         <Outlet />
       </main>

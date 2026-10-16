@@ -19,12 +19,24 @@ public class SystemStatusController {
 
     @GetMapping("/status")
     public SystemStatusResponse status() {
+        GitHubClient.TokenStatus token = gitHubClient.tokenStatus();
+        if (token == null) {
+            boolean configured = properties.tokenConfigured();
+            return new SystemStatusResponse(configured, gitHubClient.maskedToken(), configured ? "OK" : "MISSING", null);
+        }
         return new SystemStatusResponse(
                 properties.tokenConfigured(),
-                gitHubClient.maskedToken()
+                gitHubClient.maskedToken(),
+                token.state(),
+                token.rateLimitReset()
         );
     }
 
-    public record SystemStatusResponse(boolean githubTokenConfigured, String githubTokenMasked) {
+    public record SystemStatusResponse(
+            boolean githubTokenConfigured,
+            String githubTokenMasked,
+            String tokenState,
+            java.time.Instant rateLimitReset
+    ) {
     }
 }

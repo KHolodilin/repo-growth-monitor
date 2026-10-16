@@ -86,7 +86,9 @@ public record DashboardResponse(
             boolean archived,
             Instant activityAt,
             String activityStatus,
-            Integer discoverabilityPassed
+            Integer discoverabilityPassed,
+            boolean accessible,
+            boolean trafficPermissionMissing
     ) {
     }
 

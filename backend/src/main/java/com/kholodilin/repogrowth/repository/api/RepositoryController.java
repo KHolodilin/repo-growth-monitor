@@ -4,6 +4,7 @@ import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/repositories")
@@ -36,20 +38,28 @@ public class RepositoryController {
 
     @GetMapping
     public List<RepositoryResponse> list(@RequestParam(defaultValue = "false") boolean refresh) {
-        return repositoryService.list(refresh).stream().map(this::toResponse).toList();
+        List<Repository> repositories = repositoryService.list(refresh);
+        Map<Long, RepositorySignals> signals = repositoryService.signalsFor(
+                repositories.stream().map(Repository::id).toList()
+        );
+        return repositories.stream()
+                .map(repository -> toResponse(repository, signals.get(repository.id())))
+                .toList();
     }
 
     @GetMapping("/{id}")
     public RepositoryResponse get(@PathVariable long id) {
-        return toResponse(repositoryService.get(id));
+        Repository repository = repositoryService.get(id);
+        return toResponse(repository, repositoryService.signalsFor(List.of(id)).get(id));
     }
 
     @PostMapping("/{id}/tracking")
     public RepositoryResponse tracking(@PathVariable long id, @Valid @RequestBody TrackingRequest request) {
-        return toResponse(repositoryService.setTracking(id, request.enabled()));
+        Repository repository = repositoryService.setTracking(id, request.enabled());
+        return toResponse(repository, repositoryService.signalsFor(List.of(id)).get(id));
     }
 
-    private RepositoryResponse toResponse(Repository repository) {
+    private RepositoryResponse toResponse(Repository repository, RepositorySignals signals) {
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
         return new RepositoryResponse(
                 repository.id(),
@@ -68,6 +78,8 @@ public class RepositoryController {
                 repository.contributors(),
                 repository.openIssues(),
                 repository.trackingEnabled(),
+                signals == null || signals.accessible(),
+                signals != null && signals.trafficPermissionMissing(),
                 repository.githubCreatedAt(),
                 repository.githubUpdatedAt(),
                 repository.lastCommitAt(),

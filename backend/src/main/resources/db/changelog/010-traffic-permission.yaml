@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-traffic-permission
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE repository
+                  ADD COLUMN traffic_permission_missing BOOLEAN NOT NULL DEFAULT FALSE;

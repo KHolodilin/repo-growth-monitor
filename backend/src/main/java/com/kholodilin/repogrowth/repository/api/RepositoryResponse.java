@@ -20,6 +20,8 @@ public record RepositoryResponse(
         int contributors,
         int openIssues,
         boolean trackingEnabled,
+        boolean accessible,
+        boolean trafficPermissionMissing,
         Instant githubCreatedAt,
         Instant githubUpdatedAt,
         Instant lastCommitAt,
