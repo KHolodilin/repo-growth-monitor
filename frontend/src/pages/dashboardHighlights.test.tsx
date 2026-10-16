@@ -58,7 +58,35 @@ describe("portfolio highlights", () => {
     const dash = screen.getAllByText("—").find((node) => node.closest("td"));
     expect(dash?.className ?? "").not.toMatch(/emerald|amber|red/);
     expect(screen.getByRole("heading", { name: "Repositories" }).parentElement).not.toHaveTextContent("checks");
+    await user.click(screen.getByRole("link", { name: "12/13" }));
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
+  });
+
+  it("covers a drop without a rise, one promotion event, and a visitor percent that cannot be shown", async () => {
+    api.mockResolvedValue({
+      ...dashboardReady,
+      highlights: {
+        rankRise: null,
+        rankDrop: { repositoryId: 8, fullName: "acme/kafka", queryName: "kafka", fromRank: 4, toRank: 11 },
+        events: { count: 1, repositoryId: 8, fullName: "acme/kafka", repositoryNames: ["acme/kafka", "acme/outbox"] },
+        visitors: { repositoryId: 13, fullName: "acme/outbox", growthPercent: Number.NaN },
+      },
+    });
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("link", { name: "acme/kafka · kafka 4 → 11" })).toHaveAttribute(
+      "href",
+      "/repositories/8?tab=search",
+    );
+    expect(screen.queryByText("No rank changes")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "1 promotion event · acme/kafka, acme/outbox" })).toHaveAttribute(
+      "href",
+      "/repositories/8?tab=growth-events",
+    );
+    expect(screen.getByText("No visitor growth")).toBeInTheDocument();
   });
 
   it("scrolls overview to repository health from the portfolio link", async () => {

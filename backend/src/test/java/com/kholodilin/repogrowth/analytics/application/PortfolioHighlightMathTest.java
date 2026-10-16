@@ -96,5 +96,58 @@ class PortfolioHighlightMathTest {
                 new VisitorRow(2, "acme/b", 3L, 5.0),
                 new VisitorRow(1, "acme/a", 3L, 5.0)
         )).fullName()).isEqualTo("acme/a");
+        assertThat(PortfolioHighlightMath.strongestVisitorGrowth(List.of())).isNull();
+    }
+
+    @Test
+    void keepsTheEarlierChoiceWhenALaterCandidateIsNotBetter() throws Exception {
+        var constructor = PortfolioHighlightMath.class.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        constructor.newInstance();
+
+        List<RankPoint> points = List.of(
+                new RankPoint(9, "acme/old", "old", FROM.minusDays(2), 3),
+                new RankPoint(1, "acme/first", "first-rise", FROM.plusDays(1), 20),
+                new RankPoint(1, "acme/first", "first-rise", FROM.plusDays(2), 12),
+                new RankPoint(2, "acme/big", "bigger", FROM.plusDays(1), 30),
+                new RankPoint(2, "acme/big", "bigger", FROM.plusDays(2), 10),
+                new RankPoint(3, "acme/worse", "worse-finish", FROM.plusDays(1), 40),
+                new RankPoint(3, "acme/worse", "worse-finish", FROM.plusDays(2), 20),
+                new RankPoint(4, "acme/z", "z-same", FROM.plusDays(1), 30),
+                new RankPoint(4, "acme/z", "z-same", FROM.plusDays(2), 10),
+                new RankPoint(5, "acme/a", "a-same", FROM.plusDays(1), 30),
+                new RankPoint(5, "acme/a", "a-same", FROM.plusDays(2), 10),
+                new RankPoint(6, "acme/drop", "first-drop", FROM.plusDays(1), 10),
+                new RankPoint(6, "acme/drop", "first-drop", FROM.plusDays(2), 15),
+                new RankPoint(7, "acme/drop", "deeper", FROM.plusDays(1), 10),
+                new RankPoint(7, "acme/drop", "deeper", FROM.plusDays(2), 20),
+                new RankPoint(8, "acme/drop", "shallower", FROM.plusDays(1), 5),
+                new RankPoint(8, "acme/drop", "shallower", FROM.plusDays(2), 15),
+                new RankPoint(10, "acme/drop", "z-drop", FROM.plusDays(1), 10),
+                new RankPoint(10, "acme/drop", "z-drop", FROM.plusDays(2), 20),
+                new RankPoint(11, "acme/drop", "a-drop", FROM.plusDays(1), 10),
+                new RankPoint(11, "acme/drop", "a-drop", FROM.plusDays(2), 20)
+        );
+        assertThat(PortfolioHighlightMath.strongestRise(points, FROM).queryName()).isEqualTo("a-same");
+        assertThat(PortfolioHighlightMath.worstDrop(points, FROM).queryName()).isEqualTo("a-drop");
+
+        assertThat(PortfolioHighlightMath.promotionEvents(List.of(
+                new PromotionCount(1, "acme/a", 3),
+                new PromotionCount(2, "acme/m", 1),
+                new PromotionCount(3, "acme/z", 3)
+        ))).satisfies(events -> {
+            assertThat(events.fullName()).isEqualTo("acme/a");
+            assertThat(events.count()).isEqualTo(7);
+            assertThat(events.repositoryNames()).containsExactly("acme/a", "acme/m", "acme/z");
+        });
+
+        assertThat(PortfolioHighlightMath.strongestVisitorGrowth(List.of(
+                new VisitorRow(1, "mid", null, 10.0),
+                new VisitorRow(2, "high", 5L, 40.0),
+                new VisitorRow(3, "low", 9L, 1.0),
+                new VisitorRow(4, "fewer", 1L, 40.0),
+                new VisitorRow(5, "z-name", 5L, 40.0),
+                new VisitorRow(6, "a-name", 5L, 40.0)
+        )).fullName()).isEqualTo("a-name");
     }
 }

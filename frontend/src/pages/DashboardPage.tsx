@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type Dashboard } from "../lib/api";
+import { api, type Dashboard, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
@@ -250,10 +250,7 @@ function HighlightLine({ label, children }: { label: string; children: ReactNode
   );
 }
 
-function RankLink({ move }: { move: NonNullable<Dashboard["highlights"]>["rankRise"] }) {
-  if (!move) {
-    return null;
-  }
+function RankLink({ move }: { move: RankHighlight }) {
   return (
     <Link className="text-primary hover:underline" to={`/repositories/${move.repositoryId}?tab=search`}>
       {move.fullName} · {move.queryName} {move.fromRank} → {move.toRank}
