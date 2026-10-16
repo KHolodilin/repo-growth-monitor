@@ -12,7 +12,9 @@ import com.kholodilin.repogrowth.analytics.api.DashboardResponse.PartialData;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.RepositoryRow;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StarsMetric;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficLeader;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.Highlights;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficPoint;
+import com.kholodilin.repogrowth.repository.application.RepositoryHealthService.DiscoverabilityScore;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
@@ -73,6 +75,7 @@ public class AnalyticsService {
     private final CollectionController collectionController;
     private final ActivityClassifier activityClassifier;
     private final RepositoryHealthService healthService;
+    private final PortfolioHighlightsService highlightsService;
     private final Clock clock;
 
     public AnalyticsService(
@@ -83,6 +86,7 @@ public class AnalyticsService {
             CollectionController collectionController,
             ActivityClassifier activityClassifier,
             RepositoryHealthService healthService,
+            PortfolioHighlightsService highlightsService,
             Clock clock
     ) {
         this.repositoryService = repositoryService;
@@ -92,6 +96,7 @@ public class AnalyticsService {
         this.collectionController = collectionController;
         this.activityClassifier = activityClassifier;
         this.healthService = healthService;
+        this.highlightsService = highlightsService;
         this.clock = clock;
     }
 
@@ -321,7 +326,7 @@ public class AnalyticsService {
                         latestRuns.stream().map(CollectionRun::id).toList()
                 ).stream()
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
-        Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
+        Map<Long, DiscoverabilityScore> discoverability = discoverabilityByRepo(tracked);
         Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
         List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
                 .stream()
@@ -347,7 +352,8 @@ public class AnalyticsService {
                         new StarsMetric(starsTotal, starsChange)
                 ),
                 traffic,
-                rows
+                rows,
+                highlightsService.build(period, rows)
         );
     }
 
@@ -360,7 +366,7 @@ public class AnalyticsService {
                 ).stream()
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
-        Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
+        Map<Long, DiscoverabilityScore> discoverability = discoverabilityByRepo(tracked);
         Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
         List<RepositoryRow> rows = tracked.stream()
                 .map(repository -> {
@@ -385,7 +391,8 @@ public class AnalyticsService {
                             repository.archived(),
                             activityAt,
                             activityClassifier.classify(repository.archived(), activityAt).name(),
-                            discoverability.get(repository.id()),
+                            score(discoverability.get(repository.id())).passed(),
+                            score(discoverability.get(repository.id())).total(),
                             accessible(signals.get(repository.id())),
                             trafficMissing(signals.get(repository.id()))
                     );
@@ -410,7 +417,8 @@ public class AnalyticsService {
                         new StarsMetric(starsTotal, null)
                 ),
                 List.of(),
-                rows
+                rows,
+                highlightsService.build(period, rows)
         );
     }
 
@@ -432,7 +440,8 @@ public class AnalyticsService {
                         new StarsMetric(stars, null)
                 ),
                 List.of(),
-                List.of()
+                List.of(),
+                Highlights.none()
         );
     }
 
@@ -450,7 +459,7 @@ public class AnalyticsService {
             Map<Long, Long> previousVisitors,
             Map<Long, CollectionRun> runByRepo,
             Map<Long, List<CollectionJob>> jobsByRun,
-            Map<Long, Integer> discoverability,
+            Map<Long, DiscoverabilityScore> discoverability,
             Map<Long, RepositorySignals> signals
     ) {
         Double growth = period.allTime()
@@ -478,7 +487,8 @@ public class AnalyticsService {
                 row.archived(),
                 activityAt,
                 activityStatus.name(),
-                discoverability.get(row.repositoryId()),
+                score(discoverability.get(row.repositoryId())).passed(),
+                score(discoverability.get(row.repositoryId())).total(),
                 accessible(signals.get(row.repositoryId())),
                 trafficMissing(signals.get(row.repositoryId()))
         );
@@ -492,12 +502,16 @@ public class AnalyticsService {
         return signals != null && signals.trafficPermissionMissing();
     }
 
-    private Map<Long, Integer> discoverabilityByRepo(List<Repository> tracked) {
-        Map<Long, Integer> scores = new HashMap<>();
+    private Map<Long, DiscoverabilityScore> discoverabilityByRepo(List<Repository> tracked) {
+        Map<Long, DiscoverabilityScore> scores = new HashMap<>();
         for (Repository repository : tracked) {
-            scores.put(repository.id(), healthService.discoverabilityPassed(repository));
+            scores.put(repository.id(), healthService.discoverabilityScore(repository));
         }
         return scores;
+    }
+
+    private static DiscoverabilityScore score(DiscoverabilityScore score) {
+        return score == null ? new DiscoverabilityScore(null, null) : score;
     }
 
     private List<TrafficPoint> series(DashboardPeriod period) {

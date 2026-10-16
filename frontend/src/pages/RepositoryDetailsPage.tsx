@@ -145,12 +145,12 @@ export function RepositoryDetailsPage() {
   }, [load]);
 
   useEffect(() => {
-    if (tab !== "overview" || !focusHealth) {
+    if (loading || tab !== "overview" || (!focusHealth && searchParams.get("focus") !== "health")) {
       return;
     }
     document.getElementById("repository-health")?.scrollIntoView({ block: "start" });
     setFocusHealth(false);
-  }, [focusHealth, tab]);
+  }, [focusHealth, tab, loading, searchParams]);
 
   useEffect(() => {
     let cancelled = false;

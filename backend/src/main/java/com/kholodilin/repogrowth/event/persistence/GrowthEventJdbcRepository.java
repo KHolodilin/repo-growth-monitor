@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.event.persistence;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
+import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.PromotionCount;
 import com.kholodilin.repogrowth.event.detect.CandidateEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import org.springframework.jdbc.core.RowMapper;
@@ -153,6 +154,26 @@ public class GrowthEventJdbcRepository {
                 .param("from", from)
                 .param("to", to)
                 .query(MAPPER)
+                .list();
+    }
+
+    public List<PromotionCount> promotionCounts(LocalDate from, LocalDate to) {
+        return jdbcClient.sql("""
+                        SELECT e.repository_id, r.full_name, COUNT(*) AS event_count
+                        FROM growth_event e
+                        JOIN repository r ON r.id = e.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND e.category = 'PROMOTION'
+                          AND (e.event_at AT TIME ZONE 'UTC')::date BETWEEN :from AND :to
+                        GROUP BY e.repository_id, r.full_name
+                        """)
+                .param("from", from)
+                .param("to", to)
+                .query((rs, rowNum) -> new PromotionCount(
+                        rs.getLong("repository_id"),
+                        rs.getString("full_name"),
+                        rs.getInt("event_count")
+                ))
                 .list();
     }
 

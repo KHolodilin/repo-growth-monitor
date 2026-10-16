@@ -12,7 +12,10 @@ import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
+import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,6 +26,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +50,12 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     JdbcClient jdbcClient;
     @Autowired
     Clock clock;
+    @Autowired
+    SearchQueryJdbcRepository searchQueryJdbcRepository;
+    @Autowired
+    SearchRunJdbcRepository searchRunJdbcRepository;
+    @Autowired
+    GrowthEventJdbcRepository growthEventJdbcRepository;
 
     private Repository kafka;
     private Repository outbox;
@@ -62,6 +72,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.summary().repositories()).isZero();
         assertThat(dashboard.traffic()).isEmpty();
         assertThat(dashboard.repositories()).isEmpty();
+        assertThat(dashboard.highlights()).isEqualTo(DashboardResponse.Highlights.none());
     }
 
     @Test
@@ -161,8 +172,14 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(kafkaRow.growthPercent()).isEqualTo(100.0);
         assertThat(kafkaRow.forks()).isEqualTo(2);
         assertThat(kafkaRow.discoverabilityPassed()).isEqualTo(8);
+        assertThat(kafkaRow.discoverabilityTotal()).isEqualTo(13);
+        assertThat(dashboard.highlights().visitors().fullName()).isEqualTo("acme/kafka-starter");
+        assertThat(dashboard.highlights().visitors().growthPercent()).isEqualTo(100.0);
+        assertThat(dashboard.highlights().rankRise()).isNull();
+        assertThat(dashboard.highlights().events()).isNull();
         assertThat(kafkaRow.collectionStatus()).isEqualTo("PARTIAL");
         assertThat(dashboard.repositories().stream().filter(row -> row.fullName().equals("acme/spring-outbox")).findFirst().orElseThrow().discoverabilityPassed()).isNull();
+        assertThat(dashboard.repositories().stream().filter(row -> row.fullName().equals("acme/spring-outbox")).findFirst().orElseThrow().discoverabilityTotal()).isNull();
         assertThat(kafkaRow.jobs()).extracting(DashboardResponse.JobStatus::jobType)
                 .contains("TRAFFIC", "POPULAR_PATHS");
 
@@ -324,6 +341,46 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(analyticsService.portfolio("1y").repositories()).isEqualTo(2);
         assertThat(analyticsService.portfolio("nope").repositories()).isEqualTo(2);
         assertThat(analyticsService.traffic(kafka.id(), "all", true).repository().id()).isEqualTo(kafka.id());
+    }
+
+    @Test
+    void portfolioHighlightsFollowTheSelectedPeriod() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(3), 20, 80, 1, 1);
+        trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(3), 8, 10, 1, 1);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(10), 10, 40, 1, 1);
+        trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(10), 8, 10, 1, 1);
+
+        long outboxQuery = searchQueryJdbcRepository.insert(kafka.id(), "outbox", "outbox", true, 50).id();
+        long kafkaQuery = searchQueryJdbcRepository.insert(outbox.id(), "kafka", "kafka", true, 50).id();
+        succeed(outboxQuery, kafka.id(), today.minusDays(10), 22);
+        succeed(outboxQuery, kafka.id(), today.minusDays(2), 14);
+        succeed(kafkaQuery, outbox.id(), today.minusDays(10), 4);
+        succeed(kafkaQuery, outbox.id(), today.minusDays(2), 11);
+
+        growthEventJdbcRepository.insertManual(kafka.id(), today.minusDays(2).atStartOfDay(ZoneOffset.UTC).toInstant(), "PROMOTION", "LINKEDIN_POST", "Launch", null, null);
+        growthEventJdbcRepository.insertManual(kafka.id(), today.minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant(), "PROMOTION", "REDDIT_POST", "Thread", null, null);
+        growthEventJdbcRepository.insertManual(outbox.id(), today.minusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant(), "PROMOTION", "CUSTOM", "Note", null, null);
+        growthEventJdbcRepository.insertManual(kafka.id(), today.minusDays(40).atStartOfDay(ZoneOffset.UTC).toInstant(), "PROMOTION", "HABR_ARTICLE", "Old", null, null);
+
+        DashboardResponse dashboard = analyticsService.dashboard("7d");
+        assertThat(dashboard.highlights().rankRise().queryName()).isEqualTo("outbox");
+        assertThat(dashboard.highlights().rankRise().fromRank()).isEqualTo(22);
+        assertThat(dashboard.highlights().rankRise().toRank()).isEqualTo(14);
+        assertThat(dashboard.highlights().rankRise().repositoryId()).isEqualTo(kafka.id());
+        assertThat(dashboard.highlights().rankDrop().queryName()).isEqualTo("kafka");
+        assertThat(dashboard.highlights().rankDrop().fromRank()).isEqualTo(4);
+        assertThat(dashboard.highlights().rankDrop().toRank()).isEqualTo(11);
+        assertThat(dashboard.highlights().events().count()).isEqualTo(3);
+        assertThat(dashboard.highlights().events().repositoryId()).isEqualTo(kafka.id());
+        assertThat(dashboard.highlights().events().repositoryNames()).containsExactly("acme/kafka-starter", "acme/spring-outbox");
+        assertThat(dashboard.highlights().visitors().fullName()).isEqualTo("acme/kafka-starter");
+    }
+
+    private void succeed(long queryId, long repositoryId, LocalDate date, int position) {
+        searchRunJdbcRepository.insertIgnore(queryId, repositoryId, date);
+        searchRunJdbcRepository.markSuccess(searchRunJdbcRepository.find(queryId, date).orElseThrow().id(), 50, position);
     }
 
     private void createRepos() {

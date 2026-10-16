@@ -18,7 +18,8 @@ public record DashboardResponse(
         ActiveCollection activeCollection,
         DashboardSummary summary,
         List<TrafficPoint> traffic,
-        List<RepositoryRow> repositories
+        List<RepositoryRow> repositories,
+        Highlights highlights
 ) {
 
     public enum DashboardState {
@@ -87,9 +88,31 @@ public record DashboardResponse(
             Instant activityAt,
             String activityStatus,
             Integer discoverabilityPassed,
+            Integer discoverabilityTotal,
             boolean accessible,
             boolean trafficPermissionMissing
     ) {
+    }
+
+    public record RankHighlight(long repositoryId, String fullName, String queryName, int fromRank, int toRank) {
+    }
+
+    public record EventHighlight(int count, long repositoryId, String fullName, List<String> repositoryNames) {
+    }
+
+    public record VisitorHighlight(long repositoryId, String fullName, double growthPercent) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record Highlights(
+            RankHighlight rankRise,
+            RankHighlight rankDrop,
+            EventHighlight events,
+            VisitorHighlight visitors
+    ) {
+        public static Highlights none() {
+            return new Highlights(null, null, null, null);
+        }
     }
 
     public record JobStatus(String jobType, String status, String errorMessage) {
