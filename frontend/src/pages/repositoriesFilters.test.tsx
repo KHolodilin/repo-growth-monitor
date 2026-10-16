@@ -95,7 +95,7 @@ describe("repository filters", () => {
     await user.click(within(screen.getByRole("group", { name: "Tracking" })).getByRole("button", { name: "All" }));
     await user.type(screen.getByLabelText("Search repositories"), "other");
     expect(screen.getByText(untracked.fullName)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Enable shown (1)" }));
+    await user.click(screen.getByRole("button", { name: "Start tracking (1)" }));
     expect(await screen.findByText("Tracking 4 of 4")).toBeInTheDocument();
 
     vi.spyOn(window, "confirm").mockReturnValueOnce(false);
@@ -103,7 +103,7 @@ describe("repository filters", () => {
     await user.click(screen.getByRole("button", { name: "No access" }));
     const trackingCalls = () => api.mock.calls.filter((call) => String(call[0]).includes("/tracking")).length;
     const beforeCancel = trackingCalls();
-    await user.click(screen.getByRole("button", { name: "Disable shown (1)" }));
+    await user.click(screen.getByRole("button", { name: "Stop tracking (1)" }));
     expect(trackingCalls()).toBe(beforeCancel);
     vi.spyOn(window, "confirm").mockReturnValueOnce(true);
     api.mockImplementation((path: string) => {
@@ -113,8 +113,9 @@ describe("repository filters", () => {
       }
       return listed;
     });
-    await user.click(screen.getByRole("button", { name: "Disable shown (1)" }));
+    await user.click(screen.getByRole("button", { name: "Stop tracking (1)" }));
     expect(await screen.findByText("Tracking 3 of 4")).toBeInTheDocument();
+    vi.spyOn(window, "confirm").mockRestore();
   });
 
   it("reads the saved list and refreshes once when a token is new", async () => {
@@ -313,16 +314,25 @@ describe("repository filters", () => {
     });
     const page = renderRepos();
     expect(await screen.findByText("Tracking 3 of 5")).toBeInTheDocument();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false);
     const trackedRow = screen.getByText(tracked.fullName).closest("label");
+    const trackingCalls = () => api.mock.calls.filter((call) => String(call[0]).includes("/tracking")).length;
+    const beforeCancel = trackingCalls();
+    await user.click(within(trackedRow as HTMLElement).getByRole("checkbox"));
+    expect(confirm).toHaveBeenCalledWith("Stop tracking this repository? Collection stops. Stored data stays.");
+    expect(trackingCalls()).toBe(beforeCancel);
+    expect(within(trackedRow as HTMLElement).getByRole("checkbox")).toBeChecked();
+    confirm.mockReturnValueOnce(true);
     await user.click(within(trackedRow as HTMLElement).getByRole("checkbox"));
     expect(await screen.findByText("tracking failed")).toBeInTheDocument();
+    confirm.mockRestore();
 
     await user.click(within(screen.getByRole("group", { name: "Tracking" })).getByRole("button", { name: "All" }));
     const hiddenRow = screen.getByText(hidden.fullName).closest("label");
     expect(within(hiddenRow as HTMLElement).getByRole("checkbox")).toBeDisabled();
 
     await user.type(screen.getByRole("textbox", { name: "Search repositories" }), "other");
-    await user.click(screen.getByRole("button", { name: /Enable shown/ }));
+    await user.click(screen.getByRole("button", { name: /Start tracking/ }));
     expect(await screen.findByText("tracking failed")).toBeInTheDocument();
     page.unmount();
     sessionStorage.clear();

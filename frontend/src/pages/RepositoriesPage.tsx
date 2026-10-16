@@ -74,6 +74,9 @@ export function RepositoriesPage() {
   const showEnable = !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
 
   async function toggle(repo: Repository) {
+    if (repo.trackingEnabled && !window.confirm("Stop tracking this repository? Collection stops. Stored data stays.")) {
+      return;
+    }
     try {
       const updated = await api<Repository>(`/api/v1/repositories/${repo.id}/tracking`, {
         method: "POST",
@@ -119,12 +122,12 @@ export function RepositoriesPage() {
         <div className="flex flex-wrap items-center gap-2">
           {showEnable && (
             <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(true)}>
-              Enable shown ({enableTargets.length})
+              Start tracking ({enableTargets.length})
             </Button>
           )}
           {disableTargets.length > 0 && (
             <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(false)}>
-              Disable shown ({disableTargets.length})
+              Stop tracking ({disableTargets.length})
             </Button>
           )}
           <Button disabled={loading || collectionBlocked(access)} onClick={() => void load(true)}>
