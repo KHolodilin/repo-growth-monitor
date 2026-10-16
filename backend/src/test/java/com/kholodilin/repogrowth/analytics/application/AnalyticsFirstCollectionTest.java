@@ -63,7 +63,7 @@ class AnalyticsFirstCollectionTest {
         when(runs.latestPerTrackedRepository()).thenReturn(List.of(run));
         when(runs.latestCompletedAtForTracked()).thenReturn(null);
         when(jobs.findByRunIds(any())).thenReturn(List.of(job));
-        when(health.discoverabilityPassed(repository)).thenReturn(4);
+        when(health.discoverabilityScore(repository)).thenReturn(new RepositoryHealthService.DiscoverabilityScore(4, 13));
         when(activity.classify(anyBoolean(), nullable(Instant.class))).thenReturn(ActivityStatus.ACTIVE);
         AnalyticsService service = new AnalyticsService(
                 repositoryService,
@@ -73,6 +73,7 @@ class AnalyticsFirstCollectionTest {
                 mock(CollectionController.class),
                 activity,
                 health,
+                mock(PortfolioHighlightsService.class),
                 Clock.fixed(now, ZoneOffset.UTC)
         );
 
