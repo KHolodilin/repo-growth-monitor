@@ -859,6 +859,7 @@ function TrafficPanel({
       />
       {markerEvents && (
         <EventDetailsDialog
+          repositoryId={repositoryId}
           events={markerEvents}
           onClose={() => setMarkerEvents(null)}
           onEdit={() => setMarkerEvents(null)}
@@ -1310,14 +1311,36 @@ function CombinedRankChart({
   visibility: SearchHistory[];
   highlightQueryId: number | null;
 }) {
+  const [events, setEvents] = useState<GrowthEvent[]>([]);
+  const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=all`)
+      .then((rows) => {
+        if (!cancelled) {
+          setEvents(Array.isArray(rows) ? rows : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEvents([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repositoryId]);
+
   const option = useMemo(() => {
     const dates = datesFromHistory(
       visibility.map((item) => item.points),
-      visibility.flatMap((item) => item.missedDates ?? []),
+      visibility.flatMap((item) => item.missedDates),
     );
     return rankHistoryOption({
       dates,
       legend: true,
+      events,
       series: visibility.map((item) => ({
         name: item.query.name,
         points: item.points,
@@ -1327,7 +1350,7 @@ function CombinedRankChart({
         dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
       })),
     });
-  }, [visibility, highlightQueryId]);
+  }, [visibility, highlightQueryId, events]);
 
   const series = useMemo(
     () => visibility.map((item) => ({ key: String(item.query.id), name: item.query.name })),
@@ -1338,14 +1361,33 @@ function CombinedRankChart({
     return null;
   }
   return (
-    <ChartCard title="Rank History">
-      <PersistentECharts
-        chartId={repoSearchChartId(repositoryId)}
-        series={series}
-        option={option}
-        style={{ height: 360, width: "100%" }}
-      />
-    </ChartCard>
+    <>
+      <ChartCard title="Rank History">
+        <PersistentECharts
+          chartId={repoSearchChartId(repositoryId)}
+          series={series}
+          option={option}
+          style={{ height: 360, width: "100%" }}
+          onEvents={{
+            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
+              const clicked = markLineEvents(params);
+              if (clicked.length > 0) {
+                setMarkerEvents(clicked);
+              }
+            },
+          }}
+        />
+      </ChartCard>
+      {markerEvents && (
+        <EventDetailsDialog
+          repositoryId={repositoryId}
+          events={markerEvents}
+          onClose={() => setMarkerEvents(null)}
+          onEdit={() => setMarkerEvents(null)}
+          onChanged={() => setMarkerEvents(null)}
+        />
+      )}
+    </>
   );
 }
 

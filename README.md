@@ -120,7 +120,7 @@ The token is never stored in PostgreSQL and never returned by the API. Do not co
 
 Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is not the
 downloadable release: `docker compose up -d --build` builds `Dockerfile` on the machine.
-Release 0.22.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.22.0`.
+Release 0.23.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.23.0`.
 
 The image is three stages:
 

@@ -1,3 +1,6 @@
+import type { GrowthEvent } from "./api";
+import { eventMarkOverlays } from "./trafficChart";
+import { eventUtcDate } from "./growthEvents";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
 const COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
@@ -32,14 +35,73 @@ export function rankHistoryOption({
   dates,
   series,
   legend = false,
+  events = [],
   formatAxis = formatChartAxisDate,
 }: {
   dates: string[];
   series: RankHistorySeries[];
   legend?: boolean;
+  events?: GrowthEvent[];
   formatAxis?: (value: string) => string;
 }) {
+  const axisDates = events.length > 0 ? calendarDates([...dates, ...events.map((event) => eventUtcDate(event))]) : dates;
+  const overlays = events.length > 0 ? eventMarkOverlays(axisDates, events, 1) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
+  const lines = series.flatMap((item, index) => {
+    const color = COLORS[index % COLORS.length];
+    const byDate = new Map(item.points.map((point) => [point.date, point]));
+    const missed = new Set(item.missedDates ?? []);
+    return [
+      {
+        name: item.name,
+        type: "line",
+        connectNulls: false,
+        showSymbol: true,
+        symbol: "circle",
+        symbolSize: item.highlighted ? 8 : 6,
+        lineStyle: { width: item.highlighted ? 3.5 : 2, opacity: item.dimmed ? 0.25 : 1, color },
+        itemStyle: { color, opacity: item.dimmed ? 0.25 : 1 },
+        data: axisDates.map((date) => {
+          const point = byDate.get(date);
+          if (!point || point.position == null) {
+            return null;
+          }
+          return point.position;
+        }),
+      },
+      {
+        name: item.name,
+        type: "scatter",
+        symbol: "diamond",
+        symbolSize: 10,
+        tooltip: { show: false },
+        itemStyle: {
+          color: "#fff",
+          borderColor: color,
+          borderWidth: 2,
+          opacity: item.dimmed ? 0.25 : 1,
+        },
+        data: axisDates.map((date) => {
+          const point = byDate.get(date);
+          if (!point || point.position != null) {
+            return null;
+          }
+          return maxLimit + 1;
+        }),
+      },
+      // A day nobody collected is not the same as a day the repository fell out of the results,
+      // so it gets its own grey marker instead of an unexplained break in the line.
+      {
+        name: item.name,
+        type: "scatter",
+        symbol: "circle",
+        symbolSize: 7,
+        tooltip: { show: false },
+        itemStyle: { color: MISSED_COLOR, opacity: item.dimmed ? 0.25 : 0.8 },
+        data: axisDates.map((date) => (missed.has(date) ? maxLimit + 1 : null)),
+      },
+    ];
+  });
   return {
     tooltip: {
       trigger: "axis",
@@ -55,15 +117,17 @@ export function rankHistoryOption({
             return `${item.name}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
-        return `<div>${formatAxis(date)}<br/>${rows}</div>`;
+        const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];
+        const eventRows = dayEvents.length === 0 ? "" : `<br/>${dayEvents.map((item) => item.title).join("<br/>")}`;
+        return `<div>${formatAxis(date)}<br/>${rows}${eventRows}</div>`;
       },
     },
     legend: legend ? { top: 0, type: "scroll", data: series.map((item) => item.name) } : undefined,
-    grid: { left: 48, right: 72, top: legend ? 48 : 24, bottom: 40, containLabel: false },
+    grid: { left: 48, right: 72, top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24, bottom: 40, containLabel: false },
     xAxis: {
       type: "category",
-      data: dates,
-      boundaryGap: dates.length < 2,
+      data: axisDates,
+      boundaryGap: axisDates.length < 2,
       axisLabel: {
         hideOverlap: true,
         showMinLabel: true,
@@ -82,61 +146,23 @@ export function rankHistoryOption({
         formatter: (value: number) => (value > maxLimit ? `>${maxLimit}` : `#${value}`),
       },
     },
-    series: series.flatMap((item, index) => {
-      const color = COLORS[index % COLORS.length];
-      const byDate = new Map(item.points.map((point) => [point.date, point]));
-      const missed = new Set(item.missedDates ?? []);
-      return [
-        {
-          name: item.name,
-          type: "line",
-          connectNulls: false,
-          showSymbol: true,
-          symbol: "circle",
-          symbolSize: item.highlighted ? 8 : 6,
-          lineStyle: { width: item.highlighted ? 3.5 : 2, opacity: item.dimmed ? 0.25 : 1, color },
-          itemStyle: { color, opacity: item.dimmed ? 0.25 : 1 },
-          data: dates.map((date) => {
-            const point = byDate.get(date);
-            if (!point || point.position == null) {
-              return null;
-            }
-            return point.position;
-          }),
-        },
-        {
-          name: item.name,
-          type: "scatter",
-          symbol: "diamond",
-          symbolSize: 10,
-          tooltip: { show: false },
-          itemStyle: {
-            color: "#fff",
-            borderColor: color,
-            borderWidth: 2,
-            opacity: item.dimmed ? 0.25 : 1,
-          },
-          data: dates.map((date) => {
-            const point = byDate.get(date);
-            if (!point || point.position != null) {
-              return null;
-            }
-            return maxLimit + 1;
-          }),
-        },
-        // A day nobody collected is not the same as a day the repository fell out of the results,
-        // so it gets its own grey marker instead of an unexplained break in the line.
-        {
-          name: item.name,
-          type: "scatter",
-          symbol: "circle",
-          symbolSize: 7,
-          tooltip: { show: false },
-          itemStyle: { color: MISSED_COLOR, opacity: item.dimmed ? 0.25 : 0.8 },
-          data: dates.map((date) => (missed.has(date) ? maxLimit + 1 : null)),
-        },
-      ];
-    }),
+    series: [
+      ...lines,
+      ...(overlays && overlays.groups.length > 0
+        ? [
+            {
+              name: "Events",
+              type: "line",
+              data: axisDates.map(() => null),
+              showSymbol: false,
+              lineStyle: { opacity: 0, width: 0 },
+              tooltip: { show: false },
+              markLine: overlays.markLine,
+              markPoint: overlays.markPoint,
+            },
+          ]
+        : []),
+    ],
   };
 }
 

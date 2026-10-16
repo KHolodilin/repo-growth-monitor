@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   api,
   type GrowthEvent,
   type ManualGrowthEventRequest,
+  type RepositoryStatsHistory,
+  type RepositoryTraffic,
+  type SearchHistory,
 } from "../lib/api";
+import { eventWindowComparison, signedCount, type EventWindowComparison, type RankComparison } from "../lib/eventWindow";
 import {
   eventCategoryIcon,
   eventTypeLabel,
@@ -13,7 +17,7 @@ import {
   sourceBadge,
   toDateTimeLocal,
 } from "../lib/growthEvents";
-import { formatChartAxisDate } from "../lib/utils";
+import { formatChartAxisDate, formatNumber } from "../lib/utils";
 import { Button, Card } from "./ui";
 
 const RECENT = 5;
@@ -35,8 +39,10 @@ export function GrowthEventsPanel({
   const recent = events.slice(0, RECENT);
 
   function openDetails(items: GrowthEvent[]) {
-    setSelected(items);
-    onOpenEvents?.(items);
+    const date = eventUtcDate(items[0]);
+    const sameDay = events.filter((item) => eventUtcDate(item) === date);
+    setSelected(sameDay);
+    onOpenEvents?.(sameDay);
   }
 
   return (
@@ -81,6 +87,7 @@ export function GrowthEventsPanel({
       )}
       {selected && (
         <EventDetailsDialog
+          repositoryId={repositoryId}
           events={selected}
           onClose={() => setSelected(null)}
           onEdit={(event) => {
@@ -153,17 +160,100 @@ function EventRows({
   );
 }
 
+function comparisonQueries(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || !("query" in item)) {
+      return [];
+    }
+    const history = item as SearchHistory;
+    return [{ name: history.query.name, points: history.points ?? [] }];
+  });
+}
+
+function rankAfter(rank: RankComparison) {
+  if (rank.kind === "no-queries") {
+    return "No queries";
+  }
+  if (rank.kind === "none") {
+    return "—";
+  }
+  return `${rank.name} ${rank.from} to ${rank.to}`;
+}
+
+function rankDifference(rank: RankComparison) {
+  if (rank.kind !== "move") {
+    return "—";
+  }
+  return signedCount(rank.difference);
+}
+
 export function EventDetailsDialog({
+  repositoryId,
   events,
   onClose,
   onEdit,
   onChanged,
+  today,
 }: {
+  repositoryId: number;
   events: GrowthEvent[];
   onClose: () => void;
   onEdit: (event: GrowthEvent) => void;
   onChanged: () => void;
+  today?: string;
 }) {
+  const eventDate = events[0] ? eventUtcDate(events[0]) : "";
+  const [comparison, setComparison] = useState<EventWindowComparison | null>(null);
+
+  useEffect(() => {
+    if (!eventDate) {
+      return;
+    }
+    let cancelled = false;
+    const day = today ?? new Date().toISOString().slice(0, 10);
+    Promise.all([
+      api<RepositoryTraffic>(`/api/v1/repositories/${repositoryId}/traffic?period=all`),
+      api<RepositoryStatsHistory>(`/api/v1/repositories/${repositoryId}/stats-history?period=all`),
+      api<SearchHistory[]>(`/api/v1/repositories/${repositoryId}/search-visibility`),
+    ])
+      .then(([traffic, stats, queries]) => {
+        if (cancelled) {
+          return;
+        }
+        const trafficDays = traffic && typeof traffic === "object" && Array.isArray(traffic.traffic) ? traffic.traffic : [];
+        const starDays = stats && typeof stats === "object" && Array.isArray(stats.points) ? stats.points : [];
+        setComparison(
+          eventWindowComparison({
+            eventDate,
+            today: day,
+            traffic: trafficDays,
+            stats: starDays,
+            queries: comparisonQueries(queries),
+          }),
+        );
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setComparison(
+          eventWindowComparison({
+            eventDate,
+            today: day,
+            traffic: [],
+            stats: [],
+            queries: [],
+          }),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repositoryId, eventDate, today]);
+
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <Card className="max-h-[80vh] w-full max-w-lg overflow-auto" onClick={(event) => event.stopPropagation()}>
@@ -208,8 +298,59 @@ export function EventDetailsDialog({
             </div>
           ))}
         </div>
+        {comparison && (
+          <div className="mt-4 border-t pt-4">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-1 pr-3 font-medium" />
+                  <th className="py-1 pr-3 font-medium">Before</th>
+                  <th className="py-1 pr-3 font-medium">
+                    After
+                    {comparison.afterDays < 7 && (
+                      <div className="font-normal">{comparison.afterDays} of 7 days</div>
+                    )}
+                  </th>
+                  <th className="py-1 font-medium">Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                <ComparisonRow label="Visitors" metric={comparison.visitors} signedValues={false} />
+                <ComparisonRow label="Clones" metric={comparison.clones} signedValues={false} />
+                <ComparisonRow label="Stars" metric={comparison.stars} signedValues />
+                <tr className="border-t">
+                  <th className="py-1 pr-3 text-left font-medium">Rank</th>
+                  <td className="py-1 pr-3">—</td>
+                  <td className="py-1 pr-3">{rankAfter(comparison.rank)}</td>
+                  <td className="py-1">{rankDifference(comparison.rank)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-3 text-xs text-muted-foreground">A match in time does not prove a cause.</p>
+          </div>
+        )}
       </Card>
     </div>
+  );
+}
+
+function ComparisonRow({
+  label,
+  metric,
+  signedValues,
+}: {
+  label: string;
+  metric: { before: number; after: number; difference: number };
+  signedValues: boolean;
+}) {
+  const cell = signedValues ? signedCount : formatNumber;
+  return (
+    <tr className="border-t">
+      <th className="py-1 pr-3 text-left font-medium">{label}</th>
+      <td className="py-1 pr-3">{cell(metric.before)}</td>
+      <td className="py-1 pr-3">{cell(metric.after)}</td>
+      <td className="py-1">{signedCount(metric.difference)}</td>
+    </tr>
   );
 }
 

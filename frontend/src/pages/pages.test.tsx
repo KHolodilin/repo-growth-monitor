@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -214,6 +214,16 @@ describe("pages", () => {
     expect(syntax).toHaveAttribute("rel", "noreferrer");
     expect(syntax.parentElement).toHaveTextContent("Search Queries");
     expect(syntax.parentElement?.querySelector("input")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "mark-empty" }));
+    expect(screen.queryByRole("heading", { name: "Growth event" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    const deletes = screen.getAllByRole("button", { name: "Delete" });
+    api.mockResolvedValueOnce({});
+    await user.click(deletes[deletes.length - 1]);
+    await waitFor(() => expect(screen.queryByText("A match in time does not prove a cause.")).not.toBeInTheDocument());
     expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByText(searchHistory.query.name));
     fireEvent.mouseLeave(screen.getByText(searchHistory.query.name));
@@ -341,5 +351,100 @@ describe("pages", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
+  });
+
+  it("keeps the rank chart when event markers fail or arrive late", async () => {
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("search-visibility")) {
+        return json([searchHistory]);
+      }
+      if (url.includes("growth-events") && url.includes("period=all")) {
+        return Promise.reject(new Error("down"));
+      }
+      if (url.includes("growth-events")) {
+        return json([growthEvent]);
+      }
+      return json([]);
+    });
+    const rejected = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    rejected.unmount();
+
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("search-visibility")) {
+        return json([searchHistory]);
+      }
+      if (url.includes("growth-events") && url.includes("period=all")) {
+        return json({ nope: true });
+      }
+      return json([]);
+    });
+    const odd = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    odd.unmount();
+
+    const pending: ((value: unknown) => void)[] = [];
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("search-visibility")) {
+        return json([searchHistory]);
+      }
+      if (url.includes("growth-events") && url.includes("period=all")) {
+        return new Promise((resolve) => pending.push(resolve));
+      }
+      return json([]);
+    });
+    const late = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    late.unmount();
+    pending.forEach((resolve) => resolve([growthEvent]));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const failing: ((reason?: unknown) => void)[] = [];
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("search-visibility")) {
+        return json([searchHistory]);
+      }
+      if (url.includes("growth-events") && url.includes("period=all")) {
+        return new Promise((_resolve, reject) => failing.push(reject));
+      }
+      return json([]);
+    });
+    const abandoned = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    abandoned.unmount();
+    failing.forEach((reject) => reject(new Error("down")));
+    await act(async () => {
+      await Promise.resolve();
+    });
   });
 });
