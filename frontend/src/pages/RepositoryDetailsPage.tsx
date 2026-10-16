@@ -616,11 +616,11 @@ function HealthScoreLink({
   const passed = items.filter((item) => item.passed).length;
   const percent = items.length === 0 ? 0 : Math.round((passed / items.length) * 100);
   return (
-    <button type="button" onClick={onClick} className="inline-flex min-w-16 flex-col items-start gap-1 text-left text-sm text-foreground">
-      <span>
+    <button type="button" onClick={onClick} className="inline-grid justify-items-stretch gap-1 text-left text-sm text-foreground">
+      <span className="whitespace-nowrap">
         {title} {passed}/{items.length}
       </span>
-      <span className="h-1 w-16 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+      <span className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
         <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} />
       </span>
     </button>
