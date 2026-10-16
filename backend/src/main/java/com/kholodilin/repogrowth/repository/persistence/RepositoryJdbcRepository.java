@@ -9,7 +9,10 @@ import org.springframework.stereotype.Component;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -137,6 +140,16 @@ public class RepositoryJdbcRepository {
                 .list();
     }
 
+    public List<Repository> findListed() {
+        return jdbcClient.sql("""
+                        SELECT * FROM repository
+                        WHERE account_accessible = TRUE OR tracking_enabled = TRUE
+                        ORDER BY full_name
+                        """)
+                .query(MAPPER)
+                .list();
+    }
+
     public List<Repository> findAccountAccessible() {
         return jdbcClient.sql("""
                         SELECT * FROM repository
@@ -167,6 +180,62 @@ public class RepositoryJdbcRepository {
                         """)
                 .param("id", id)
                 .update();
+    }
+
+    public void markInaccessibleExcept(Collection<Long> seenIds) {
+        if (seenIds.isEmpty()) {
+            jdbcClient.sql("""
+                            UPDATE repository
+                            SET account_accessible = FALSE, updated_at = NOW()
+                            WHERE account_accessible = TRUE
+                            """)
+                    .update();
+            return;
+        }
+        jdbcClient.sql("""
+                        UPDATE repository
+                        SET account_accessible = FALSE, updated_at = NOW()
+                        WHERE account_accessible = TRUE
+                          AND id NOT IN (:ids)
+                        """)
+                .param("ids", seenIds)
+                .update();
+    }
+
+    public void setTrafficPermissionMissing(long id, boolean missing) {
+        jdbcClient.sql("""
+                        UPDATE repository
+                        SET traffic_permission_missing = :missing, updated_at = NOW()
+                        WHERE id = :id
+                        """)
+                .param("missing", missing)
+                .param("id", id)
+                .update();
+    }
+
+    public Map<Long, RepositorySignals> signalsFor(Collection<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, RepositorySignals> signals = new HashMap<>();
+        jdbcClient.sql("""
+                        SELECT id, account_accessible, traffic_permission_missing
+                        FROM repository
+                        WHERE id IN (:ids)
+                        """)
+                .param("ids", ids)
+                .query((rs, rowNum) -> {
+                    signals.put(rs.getLong("id"), new RepositorySignals(
+                            rs.getBoolean("account_accessible"),
+                            rs.getBoolean("traffic_permission_missing")
+                    ));
+                    return null;
+                })
+                .list();
+        return signals;
+    }
+
+    public record RepositorySignals(boolean accessible, boolean trafficPermissionMissing) {
     }
 
     public List<Repository> findTracked() {

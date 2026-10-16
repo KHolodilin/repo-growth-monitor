@@ -25,6 +25,7 @@ import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath;
 import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
@@ -321,9 +322,10 @@ public class AnalyticsService {
                 ).stream()
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
+        Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
         List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
                 .stream()
-                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability))
+                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability, signals))
                 .toList();
         int partialCount = (int) latestRuns.stream()
                 .filter(run -> run.status() == CollectionRunStatus.PARTIAL)
@@ -359,6 +361,7 @@ public class AnalyticsService {
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
         Map<Long, Integer> discoverability = discoverabilityByRepo(tracked);
+        Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
         List<RepositoryRow> rows = tracked.stream()
                 .map(repository -> {
                     CollectionRun run = runByRepo.get(repository.id());
@@ -382,7 +385,9 @@ public class AnalyticsService {
                             repository.archived(),
                             activityAt,
                             activityClassifier.classify(repository.archived(), activityAt).name(),
-                            discoverability.get(repository.id())
+                            discoverability.get(repository.id()),
+                            accessible(signals.get(repository.id())),
+                            trafficMissing(signals.get(repository.id()))
                     );
                 })
                 .toList();
@@ -445,7 +450,8 @@ public class AnalyticsService {
             Map<Long, Long> previousVisitors,
             Map<Long, CollectionRun> runByRepo,
             Map<Long, List<CollectionJob>> jobsByRun,
-            Map<Long, Integer> discoverability
+            Map<Long, Integer> discoverability,
+            Map<Long, RepositorySignals> signals
     ) {
         Double growth = period.allTime()
                 ? null
@@ -472,8 +478,18 @@ public class AnalyticsService {
                 row.archived(),
                 activityAt,
                 activityStatus.name(),
-                discoverability.get(row.repositoryId())
+                discoverability.get(row.repositoryId()),
+                accessible(signals.get(row.repositoryId())),
+                trafficMissing(signals.get(row.repositoryId()))
         );
+    }
+
+    static boolean accessible(RepositorySignals signals) {
+        return signals == null || signals.accessible();
+    }
+
+    static boolean trafficMissing(RepositorySignals signals) {
+        return signals != null && signals.trafficPermissionMissing();
     }
 
     private Map<Long, Integer> discoverabilityByRepo(List<Repository> tracked) {

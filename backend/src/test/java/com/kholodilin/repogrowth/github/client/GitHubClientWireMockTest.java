@@ -57,8 +57,16 @@ class GitHubClientWireMockTest {
     }
 
     private GitHubClient clientFor(Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
+        return clientForToken("test-token", connectTimeout, readTimeout, webBaseUrl);
+    }
+
+    private GitHubClient clientForToken(String token) {
+        return clientForToken(token, Duration.ofSeconds(2), Duration.ofSeconds(2), wireMock.baseUrl());
+    }
+
+    private GitHubClient clientForToken(String token, Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
         GitHubProperties properties = new GitHubProperties(
-                "test-token",
+                token,
                 wireMock.baseUrl(),
                 connectTimeout,
                 readTimeout,
@@ -126,6 +134,15 @@ class GitHubClientWireMockTest {
     }
 
     @Test
+    void probesAConfiguredTokenOnce() {
+        wireMock.stubFor(get(urlPathEqualTo("/user"))
+                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody("{\"login\":\"acme\"}")));
+        assertThat(client.tokenStatus().state()).isEqualTo("OK");
+        assertThat(client.tokenStatus().state()).isEqualTo("OK");
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/user")));
+    }
+
+    @Test
     void unauthorized() {
         wireMock.stubFor(get("/repos/acme/a")
                 .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
@@ -133,6 +150,8 @@ class GitHubClientWireMockTest {
                 .isInstanceOf(GitHubException.class)
                 .extracting(ex -> ((GitHubException) ex).retryable())
                 .isEqualTo(false);
+        assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
+        assertThat(client.tokenRejected()).isTrue();
     }
 
     @Test
@@ -160,6 +179,39 @@ class GitHubClientWireMockTest {
                     assertThat(github.retryable()).isTrue();
                     assertThat(github.rateLimitReset()).isNotNull();
                 });
+        assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
+        assertThat(client.tokenStatus().rateLimitReset()).isNotNull();
+    }
+
+    @Test
+    void probeFailureIsRemembered() {
+        wireMock.stubFor(get(urlPathEqualTo("/user"))
+                .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
+        assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
+        assertThat(client.tokenRejected()).isTrue();
+    }
+
+    @Test
+    void rateLimitMessageWithoutARemainingHeader() {
+        wireMock.stubFor(get("/repos/acme/a/traffic/views")
+                .willReturn(aResponse()
+                        .withStatus(403)
+                        .withHeader("X-RateLimit-Remaining", "10")
+                        .withHeader("X-RateLimit-Reset", "2000000000")
+                        .withBody("{\"message\":\"secondary rate limit\"}")));
+        assertThatThrownBy(() -> client.getViews("acme", "a")).isInstanceOf(GitHubException.class);
+        assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
+    }
+
+    @Test
+    void expiredTooManyRequestsReturnsToOk() {
+        wireMock.stubFor(get("/repos/acme/a")
+                .willReturn(aResponse()
+                        .withStatus(429)
+                        .withHeader("X-RateLimit-Reset", "1")
+                        .withBody("{\"message\":\"slow\"}")));
+        assertThatThrownBy(() -> client.getRepository("acme", "a")).isInstanceOf(GitHubException.class);
+        assertThat(client.tokenStatus().state()).isEqualTo("OK");
     }
 
     @Test
@@ -272,6 +324,9 @@ class GitHubClientWireMockTest {
         assertThat(blank.webBaseUrl()).isEqualTo("https://github.com");
         assertThat(missing.webBaseUrl()).isEqualTo("https://github.com");
         clientFor(null, null, " ");
+        GitHubClient unconfigured = clientForToken(" ");
+        assertThat(unconfigured.tokenStatus().state()).isEqualTo("MISSING");
+        assertThat(unconfigured.tokenRejected()).isFalse();
     }
 
     @Test

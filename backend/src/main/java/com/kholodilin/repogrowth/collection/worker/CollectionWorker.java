@@ -4,6 +4,7 @@ import com.kholodilin.repogrowth.collection.collector.CollectionContext;
 import com.kholodilin.repogrowth.collection.collector.CollectorRegistry;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
+import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
@@ -91,15 +92,18 @@ public class CollectionWorker {
                 transactionTemplate.executeWithoutResult(status -> {
                     jobRepository.markSuccess(job.id());
                     runRepository.refreshAggregates(job.collectionRunId());
+                    if (job.jobType() == CollectionJobType.TRAFFIC) {
+                        repositoryJdbcRepository.setTrafficPermissionMissing(job.repositoryId(), false);
+                    }
                 });
                 log.info("Collection job succeeded jobType={} attempt={}", job.jobType(), job.attempt());
             } finally {
                 repositoryLock.unlock(lockConnection, job.repositoryId());
             }
         } catch (GitHubException ex) {
-            handleFailure(job, ex.retryable(), ex.errorCode().name(), ex.getMessage(), ex.rateLimitReset());
+            handleFailure(job, ex.retryable(), ex.statusCode(), ex.errorCode().name(), ex.getMessage(), ex.rateLimitReset());
         } catch (Exception ex) {
-            handleFailure(job, true, "INTERNAL_ERROR", ex.getMessage(), null);
+            handleFailure(job, true, 0, "INTERNAL_ERROR", ex.getMessage(), null);
         } finally {
             sample.stop(Timer.builder("collection.duration").tag("jobType", job.jobType().name()).register(Metrics.globalRegistry));
             LogMdc.clearJob();
@@ -109,6 +113,7 @@ public class CollectionWorker {
     private void handleFailure(
             CollectionJob job,
             boolean retryable,
+            int statusCode,
             String errorCode,
             String message,
             java.time.Instant rateLimitReset
@@ -116,6 +121,11 @@ public class CollectionWorker {
         log.warn("Collection job failed jobType={} retryable={} errorCode={} attempt={}",
                 job.jobType(), retryable, errorCode, job.attempt());
         transactionTemplate.executeWithoutResult(status -> {
+            if (job.jobType() == CollectionJobType.TRAFFIC
+                    && statusCode == 403
+                    && "GITHUB_API_ERROR".equals(errorCode)) {
+                repositoryJdbcRepository.setTrafficPermissionMissing(job.repositoryId(), true);
+            }
             if (retryable && !retryPolicy.exhausted(job.attempt())) {
                 jobRepository.markRetry(
                         job.id(),

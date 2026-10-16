@@ -39,6 +39,8 @@ export type Repository = {
   forks: number;
   openIssues: number;
   trackingEnabled: boolean;
+  accessible?: boolean;
+  trafficPermissionMissing?: boolean;
   githubCreatedAt?: string;
   githubUpdatedAt?: string;
   lastCommitAt?: string;
@@ -101,6 +103,8 @@ export type Dashboard = {
     activityAt?: string | null;
     activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
     discoverabilityPassed: number | null;
+    accessible?: boolean;
+    trafficPermissionMissing?: boolean;
   }[];
 };
 

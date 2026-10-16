@@ -3,7 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
+import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
+import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -204,6 +206,22 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
 }
 
 function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
+  const [tokenState, setTokenState] = useState<TokenState | null>(null);
+  const needsAccess = rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
+  useEffect(() => {
+    if (!needsAccess) {
+      return;
+    }
+    let cancelled = false;
+    void loadGitHubAccess().then((next) => {
+      if (!cancelled) {
+        setTokenState(next.tokenState);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [needsAccess]);
   const navigate = useNavigate();
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "dashboard-repositories",
@@ -267,6 +285,11 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                     >
                       {row.fullName}
                     </Link>
+                    <RepositoryAccessNote
+                      accessible={row.accessible}
+                      trafficPermissionMissing={row.trafficPermissionMissing}
+                      tokenState={tokenState}
+                    />
                     {row.collectionStatus === "PARTIAL" && (
                       <CollectionHint jobs={row.jobs} />
                     )}

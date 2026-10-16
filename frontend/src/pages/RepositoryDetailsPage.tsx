@@ -12,10 +12,12 @@ import {
   type SearchHistory,
   type TopicHistory,
 } from "../lib/api";
+import { collectionBlocked, loadGitHubAccess, tokenBanner, type TokenState } from "../lib/githubAccess";
 import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
+import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -86,6 +88,22 @@ export function RepositoryDetailsPage() {
   const [queryText, setQueryText] = useState("");
   const [queryError, setQueryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tokenState, setTokenState] = useState<TokenState | null>(null);
+
+  useEffect(() => {
+    if (repo?.accessible !== false && !repo?.trafficPermissionMissing) {
+      return;
+    }
+    let cancelled = false;
+    void loadGitHubAccess().then((next) => {
+      if (!cancelled) {
+        setTokenState(next.tokenState);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repo?.accessible, repo?.trafficPermissionMissing]);
   const [loading, setLoading] = useState(true);
   const [collecting, setCollecting] = useState(false);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
@@ -191,6 +209,12 @@ export function RepositoryDetailsPage() {
 
   async function collect() {
     if (!id || collecting || runActive) {
+      return;
+    }
+    const nextAccess = await loadGitHubAccess();
+    setTokenState(nextAccess.tokenState);
+    if (collectionBlocked(nextAccess)) {
+      setError(tokenBanner(nextAccess));
       return;
     }
     setCollecting(true);
@@ -342,6 +366,11 @@ export function RepositoryDetailsPage() {
             },
             { label: TAB_LABEL[tab] },
           ]}
+        />
+        <RepositoryAccessNote
+          accessible={repo.accessible}
+          trafficPermissionMissing={repo.trafficPermissionMissing}
+          tokenState={tokenState}
         />
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1">
