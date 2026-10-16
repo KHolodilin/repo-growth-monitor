@@ -57,6 +57,11 @@ vi.mock("echarts-for-react", async () => {
         },
         "mark",
       ),
+      React.createElement(
+        "button",
+        { type: "button", onClick: () => onEvents?.click?.({ componentType: "series" }) },
+        "mark-empty",
+      ),
     );
   });
   return { default: MockECharts };

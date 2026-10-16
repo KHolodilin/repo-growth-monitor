@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -414,6 +414,8 @@ describe("components", () => {
     await user.click(screen.getByRole("button", { name: "View all →" }));
     await user.click(screen.getByRole("button", { name: "Close" }));
     await user.click(screen.getByText("LinkedIn launch"));
+    expect(screen.getByRole("heading", { name: "2 events" })).toBeInTheDocument();
+    expect(screen.getAllByText("Stars").length).toBeGreaterThan(1);
     await user.click(screen.getAllByRole("button", { name: "Edit" })[0]);
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     api.mockResolvedValueOnce({});
@@ -428,6 +430,7 @@ describe("components", () => {
     const onClose = vi.fn();
     render(
       <EventDetailsDialog
+        repositoryId={13}
         events={[{ ...growthEvent, description: "note", url: "https://example.com" }]}
         onClose={onClose}
         onEdit={vi.fn()}
@@ -449,6 +452,205 @@ describe("components", () => {
     );
     await user.click(screen.getAllByRole("button", { name: /^Views/ })[0]);
     expect(screen.getByText("No snapshots for this period.")).toBeInTheDocument();
+  });
+
+  it("shows one before and after table for the day's events", async () => {
+    api.mockImplementation((url: string) => {
+      const path = String(url);
+      if (path.includes("traffic")) {
+        return Promise.resolve({
+          traffic: [
+            { date: "2026-09-30", uniqueVisitors: 100, clones: 18 },
+            { date: "2026-10-04", uniqueVisitors: 20, clones: null },
+            { date: "2026-10-05", uniqueVisitors: 340, clones: 40 },
+          ],
+        });
+      }
+      if (path.includes("stats-history")) {
+        return Promise.resolve({
+          points: [
+            { date: "2026-09-27", stars: 10 },
+            { date: "2026-10-04", stars: 11 },
+            { date: "2026-10-11", stars: 17 },
+          ],
+        });
+      }
+      if (path.includes("search-visibility")) {
+        return Promise.resolve([
+          {
+            query: { name: "outbox" },
+            points: [
+              { date: "2026-10-04", position: 22 },
+              { date: "2026-10-08", position: 14 },
+            ],
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-12"
+        events={[
+          { ...growthEvent, eventAt: "2026-10-05T12:00:00Z", title: "README change" },
+          { ...growthEvent, id: 2, eventAt: "2026-10-05T15:00:00Z", title: "Merged pull request", source: "GITHUB" },
+        ]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "2 events" })).toBeInTheDocument();
+    expect(screen.getByText("README change")).toBeInTheDocument();
+    expect(screen.getByText("Merged pull request")).toBeInTheDocument();
+    expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
+    expect(screen.getByText("120")).toBeInTheDocument();
+    expect(screen.getByText("340")).toBeInTheDocument();
+    expect(screen.getByText("+220")).toBeInTheDocument();
+    expect(screen.getByText("+1")).toBeInTheDocument();
+    expect(screen.getByText("+6")).toBeInTheDocument();
+    expect(screen.getByText("+5")).toBeInTheDocument();
+    expect(screen.getByText("outbox 22 to 14")).toBeInTheDocument();
+    expect(screen.getByText("+8")).toBeInTheDocument();
+    expect(screen.queryByText(/of 7 days/)).not.toBeInTheDocument();
+  });
+
+  it("labels a short after window and missing queries", async () => {
+    api.mockResolvedValue([]);
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-08"
+        events={[{ ...growthEvent, eventAt: "2026-10-05T12:00:00Z", title: "README change" }]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("3 of 7 days")).toBeInTheDocument();
+    expect(screen.getByText("No queries")).toBeInTheDocument();
+    cleanup();
+
+    api.mockResolvedValue({});
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-12"
+        events={[]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "0 events" })).toBeInTheDocument();
+    cleanup();
+
+    api.mockResolvedValue({});
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-12"
+        events={[growthEvent]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("No queries")).toBeInTheDocument();
+    cleanup();
+
+    api.mockResolvedValue([{ enabled: true }]);
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-12"
+        events={[{ ...growthEvent, id: 9, title: "Skipped query shape" }]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("No queries")).toBeInTheDocument();
+    cleanup();
+
+    api.mockImplementation((url: string) => {
+      if (String(url).includes("search-visibility")) {
+        return Promise.resolve([{ query: { name: "outbox" } }, { query: { name: "outbox" }, points: [{ date: "2026-01-01", position: 3 }] }]);
+      }
+      return Promise.resolve({ traffic: [], points: [] });
+    });
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-12"
+        events={[{ ...growthEvent, title: "No rank move" }]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
+    expect(screen.queryByText("outbox 3 to 3")).not.toBeInTheDocument();
+    expect(screen.queryByText("No queries")).not.toBeInTheDocument();
+  });
+
+  it("still shows the comparison when the series cannot be loaded", async () => {
+    api.mockRejectedValue(new Error("down"));
+    render(
+      <EventDetailsDialog
+        repositoryId={13}
+        today="2026-10-12"
+        events={[{ ...growthEvent, eventAt: "2026-10-05T12:00:00Z" }]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    expect(await screen.findByText("No queries")).toBeInTheDocument();
+
+    const pending: { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }[] = [];
+    api.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          pending.push({ resolve, reject });
+        }),
+    );
+    const late = render(
+      <EventDetailsDialog
+        repositoryId={13}
+        events={[growthEvent]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    late.unmount();
+    pending.forEach((item) => item.resolve({}));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const again: typeof pending = [];
+    api.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          again.push({ resolve, reject });
+        }),
+    );
+    const failed = render(
+      <EventDetailsDialog
+        repositoryId={13}
+        events={[growthEvent]}
+        onClose={vi.fn()}
+        onEdit={vi.fn()}
+        onChanged={vi.fn()}
+      />,
+    );
+    failed.unmount();
+    again.forEach((item) => item.reject(new Error("down")));
+    await act(async () => {
+      await Promise.resolve();
+    });
   });
 });
 

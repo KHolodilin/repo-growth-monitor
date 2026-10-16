@@ -41,6 +41,27 @@ describe("rankChart", () => {
     });
     const plainTooltip = withoutMisses.tooltip.formatter as (params: { axisValue: string }[]) => string;
     expect(plainTooltip([{ axisValue: "2026-09-23" }])).toContain("#2");
+    const marked = rankHistoryOption({
+      dates: ["2026-09-23"],
+      events: [
+        {
+          id: 1,
+          repositoryId: 13,
+          eventAt: "2026-09-22T12:00:00Z",
+          category: "PROMOTION",
+          type: "LINKEDIN_POST",
+          title: "LinkedIn launch",
+          source: "MANUAL",
+        },
+      ],
+      series: [{ name: "outbox", limit: 50, points: [{ date: "2026-09-23", position: 2 }] }],
+    });
+    expect(marked.series).toHaveLength(4);
+    expect(marked.xAxis.data).toEqual(["2026-09-22", "2026-09-23"]);
+    const markedTooltip = marked.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    const hint = markedTooltip([{ axisValue: "2026-09-22" }]);
+    expect(hint).toContain("LinkedIn launch");
+    expect(hint).not.toContain("Before");
   });
 
   it("collects dates and recent misses", () => {

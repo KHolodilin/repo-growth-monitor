@@ -284,6 +284,7 @@ describe("remaining coverage edges", () => {
     const onEdit = vi.fn();
     render(
       <EventDetailsDialog
+        repositoryId={13}
         events={[{ ...growthEvent, description: "note", url: "https://example.com" }]}
         onClose={vi.fn()}
         onEdit={onEdit}
