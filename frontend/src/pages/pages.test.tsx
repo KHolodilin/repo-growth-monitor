@@ -205,6 +205,15 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Search Visibility" }));
+    const syntax = screen.getByRole("link", { name: "Search syntax tips" });
+    expect(syntax).toHaveAttribute(
+      "href",
+      "https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories",
+    );
+    expect(syntax).toHaveAttribute("target", "_blank");
+    expect(syntax).toHaveAttribute("rel", "noreferrer");
+    expect(syntax.parentElement).toHaveTextContent("Search Queries");
+    expect(syntax.parentElement?.querySelector("input")).toBeNull();
     expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByText(searchHistory.query.name));
     fireEvent.mouseLeave(screen.getByText(searchHistory.query.name));
