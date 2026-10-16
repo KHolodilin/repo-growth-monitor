@@ -79,7 +79,7 @@ describe("pages", () => {
     expect(screen.getByText("16")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Speed" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Growth/ }));
-    await user.click(screen.getByRole("button", { name: /Collect now/ }));
+    await user.click(screen.getByRole("button", { name: "Collect 1 repository" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
     await user.click(screen.getByRole("button", { name: "7d" }));
   });

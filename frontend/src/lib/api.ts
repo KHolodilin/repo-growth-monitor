@@ -98,7 +98,7 @@ export type Dashboard = {
     forks: number;
     growthPercent: number | null;
     collectionStatus: string | null;
-    jobs: { jobType: string; status: string }[];
+    jobs: { jobType: string; status: string; errorMessage?: string | null }[];
     archived: boolean;
     activityAt?: string | null;
     activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;

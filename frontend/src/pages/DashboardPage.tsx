@@ -119,7 +119,7 @@ export function DashboardPage() {
         <Card>
           <h2 className="font-medium">No traffic yet</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Use Collect now to fetch GitHub stats for the selected repositories. The chart fills in after the first successful collection.
+            Use the collect button in the header to fetch GitHub stats for the tracked repositories. The chart fills in after the first successful collection.
           </p>
         </Card>
       )}

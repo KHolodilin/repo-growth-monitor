@@ -12,7 +12,8 @@ import {
   type SearchHistory,
   type TopicHistory,
 } from "../lib/api";
-import { collectionBlocked, loadGitHubAccess, tokenBanner, type TokenState } from "../lib/githubAccess";
+import { JOB_LABELS } from "../lib/collectProgress";
+import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -65,14 +66,6 @@ function parseTab(tabParam: string | null): Tab {
   return "traffic";
 }
 
-const JOB_LABELS: Record<string, string> = {
-  TRAFFIC: "Traffic",
-  REFERRERS: "Referrers",
-  POPULAR_PATHS: "Popular Paths",
-  REPOSITORY_STATS: "Repository Stats",
-  GROWTH_EVENTS: "Growth Events",
-};
-
 export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -105,7 +98,6 @@ export function RepositoryDetailsPage() {
     };
   }, [repo?.accessible, repo?.trafficPermissionMissing]);
   const [loading, setLoading] = useState(true);
-  const [collecting, setCollecting] = useState(false);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
   const [runningAll, setRunningAll] = useState(false);
   const [focusHealth, setFocusHealth] = useState(false);
@@ -191,9 +183,6 @@ export function RepositoryDetailsPage() {
   });
 
   useEffect(() => {
-    if (!runActive) {
-      setCollecting(false);
-    }
     if (!searchActive && !topicsActive) {
       setRunningQueryId(null);
       setRunningAll(false);
@@ -206,26 +195,6 @@ export function RepositoryDetailsPage() {
     }, 2500);
     return () => window.clearInterval(timer);
   }, [runActive, searchActive, topicsActive, load]);
-
-  async function collect() {
-    if (!id || collecting || runActive) {
-      return;
-    }
-    const nextAccess = await loadGitHubAccess();
-    setTokenState(nextAccess.tokenState);
-    if (collectionBlocked(nextAccess)) {
-      setError(tokenBanner(nextAccess));
-      return;
-    }
-    setCollecting(true);
-    try {
-      await api(`/api/v1/repositories/${id}/collect`, { method: "POST" });
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-      setCollecting(false);
-    }
-  }
 
   async function createQuery() {
     if (!id) {
@@ -343,8 +312,6 @@ export function RepositoryDetailsPage() {
     );
   }
 
-  const busy = collecting || runActive;
-
   return (
     <div className="space-y-4">
       <header>
@@ -457,12 +424,7 @@ export function RepositoryDetailsPage() {
         )}
       </div>
       {tab === "overview" && (
-        <Overview
-          repo={repo}
-          lastCollection={traffic.lastCollection}
-          busy={busy}
-          onCollect={() => void collect()}
-        />
+        <Overview repo={repo} lastCollection={traffic.lastCollection} />
       )}
       {tab === "growth-events" && (
         <GrowthEventsTab repositoryId={repo.id} period={period} />
@@ -565,13 +527,9 @@ function ContributorsIcon() {
 function Overview({
   repo,
   lastCollection,
-  busy,
-  onCollect,
 }: {
   repo: Repository;
   lastCollection?: CollectionRun;
-  busy: boolean;
-  onCollect: () => void;
 }) {
   const about = repo.description?.trim();
   return (
@@ -615,7 +573,7 @@ function Overview({
         </dl>
       </Card>
       <div className="space-y-4">
-        <CollectionStatusCard run={lastCollection} busy={busy} onCollect={onCollect} />
+        <CollectionStatusCard run={lastCollection} />
         <TopicsCard topics={repo.topics ?? []} />
       </div>
       </div>
@@ -697,15 +655,7 @@ function HealthCheckList({ title, items }: { title: string; items: { label: stri
   );
 }
 
-function CollectionStatusCard({
-  run,
-  busy,
-  onCollect,
-}: {
-  run?: CollectionRun;
-  busy: boolean;
-  onCollect: () => void;
-}) {
+function CollectionStatusCard({ run }: { run?: CollectionRun }) {
   if (!run) {
     return (
       <Card>
@@ -714,31 +664,15 @@ function CollectionStatusCard({
         <p className="mt-2 text-sm text-muted-foreground">
           Run your first collection to fetch GitHub repository statistics.
         </p>
-        <Button className="mt-4" disabled={busy} onClick={onCollect}>
-          {busy ? "Collecting..." : "Collect now"}
-        </Button>
       </Card>
     );
   }
 
-  if (run.status === "FAILED") {
-    const failed = run.jobs.find((job) => job.status === "FAILED");
-    return (
-      <Card>
-        <h2 className="mb-4 font-medium">Collection Status</h2>
-        <h3 className="font-medium text-red-700">Collection failed</h3>
-        <p className="mt-2 text-sm text-muted-foreground">Last attempt: {formatSyncTime(run.completedAt ?? run.createdAt) ?? "—"}</p>
-        {failed?.errorMessage && <p className="mt-2 text-sm">{failed.errorMessage}</p>}
-        <Button className="mt-4" disabled={busy} onClick={onCollect}>
-          {busy ? "Collecting..." : "Retry"}
-        </Button>
-      </Card>
-    );
-  }
-
+  const failed = run.jobs.find((job) => job.status === "FAILED");
   return (
     <Card>
       <h2 className="mb-4 font-medium">Collection Status</h2>
+      {run.status === "FAILED" && <h3 className="mb-2 font-medium text-red-700">Collection failed</h3>}
       <div className="text-sm">
         {formatBusinessDate(run.businessDate)} · {run.status}
       </div>
@@ -748,6 +682,7 @@ function CollectionStatusCard({
       {(run.completedAt || run.createdAt) && (
         <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
       )}
+      {failed?.errorMessage && <p className="mt-2 text-sm">{failed.errorMessage}</p>}
       <div className="mt-4 space-y-2 text-sm">
         {run.jobs.map((job) => (
           <JobRow key={job.jobType} job={job} />

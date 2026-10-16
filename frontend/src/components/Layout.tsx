@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
+import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { cn, formatSyncTime } from "../lib/utils";
 import { DashboardIcon, LogoMark, RepositoriesIcon } from "./icons";
@@ -9,26 +10,34 @@ import { Button } from "./ui";
 export function Layout() {
   const location = useLocation();
   const dashboardActive = location.pathname === "/" || location.pathname === "/dashboard";
+  const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
+  const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
   const [collecting, setCollecting] = useState(false);
+  const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
   const syncLabel = formatSyncTime(sync) ?? "—";
+  const progress = headerProgress({ repositoryId, rows: rows ?? [], watching });
+  const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
 
-  async function refreshStatus() {
+  const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
     if (!dashboard?.repositories) {
-      return;
+      setRows([]);
+      return dashboard;
     }
     setSync(dashboard.lastSyncAt);
+    setRows(dashboard.repositories);
     return dashboard;
-  }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     refreshStatus().catch(() => {
       if (!cancelled) {
         setSync(null);
+        setRows([]);
       }
     });
     void loadGitHubAccess().then((next) => {
@@ -39,10 +48,28 @@ export function Layout() {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname]);
+  }, [location.pathname, refreshStatus]);
+
+  useEffect(() => {
+    if (!live) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      refreshStatus()
+        .then((dashboard) => {
+          const stillActive = (dashboard?.repositories ?? []).some((row) => collectionInProgress(row.collectionStatus));
+          if (!stillActive) {
+            setWatching(false);
+          }
+        })
+        .catch(() => undefined);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [live, refreshStatus]);
 
   async function collectNow() {
     setCollecting(true);
+    setWatching(true);
     setError(null);
     try {
       const onlyId = repositoryIdFromPath(location.pathname);
@@ -54,16 +81,24 @@ export function Layout() {
         await Promise.all(ids.map((id) => api(`/api/v1/repositories/${id}/collect`, { method: "POST" })));
         if (dashboard?.repositories) {
           setSync(dashboard.lastSyncAt);
+          setRows(dashboard.repositories);
         }
       }
       window.dispatchEvent(new Event("repos-collected"));
-      await refreshStatus();
+      const refreshed = await refreshStatus();
+      const stillActive = (refreshed?.repositories ?? []).some((row) => collectionInProgress(row.collectionStatus));
+      if (!stillActive) {
+        setWatching(false);
+      }
     } catch (err) {
+      setWatching(false);
       setError(err instanceof Error ? err.message : "Collect failed");
     } finally {
       setCollecting(false);
     }
   }
+
+  const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -77,8 +112,12 @@ export function Layout() {
             </span>
           </NavLink>
           <nav className="flex items-center gap-6 text-sm">
-            <Button className="py-1.5" disabled={collecting || collectionBlocked(access)} onClick={() => void collectNow()}>
-              {collecting ? "Collecting..." : "Collect now"}
+            <Button
+              className="py-1.5"
+              disabled={collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0)}
+              onClick={() => void collectNow()}
+            >
+              {label}
             </Button>
             <NavLink
               to="/"
@@ -98,6 +137,11 @@ export function Layout() {
           </nav>
         </div>
       </header>
+      {progress && (
+        <div className="border-b bg-card">
+          <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{progress}</p>
+        </div>
+      )}
       {tokenBanner(access) && (
         <div className="border-b bg-amber-50 text-amber-950">
           <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{tokenBanner(access)}</p>

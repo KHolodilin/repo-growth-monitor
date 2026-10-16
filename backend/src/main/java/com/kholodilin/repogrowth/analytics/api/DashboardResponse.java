@@ -92,6 +92,6 @@ public record DashboardResponse(
     ) {
     }
 
-    public record JobStatus(String jobType, String status) {
+    public record JobStatus(String jobType, String status, String errorMessage) {
     }
 }

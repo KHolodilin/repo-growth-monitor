@@ -164,8 +164,8 @@ describe("repository filters", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(TOKEN_MISSING)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Collect now" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Collect now" }));
+    expect(screen.getByRole("button", { name: "Collect 1 repository" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Collect 1 repository" }));
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
     missing.unmount();
 
@@ -378,7 +378,6 @@ describe("repository filters", () => {
   });
 
   it("stops repository collection when the token is rejected and shows an undated rate limit", async () => {
-    const user = userEvent.setup();
     api.mockImplementation(async (path: string) => {
       const url = String(path);
       if (url.includes("/system/status")) {
@@ -400,8 +399,8 @@ describe("repository filters", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
-    expect(await screen.findByText(TOKEN_REJECTED)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collect now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
     details.unmount();
 
