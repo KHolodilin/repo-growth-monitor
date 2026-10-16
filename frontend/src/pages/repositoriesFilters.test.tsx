@@ -478,4 +478,24 @@ describe("repository filters", () => {
     releaseStatus({ tokenState: "OK", rateLimitReset: null });
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
+
+  it("updates the row when the checkbox turns tracking off", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    api.mockImplementation(async (path: string) => {
+      if (String(path).includes("/system/status")) {
+        return { tokenState: "OK", rateLimitReset: null };
+      }
+      if (String(path).includes("/tracking")) {
+        return { ...tracked, trackingEnabled: false };
+      }
+      return [tracked, privateRepo];
+    });
+    renderRepos();
+    expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
+    const row = screen.getByText(tracked.fullName).closest("label");
+    await user.click(within(row as HTMLElement).getByRole("checkbox"));
+    expect(await screen.findByText("Tracking 1 of 2")).toBeInTheDocument();
+    confirm.mockRestore();
+  });
 });

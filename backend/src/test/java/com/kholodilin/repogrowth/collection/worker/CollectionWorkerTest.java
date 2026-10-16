@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.collection.worker;
 
 import com.kholodilin.repogrowth.collection.collector.Collector;
+import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.collection.collector.CollectorRegistry;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -91,6 +92,11 @@ class CollectionWorkerTest {
         worker.poll("worker");
         verify(jobs).markRetry(eq(1L), any(), eq("INTERNAL_ERROR"), eq("boom"));
 
+        doThrow(new GitHubException(ErrorCode.VALIDATION_ERROR, 403, false, null, "nope")).when(collector).collect(any());
+        worker.poll("worker");
+        verify(jobs).markFailed(1L, "VALIDATION_ERROR", "nope");
+        verify(repositories, org.mockito.Mockito.times(1)).setTrafficPermissionMissing(13L, true);
+
         org.mockito.Mockito.doNothing().when(collector).collect(any());
         worker.poll("worker");
         verify(repositories).setTrafficPermissionMissing(13L, false);
@@ -117,6 +123,10 @@ class CollectionWorkerTest {
         )));
         other.poll("worker");
         verify(repositories, org.mockito.Mockito.times(1)).setTrafficPermissionMissing(13L, false);
+
+        doThrow(new IllegalStateException("other")).when(referrers).collect(any());
+        other.poll("worker");
+        verify(jobs).markRetry(eq(2L), any(), eq("INTERNAL_ERROR"), eq("other"));
         verify(runs, org.mockito.Mockito.atLeastOnce()).refreshAggregates(1L);
     }
 
