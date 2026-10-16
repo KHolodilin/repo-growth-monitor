@@ -484,11 +484,11 @@ public class AnalyticsService {
         );
     }
 
-    private static boolean accessible(RepositorySignals signals) {
+    static boolean accessible(RepositorySignals signals) {
         return signals == null || signals.accessible();
     }
 
-    private static boolean trafficMissing(RepositorySignals signals) {
+    static boolean trafficMissing(RepositorySignals signals) {
         return signals != null && signals.trafficPermissionMissing();
     }
 

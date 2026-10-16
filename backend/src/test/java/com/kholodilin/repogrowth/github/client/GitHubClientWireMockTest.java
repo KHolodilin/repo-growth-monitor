@@ -184,6 +184,37 @@ class GitHubClientWireMockTest {
     }
 
     @Test
+    void probeFailureIsRemembered() {
+        wireMock.stubFor(get(urlPathEqualTo("/user"))
+                .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
+        assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
+        assertThat(client.tokenRejected()).isTrue();
+    }
+
+    @Test
+    void rateLimitMessageWithoutARemainingHeader() {
+        wireMock.stubFor(get("/repos/acme/a/traffic/views")
+                .willReturn(aResponse()
+                        .withStatus(403)
+                        .withHeader("X-RateLimit-Remaining", "10")
+                        .withHeader("X-RateLimit-Reset", "2000000000")
+                        .withBody("{\"message\":\"secondary rate limit\"}")));
+        assertThatThrownBy(() -> client.getViews("acme", "a")).isInstanceOf(GitHubException.class);
+        assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
+    }
+
+    @Test
+    void expiredTooManyRequestsReturnsToOk() {
+        wireMock.stubFor(get("/repos/acme/a")
+                .willReturn(aResponse()
+                        .withStatus(429)
+                        .withHeader("X-RateLimit-Reset", "1")
+                        .withBody("{\"message\":\"slow\"}")));
+        assertThatThrownBy(() -> client.getRepository("acme", "a")).isInstanceOf(GitHubException.class);
+        assertThat(client.tokenStatus().state()).isEqualTo("OK");
+    }
+
+    @Test
     void notFound() {
         wireMock.stubFor(get("/repos/acme/missing").willReturn(aResponse().withStatus(404).withBody("{}")));
         assertThatThrownBy(() -> client.getRepository("acme", "missing")).isInstanceOf(GitHubException.class);

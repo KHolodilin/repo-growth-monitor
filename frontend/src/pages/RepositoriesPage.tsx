@@ -36,10 +36,6 @@ export function RepositoriesPage() {
         setAccess(nextAccess);
       }
       if (refresh) {
-        if (collectionBlocked(nextAccess)) {
-          setRepos(await api<Repository[]>("/api/v1/repositories?refresh=false"));
-          return;
-        }
         setRepos(await api<Repository[]>("/api/v1/repositories?refresh=true"));
         return;
       }
@@ -78,9 +74,6 @@ export function RepositoriesPage() {
   const showEnable = !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
 
   async function toggle(repo: Repository) {
-    if (repo.accessible === false && !repo.trackingEnabled) {
-      return;
-    }
     try {
       const updated = await api<Repository>(`/api/v1/repositories/${repo.id}/tracking`, {
         method: "POST",
@@ -94,9 +87,6 @@ export function RepositoriesPage() {
 
   async function applyShown(enabled: boolean) {
     const targets = enabled ? enableTargets : disableTargets;
-    if (targets.length === 0) {
-      return;
-    }
     if (!enabled && !window.confirm("Turn tracking off for the shown repositories? Collection stops. Stored data stays.")) {
       return;
     }

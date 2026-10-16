@@ -42,9 +42,6 @@ export function Layout() {
   }, [location.pathname]);
 
   async function collectNow() {
-    if (collectionBlocked(access)) {
-      return;
-    }
     setCollecting(true);
     setError(null);
     try {

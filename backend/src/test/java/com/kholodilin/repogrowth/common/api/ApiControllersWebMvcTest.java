@@ -28,6 +28,7 @@ import com.kholodilin.repogrowth.repository.api.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
+import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.search.api.SearchQueryController;
@@ -53,6 +54,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -307,5 +309,35 @@ class ApiControllersWebMvcTest {
                 .andExpect(status().isBadRequest());
         doThrow(new IllegalStateException("boom")).when(repositoryService).get(13L);
         mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isInternalServerError());
+    }
+
+    @Test
+    void statusAndCollectFollowTheTokenAndRepositorySignals() throws Exception {
+        when(gitHubClient.tokenStatus()).thenReturn(null);
+        when(gitHubProperties.tokenConfigured()).thenReturn(false);
+        mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenState").value("MISSING"));
+
+        when(gitHubProperties.tokenConfigured()).thenReturn(true);
+        when(gitHubClient.tokenStatus()).thenReturn(
+                new GitHubClient.TokenStatus("RATE_LIMITED", Instant.parse("2033-05-18T03:33:20Z")));
+        mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenState").value("RATE_LIMITED"))
+                .andExpect(jsonPath("$.rateLimitReset").exists());
+
+        when(gitHubProperties.tokenConfigured()).thenReturn(false);
+        mockMvc.perform(post("/api/v1/repositories/13/collect")).andExpect(status().isUnauthorized());
+        when(gitHubProperties.tokenConfigured()).thenReturn(true);
+        when(gitHubClient.tokenRejected()).thenReturn(true);
+        mockMvc.perform(post("/api/v1/repositories/13/collect")).andExpect(status().isUnauthorized());
+
+        when(repositoryService.signalsFor(any())).thenReturn(Map.of(13L, new RepositorySignals(false, true)));
+        mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessible").value(false))
+                .andExpect(jsonPath("$.trafficPermissionMissing").value(true));
+        when(repositoryService.signalsFor(any())).thenReturn(Map.of(13L, new RepositorySignals(true, false)));
+        mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessible").value(true))
+                .andExpect(jsonPath("$.trafficPermissionMissing").value(false));
     }
 }
