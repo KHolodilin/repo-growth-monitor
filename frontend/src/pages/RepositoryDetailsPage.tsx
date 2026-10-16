@@ -16,7 +16,6 @@ import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, forma
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
-import { RepoSwitcher } from "../components/RepoSwitcher";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -306,7 +305,6 @@ export function RepositoryDetailsPage() {
     return (
       <div className="space-y-4">
         <div className="space-y-3">
-          <Skeleton className="h-4 w-48" />
           <Skeleton className="h-4 w-72" />
           <div className="flex items-center justify-between gap-4 border-b pb-3">
             <Skeleton className="h-4 w-64" />
@@ -325,27 +323,26 @@ export function RepositoryDetailsPage() {
 
   return (
     <div className="space-y-4">
-      <header className="space-y-0">
+      <header>
         <PageBreadcrumb
           items={[
             { label: "Portfolio", to: "/dashboard" },
+            {
+              label: repo.fullName,
+              repoSwitcher: {
+                currentId: repo.id,
+                description: repo.description,
+                hrefFor: (repositoryId) =>
+                  tab === "traffic"
+                    ? `/repositories/${repositoryId}`
+                    : tab === "topics" && scope === "language"
+                      ? `/repositories/${repositoryId}?tab=topics&scope=language`
+                      : `/repositories/${repositoryId}?tab=${tab}`,
+              },
+            },
             { label: TAB_LABEL[tab] },
           ]}
         />
-        <div className="mt-2 text-sm">
-          <RepoSwitcher
-            currentId={repo.id}
-            currentLabel={repo.fullName}
-            description={repo.description}
-            hrefFor={(repositoryId) =>
-              tab === "traffic"
-                ? `/repositories/${repositoryId}`
-                : tab === "topics" && scope === "language"
-                  ? `/repositories/${repositoryId}?tab=topics&scope=language`
-                  : `/repositories/${repositoryId}?tab=${tab}`
-            }
-          />
-        </div>
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <StarIcon />
