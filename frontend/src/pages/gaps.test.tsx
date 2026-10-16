@@ -62,7 +62,7 @@ describe("coverage gaps", () => {
     expect(await screen.findByText("No traffic yet")).toBeInTheDocument();
     expect(screen.getByText("Last sync: —")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "all" }));
-    await user.click(await screen.findByRole("button", { name: /Collect now/ }));
+    await user.click(await screen.findByRole("button", { name: "Collect 2 repositories" }));
     expect(await screen.findByText("busy")).toBeInTheDocument();
   });
 
@@ -257,13 +257,14 @@ describe("coverage gaps", () => {
     await user.click(screen.getByRole("button", { name: "1d" }));
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collect now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     const loadsBefore = api.mock.calls.filter((call) => String(call[0]).endsWith("/repositories/13")).length;
     window.dispatchEvent(new Event("repos-collected"));
     await waitFor(() => {
       const loadsAfter = api.mock.calls.filter((call) => String(call[0]).endsWith("/repositories/13")).length;
       expect(loadsAfter).toBeGreaterThan(loadsBefore);
     });
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText(/No topics yet/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Java" }));

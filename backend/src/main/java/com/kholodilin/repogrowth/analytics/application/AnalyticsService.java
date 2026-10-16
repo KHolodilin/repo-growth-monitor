@@ -368,7 +368,7 @@ public class AnalyticsService {
                     List<JobStatus> jobs = run == null
                             ? List.of()
                             : jobsByRun.getOrDefault(run.id(), List.of()).stream()
-                                    .map(job -> new JobStatus(job.jobType().name(), job.status().name()))
+                                    .map(AnalyticsService::jobStatus)
                                     .toList();
                     Instant activityAt = repository.activityAt();
                     return new RepositoryRow(
@@ -460,7 +460,7 @@ public class AnalyticsService {
         List<JobStatus> jobs = run == null
                 ? List.of()
                 : jobsByRun.getOrDefault(run.id(), List.of()).stream()
-                        .map(job -> new JobStatus(job.jobType().name(), job.status().name()))
+                        .map(AnalyticsService::jobStatus)
                         .toList();
         Instant activityAt = row.lastCommitAt() != null ? row.lastCommitAt() : row.githubPushedAt();
         ActivityStatus activityStatus = activityClassifier.classify(row.archived(), activityAt);
@@ -611,6 +611,10 @@ public class AnalyticsService {
                 ? "1 repository has partial collection"
                 : partialCount + " repositories have partial collection";
         return new CollectionWarning(partialCount, message);
+    }
+
+    static JobStatus jobStatus(CollectionJob job) {
+        return new JobStatus(job.jobType().name(), job.status().name(), job.errorMessage());
     }
 
     private static ActiveCollection activeCollection(List<CollectionRun> latestRuns) {

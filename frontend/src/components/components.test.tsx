@@ -71,7 +71,7 @@ describe("components", () => {
     expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
     expect(screen.getByText(/About data/)).toBeInTheDocument();
     expect(screen.queryByText(/Last updated/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
+    await user.click(screen.getByRole("button", { name: "Collect 1 repository" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
     );
@@ -83,14 +83,15 @@ describe("components", () => {
     const waiters: Array<(value: unknown) => void> = [];
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        return {};
+        return new Promise((resolve) => {
+          if (!hold) {
+            resolve({});
+            return;
+          }
+          waiters.push(resolve);
+        });
       }
-      if (!hold) {
-        return dashboardReady;
-      }
-      return new Promise((resolve) => {
-        waiters.push(resolve);
-      });
+      return dashboardReady;
     });
     const pending = render(
       <MemoryRouter>
@@ -101,11 +102,12 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
-    expect(screen.getByRole("button", { name: "Collecting..." })).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Collect 1 repository" }));
+    expect(screen.getByRole("button", { name: "Collect 1 repository" })).toBeDisabled();
+    expect(screen.getByText("Collected 0 of 1")).toBeInTheDocument();
     hold = false;
-    waiters.forEach((resolve) => resolve(dashboardReady));
-    expect(await screen.findByRole("button", { name: "Collect now" })).toBeInTheDocument();
+    waiters.forEach((resolve) => resolve({}));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Collect 1 repository" })).toBeEnabled());
     pending.unmount();
 
     api.mockImplementation((path: string) => {
@@ -123,7 +125,7 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    await user.click(await screen.findByRole("button", { name: "Collect 1 repository" }));
     expect(await screen.findByText("busy")).toBeInTheDocument();
     failed.unmount();
 
@@ -142,7 +144,7 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    expect(await screen.findByRole("button", { name: "Select repositories first" })).toBeDisabled();
     expect(screen.getByText("Last sync: —")).toBeInTheDocument();
     empty.unmount();
 
@@ -161,15 +163,15 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    await user.click(await screen.findByRole("button", { name: "Collect 1 repository" }));
     expect(await screen.findByText("Collect failed")).toBeInTheDocument();
     plain.unmount();
 
-    let rejectStatus: (reason: Error) => void = () => undefined;
+    const rejectors: Array<(reason: Error) => void> = [];
     api.mockImplementation(
       () =>
         new Promise((_, reject) => {
-          rejectStatus = reject;
+          rejectors.push(reject);
         }),
     );
     const hanging = render(
@@ -179,7 +181,7 @@ describe("components", () => {
     );
     hanging.unmount();
     await act(async () => {
-      rejectStatus(new Error("late"));
+      rejectors.forEach((reject) => reject(new Error("late")));
     });
 
     api.mockRejectedValue(new Error("down"));
@@ -215,7 +217,7 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    await user.click(await screen.findByRole("button", { name: "Collect this repository" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
     );
@@ -238,11 +240,121 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect now" }));
+    await user.click(await screen.findByRole("button", { name: "Collect 2 repositories" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" }),
     );
     expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" });
+  });
+
+  it("shows job progress under the header until the run finishes", async () => {
+    const user = userEvent.setup();
+    const timers: Array<() => void> = [];
+    const spy = vi.spyOn(window, "setInterval").mockImplementation((handler) => {
+      timers.push(() => {
+        void (handler as () => void)();
+      });
+      return 1 as unknown as ReturnType<typeof setInterval>;
+    });
+    const clear = vi.spyOn(window, "clearInterval").mockImplementation(() => undefined);
+    let phase: "running" | "done" = "running";
+    let failPoll = false;
+    let bare = false;
+    api.mockImplementation((path: string) => {
+      if (failPoll) {
+        return Promise.reject(new Error("poll failed"));
+      }
+      if (bare || String(path).includes("/collect")) {
+        return bare ? { lastSyncAt: null } : {};
+      }
+      const running = phase === "running";
+      return {
+        ...dashboardReady,
+        repositories: [
+          {
+            ...dashboardReady.repositories[0],
+            collectionStatus: running ? "RUNNING" : "SUCCESS",
+            jobs: running
+              ? [
+                  { jobType: "TRAFFIC", status: "SUCCESS" },
+                  { jobType: "REFERRERS", status: "FAILED", errorMessage: "rate limit" },
+                ]
+              : [{ jobType: "TRAFFIC", status: "SUCCESS" }],
+          },
+          { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", collectionStatus: "SUCCESS", jobs: [] },
+        ],
+      };
+    });
+    const view = render(
+      <MemoryRouter initialEntries={["/repositories/13"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/repositories/:id" element={<p>repo</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText(
+        "Collecting KHolodilin/spring-transactional-outbox-kafka: Traffic done, Referrers failed: rate limit",
+      ),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Collect this repository" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
+    expect(timers.length).toBeGreaterThan(0);
+    const fireTimers = async () => {
+      await act(async () => {
+        timers.forEach((run) => run());
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    };
+    failPoll = true;
+    await fireTimers();
+    failPoll = false;
+    await fireTimers();
+    expect(screen.getByText(/Referrers failed: rate limit/)).toBeInTheDocument();
+    bare = true;
+    await fireTimers();
+    bare = false;
+    phase = "done";
+    await fireTimers();
+    await waitFor(() => expect(screen.queryByText(/Collecting KHolodilin/)).not.toBeInTheDocument());
+    view.unmount();
+    expect(clear).toHaveBeenCalled();
+    spy.mockRestore();
+    clear.mockRestore();
+  });
+
+  it("does not collect when no repository is tracked", async () => {
+    const user = userEvent.setup();
+    let release: (value: unknown) => void = () => undefined;
+    let calls = 0;
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return {};
+      }
+      calls += 1;
+      if (calls === 1) {
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      return { lastSyncAt: null };
+    });
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<p>home</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Collect repositories" }));
+    await waitFor(() => expect(calls).toBeGreaterThan(1));
+    expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
+    release({ lastSyncAt: "2026-09-23T06:00:00Z", repositories: [] });
+    expect(await screen.findByRole("button", { name: "Select repositories first" })).toBeDisabled();
   });
 
   it("maps referrer icons and colors", () => {

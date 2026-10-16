@@ -244,8 +244,8 @@ describe("extra coverage", () => {
     });
     const collectView = renderAt("/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect now" }));
-    expect(await screen.findByText("collect failed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Collect now" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     collectView.unmount();
 
     api.mockImplementation(async (path: string) => {
