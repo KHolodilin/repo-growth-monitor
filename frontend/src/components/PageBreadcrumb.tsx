@@ -7,6 +7,7 @@ export type BreadcrumbItem = {
   repoSwitcher?: {
     currentId: number;
     hrefFor: (repositoryId: number) => string;
+    description?: string;
   };
 };
 
@@ -25,6 +26,7 @@ export function PageBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
               currentId={item.repoSwitcher.currentId}
               currentLabel={item.label}
               hrefFor={item.repoSwitcher.hrefFor}
+              description={item.repoSwitcher.description}
             />
           ) : item.to ? (
             <Link className="font-medium text-muted-foreground hover:text-foreground" to={item.to}>

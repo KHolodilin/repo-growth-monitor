@@ -162,6 +162,10 @@ describe("pages", () => {
       "https://github.com/KHolodilin/spring-transactional-outbox-kafka/graphs/traffic",
     );
     expect(screen.getByRole("link", { name: "GitHub Traffic" }).parentElement).toHaveClass("ml-auto");
+    const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(crumb).toHaveTextContent("Portfolio");
+    expect(crumb).toHaveTextContent(repository.fullName);
+    expect(crumb).toHaveTextContent("Traffic");
     expect(screen.getByRole("tooltip", { hidden: true, name: repository.description })).toHaveClass(
       "delay-300",
       "w-72",
