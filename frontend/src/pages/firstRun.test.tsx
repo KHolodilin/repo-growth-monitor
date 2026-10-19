@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dashboardReady } from "../test/fixtures";
@@ -108,6 +108,41 @@ describe("first-run portfolio", () => {
     expect(screen.getByText("rate limit")).toBeInTheDocument();
     expect(screen.getByText("Auto-collect runs every day from 10:00 to 18:00 UTC.")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Traffic" })).not.toBeInTheDocument();
+  });
+
+  it("ignores a status result that arrives after leaving the page", async () => {
+    const empty = { ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] };
+    let resolveStatus: (value: unknown) => void = () => undefined;
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/system/status")) {
+        return new Promise((resolve) => {
+          resolveStatus = resolve;
+        });
+      }
+      return Promise.resolve(empty);
+    });
+    const accepted = renderDashboard();
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/system/status"));
+    accepted.unmount();
+    await act(async () => {
+      resolveStatus(status("OK", true));
+    });
+
+    let rejectStatus: (error: Error) => void = () => undefined;
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/system/status")) {
+        return new Promise((_resolve, reject) => {
+          rejectStatus = reject;
+        });
+      }
+      return Promise.resolve(empty);
+    });
+    const failed = renderDashboard();
+    await waitFor(() => expect(api.mock.calls.filter((call) => String(call[0]).includes("/system/status")).length).toBeGreaterThan(1));
+    failed.unmount();
+    await act(async () => {
+      rejectStatus(new Error("offline"));
+    });
   });
 
   it("explains a closed auto-collect window under the portfolio header", async () => {
