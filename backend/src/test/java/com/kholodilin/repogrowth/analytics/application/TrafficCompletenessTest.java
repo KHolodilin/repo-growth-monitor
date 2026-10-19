@@ -116,6 +116,36 @@ class TrafficCompletenessTest {
         assertThat(notice.date()).isEqualTo(YESTERDAY);
     }
 
+    @Test
+    void aJobThatHasNotFinishedStaysInProgress() {
+        CollectionJob waiting = job(CollectionJobStatus.READY, null, null, null);
+        assertThat(TrafficCompleteness.jobState(waiting)).isEqualTo(TrafficJobState.IN_PROGRESS);
+        CollectionJob noted = job(CollectionJobStatus.READY, Instant.parse("2026-10-19T12:00:00Z"), null, "still running");
+        assertThat(TrafficCompleteness.jobState(noted)).isEqualTo(TrafficJobState.IN_PROGRESS);
+        CollectionJob blankErrors = job(CollectionJobStatus.READY, Instant.parse("2026-10-19T12:00:00Z"), " ", "");
+        assertThat(TrafficCompleteness.jobState(blankErrors)).isEqualTo(TrafficJobState.SUCCEEDED);
+        assertThat(TrafficCompleteness.status(TODAY, false, false, TrafficJobState.IN_PROGRESS)).isNull();
+    }
+
+    @Test
+    void aFuturePeriodAndARepositoryWithNoStoredTrafficStayQuietOrNameTheGap() {
+        Notice future = TrafficCompleteness.portfolio(
+                TODAY, true, TODAY.plusDays(1), TODAY.plusDays(7),
+                Set.of(),
+                null,
+                TrafficJobState.SUCCEEDED
+        );
+        assertThat(future).isNull();
+
+        Notice neverStored = TrafficCompleteness.portfolio(
+                TODAY, true, TODAY.minusDays(1), TODAY,
+                Set.of(),
+                null,
+                TrafficJobState.SUCCEEDED
+        );
+        assertThat(neverStored).isEqualTo(new Notice(Reason.GITHUB_DATA_MISSING, YESTERDAY, null));
+    }
+
     private static CollectionJob job(CollectionJobStatus status, Instant completedAt, String errorCode, String errorMessage) {
         return new CollectionJob(
                 1L, 2L, 3L, CollectionJobType.TRAFFIC, TODAY,

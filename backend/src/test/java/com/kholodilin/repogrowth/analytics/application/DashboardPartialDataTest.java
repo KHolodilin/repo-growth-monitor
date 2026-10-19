@@ -6,6 +6,7 @@ import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.Repos
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,6 +44,35 @@ class DashboardPartialDataTest {
         assertThat(traffic.get(2).views()).isEqualTo(8);
         assertThat(traffic.get(2).missingRepositories()).isEqualTo(2);
         assertThat(traffic).noneMatch(point -> point.date().equals(today));
+    }
+
+    @Test
+    void daysOutsideThePublishedRangeAreLeftOutAndTheMissingCountCannotGoBelowZero() {
+        LocalDate today = LocalDate.of(2026, 10, 19);
+        LocalDate from = LocalDate.of(2026, 10, 13);
+        LocalDate to = LocalDate.of(2026, 10, 17);
+        LocalDate inside = LocalDate.of(2026, 10, 15);
+        LocalDate middle = LocalDate.of(2026, 10, 16);
+        LocalDate later = LocalDate.of(2026, 10, 17);
+        LocalDate before = LocalDate.of(2026, 10, 12);
+        LocalDate after = LocalDate.of(2026, 10, 18);
+        LocalDate empty = LocalDate.of(2026, 10, 14);
+        Map<LocalDate, List<RepositoryDayTotals>> byDate = new LinkedHashMap<>();
+        byDate.put(middle, List.of(new RepositoryDayTotals(middle, "owner/a", 3, 1, 1)));
+        byDate.put(inside, List.of(
+                new RepositoryDayTotals(inside, "owner/a", 2, 1, 0),
+                new RepositoryDayTotals(inside, "owner/b", 1, 1, 0)
+        ));
+        byDate.put(later, List.of(new RepositoryDayTotals(later, "owner/a", 4, 1, 1)));
+        byDate.put(before, List.of(new RepositoryDayTotals(before, "owner/a", 9, 1, 1)));
+        byDate.put(after, List.of(new RepositoryDayTotals(after, "owner/a", 9, 1, 1)));
+        byDate.put(empty, List.of());
+
+        List<TrafficPoint> traffic = AnalyticsService.portfolioSeries(from, to, today, 1, byDate);
+
+        assertThat(traffic).extracting(TrafficPoint::date).containsExactly(inside, middle, later);
+        assertThat(traffic.get(0).missingRepositories()).isZero();
+        assertThat(traffic.get(0).views()).isEqualTo(3);
     }
 
     @Test

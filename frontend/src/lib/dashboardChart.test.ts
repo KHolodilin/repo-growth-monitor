@@ -71,6 +71,8 @@ describe("dashboardTrafficOption", () => {
     expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
     expect(formatter({ seriesName: "Views", data: 1 })).toBe("");
     expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: undefined as unknown as null }])).toContain("Views - —");
+    expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: { value: 40 } }])).toContain("Views - 40");
+    expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: {} }])).toContain("Views - —");
 
     const zeroShare = dashboardTrafficOption([
       { date: "2026-10-08", views: 40, visitors: 1, clones: 1, viewsLeaders: [{ fullName: "owner/outbox", value: 0 }] },

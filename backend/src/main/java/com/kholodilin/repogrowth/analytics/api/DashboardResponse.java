@@ -71,18 +71,6 @@ public record DashboardResponse(
         public TrafficPoint(LocalDate date, Long views, Long visitors, Long clones) {
             this(date, views, visitors, clones, List.of(), List.of(), List.of(), 0);
         }
-
-        public TrafficPoint(
-                LocalDate date,
-                Long views,
-                Long visitors,
-                Long clones,
-                List<TrafficLeader> viewsLeaders,
-                List<TrafficLeader> visitorsLeaders,
-                List<TrafficLeader> clonesLeaders
-        ) {
-            this(date, views, visitors, clones, viewsLeaders, visitorsLeaders, clonesLeaders, 0);
-        }
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)

@@ -64,11 +64,12 @@ function mergedColumns(series: Series[]) {
     if (!isExportedSeries(item)) {
       continue;
     }
-    if (!data.has(item.name)) {
+    let column = data.get(item.name);
+    if (!column) {
+      column = [];
       order.push(item.name);
-      data.set(item.name, []);
+      data.set(item.name, column);
     }
-    const column = data.get(item.name) ?? [];
     const values = item.data ?? [];
     for (let index = 0; index < values.length; index += 1) {
       if (cellText(column[index]) === "" && cellText(values[index]) !== "") {
