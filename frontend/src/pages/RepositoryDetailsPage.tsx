@@ -411,7 +411,7 @@ export function RepositoryDetailsPage() {
               type="button"
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium",
-                tab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setTab(key)}
             >
@@ -823,7 +823,7 @@ function TrafficPanel({
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  filter === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  filter === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setFilter(key)}
               >
@@ -937,7 +937,7 @@ function TopicsPanel({
                     type="button"
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm font-medium",
-                      scope === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => onScope(key)}
                   >

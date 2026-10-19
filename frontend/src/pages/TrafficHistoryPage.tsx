@@ -111,7 +111,7 @@ export function TrafficHistoryPage() {
               type="button"
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium",
-                kind === option ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                kind === option ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setSearchParams({ kind: option, days: String(days) }, { replace: true })}
             >
@@ -132,7 +132,7 @@ export function TrafficHistoryPage() {
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  days === option ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  days === option ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => setSearchParams({ kind, days: String(option) }, { replace: true })}
               >

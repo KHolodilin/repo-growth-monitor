@@ -164,7 +164,7 @@ export function TopicDetailsPage() {
               key={key}
               type="button"
               className={`rounded-md px-3 py-1.5 text-sm font-medium ${
-                scope === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => setScope(key)}
             >

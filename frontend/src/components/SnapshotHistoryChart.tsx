@@ -151,7 +151,7 @@ function MetricButton({
       type="button"
       className={cn(
         "rounded-md px-3 py-1.5 text-sm font-medium",
-        active ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+        active ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
       )}
       onClick={onClick}
     >

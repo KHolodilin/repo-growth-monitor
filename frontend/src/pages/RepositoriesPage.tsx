@@ -144,7 +144,7 @@ export function RepositoriesPage() {
             </p>
             <input
               aria-label="Search repositories"
-              className="w-full max-w-xs rounded-md border bg-background px-3 py-1.5 text-sm outline-none focus:border-primary"
+              className="w-full max-w-xs rounded-md border bg-background px-3 py-1.5 text-sm outline-hidden focus:border-primary"
               placeholder="owner/name"
               value={search}
               onChange={(event) => {
@@ -256,7 +256,7 @@ function FilterButton({ active, onClick, children }: { active: boolean; onClick:
   return (
     <button
       type="button"
-      className={active ? "rounded-md bg-card px-3 py-1.5 text-sm font-medium shadow-sm" : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"}
+      className={active ? "rounded-md bg-card px-3 py-1.5 text-sm font-medium shadow-xs" : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"}
       aria-pressed={active}
       onClick={onClick}
     >

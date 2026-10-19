@@ -170,7 +170,7 @@ export function QueryDetailsPage() {
                     type="button"
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm font-medium",
-                      metric === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      metric === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                     )}
                     aria-pressed={metric === key}
                     onClick={() => setMetric(key)}
@@ -189,7 +189,7 @@ export function QueryDetailsPage() {
                     type="button"
                     className={cn(
                       "rounded-md px-3 py-1.5 text-sm font-medium",
-                      axis === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                      axis === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                     )}
                     aria-pressed={axis === key}
                     onClick={() => setAxis(key)}

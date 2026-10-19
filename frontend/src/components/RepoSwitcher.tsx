@@ -156,7 +156,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={onSearchKeyDown}
               placeholder="Search repositories"
-              className="w-full rounded-md border bg-background py-1.5 pl-8 pr-3 text-sm outline-none focus:border-primary"
+              className="w-full rounded-md border bg-background py-1.5 pl-8 pr-3 text-sm outline-hidden focus:border-primary"
             />
           </div>
           <div className="max-h-72 overflow-y-auto py-1" role="listbox">
