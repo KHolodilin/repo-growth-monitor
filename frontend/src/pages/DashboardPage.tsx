@@ -6,12 +6,7 @@ import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumb
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
 import { loadGitHubAccess, parseGitHubAccess, type GitHubAccess, type TokenState } from "../lib/githubAccess";
-import {
-  checklistSchedule,
-  collectionJobLines,
-  DEFAULT_PLANNER,
-  headerSchedule,
-} from "../lib/setupChecklist";
+import { checklistSchedule, collectionJobLines, DEFAULT_PLANNER } from "../lib/setupChecklist";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -94,11 +89,9 @@ export function DashboardPage() {
     return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
   }
 
-  const schedule = access?.planner ? headerSchedule(access.planner) : null;
-
   return (
     <div className="space-y-4">
-      <DashboardHeader data={data} period={period} onPeriod={setPeriod} schedule={schedule} />
+      <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <KpiCard label="Repositories" value={data.summary.repositories} />
         <TrafficKpiCard
@@ -135,19 +128,14 @@ function DashboardHeader({
   data,
   period,
   onPeriod,
-  schedule,
 }: {
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
-  schedule?: string | null;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Portfolio</h1>
-        {schedule && <p className="mt-1 max-w-xl text-sm text-muted-foreground">{schedule}</p>}
-      </div>
+      <h1 className="text-2xl font-semibold">Portfolio</h1>
       <div className="flex flex-col items-end gap-3">
         {(data?.collectionWarning || data?.partialData?.present) && (
           <div className="text-right text-sm text-muted-foreground">

@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Layout } from "../components/Layout";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dashboardReady } from "../test/fixtures";
 import { TRAFFIC_PERMISSION } from "../lib/githubAccess";
@@ -106,7 +107,7 @@ describe("first-run portfolio", () => {
     expect(await screen.findByRole("heading", { name: "Collecting" })).toBeInTheDocument();
     expect(screen.getByText(TRAFFIC_PERMISSION)).toBeInTheDocument();
     expect(screen.getByText("rate limit")).toBeInTheDocument();
-    expect(screen.getByText("Auto-collect runs every day from 10:00 to 18:00 UTC.")).toBeInTheDocument();
+    expect(screen.queryByText(/Auto-collect runs every day/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Traffic" })).not.toBeInTheDocument();
   });
 
@@ -145,15 +146,25 @@ describe("first-run portfolio", () => {
     });
   });
 
-  it("explains a closed auto-collect window under the portfolio header", async () => {
+  it("explains the auto-collect window in the footer", async () => {
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
         return Promise.resolve(status("OK", false));
       }
       return Promise.resolve(dashboardReady);
     });
-    renderDashboard();
-    expect(await screen.findByText(/It has not started yet today/)).toBeInTheDocument();
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<DashboardPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const line = await screen.findByText(/It has not started yet today/);
+    expect(line.closest("footer")).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Portfolio" }).parentElement).not.toContainElement(line);
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
   });
 });

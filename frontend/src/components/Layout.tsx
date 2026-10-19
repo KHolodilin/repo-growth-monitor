@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
+import { headerSchedule } from "../lib/setupChecklist";
 import { cn, formatSyncTime } from "../lib/utils";
 import { DashboardIcon, LogoMark, RepositoriesIcon } from "./icons";
 import { Button } from "./ui";
@@ -156,6 +157,7 @@ export function Layout() {
             <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
             paths show the latest GitHub snapshot; History has the change between snapshots.
           </div>
+          {access?.planner && <div>{headerSchedule(access.planner)}</div>}
           <div>Last sync: {syncLabel}</div>
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
