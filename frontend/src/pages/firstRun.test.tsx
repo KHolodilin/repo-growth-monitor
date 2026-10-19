@@ -105,7 +105,7 @@ describe("first-run portfolio", () => {
     });
     renderDashboard();
     expect(await screen.findByRole("heading", { name: "Collecting" })).toBeInTheDocument();
-    expect(screen.getByText(TRAFFIC_PERMISSION)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText(TRAFFIC_PERMISSION)).toHaveLength(2));
     expect(screen.getByText("rate limit")).toBeInTheDocument();
     expect(screen.queryByText(/Auto-collect runs every day/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Traffic" })).not.toBeInTheDocument();

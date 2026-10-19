@@ -11,6 +11,7 @@ import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventSettingJdbcRepository;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventStateJdbcRepository;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
+import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.github.model.GitHubSocialPreview;
@@ -22,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -60,11 +62,14 @@ public class GrowthEventsCollector implements Collector {
     public void collect(CollectionContext context) {
         String owner = context.ownerLogin();
         String name = context.repository().name();
-        GitHubRepositoryResponse remote = gitHubClient.getRepository(owner, name);
-        GitHubReadmeResponse readme = gitHubClient.getReadmeDetails(owner, name).orElse(null);
+        GitHubRepositoryResponse remote = readGitHub("Could not load the repository", () -> gitHubClient.getRepository(owner, name));
+        GitHubReadmeResponse readme = readGitHub("Could not load the readme", () -> gitHubClient.getReadmeDetails(owner, name).orElse(null));
         Instant readmeCommittedAt = readme == null || readme.name() == null || readme.name().isBlank()
                 ? null
-                : gitHubClient.latestCommitAt(owner, name, readme.name()).orElse(null);
+                : readGitHub(
+                        "Could not load the readme commit",
+                        () -> gitHubClient.latestCommitAt(owner, name, readme.name()).orElse(null)
+                );
         Boolean customPreview = null;
         String previewUrl = null;
         try {
@@ -79,10 +84,10 @@ public class GrowthEventsCollector implements Collector {
                 readme == null ? null : readme.decodedText(),
                 readme == null ? null : readme.sha(),
                 readmeCommittedAt,
-                gitHubClient.listIssues(owner, name),
-                gitHubClient.listPulls(owner, name),
-                gitHubClient.listReleases(owner, name),
-                gitHubClient.listContributors(owner, name),
+                readGitHub("Could not load issues", () -> gitHubClient.listIssues(owner, name)),
+                readGitHub("Could not load pull requests", () -> gitHubClient.listPulls(owner, name)),
+                readGitHub("Could not load releases", () -> gitHubClient.listReleases(owner, name)),
+                readGitHub("Could not load contributors", () -> gitHubClient.listContributors(owner, name)),
                 customPreview,
                 previewUrl
         );
@@ -128,5 +133,13 @@ public class GrowthEventsCollector implements Collector {
                     GrowthEventDetections.snapshot(previous, snapshot, owner)
             );
         });
+    }
+
+    private <T> T readGitHub(String context, Supplier<T> call) {
+        try {
+            return call.get();
+        } catch (GitHubException ex) {
+            throw ex.withContext(context);
+        }
     }
 }

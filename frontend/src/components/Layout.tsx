@@ -101,10 +101,7 @@ export function Layout() {
 
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
   const noToken = access?.tokenState === "MISSING";
-
-  useEffect(() => {
-    document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
-  }, [noToken]);
+  document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">

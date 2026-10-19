@@ -7,6 +7,7 @@ import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
 import { loadGitHubAccess, parseGitHubAccess, type GitHubAccess, type TokenState } from "../lib/githubAccess";
 import { checklistSchedule, collectionJobLines, DEFAULT_PLANNER } from "../lib/setupChecklist";
+import { repositoryProblemBadge, repositoryProblemLines } from "../lib/trafficGap";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -17,14 +18,6 @@ import { useTableSort } from "../lib/tableSortPrefs";
 const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
-
-const JOB_LABELS: Record<string, string> = {
-  TRAFFIC: "Traffic",
-  REFERRERS: "Referrers",
-  POPULAR_PATHS: "Popular Paths",
-  REPOSITORY_STATS: "Repository Stats",
-  GROWTH_EVENTS: "Growth Events",
-};
 
 export function DashboardPage() {
   const [period, setPeriod] = usePeriod();
@@ -133,25 +126,41 @@ function DashboardHeader({
   period: Period;
   onPeriod: (period: Period) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const problems = (data?.repositories ?? [])
+    .map((row) => ({ row, lines: repositoryProblemLines(row) }))
+    .filter((item) => item.lines.length > 0);
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <h1 className="text-2xl font-semibold">Portfolio</h1>
-      <div className="flex flex-col items-end gap-3">
-        {(data?.collectionWarning || data?.partialData?.present) && (
-          <div className="text-right text-sm text-muted-foreground">
-            {data?.collectionWarning && (
-              <div className="text-amber-700">⚠ {data.collectionWarning.message}</div>
-            )}
-            {data?.partialData?.present && (
-              <div className="group relative mt-1 inline-block text-amber-700">
-                ⚠ Partial data
-                <div className="invisible absolute right-0 z-10 mt-2 w-72 rounded-md border bg-card p-3 text-left text-xs text-foreground shadow-lg group-hover:visible">
-                  {data.partialData.message}
-                </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold">Portfolio</h1>
+        {problems.length > 0 && (
+          <div className="relative">
+            <button
+              type="button"
+              className="text-sm text-amber-700"
+              onClick={() => setOpen((current) => !current)}
+            >
+              ⚠ {repositoryProblemBadge(problems.length)}
+            </button>
+            {open && (
+              <div className="absolute left-0 z-10 mt-2 w-80 rounded-md border bg-card p-3 text-left shadow-lg">
+                {problems.map(({ row, lines }) => (
+                  <div key={row.id} className="py-1 text-sm">
+                    <Link className="text-primary hover:underline" to={`/repositories/${row.id}`}>
+                      {row.fullName}
+                    </Link>
+                    {lines.map((line) => (
+                      <div key={line} className="text-muted-foreground">{line}</div>
+                    ))}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
+      </div>
+      <div className="flex flex-col items-end gap-3">
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
     </div>
@@ -318,6 +327,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
           <tbody>
             {sorted.map((row) => {
               const growth = formatGrowth(row.growthPercent);
+              const problems = repositoryProblemLines(row).join(" ");
               return (
                 <tr
                   key={row.id}
@@ -325,6 +335,11 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   onClick={() => navigate(`/repositories/${row.id}`)}
                 >
                   <td className="max-w-0 px-5 py-3 align-top">
+                    {problems && (
+                      <span role="img" className="mr-1 text-amber-700" title={problems} aria-label={problems}>
+                        !
+                      </span>
+                    )}
                     <Link
                       className="break-words [overflow-wrap:anywhere] text-primary hover:underline"
                       to={`/repositories/${row.id}`}
@@ -337,9 +352,6 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                       trafficPermissionMissing={row.trafficPermissionMissing}
                       tokenState={tokenState}
                     />
-                    {row.collectionStatus === "PARTIAL" && (
-                      <CollectionHint jobs={row.jobs} />
-                    )}
                   </td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.visitors)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.views)}</td>
@@ -413,23 +425,6 @@ function SortHeader({
         {active ? (dir === "desc" ? " ↓" : " ↑") : ""}
       </button>
     </th>
-  );
-}
-
-function CollectionHint({ jobs }: { jobs: { jobType: string; status: string }[] }) {
-  return (
-    <span className="group relative ml-2 inline-block align-middle text-amber-700">
-      ⚠
-      <span className="invisible absolute left-0 z-10 mt-2 w-56 rounded-md border bg-card p-3 text-left text-xs font-normal text-foreground shadow-lg group-hover:visible">
-        <div className="mb-2 font-medium">Collection status</div>
-        {jobs.map((job) => (
-          <div key={job.jobType} className="flex justify-between gap-3 py-0.5">
-            <span>{JOB_LABELS[job.jobType] ?? job.jobType}</span>
-            <span>{job.status === "SUCCESS" ? "✓" : job.status === "FAILED" ? "✕" : "…"}</span>
-          </div>
-        ))}
-      </span>
-    </span>
   );
 }
 

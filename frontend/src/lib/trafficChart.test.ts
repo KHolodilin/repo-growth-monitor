@@ -73,6 +73,39 @@ describe("trafficChart", () => {
     expect(sparse.series[3].markPoint.data[0].name).toBe("Events");
     expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
+
+    const broken = trafficChartOption(
+      [
+        { date: "2026-10-15", views: 4, uniqueVisitors: 2, clones: 1, uniqueCloners: 1 },
+        { date: "2026-10-17", views: 6, uniqueVisitors: 3, clones: 1, uniqueCloners: 1 },
+      ],
+      [],
+      "7d",
+      { reason: "GITHUB_DATA_MISSING", date: "2026-10-18", lastTrafficDate: "2026-10-17" },
+    );
+    expect(broken.xAxis.data).toContain("2026-10-16");
+    expect(broken.xAxis.data).toContain("2026-10-18");
+    expect(broken.series[0].data[broken.xAxis.data.indexOf("2026-10-16")]).toBeNull();
+    expect(broken.series[0].connectNulls).toBe(false);
+    expect(broken.series[0].markPoint?.data[0]).toMatchObject({ xAxis: "2026-10-18" });
+    expect(broken.series[0].markPoint?.tooltip.formatter()).toBe("GitHub traffic data is missing for Oct 18 (T-1).");
+    const gapFormatter = broken.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
+    expect(gapFormatter([{ axisValue: "2026-10-18", seriesName: "Views", data: null }])).toBe(
+      "GitHub traffic data is missing for Oct 18 (T-1).",
+    );
+    const kept = trafficChartOption(
+      [{ date: "2026-10-18", views: 0, uniqueVisitors: 0, clones: 0, uniqueCloners: 0 }],
+      [],
+      "7d",
+      { reason: "COLLECTION_FAILED", date: "2026-10-19", lastTrafficDate: null },
+    );
+    expect(kept.series[0].markPoint).toBeUndefined();
+    expect(kept.series[0].data).toEqual([0]);
+    expect(trafficChartOption([], [], "7d", {
+      reason: "COLLECTION_NOT_EXECUTED",
+      date: "2026-10-19",
+      lastTrafficDate: null,
+    }).xAxis.data).toEqual(["2026-10-18"]);
     expect(markLineEvents({ componentType: "series" })).toEqual([]);
     expect(markLineEvents({ componentType: "markLine", data: { events: [event("2026-09-23", "Launch")] } })).toHaveLength(
       1,

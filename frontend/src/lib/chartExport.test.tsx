@@ -71,6 +71,17 @@ describe("chartExport", () => {
         ]),
       ),
     ).toBe("date,Views,Visitors,Clones\n2026-10-08,,3,1\n2026-10-09,2,,");
+    expect(chartCsv({
+      xAxis: { data: ["2026-10-18"] },
+      series: [
+        { name: "Views", type: "line", data: [null] },
+        { name: "Views", type: "line", data: [{ value: 7 }] },
+      ],
+    })).toBe("date,Views\n2026-10-18,7");
+    expect(chartCsv({
+      xAxis: { data: ["2026-10-18"] },
+      series: [{ name: "Views", type: "line" }],
+    })).toBe("date,Views\n2026-10-18,");
   });
 
   it("keeps hidden series, escapes cells, and ignores marker-only shapes", () => {

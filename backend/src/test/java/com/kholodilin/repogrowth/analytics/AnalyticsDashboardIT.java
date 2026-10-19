@@ -137,14 +137,15 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.summary().clones().value()).isEqualTo(28);
         assertThat(dashboard.summary().stars().total()).isEqualTo(169);
         assertThat(dashboard.summary().stars().change()).isEqualTo(14);
-        assertThat(dashboard.partialData()).isNotNull();
-        assertThat(dashboard.partialData().present()).isTrue();
-        assertThat(dashboard.partialData().message()).contains("because the service was not running.");
+        assertThat(dashboard.partialData()).isNull();
         assertThat(dashboard.collectionWarning()).isNotNull();
         assertThat(dashboard.collectionWarning().partialRepositories()).isEqualTo(1);
 
         assertThat(dashboard.traffic()).extracting(DashboardResponse.TrafficPoint::date)
-                .containsExactly(today.minusDays(6), today.minusDays(4));
+                .containsExactly(today.minusDays(6), today.minusDays(5), today.minusDays(4));
+        assertThat(dashboard.traffic().get(1).views()).isNull();
+        assertThat(dashboard.traffic().get(1).missingRepositories()).isEqualTo(2);
+        assertThat(dashboard.traffic().get(0).missingRepositories()).isZero();
         DashboardResponse.TrafficPoint firstDay = dashboard.traffic().getFirst();
         assertThat(firstDay.views()).isEqualTo(170);
         assertThat(firstDay.visitors()).isEqualTo(85);
@@ -161,7 +162,6 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 new DashboardResponse.TrafficLeader("acme/kafka-starter", 12),
                 new DashboardResponse.TrafficLeader("acme/spring-outbox", 5)
         );
-        assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today.minusDays(5)));
         assertThat(dashboard.traffic()).noneMatch(point -> point.date().equals(today));
 
         DashboardResponse.RepositoryRow kafkaRow = dashboard.repositories().stream()
@@ -173,6 +173,10 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(kafkaRow.forks()).isEqualTo(2);
         assertThat(kafkaRow.discoverabilityPassed()).isEqualTo(8);
         assertThat(kafkaRow.discoverabilityTotal()).isEqualTo(13);
+        assertThat(kafkaRow.trafficNotice()).isNotNull();
+        assertThat(kafkaRow.trafficNotice().reason()).isEqualTo("GITHUB_DATA_MISSING");
+        assertThat(kafkaRow.trafficNotice().date()).isEqualTo(today.minusDays(1));
+        assertThat(kafkaRow.trafficNotice().lastTrafficDate()).isEqualTo(today.minusDays(4));
         assertThat(dashboard.highlights().visitors().fullName()).isEqualTo("acme/kafka-starter");
         assertThat(dashboard.highlights().visitors().growthPercent()).isEqualTo(100.0);
         assertThat(dashboard.highlights().rankRise()).isNull();

@@ -8,8 +8,8 @@ import com.kholodilin.repogrowth.analytics.api.DashboardResponse.DashboardState;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.DashboardSummary;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.JobStatus;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.MetricValue;
-import com.kholodilin.repogrowth.analytics.api.DashboardResponse.PartialData;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.RepositoryRow;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficNotice;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StarsMetric;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficLeader;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.Highlights;
@@ -17,6 +17,7 @@ import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService.DiscoverabilityScore;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
+import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
@@ -28,6 +29,7 @@ import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath;
 import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
@@ -46,13 +48,12 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -64,7 +65,6 @@ import java.util.stream.Collectors;
 public class AnalyticsService {
 
     private static final Logger log = LoggerFactory.getLogger(AnalyticsService.class);
-    private static final DateTimeFormatter GAP_DATE = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
     /** GitHub reports a rolling 14-day window, so a wider history table would repeat itself. */
     private static final int MAX_HISTORY_DAYS = 14;
 
@@ -76,6 +76,7 @@ public class AnalyticsService {
     private final ActivityClassifier activityClassifier;
     private final RepositoryHealthService healthService;
     private final PortfolioHighlightsService highlightsService;
+    private final PlanningWindow planningWindow;
     private final Clock clock;
 
     public AnalyticsService(
@@ -87,6 +88,7 @@ public class AnalyticsService {
             ActivityClassifier activityClassifier,
             RepositoryHealthService healthService,
             PortfolioHighlightsService highlightsService,
+            PlanningWindow planningWindow,
             Clock clock
     ) {
         this.repositoryService = repositoryService;
@@ -97,6 +99,7 @@ public class AnalyticsService {
         this.activityClassifier = activityClassifier;
         this.healthService = healthService;
         this.highlightsService = highlightsService;
+        this.planningWindow = planningWindow;
         this.clock = clock;
     }
 
@@ -174,7 +177,8 @@ public class AnalyticsService {
                 referrers.snapshotAt(),
                 paths.rows(),
                 paths.snapshotAt(),
-                latestRun == null ? null : collectionController.toResponse(latestRun)
+                latestRun == null ? null : collectionController.toResponse(latestRun),
+                trafficGap(repositoryId)
         );
     }
 
@@ -317,7 +321,8 @@ public class AnalyticsService {
                 : trafficJdbcRepository.portfolioTotalsInRange(period.previousFrom(), period.previousTo());
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
         Long starsChange = period.allTime() ? null : trafficJdbcRepository.starsChangeSince(period.from());
-        List<TrafficPoint> traffic = series(period);
+        List<TrafficPoint> traffic = series(period, tracked.size());
+        Map<Long, TrafficNotice> notices = trafficNotices(period, tracked);
         Map<Long, Long> previousVisitors = previousVisitorsByRepo(period);
         List<CollectionRun> latestRuns = runRepository.latestPerTrackedRepository();
         Map<Long, CollectionRun> runByRepo = latestRuns.stream()
@@ -330,7 +335,7 @@ public class AnalyticsService {
         Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
         List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
                 .stream()
-                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability, signals))
+                .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability, signals, notices))
                 .toList();
         int partialCount = (int) latestRuns.stream()
                 .filter(run -> run.status() == CollectionRunStatus.PARTIAL)
@@ -341,7 +346,7 @@ public class AnalyticsService {
                 period.to(),
                 runRepository.latestCompletedAtForTracked(),
                 DashboardState.READY,
-                partialData(traffic),
+                null,
                 collectionWarning(partialCount),
                 activeCollection(latestRuns),
                 new DashboardSummary(
@@ -394,7 +399,8 @@ public class AnalyticsService {
                             score(discoverability.get(repository.id())).passed(),
                             score(discoverability.get(repository.id())).total(),
                             accessible(signals.get(repository.id())),
-                            trafficMissing(signals.get(repository.id()))
+                            trafficMissing(signals.get(repository.id())),
+                            null
                     );
                 })
                 .toList();
@@ -460,7 +466,8 @@ public class AnalyticsService {
             Map<Long, CollectionRun> runByRepo,
             Map<Long, List<CollectionJob>> jobsByRun,
             Map<Long, DiscoverabilityScore> discoverability,
-            Map<Long, RepositorySignals> signals
+            Map<Long, RepositorySignals> signals,
+            Map<Long, TrafficNotice> notices
     ) {
         Double growth = period.allTime()
                 ? null
@@ -490,7 +497,8 @@ public class AnalyticsService {
                 score(discoverability.get(row.repositoryId())).passed(),
                 score(discoverability.get(row.repositoryId())).total(),
                 accessible(signals.get(row.repositoryId())),
-                trafficMissing(signals.get(row.repositoryId()))
+                trafficMissing(signals.get(row.repositoryId())),
+                notices.get(row.repositoryId())
         );
     }
 
@@ -514,29 +522,73 @@ public class AnalyticsService {
         return score == null ? new DiscoverabilityScore(null, null) : score;
     }
 
-    private List<TrafficPoint> series(DashboardPeriod period) {
+    private List<TrafficPoint> series(DashboardPeriod period, int tracked) {
         Map<LocalDate, List<RepositoryDayTotals>> byDate = new TreeMap<>();
         for (RepositoryDayTotals row : trafficJdbcRepository.dailyByRepository(period.from(), period.to())) {
             byDate.computeIfAbsent(row.date(), date -> new ArrayList<>()).add(row);
         }
+        return portfolioSeries(period.from(), period.to(), LocalDate.now(clock), tracked, byDate);
+    }
+
+    /**
+     * Days nobody has are omitted after the last stored day, so the line stops.
+     * A hole between stored days stays, with a null total, so the line breaks.
+     * A day some repositories have is the sum of those rows and names how many are missing.
+     */
+    static List<TrafficPoint> portfolioSeries(
+            LocalDate from,
+            LocalDate to,
+            LocalDate today,
+            int tracked,
+            Map<LocalDate, List<RepositoryDayTotals>> byDate
+    ) {
+        LocalDate expectedEnd = to.isBefore(today.minusDays(1)) ? to : today.minusDays(1);
+        LocalDate first = null;
+        LocalDate last = null;
+        for (LocalDate day : byDate.keySet()) {
+            if (day.isBefore(from) || day.isAfter(expectedEnd)) {
+                continue;
+            }
+            if (byDate.get(day).isEmpty()) {
+                continue;
+            }
+            if (first == null || day.isBefore(first)) {
+                first = day;
+            }
+            if (last == null || day.isAfter(last)) {
+                last = day;
+            }
+        }
+        if (first == null) {
+            return List.of();
+        }
         List<TrafficPoint> points = new ArrayList<>();
-        for (Map.Entry<LocalDate, List<RepositoryDayTotals>> entry : byDate.entrySet()) {
+        for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+            List<RepositoryDayTotals> rows = byDate.getOrDefault(day, List.of());
+            if (rows.isEmpty()) {
+                points.add(new TrafficPoint(day, null, null, null, List.of(), List.of(), List.of(), tracked));
+                continue;
+            }
             long views = 0;
             long visitors = 0;
             long clones = 0;
-            for (RepositoryDayTotals row : entry.getValue()) {
+            Set<String> names = new HashSet<>();
+            for (RepositoryDayTotals row : rows) {
                 views += row.views();
                 visitors += row.uniqueVisitors();
                 clones += row.clones();
+                names.add(row.fullName());
             }
+            int missing = Math.max(0, tracked - names.size());
             points.add(new TrafficPoint(
-                    entry.getKey(),
+                    day,
                     views,
                     visitors,
                     clones,
-                    topShares(entry.getValue(), RepositoryDayTotals::views),
-                    topShares(entry.getValue(), RepositoryDayTotals::uniqueVisitors),
-                    topShares(entry.getValue(), RepositoryDayTotals::clones)
+                    topShares(rows, RepositoryDayTotals::views),
+                    topShares(rows, RepositoryDayTotals::uniqueVisitors),
+                    topShares(rows, RepositoryDayTotals::clones),
+                    missing
             ));
         }
         return points;
@@ -564,57 +616,73 @@ public class AnalyticsService {
         return end == points.size() ? points : new ArrayList<>(points.subList(0, end));
     }
 
-    static PartialData partialData(List<TrafficPoint> traffic) {
-        List<LocalDate> observed = traffic.stream()
-                .filter(point -> point.views() != null)
-                .map(TrafficPoint::date)
-                .sorted()
-                .toList();
-        if (observed.isEmpty()) {
-            return null;
+    private Map<Long, TrafficNotice> trafficNotices(DashboardPeriod period, List<Repository> tracked) {
+        LocalDate today = LocalDate.now(clock);
+        boolean windowOpen = planningWindow.isOpen();
+        Map<Long, Set<LocalDate>> stored = new HashMap<>();
+        for (TrafficJdbcRepository.StoredTrafficDay day : trafficJdbcRepository.trackedTrafficDays(period.from(), period.to())) {
+            stored.computeIfAbsent(day.repositoryId(), id -> new HashSet<>()).add(day.date());
         }
-        LocalDate first = observed.getFirst();
-        LocalDate last = observed.getLast();
-        Set<LocalDate> present = new HashSet<>(observed);
-        List<LocalDate> gaps = new ArrayList<>();
-        for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
-            if (!present.contains(day)) {
-                gaps.add(day);
+        Map<Long, LocalDate> latest = new HashMap<>();
+        for (TrafficJdbcRepository.LatestTrafficDate day : trafficJdbcRepository.latestTrackedTrafficDates()) {
+            if (day.date() != null) {
+                latest.put(day.repositoryId(), day.date());
             }
         }
-        if (gaps.isEmpty()) {
-            return null;
+        Map<Long, CollectionJob> trafficJobs = new HashMap<>();
+        List<Long> runIds = runRepository.trackedOn(today).stream().map(CollectionRun::id).toList();
+        for (CollectionJob job : jobRepository.findByRunIds(runIds)) {
+            if (job.jobType() == CollectionJobType.TRAFFIC) {
+                trafficJobs.put(job.repositoryId(), job);
+            }
         }
-        return new PartialData(true, "Data is unavailable for " + formatGapRanges(gaps)
-                + " because the service was not running.");
-    }
-
-    static String formatGapRanges(List<LocalDate> gaps) {
-        List<String> parts = new ArrayList<>();
-        LocalDate rangeStart = gaps.getFirst();
-        LocalDate rangeEnd = gaps.getFirst();
-        for (int i = 1; i < gaps.size(); i++) {
-            LocalDate current = gaps.get(i);
-            if (current.equals(rangeEnd.plusDays(1))) {
-                rangeEnd = current;
+        Map<Long, TrafficNotice> notices = new HashMap<>();
+        for (Repository repository : tracked) {
+            TrafficCompleteness.Notice notice = TrafficCompleteness.portfolio(
+                    today,
+                    windowOpen,
+                    period.from(),
+                    period.to(),
+                    stored.getOrDefault(repository.id(), Set.of()),
+                    latest.get(repository.id()),
+                    TrafficCompleteness.jobState(trafficJobs.get(repository.id()))
+            );
+            if (notice == null) {
                 continue;
             }
-            parts.add(formatRange(rangeStart, rangeEnd));
-            rangeStart = current;
-            rangeEnd = current;
+            notices.put(repository.id(), new TrafficNotice(
+                    notice.reason().name(),
+                    notice.date(),
+                    notice.lastTrafficDate()
+            ));
         }
-        parts.add(formatRange(rangeStart, rangeEnd));
-        return String.join(", ", parts);
+        return notices;
     }
 
-    private static String formatRange(LocalDate start, LocalDate end) {
-        if (start.equals(end)) {
-            return GAP_DATE.format(start);
+    private TrafficNotice trafficGap(long repositoryId) {
+        LocalDate today = LocalDate.now(clock);
+        CollectionRun todayRun = runRepository.find(repositoryId, today).orElse(null);
+        CollectionJob trafficJob = null;
+        if (todayRun != null) {
+            for (CollectionJob job : jobRepository.findByRun(todayRun.id())) {
+                if (job.jobType() == CollectionJobType.TRAFFIC) {
+                    trafficJob = job;
+                }
+            }
         }
-        if (start.getYear() == end.getYear() && start.getMonth() == end.getMonth()) {
-            return GAP_DATE.format(start) + "–" + end.getDayOfMonth();
+        boolean yesterdayStored = trafficJdbcRepository.latestDate(repositoryId)
+                .filter(date -> !date.isBefore(today.minusDays(1)))
+                .isPresent();
+        TrafficCompleteness.Notice notice = TrafficCompleteness.status(
+                today,
+                planningWindow.isOpen(),
+                yesterdayStored,
+                TrafficCompleteness.jobState(trafficJob)
+        );
+        if (notice == null) {
+            return null;
         }
-        return GAP_DATE.format(start) + "–" + GAP_DATE.format(end);
+        return new TrafficNotice(notice.reason().name(), notice.date(), notice.lastTrafficDate());
     }
 
     private static CollectionWarning collectionWarning(int partialCount) {
@@ -746,7 +814,8 @@ public class AnalyticsService {
             Instant referrerSnapshotAt,
             List<TrafficJdbcRepository.PathRow> paths,
             Instant pathSnapshotAt,
-            CollectionController.CollectionRunResponse lastCollection
+            CollectionController.CollectionRunResponse lastCollection,
+            TrafficNotice trafficGap
     ) {
     }
 

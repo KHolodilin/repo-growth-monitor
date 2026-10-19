@@ -12,9 +12,9 @@ import {
   type SearchHistory,
   type TopicHistory,
 } from "../lib/api";
-import { JOB_LABELS } from "../lib/collectProgress";
+import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
-import { cn, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
+import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -30,6 +30,7 @@ import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
+import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/querySort";
 import { useTableSort } from "../lib/tableSortPrefs";
@@ -385,7 +386,7 @@ export function RepositoryDetailsPage() {
           <div className="ml-auto flex items-center gap-4">
             <StatDivider />
             <a
-              className="inline-flex items-center gap-1 text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-primary underline"
               href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
               target="_blank"
               rel="noreferrer"
@@ -424,7 +425,7 @@ export function RepositoryDetailsPage() {
         )}
       </div>
       {tab === "overview" && (
-        <Overview repo={repo} lastCollection={traffic.lastCollection} />
+        <Overview repo={repo} lastCollection={traffic.lastCollection} trafficGap={traffic.trafficGap} />
       )}
       {tab === "growth-events" && (
         <GrowthEventsTab repositoryId={repo.id} period={period} />
@@ -527,9 +528,11 @@ function ContributorsIcon() {
 function Overview({
   repo,
   lastCollection,
+  trafficGap,
 }: {
   repo: Repository;
   lastCollection?: CollectionRun;
+  trafficGap?: RepositoryTraffic["trafficGap"];
 }) {
   const about = repo.description?.trim();
   return (
@@ -573,7 +576,7 @@ function Overview({
         </dl>
       </Card>
       <div className="space-y-4">
-        <CollectionStatusCard run={lastCollection} />
+        <CollectionStatusCard run={lastCollection} trafficGap={trafficGap} />
         <TopicsCard topics={repo.topics ?? []} />
       </div>
       </div>
@@ -655,7 +658,21 @@ function HealthCheckList({ title, items }: { title: string; items: { label: stri
   );
 }
 
-function CollectionStatusCard({ run }: { run?: CollectionRun }) {
+function CollectionStatusCard({
+  run,
+  trafficGap,
+}: {
+  run?: CollectionRun;
+  trafficGap?: RepositoryTraffic["trafficGap"];
+}) {
+  if (trafficGap?.reason === "COLLECTION_NOT_EXECUTED") {
+    return (
+      <Card>
+        <h2 className="mb-4 font-medium">Collection Status</h2>
+        <p className="text-sm">⛔ {repositoryGapText(trafficGap)}</p>
+      </Card>
+    );
+  }
   if (!run) {
     return (
       <Card>
@@ -669,6 +686,7 @@ function CollectionStatusCard({ run }: { run?: CollectionRun }) {
   }
 
   const failed = run.jobs.find((job) => job.status === "FAILED");
+  const failureReason = collectionFailureReason(failed?.errorMessage, failed?.jobType);
   return (
     <Card>
       <h2 className="mb-4 font-medium">Collection Status</h2>
@@ -682,40 +700,38 @@ function CollectionStatusCard({ run }: { run?: CollectionRun }) {
       {(run.completedAt || run.createdAt) && (
         <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
       )}
-      {failed?.errorMessage && <p className="mt-2 text-sm">{failed.errorMessage}</p>}
+      {failureReason && <p className="mt-2 text-sm">{failureReason}</p>}
       <div className="mt-4 space-y-2 text-sm">
         {run.jobs.map((job) => (
-          <JobRow key={job.jobType} job={job} />
+          <JobRow key={job.jobType} job={job} businessDate={run.businessDate} trafficGap={trafficGap} />
         ))}
       </div>
     </Card>
   );
 }
 
-function JobRow({ job }: { job: CollectionJob }) {
-  const icon = job.status === "SUCCESS" ? "✓" : job.status === "FAILED" ? "✕" : job.status === "RUNNING" ? "⟳" : "○";
-  const color =
-    job.status === "SUCCESS"
-      ? "text-emerald-700"
-      : job.status === "FAILED"
-        ? "text-red-700"
-        : job.status === "RUNNING"
-          ? "text-primary"
-          : "text-muted-foreground";
+function JobRow({
+  job,
+  businessDate,
+  trafficGap,
+}: {
+  job: CollectionJob;
+  businessDate: string;
+  trafficGap?: RepositoryTraffic["trafficGap"];
+}) {
+  if (job.status === "FAILED") {
+    return <div className="text-sm text-red-700">⛔ Collection failed for {formatChartAxisDate(businessDate)}.</div>;
+  }
+  if (job.jobType === "TRAFFIC" && trafficGap?.reason === "GITHUB_DATA_MISSING") {
+    return <div className="text-sm text-amber-700">⚠ {trafficJobWarning(trafficGap)}</div>;
+  }
+  const icon = job.status === "SUCCESS" ? "✓" : job.status === "RUNNING" ? "⟳" : "○";
+  const color = job.status === "SUCCESS" ? "text-emerald-700" : job.status === "RUNNING" ? "text-primary" : "text-muted-foreground";
   return (
-    <div className={cn("group relative flex items-center justify-between gap-3", color)}>
+    <div className={cn("flex items-center justify-between gap-3", color)}>
       <span>
         {icon} {JOB_LABELS[job.jobType] ?? job.jobType}
       </span>
-      {job.status === "FAILED" && (
-        <span className="invisible absolute left-0 top-6 z-10 w-64 rounded-md border bg-card p-3 text-xs font-normal text-foreground shadow-lg group-hover:visible">
-          <div className="mb-1 font-medium">{JOB_LABELS[job.jobType] ?? job.jobType}</div>
-          <div>{job.errorMessage ?? "Collection failed"}</div>
-          {job.completedAt && (
-            <div className="mt-1 text-muted-foreground">Last attempt: {formatJobTime(job.completedAt)}</div>
-          )}
-        </span>
-      )}
     </div>
   );
 }
@@ -775,7 +791,10 @@ function TrafficPanel({
   }, [loadEvents]);
 
   const visibleEvents = useMemo(() => filterGrowthEvents(events, filter), [events, filter]);
-  const option = useMemo(() => trafficChartOption(traffic.traffic, visibleEvents, period), [traffic, visibleEvents, period]);
+  const option = useMemo(
+    () => trafficChartOption(traffic.traffic, visibleEvents, period, traffic.trafficGap),
+    [traffic, visibleEvents, period],
+  );
 
   return (
     <div className="space-y-3">
@@ -1156,7 +1175,7 @@ function SearchPanel({
         <div className="mb-3 flex items-baseline gap-3">
           <h2 className="font-medium">Search Queries</h2>
           <a
-            className="text-sm font-normal text-muted-foreground hover:underline"
+            className="text-sm font-normal text-primary underline"
             href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
             target="_blank"
             rel="noreferrer"
@@ -1395,8 +1414,4 @@ function formatBusinessDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
     new Date(`${value}T00:00:00`),
   );
-}
-
-function formatJobTime(iso: string) {
-  return new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 }

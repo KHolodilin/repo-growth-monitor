@@ -89,6 +89,19 @@ public class CollectionRunJdbcRepository {
                 .list();
     }
 
+    public List<CollectionRun> trackedOn(LocalDate businessDate) {
+        return jdbcClient.sql("""
+                        SELECT cr.*
+                        FROM collection_run cr
+                        JOIN repository r ON r.id = cr.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND cr.business_date = :businessDate
+                        """)
+                .param("businessDate", businessDate)
+                .query(MAPPER)
+                .list();
+    }
+
     public Optional<CollectionRun> latestForRepository(long repositoryId) {
         return jdbcClient.sql("""
                         SELECT * FROM collection_run

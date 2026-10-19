@@ -6,56 +6,84 @@ import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.Repos
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DashboardPartialDataTest {
 
     @Test
-    void internalGapsAreReportedWithoutFillingZeros() {
-        List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 20), 100L, 40L, 5L),
-                new TrafficPoint(LocalDate.of(2026, 8, 21), null, null, null),
-                new TrafficPoint(LocalDate.of(2026, 8, 22), 130L, 50L, 8L)
+    void aHoleBreaksTheLineAndAPartialDayKeepsTheSumOfRepositoriesThatHaveIt() {
+        LocalDate today = LocalDate.of(2026, 8, 23);
+        LocalDate twentieth = LocalDate.of(2026, 8, 20);
+        LocalDate twentySecond = LocalDate.of(2026, 8, 22);
+        List<TrafficPoint> traffic = AnalyticsService.portfolioSeries(
+                LocalDate.of(2026, 8, 18),
+                today,
+                today,
+                3,
+                Map.of(
+                        twentieth, List.of(
+                                new RepositoryDayTotals(twentieth, "owner/a", 10, 4, 1),
+                                new RepositoryDayTotals(twentieth, "owner/b", 0, 0, 0)
+                        ),
+                        twentySecond, List.of(new RepositoryDayTotals(twentySecond, "owner/a", 8, 3, 1))
+                )
         );
-        var partial = AnalyticsService.partialData(traffic);
-        assertThat(partial).isNotNull();
-        assertThat(partial.present()).isTrue();
-        assertThat(partial.message()).isEqualTo(
-                "Data is unavailable for Aug 21 because the service was not running."
-        );
-    }
-
-    @Test
-    void calendarHolesBetweenObservedDaysArePartialEvenWithoutPlaceholderPoints() {
-        List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 20), 100L, 40L, 5L),
-                new TrafficPoint(LocalDate.of(2026, 8, 22), 130L, 50L, 8L)
-        );
-        var partial = AnalyticsService.partialData(traffic);
-        assertThat(partial).isNotNull();
-        assertThat(partial.message()).isEqualTo(
-                "Data is unavailable for Aug 21 because the service was not running."
-        );
-    }
-
-    @Test
-    void leadingEmptyDaysBeforeFirstObservationAreNotPartial() {
-        List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 20), null, null, null),
-                new TrafficPoint(LocalDate.of(2026, 8, 21), 10L, 4L, 1L),
-                new TrafficPoint(LocalDate.of(2026, 8, 22), 12L, 5L, 1L)
-        );
-        assertThat(AnalyticsService.partialData(traffic)).isNull();
-    }
-
-    @Test
-    void consecutiveGapsAreFormattedAsARange() {
-        assertThat(AnalyticsService.formatGapRanges(List.of(
+        assertThat(traffic).extracting(TrafficPoint::date).containsExactly(
+                twentieth,
                 LocalDate.of(2026, 8, 21),
-                LocalDate.of(2026, 8, 22)
-        ))).isEqualTo("Aug 21–22");
+                twentySecond
+        );
+        assertThat(traffic.get(0).missingRepositories()).isEqualTo(1);
+        assertThat(traffic.get(0).views()).isEqualTo(10);
+        assertThat(traffic.get(1).views()).isNull();
+        assertThat(traffic.get(1).missingRepositories()).isEqualTo(3);
+        assertThat(traffic.get(2).views()).isEqualTo(8);
+        assertThat(traffic.get(2).missingRepositories()).isEqualTo(2);
+        assertThat(traffic).noneMatch(point -> point.date().equals(today));
+    }
+
+    @Test
+    void daysOutsideThePublishedRangeAreLeftOutAndTheMissingCountCannotGoBelowZero() {
+        LocalDate today = LocalDate.of(2026, 10, 19);
+        LocalDate from = LocalDate.of(2026, 10, 13);
+        LocalDate to = LocalDate.of(2026, 10, 17);
+        LocalDate inside = LocalDate.of(2026, 10, 15);
+        LocalDate middle = LocalDate.of(2026, 10, 16);
+        LocalDate later = LocalDate.of(2026, 10, 17);
+        LocalDate before = LocalDate.of(2026, 10, 12);
+        LocalDate after = LocalDate.of(2026, 10, 18);
+        LocalDate empty = LocalDate.of(2026, 10, 14);
+        Map<LocalDate, List<RepositoryDayTotals>> byDate = new LinkedHashMap<>();
+        byDate.put(middle, List.of(new RepositoryDayTotals(middle, "owner/a", 3, 1, 1)));
+        byDate.put(inside, List.of(
+                new RepositoryDayTotals(inside, "owner/a", 2, 1, 0),
+                new RepositoryDayTotals(inside, "owner/b", 1, 1, 0)
+        ));
+        byDate.put(later, List.of(new RepositoryDayTotals(later, "owner/a", 4, 1, 1)));
+        byDate.put(before, List.of(new RepositoryDayTotals(before, "owner/a", 9, 1, 1)));
+        byDate.put(after, List.of(new RepositoryDayTotals(after, "owner/a", 9, 1, 1)));
+        byDate.put(empty, List.of());
+
+        List<TrafficPoint> traffic = AnalyticsService.portfolioSeries(from, to, today, 1, byDate);
+
+        assertThat(traffic).extracting(TrafficPoint::date).containsExactly(inside, middle, later);
+        assertThat(traffic.get(0).missingRepositories()).isZero();
+        assertThat(traffic.get(0).views()).isEqualTo(3);
+    }
+
+    @Test
+    void noStoredDaysProduceAnEmptySeries() {
+        assertThat(AnalyticsService.portfolioSeries(
+                LocalDate.of(2026, 8, 20),
+                LocalDate.of(2026, 8, 22),
+                LocalDate.of(2026, 8, 22),
+                2,
+                Map.of()
+        )).isEmpty();
     }
 
     @Test

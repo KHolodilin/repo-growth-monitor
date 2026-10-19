@@ -1,4 +1,4 @@
-import { JOB_LABELS, type ProgressJob } from "./collectProgress";
+import { collectionFailureReason, JOB_LABELS, type ProgressJob } from "./collectProgress";
 import { TRAFFIC_PERMISSION, type PlannerWindow } from "./githubAccess";
 
 export const DEFAULT_PLANNER: PlannerWindow = {
@@ -54,8 +54,7 @@ function jobLine(jobType: string, job: ProgressJob | undefined, trafficPermissio
     return { jobType, label, mark: "✓", detail: null };
   }
   if (job?.status === "FAILED") {
-    const detail = job.errorMessage?.trim();
-    return { jobType, label, mark: "✕", detail: detail ? detail : null };
+    return { jobType, label, mark: "✕", detail: collectionFailureReason(job.errorMessage, job.jobType) };
   }
   if (job?.status === "RUNNING" || job?.status === "RETRY") {
     return { jobType, label, mark: "…", detail: null };

@@ -84,12 +84,28 @@ function portfolioLine(rows: ProgressRow[], watching: boolean): string | null {
   if (!active) {
     return base;
   }
-  const reason = rows
+  const failedJob = rows
     .filter((row) => collectionInProgress(row.collectionStatus))
     .flatMap((row) => row.jobs)
-    .find((job) => job.status === "FAILED" && job.errorMessage?.trim())
-    ?.errorMessage?.trim();
+    .find((job) => job.status === "FAILED" && collectionFailureReason(job.errorMessage, job.jobType));
+  const reason = failedJob ? collectionFailureReason(failedJob.errorMessage, failedJob.jobType) : null;
   return reason ? `${base}. ${reason}` : base;
+}
+
+/** Stored on collection jobs when any GitHub 422 was labeled as a search failure. */
+export const MISLABELED_SEARCH_ERROR = "Invalid GitHub search query";
+
+export const GROWTH_ACTIVITY_FAILURE = "Could not load issues";
+
+export function collectionFailureReason(message: string | null | undefined, jobType?: string): string | null {
+  const reason = message?.trim();
+  if (reason === MISLABELED_SEARCH_ERROR && jobType === "GROWTH_EVENTS") {
+    return GROWTH_ACTIVITY_FAILURE;
+  }
+  if (!reason || reason === MISLABELED_SEARCH_ERROR) {
+    return null;
+  }
+  return reason;
 }
 
 function jobPhrases(jobs: ProgressJob[]): { text: string; failed: boolean }[] {
@@ -102,7 +118,7 @@ function jobPhrases(jobs: ProgressJob[]): { text: string; failed: boolean }[] {
       return [{ text: `${label} running`, failed: false }];
     }
     if (job.status === "FAILED") {
-      const reason = job.errorMessage?.trim();
+      const reason = collectionFailureReason(job.errorMessage, job.jobType);
       return [{ text: reason ? `${label} failed: ${reason}` : `${label} failed`, failed: true }];
     }
     return [];

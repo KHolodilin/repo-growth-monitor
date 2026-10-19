@@ -84,6 +84,22 @@ describe("collect progress", () => {
         watching: false,
       }),
     ).toBe("Referrers failed: rate limit");
+    expect(
+      headerProgress({
+        repositoryId: 13,
+        rows: [repo({ jobs: [{ jobType: "GROWTH_EVENTS", status: "FAILED", errorMessage: "Invalid GitHub search query" }] })],
+        watching: false,
+      }),
+    ).toBe(
+      "Growth Events failed: Could not load issues",
+    );
+    expect(
+      headerProgress({
+        repositoryId: 13,
+        rows: [repo({ jobs: [{ jobType: "GROWTH_EVENTS", status: "FAILED", errorMessage: "Could not load issues (Validation Failed)" }] })],
+        watching: false,
+      }),
+    ).toBe("Growth Events failed: Could not load issues (Validation Failed)");
     expect(headerProgress({ repositoryId: 13, rows: [repo()], watching: false })).toBeNull();
   });
 });
