@@ -12,7 +12,7 @@ import {
   type SearchHistory,
   type TopicHistory,
 } from "../lib/api";
-import { JOB_LABELS } from "../lib/collectProgress";
+import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
@@ -686,6 +686,7 @@ function CollectionStatusCard({
   }
 
   const failed = run.jobs.find((job) => job.status === "FAILED");
+  const failureReason = collectionFailureReason(failed?.errorMessage, failed?.jobType);
   return (
     <Card>
       <h2 className="mb-4 font-medium">Collection Status</h2>
@@ -699,7 +700,7 @@ function CollectionStatusCard({
       {(run.completedAt || run.createdAt) && (
         <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
       )}
-      {failed?.errorMessage && <p className="mt-2 text-sm">{failed.errorMessage}</p>}
+      {failureReason && <p className="mt-2 text-sm">{failureReason}</p>}
       <div className="mt-4 space-y-2 text-sm">
         {run.jobs.map((job) => (
           <JobRow key={job.jobType} job={job} businessDate={run.businessDate} trafficGap={trafficGap} />

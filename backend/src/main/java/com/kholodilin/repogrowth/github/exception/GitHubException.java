@@ -56,6 +56,10 @@ public class GitHubException extends RuntimeException {
         return rateLimitReset;
     }
 
+    public GitHubException withContext(String context) {
+        return new GitHubException(errorCode, statusCode, retryable, rateLimitReset, context + " (" + getMessage() + ")", this);
+    }
+
     public static GitHubException auth(int status, String message) {
         return new GitHubException(ErrorCode.GITHUB_AUTH_ERROR, status, false, null, message);
     }

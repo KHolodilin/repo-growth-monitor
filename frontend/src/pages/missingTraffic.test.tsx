@@ -30,12 +30,18 @@ describe("missing traffic", () => {
         repositories: [
           {
             ...dashboardReady.repositories[0],
+            collectionStatus: "SUCCESS",
             trafficNotice: { reason: "GITHUB_DATA_MISSING", date: "2026-10-18", lastTrafficDate: "2026-10-17" },
           },
           {
             ...dashboardReady.repositories[0],
             id: 8,
             fullName: "KHolodilin/other",
+            collectionStatus: "PARTIAL",
+            jobs: [
+              { jobType: "TRAFFIC", status: "FAILED" },
+              { jobType: "REFERRERS", status: "SUCCESS" },
+            ],
             trafficNotice: { reason: "COLLECTION_FAILED", date: "2026-10-19", lastTrafficDate: "2026-10-18" },
           },
         ],
@@ -46,13 +52,16 @@ describe("missing traffic", () => {
         <DashboardPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("button", { name: /2 repositories missing traffic data/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /2 repositories/ })).toBeInTheDocument();
+    expect(screen.queryByText(/collected partially/)).not.toBeInTheDocument();
     expect(screen.queryByText(/service was not running/)).not.toBeInTheDocument();
     expect(screen.queryByText("Partial data")).not.toBeInTheDocument();
     const icon = screen.getByRole("img", { name: "No GitHub traffic for 18 Oct. Last data Oct 17" });
+    expect(icon).toHaveTextContent("!");
     expect(icon.closest("a")).toBeNull();
-    await user.click(screen.getByRole("button", { name: /2 repositories missing traffic data/ }));
+    await user.click(screen.getByRole("button", { name: /2 repositories/ }));
     expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
+    expect(screen.getByText("Partial collection: Traffic ✕")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "KHolodilin/other" })).toHaveLength(2);
   });
 

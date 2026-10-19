@@ -81,7 +81,7 @@ class TrafficCompletenessTest {
                 YESTERDAY,
                 TrafficJobState.SUCCEEDED
         );
-        assertThat(hole).isEqualTo(new Notice(Reason.MISSING_DAY, LocalDate.of(2026, 10, 15), null));
+        assertThat(hole).isNull();
 
         Notice failed = TrafficCompleteness.portfolio(
                 TODAY, true, TODAY.minusDays(6), TODAY,
@@ -112,8 +112,7 @@ class TrafficCompletenessTest {
                 LocalDate.of(2026, 10, 17),
                 TrafficJobState.ABSENT
         );
-        assertThat(notice.reason()).isEqualTo(Reason.MISSING_DAY);
-        assertThat(notice.date()).isEqualTo(YESTERDAY);
+        assertThat(notice).isNull();
     }
 
     @Test

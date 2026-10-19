@@ -15,6 +15,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
@@ -222,9 +223,30 @@ class GitHubClientWireMockTest {
 
     @Test
     void unprocessableSearchQuery() {
-        wireMock.stubFor(get("/search/repositories")
+        wireMock.stubFor(get(urlPathEqualTo("/search/repositories"))
                 .willReturn(aResponse().withStatus(422).withBody("{\"message\":\"Validation Failed\"}")));
-        assertThatThrownBy(() -> client.searchRepositories("bad:", 10)).isInstanceOf(GitHubException.class);
+        assertThatThrownBy(() -> client.searchRepositories("bad:", 10))
+                .isInstanceOf(GitHubException.class)
+                .hasMessage("Invalid GitHub search query");
+    }
+
+    @Test
+    void unprocessableRepositoryKeepsGitHubMessage() {
+        wireMock.stubFor(get("/repos/acme/a")
+                .willReturn(aResponse().withStatus(422).withBody("{\"message\":\"Validation Failed\"}")));
+        assertThatThrownBy(() -> client.getRepository("acme", "a"))
+                .isInstanceOf(GitHubException.class)
+                .hasMessage("Validation Failed");
+    }
+
+    @Test
+    void unprocessableRepositoryWithoutAMessage() {
+        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("")));
+        assertThatThrownBy(() -> client.getRepository("acme", "a")).hasMessage("GitHub rejected the request");
+        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("not-json")));
+        assertThatThrownBy(() -> client.getRepository("acme", "a")).hasMessage("GitHub rejected the request");
+        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("{\"message\":\"  \"}")));
+        assertThatThrownBy(() -> client.getRepository("acme", "a")).hasMessage("GitHub rejected the request");
     }
 
     @Test
@@ -413,6 +435,26 @@ class GitHubClientWireMockTest {
             assertThat(readme.sha()).isEqualTo("abc");
             assertThat(readme.decodedText()).isEqualTo("# demo");
         });
+    }
+
+    @Test
+    void keepsAnEncodedIssuesCursorOnTheNextPage() {
+        wireMock.stubFor(get(urlPathEqualTo("/repos/acme/a/issues"))
+                .withQueryParam("after", absent())
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withHeader("Link", "<" + wireMock.baseUrl() + "/repos/acme/a/issues?per_page=100&after=abc%3D&page=2>; rel=\"next\"")
+                        .withBody("""
+                                [{"id":11,"number":1,"title":"Help wanted","state":"open","html_url":"https://github.com/acme/a/issues/1","created_at":"2026-08-20T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[]}]
+                                """)));
+        wireMock.stubFor(get(urlPathEqualTo("/repos/acme/a/issues"))
+                .withQueryParam("after", equalTo("abc="))
+                .willReturn(aResponse()
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("""
+                                [{"id":12,"number":2,"title":"Next","state":"open","html_url":"https://github.com/acme/a/issues/2","created_at":"2026-08-21T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[]}]
+                                """)));
+        assertThat(client.listIssues("acme", "a")).hasSize(2);
     }
 
     @Test

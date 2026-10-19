@@ -109,16 +109,10 @@ public final class TrafficCompleteness {
                 storedAfter = false;
             }
         }
-        if (latestMissing == null) {
+        if (latestMissing == null || storedAfter || runNotice == null) {
             return null;
         }
-        if (storedAfter) {
-            return new Notice(Reason.MISSING_DAY, latestMissing, null);
-        }
-        if (runNotice != null) {
-            return new Notice(Reason.GITHUB_DATA_MISSING, latestMissing, lastStored);
-        }
-        return new Notice(Reason.MISSING_DAY, latestMissing, lastStored);
+        return new Notice(Reason.GITHUB_DATA_MISSING, latestMissing, lastStored);
     }
 
     private static boolean blank(String value) {

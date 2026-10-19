@@ -130,37 +130,7 @@ function metricSeries(
   name: string,
   color: string,
 ) {
-  const partial = traffic.map((point) => (point.missingRepositories ?? 0) > 0 && point.views != null);
-  const values = traffic.map((point) => point[metric] ?? null);
-  const solid = values.map((value, index) => (partial[index] ? null : value));
-  const dashed = values.map((value, index) => {
-    if (value == null) {
-      return null;
-    }
-    if (partial[index]) {
-      return { value, symbol: "circle" };
-    }
-    if (index + 1 < partial.length && partial[index + 1]) {
-      return { value, symbol: "none" };
-    }
-    return null;
-  });
-  const bridge = values.map((value, index) => {
-    if (value == null) {
-      return null;
-    }
-    const nextPartial = index + 1 < partial.length && partial[index + 1];
-    const previousPartial = index > 0 && partial[index - 1];
-    if (partial[index] && !nextPartial && index + 1 < values.length && values[index + 1] != null) {
-      return value;
-    }
-    if (!partial[index] && previousPartial) {
-      return value;
-    }
-    return null;
-  });
   return [
-    { name, type: "line" as const, color, showSymbol: true, symbolSize: 8, connectNulls: false, data: solid },
     {
       name,
       type: "line" as const,
@@ -168,20 +138,7 @@ function metricSeries(
       showSymbol: true,
       symbolSize: 8,
       connectNulls: false,
-      lineStyle: { type: "dashed" as const, color },
-      itemStyle: { color },
-      data: dashed,
-    },
-    {
-      name,
-      type: "line" as const,
-      color,
-      showSymbol: false,
-      silent: true,
-      connectNulls: false,
-      lineStyle: { color },
-      tooltip: { show: false },
-      data: bridge,
+      data: traffic.map((point) => point[metric] ?? null),
     },
   ];
 }

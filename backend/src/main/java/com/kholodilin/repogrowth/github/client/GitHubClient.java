@@ -36,6 +36,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriUtils;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
@@ -491,7 +492,7 @@ public class GitHubClient {
         long started = System.nanoTime();
         try {
             ResponseEntity<byte[]> response = restClient.get()
-                    .uri(path)
+                    .uri(requestUri(path))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, this::handleError)
                     .toEntity(byte[].class);
@@ -519,7 +520,7 @@ public class GitHubClient {
         long started = System.nanoTime();
         try {
             ResponseEntity<byte[]> response = restClient.post()
-                    .uri(path)
+                    .uri(requestUri(path))
                     .header(HttpHeaders.CONTENT_TYPE, "application/json")
                     .body(json)
                     .retrieve()
@@ -595,7 +596,10 @@ public class GitHubClient {
             throw GitHubException.notFound("GitHub resource not found");
         }
         if (status == 422) {
-            throw GitHubException.validation("Invalid GitHub search query");
+            if (request.getURI().getPath().contains("/search/")) {
+                throw GitHubException.validation("Invalid GitHub search query");
+            }
+            throw GitHubException.validation(validationMessage(body));
         }
         boolean retryable = status >= 500 || status == 429;
         if (status == 429) {
@@ -698,6 +702,17 @@ public class GitHubClient {
         return matcher.group(1);
     }
 
+    private URI requestUri(String path) {
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return URI.create(path);
+        }
+        String base = properties.apiBaseUrl();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        return URI.create(base + (path.startsWith("/") ? path : "/" + path));
+    }
+
     private String nextPath(String linkHeader) {
         if (linkHeader == null || linkHeader.isBlank()) {
             return null;
@@ -737,6 +752,22 @@ public class GitHubClient {
     private boolean remainingZero(HttpHeaders headers) {
         String remaining = headers.getFirst("X-RateLimit-Remaining");
         return "0".equals(remaining);
+    }
+
+    private String validationMessage(String body) {
+        if (body == null || body.isBlank()) {
+            return "GitHub rejected the request";
+        }
+        try {
+            JsonNode node = jsonMapper.readTree(body);
+            String text = node.path("message").asText("");
+            if (!text.isBlank()) {
+                return text;
+            }
+        } catch (JacksonException ignored) {
+            return "GitHub rejected the request";
+        }
+        return "GitHub rejected the request";
     }
 
     private String bodyAsString(ClientHttpResponse response) {
