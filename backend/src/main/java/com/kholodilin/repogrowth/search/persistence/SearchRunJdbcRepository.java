@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.search.persistence;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
+import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.RankPoint;
 import com.kholodilin.repogrowth.search.domain.SearchRun;
 import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
 import org.springframework.jdbc.core.RowMapper;
@@ -312,6 +313,33 @@ public class SearchRunJdbcRepository {
                         """)
                 .param("searchQueryId", searchQueryId)
                 .query((rs, rowNum) -> rs.getObject("business_date", LocalDate.class))
+                .list();
+    }
+
+    public List<RankPoint> successfulPositions(LocalDate to) {
+        return jdbcClient.sql("""
+                        SELECT r.id AS repository_id,
+                               r.full_name,
+                               q.name AS query_name,
+                               run.business_date,
+                               run.tracked_repository_position AS tracked_position
+                        FROM search_run run
+                        JOIN search_query q ON q.id = run.search_query_id
+                        JOIN repository r ON r.id = run.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND run.status = 'SUCCESS'
+                          AND run.tracked_repository_position IS NOT NULL
+                          AND run.business_date <= :to
+                        ORDER BY run.business_date, run.id
+                        """)
+                .param("to", to)
+                .query((rs, rowNum) -> new RankPoint(
+                        rs.getLong("repository_id"),
+                        rs.getString("full_name"),
+                        rs.getString("query_name"),
+                        rs.getObject("business_date", LocalDate.class),
+                        rs.getInt("tracked_position")
+                ))
                 .list();
     }
 

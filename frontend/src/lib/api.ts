@@ -103,9 +103,37 @@ export type Dashboard = {
     activityAt?: string | null;
     activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
     discoverabilityPassed: number | null;
+    discoverabilityTotal?: number | null;
     accessible?: boolean;
     trafficPermissionMissing?: boolean;
   }[];
+  highlights?: {
+    rankRise: RankHighlight | null;
+    rankDrop: RankHighlight | null;
+    events: EventHighlight | null;
+    visitors: VisitorHighlight | null;
+  } | null;
+};
+
+export type RankHighlight = {
+  repositoryId: number;
+  fullName: string;
+  queryName: string;
+  fromRank: number;
+  toRank: number;
+};
+
+export type EventHighlight = {
+  count: number;
+  repositoryId: number;
+  fullName: string;
+  repositoryNames: string[];
+};
+
+export type VisitorHighlight = {
+  repositoryId: number;
+  fullName: string;
+  growthPercent: number;
 };
 
 export type TrafficPoint = {

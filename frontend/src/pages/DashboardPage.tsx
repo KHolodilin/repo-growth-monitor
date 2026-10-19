@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type Dashboard } from "../lib/api";
+import { api, type Dashboard, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
@@ -124,6 +124,7 @@ export function DashboardPage() {
         </Card>
       )}
       <TrafficChart traffic={data.traffic} />
+      <PeriodHighlights highlights={data.highlights} />
       <RepositoryTable rows={data.repositories} />
     </div>
   );
@@ -202,6 +203,58 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
         opts={{ renderer: "canvas" }}
       />
     </ChartCard>
+  );
+}
+
+function PeriodHighlights({ highlights }: { highlights: Dashboard["highlights"] }) {
+  const rise = highlights?.rankRise;
+  const drop = highlights?.rankDrop;
+  const events = highlights?.events;
+  const visitors = highlights?.visitors;
+  const growth = visitors ? formatGrowth(visitors.growthPercent) : null;
+  return (
+    <div className="space-y-2 text-sm">
+      <HighlightLine label="Rank">
+        {rise && <RankLink move={rise} />}
+        {drop && <RankLink move={drop} />}
+        {!rise && !drop && <span className="text-muted-foreground">No rank changes</span>}
+      </HighlightLine>
+      <HighlightLine label="Events">
+        {events ? (
+          <Link className="text-primary hover:underline" to={`/repositories/${events.repositoryId}?tab=growth-events`}>
+            {events.count} {events.count === 1 ? "promotion event" : "promotion events"} · {events.repositoryNames.join(", ")}
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">No promotion events</span>
+        )}
+      </HighlightLine>
+      <HighlightLine label="Visitors">
+        {visitors && growth ? (
+          <Link className="hover:underline" to={`/repositories/${visitors.repositoryId}`}>
+            {visitors.fullName} <span className={growthClass(growth.direction)}>{growth.label}</span>
+          </Link>
+        ) : (
+          <span className="text-muted-foreground">No visitor growth</span>
+        )}
+      </HighlightLine>
+    </div>
+  );
+}
+
+function HighlightLine({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+      <div className="flex flex-col gap-1">{children}</div>
+    </div>
+  );
+}
+
+function RankLink({ move }: { move: RankHighlight }) {
+  return (
+    <Link className="text-primary hover:underline" to={`/repositories/${move.repositoryId}?tab=search`}>
+      {move.fullName} · {move.queryName} {move.fromRank} → {move.toRank}
+    </Link>
   );
 }
 
@@ -303,7 +356,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                     {growth?.label ?? "—"}
                   </td>
                   <td className="px-5 text-right tabular-nums">
-                    {row.discoverabilityPassed == null ? "—" : row.discoverabilityPassed}
+                    <DiscoverabilityCell row={row} />
                   </td>
                   <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
                     {formatActivityPresentation(row.activityStatus, row.activityAt)}
@@ -316,6 +369,36 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
       </div>
     </Card>
   );
+}
+
+function DiscoverabilityCell({ row }: { row: Dashboard["repositories"][number] }) {
+  if (row.discoverabilityPassed == null) {
+    return <span>—</span>;
+  }
+  const tone = discoverabilityTone(row.discoverabilityPassed);
+  if (row.discoverabilityTotal == null) {
+    return <span className={tone}>{row.discoverabilityPassed}</span>;
+  }
+  return (
+    <Link
+      className="hover:underline"
+      to={`/repositories/${row.id}?tab=overview&focus=health`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <span className={tone}>{row.discoverabilityPassed}</span>
+      <span>/{row.discoverabilityTotal}</span>
+    </Link>
+  );
+}
+
+function discoverabilityTone(passed: number) {
+  if (passed >= 11) {
+    return "text-emerald-700";
+  }
+  if (passed >= 5) {
+    return "text-amber-600";
+  }
+  return "text-red-700";
 }
 
 function SortHeader({

@@ -8,6 +8,8 @@ import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class RepositoryHealthService {
 
@@ -38,15 +40,23 @@ public class RepositoryHealthService {
 
     /** Passed Discoverability checks, or null before the first stats collection stored health facts. */
     public Integer discoverabilityPassed(Repository repository) {
+        return discoverabilityScore(repository).passed();
+    }
+
+    public DiscoverabilityScore discoverabilityScore(Repository repository) {
         if (repositoryJdbcRepository.findHealth(repository.id()).isEmpty()) {
-            return null;
+            return new DiscoverabilityScore(null, null);
         }
+        List<HealthCheckItem> items = forRepository(repository).discoverability();
         int passed = 0;
-        for (HealthCheckItem item : forRepository(repository).discoverability()) {
+        for (HealthCheckItem item : items) {
             if (item.passed()) {
                 passed++;
             }
         }
-        return passed;
+        return new DiscoverabilityScore(passed, items.size());
+    }
+
+    public record DiscoverabilityScore(Integer passed, Integer total) {
     }
 }
