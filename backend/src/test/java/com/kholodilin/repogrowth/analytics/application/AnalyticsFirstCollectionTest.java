@@ -9,6 +9,7 @@ import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
+import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.Repository;
@@ -79,6 +80,7 @@ class AnalyticsFirstCollectionTest {
                 activity,
                 health,
                 mock(PortfolioHighlightsService.class),
+                mock(PlanningWindow.class),
                 Clock.fixed(now, ZoneOffset.UTC)
         );
 

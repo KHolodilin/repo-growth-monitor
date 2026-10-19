@@ -1,3 +1,4 @@
+import { partialDayTooltip } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
 type TrafficLeader = { fullName: string; value: number };
@@ -10,6 +11,7 @@ type DashboardTrafficPoint = {
   viewsLeaders?: TrafficLeader[] | null;
   visitorsLeaders?: TrafficLeader[] | null;
   clonesLeaders?: TrafficLeader[] | null;
+  missingRepositories?: number;
 };
 
 function leadersFor(point: DashboardTrafficPoint | undefined, seriesName: string) {
@@ -39,7 +41,17 @@ function shareLines(total: number | null | undefined, leaders: TrafficLeader[] |
   return rows.map((leader) => `<div>${leader.fullName} - ${formatNumber(leader.value)}</div>`).join("");
 }
 
-type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | null };
+type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | { value?: number | null } | null };
+
+function pointValue(data: TooltipItem["data"]) {
+  if (data == null) {
+    return null;
+  }
+  if (typeof data === "number") {
+    return data;
+  }
+  return data.value ?? null;
+}
 
 function tooltipItems(raw: unknown): TooltipItem[] | null {
   if (Array.isArray(raw)) {
@@ -67,14 +79,19 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
           return "";
         }
         const point = byDate.get(dateKey);
+        const missing = point?.missingRepositories ?? 0;
+        const partial = missing > 0 && point?.views != null
+          ? `<div>${partialDayTooltip(missing, dateKey)}</div>`
+          : "";
         const rows = items
           .map((item) => {
-            const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-            const share = shareLines(item.data, leadersFor(point, item.seriesName));
-            return `<div>${item.seriesName} - ${value}</div>${share}`;
+            const value = pointValue(item.data);
+            const shown = value === null || value === undefined ? "—" : formatNumber(value);
+            const share = shareLines(value, leadersFor(point, item.seriesName));
+            return `<div>${item.seriesName} - ${shown}</div>${share}`;
           })
           .join("");
-        return `<div><div>${formatChartAxisDate(dateKey)}</div>${rows}</div>`;
+        return `<div><div>${formatChartAxisDate(dateKey)}</div>${partial}${rows}</div>`;
       },
     },
     legend: { top: 0, data: ["Views", "Visitors", "Clones"] },
@@ -94,9 +111,77 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
     },
     yAxis: { type: "value" as const, name: "Metric value" },
     series: [
-      { name: "Views", type: "line" as const, showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.views ?? null) },
-      { name: "Visitors", type: "line" as const, showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.visitors ?? null) },
-      { name: "Clones", type: "line" as const, showSymbol: true, symbolSize: 8, connectNulls: false, data: traffic.map((point) => point.clones ?? null) },
+      ...metricSeries(traffic, "views", "Views", "#5470c6"),
+      ...metricSeries(traffic, "visitors", "Visitors", "#91cc75"),
+      ...metricSeries(traffic, "clones", "Clones", "#fac858"),
     ],
   };
+}
+
+const METRIC_KEY = {
+  views: "views",
+  visitors: "visitors",
+  clones: "clones",
+} as const;
+
+function metricSeries(
+  traffic: DashboardTrafficPoint[],
+  metric: keyof typeof METRIC_KEY,
+  name: string,
+  color: string,
+) {
+  const partial = traffic.map((point) => (point.missingRepositories ?? 0) > 0 && point.views != null);
+  const values = traffic.map((point) => point[metric] ?? null);
+  const solid = values.map((value, index) => (partial[index] ? null : value));
+  const dashed = values.map((value, index) => {
+    if (value == null) {
+      return null;
+    }
+    if (partial[index]) {
+      return { value, symbol: "circle" };
+    }
+    if (index + 1 < partial.length && partial[index + 1]) {
+      return { value, symbol: "none" };
+    }
+    return null;
+  });
+  const bridge = values.map((value, index) => {
+    if (value == null) {
+      return null;
+    }
+    const nextPartial = index + 1 < partial.length && partial[index + 1];
+    const previousPartial = index > 0 && partial[index - 1];
+    if (partial[index] && !nextPartial && index + 1 < values.length && values[index + 1] != null) {
+      return value;
+    }
+    if (!partial[index] && previousPartial) {
+      return value;
+    }
+    return null;
+  });
+  return [
+    { name, type: "line" as const, color, showSymbol: true, symbolSize: 8, connectNulls: false, data: solid },
+    {
+      name,
+      type: "line" as const,
+      color,
+      showSymbol: true,
+      symbolSize: 8,
+      connectNulls: false,
+      lineStyle: { type: "dashed" as const, color },
+      itemStyle: { color },
+      data: dashed,
+    },
+    {
+      name,
+      type: "line" as const,
+      color,
+      showSymbol: false,
+      silent: true,
+      connectNulls: false,
+      lineStyle: { color },
+      tooltip: { show: false },
+      data: bridge,
+    },
+  ];
 }

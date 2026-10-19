@@ -87,6 +87,7 @@ export type Dashboard = {
     viewsLeaders?: { fullName: string; value: number }[] | null;
     visitorsLeaders?: { fullName: string; value: number }[] | null;
     clonesLeaders?: { fullName: string; value: number }[] | null;
+    missingRepositories?: number;
   }[];
   repositories: {
     id: number;
@@ -106,6 +107,7 @@ export type Dashboard = {
     discoverabilityTotal?: number | null;
     accessible?: boolean;
     trafficPermissionMissing?: boolean;
+    trafficNotice?: TrafficNotice | null;
   }[];
   highlights?: {
     rankRise: RankHighlight | null;
@@ -134,6 +136,12 @@ export type VisitorHighlight = {
   repositoryId: number;
   fullName: string;
   growthPercent: number;
+};
+
+export type TrafficNotice = {
+  reason: "GITHUB_DATA_MISSING" | "COLLECTION_NOT_EXECUTED" | "COLLECTION_FAILED" | "MISSING_DAY";
+  date: string;
+  lastTrafficDate?: string | null;
 };
 
 export type TrafficPoint = {
@@ -222,6 +230,7 @@ export type RepositoryTraffic = {
   paths: PathSnapshotRow[];
   pathSnapshotAt?: string;
   lastCollection?: CollectionRun;
+  trafficGap?: TrafficNotice | null;
 };
 
 export type PathSnapshotRow = {

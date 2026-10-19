@@ -26,7 +26,7 @@ export function chartCsv(option: object) {
   const chart = option as ChartOption;
   const axis = Array.isArray(chart.xAxis) ? chart.xAxis[0] : chart.xAxis;
   const dates = (axis?.data ?? []).map((value) => (value == null ? "" : String(value)));
-  const columns = (chart.series ?? []).filter(isExportedSeries);
+  const columns = mergedColumns(chart.series ?? []);
   const header = ["date", ...columns.map((series) => series.name)].map(csvField).join(",");
   const rows = dates.map((date, index) =>
     [date, ...columns.map((series) => cellText(series.data?.[index]))].map(csvField).join(","),
@@ -55,6 +55,28 @@ export function downloadChartCsv(filename: string, csv: string) {
   const url = URL.createObjectURL(blob);
   saveDownload(filename, url);
   URL.revokeObjectURL(url);
+}
+
+function mergedColumns(series: Series[]) {
+  const order: string[] = [];
+  const data = new Map<string, unknown[]>();
+  for (const item of series) {
+    if (!isExportedSeries(item)) {
+      continue;
+    }
+    if (!data.has(item.name)) {
+      order.push(item.name);
+      data.set(item.name, []);
+    }
+    const column = data.get(item.name) ?? [];
+    const values = item.data ?? [];
+    for (let index = 0; index < values.length; index += 1) {
+      if (cellText(column[index]) === "" && cellText(values[index]) !== "") {
+        column[index] = values[index];
+      }
+    }
+  }
+  return order.map((name) => ({ name, data: data.get(name) }));
 }
 
 function isExportedSeries(series: Series): series is Series & { name: string } {

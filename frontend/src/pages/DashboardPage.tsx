@@ -7,6 +7,7 @@ import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
 import { loadGitHubAccess, parseGitHubAccess, type GitHubAccess, type TokenState } from "../lib/githubAccess";
 import { checklistSchedule, collectionJobLines, DEFAULT_PLANNER } from "../lib/setupChecklist";
+import { missingTrafficBadge, portfolioNoticeText } from "../lib/trafficGap";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -133,24 +134,41 @@ function DashboardHeader({
   period: Period;
   onPeriod: (period: Period) => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const missing = (data?.repositories ?? []).filter((row) => row.trafficNotice);
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <h1 className="text-2xl font-semibold">Portfolio</h1>
-      <div className="flex flex-col items-end gap-3">
-        {(data?.collectionWarning || data?.partialData?.present) && (
-          <div className="text-right text-sm text-muted-foreground">
-            {data?.collectionWarning && (
-              <div className="text-amber-700">⚠ {data.collectionWarning.message}</div>
-            )}
-            {data?.partialData?.present && (
-              <div className="group relative mt-1 inline-block text-amber-700">
-                ⚠ Partial data
-                <div className="invisible absolute right-0 z-10 mt-2 w-72 rounded-md border bg-card p-3 text-left text-xs text-foreground shadow-lg group-hover:visible">
-                  {data.partialData.message}
-                </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold">Portfolio</h1>
+        {missing.length > 0 && (
+          <div className="relative">
+            <button
+              type="button"
+              className="text-sm text-amber-700"
+              onClick={() => setOpen((current) => !current)}
+            >
+              ⚠ {missingTrafficBadge(missing.length)}
+            </button>
+            {open && (
+              <div className="absolute left-0 z-10 mt-2 w-80 rounded-md border bg-card p-3 text-left shadow-lg">
+                {missing.map((row) => (
+                  <div key={row.id} className="py-1 text-sm">
+                    <Link className="text-primary hover:underline" to={`/repositories/${row.id}`}>
+                      {row.fullName}
+                    </Link>
+                    {row.trafficNotice && (
+                      <div className="text-muted-foreground">{portfolioNoticeText(row.trafficNotice)}</div>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
+        )}
+      </div>
+      <div className="flex flex-col items-end gap-3">
+        {data?.collectionWarning && (
+          <div className="text-right text-sm text-amber-700">⚠ {data.collectionWarning.message}</div>
         )}
         <PeriodSelector period={period} onPeriod={onPeriod} />
       </div>
@@ -325,6 +343,16 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   onClick={() => navigate(`/repositories/${row.id}`)}
                 >
                   <td className="max-w-0 px-5 py-3 align-top">
+                    {row.trafficNotice && (
+                      <span
+                        role="img"
+                        className="mr-1 text-amber-600"
+                        title={portfolioNoticeText(row.trafficNotice)}
+                        aria-label={portfolioNoticeText(row.trafficNotice)}
+                      >
+                        ⚠
+                      </span>
+                    )}
                     <Link
                       className="break-words [overflow-wrap:anywhere] text-primary hover:underline"
                       to={`/repositories/${row.id}`}

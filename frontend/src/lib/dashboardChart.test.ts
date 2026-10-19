@@ -17,7 +17,8 @@ describe("dashboardTrafficOption", () => {
     expect(option.tooltip.trigger).toBe("item");
     expect(option.tooltip.triggerOn).toBe("click");
     expect(option.xAxis.boundaryGap).toBe(false);
-    expect(option.series).toHaveLength(3);
+    expect(option.series).toHaveLength(9);
+    expect(option.series.filter((series) => series.lineStyle?.type === "dashed")).toHaveLength(3);
     expect(formatter({})).toBe("");
     expect(dashboardTrafficOption([{ date: "2026-10-08", views: 1, visitors: 1, clones: 1 }]).xAxis.boundaryGap).toBe(true);
   });
@@ -79,5 +80,38 @@ describe("dashboardTrafficOption", () => {
       { date: "2026-10-08", views: 40, visitors: 1, clones: 1, viewsLeaders: [] },
     ]);
     expect(none.tooltip.formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: 40 }])).not.toContain("owner/outbox");
+  });
+
+  it("draws a partial day as a dashed segment and keeps a stored zero solid", () => {
+    const option = dashboardTrafficOption([
+      { date: "2026-10-17", views: 10, visitors: 4, clones: 1, missingRepositories: 0 },
+      { date: "2026-10-18", views: 7, visitors: 3, clones: 1, missingRepositories: 2 },
+    ]);
+    const dashed = option.series.find((series) => series.name === "Views" && series.lineStyle?.type === "dashed");
+    expect(dashed?.data[1]).toMatchObject({ value: 7 });
+    expect(option.series.find((series) => series.name === "Views" && !series.lineStyle)?.data).toEqual([10, null]);
+    const text = option.tooltip.formatter([{ axisValue: "2026-10-18", seriesName: "Views", data: 7 }]);
+    expect(text).toContain("Partial data — 2 repositories missing traffic data for 18 Oct");
+    const solid = dashboardTrafficOption([{ date: "2026-10-18", views: 0, visitors: 0, clones: 0, missingRepositories: 0 }]);
+    expect(solid.tooltip.formatter([{ name: "2026-10-18", seriesName: "Views", data: 0 }])).not.toContain("Partial data");
+
+    const middle = dashboardTrafficOption([
+      { date: "2026-10-16", views: 4, visitors: 1, clones: 1, missingRepositories: 0 },
+      { date: "2026-10-17", views: 5, visitors: 1, clones: 1, missingRepositories: 2 },
+      { date: "2026-10-18", views: 6, visitors: 1, clones: 1, missingRepositories: 0 },
+    ]);
+    const bridge = middle.series.find((series) => series.name === "Views" && series.silent);
+    expect(bridge?.data).toEqual([null, 5, 6]);
+    const hole = dashboardTrafficOption([
+      { date: "2026-10-16", views: 4, visitors: 1, clones: 1 },
+      { date: "2026-10-17", views: null, visitors: null, clones: null, missingRepositories: 3 },
+      { date: "2026-10-18", views: 6, visitors: 1, clones: 1 },
+    ]);
+    expect(hole.series.find((series) => series.name === "Views" && series.lineStyle?.type === "dashed")?.data[1]).toBeNull();
+    const both = dashboardTrafficOption([
+      { date: "2026-10-16", views: 1, visitors: 1, clones: 1, missingRepositories: 1 },
+      { date: "2026-10-17", views: 2, visitors: 1, clones: 1, missingRepositories: 1 },
+    ]);
+    expect(both.series.find((series) => series.name === "Views" && series.silent)?.data).toEqual([null, null]);
   });
 });

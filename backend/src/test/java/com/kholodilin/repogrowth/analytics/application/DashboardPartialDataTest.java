@@ -7,55 +7,53 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DashboardPartialDataTest {
 
     @Test
-    void internalGapsAreReportedWithoutFillingZeros() {
-        List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 20), 100L, 40L, 5L),
-                new TrafficPoint(LocalDate.of(2026, 8, 21), null, null, null),
-                new TrafficPoint(LocalDate.of(2026, 8, 22), 130L, 50L, 8L)
+    void aHoleBreaksTheLineAndAPartialDayKeepsTheSumOfRepositoriesThatHaveIt() {
+        LocalDate today = LocalDate.of(2026, 8, 23);
+        LocalDate twentieth = LocalDate.of(2026, 8, 20);
+        LocalDate twentySecond = LocalDate.of(2026, 8, 22);
+        List<TrafficPoint> traffic = AnalyticsService.portfolioSeries(
+                LocalDate.of(2026, 8, 18),
+                today,
+                today,
+                3,
+                Map.of(
+                        twentieth, List.of(
+                                new RepositoryDayTotals(twentieth, "owner/a", 10, 4, 1),
+                                new RepositoryDayTotals(twentieth, "owner/b", 0, 0, 0)
+                        ),
+                        twentySecond, List.of(new RepositoryDayTotals(twentySecond, "owner/a", 8, 3, 1))
+                )
         );
-        var partial = AnalyticsService.partialData(traffic);
-        assertThat(partial).isNotNull();
-        assertThat(partial.present()).isTrue();
-        assertThat(partial.message()).isEqualTo(
-                "Data is unavailable for Aug 21 because the service was not running."
-        );
-    }
-
-    @Test
-    void calendarHolesBetweenObservedDaysArePartialEvenWithoutPlaceholderPoints() {
-        List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 20), 100L, 40L, 5L),
-                new TrafficPoint(LocalDate.of(2026, 8, 22), 130L, 50L, 8L)
-        );
-        var partial = AnalyticsService.partialData(traffic);
-        assertThat(partial).isNotNull();
-        assertThat(partial.message()).isEqualTo(
-                "Data is unavailable for Aug 21 because the service was not running."
-        );
-    }
-
-    @Test
-    void leadingEmptyDaysBeforeFirstObservationAreNotPartial() {
-        List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 20), null, null, null),
-                new TrafficPoint(LocalDate.of(2026, 8, 21), 10L, 4L, 1L),
-                new TrafficPoint(LocalDate.of(2026, 8, 22), 12L, 5L, 1L)
-        );
-        assertThat(AnalyticsService.partialData(traffic)).isNull();
-    }
-
-    @Test
-    void consecutiveGapsAreFormattedAsARange() {
-        assertThat(AnalyticsService.formatGapRanges(List.of(
+        assertThat(traffic).extracting(TrafficPoint::date).containsExactly(
+                twentieth,
                 LocalDate.of(2026, 8, 21),
-                LocalDate.of(2026, 8, 22)
-        ))).isEqualTo("Aug 21–22");
+                twentySecond
+        );
+        assertThat(traffic.get(0).missingRepositories()).isEqualTo(1);
+        assertThat(traffic.get(0).views()).isEqualTo(10);
+        assertThat(traffic.get(1).views()).isNull();
+        assertThat(traffic.get(1).missingRepositories()).isEqualTo(3);
+        assertThat(traffic.get(2).views()).isEqualTo(8);
+        assertThat(traffic.get(2).missingRepositories()).isEqualTo(2);
+        assertThat(traffic).noneMatch(point -> point.date().equals(today));
+    }
+
+    @Test
+    void noStoredDaysProduceAnEmptySeries() {
+        assertThat(AnalyticsService.portfolioSeries(
+                LocalDate.of(2026, 8, 20),
+                LocalDate.of(2026, 8, 22),
+                LocalDate.of(2026, 8, 22),
+                2,
+                Map.of()
+        )).isEmpty();
     }
 
     @Test

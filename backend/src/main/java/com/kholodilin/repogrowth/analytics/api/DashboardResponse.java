@@ -65,10 +65,23 @@ public record DashboardResponse(
             Long clones,
             List<TrafficLeader> viewsLeaders,
             List<TrafficLeader> visitorsLeaders,
-            List<TrafficLeader> clonesLeaders
+            List<TrafficLeader> clonesLeaders,
+            int missingRepositories
     ) {
         public TrafficPoint(LocalDate date, Long views, Long visitors, Long clones) {
-            this(date, views, visitors, clones, List.of(), List.of(), List.of());
+            this(date, views, visitors, clones, List.of(), List.of(), List.of(), 0);
+        }
+
+        public TrafficPoint(
+                LocalDate date,
+                Long views,
+                Long visitors,
+                Long clones,
+                List<TrafficLeader> viewsLeaders,
+                List<TrafficLeader> visitorsLeaders,
+                List<TrafficLeader> clonesLeaders
+        ) {
+            this(date, views, visitors, clones, viewsLeaders, visitorsLeaders, clonesLeaders, 0);
         }
     }
 
@@ -90,8 +103,12 @@ public record DashboardResponse(
             Integer discoverabilityPassed,
             Integer discoverabilityTotal,
             boolean accessible,
-            boolean trafficPermissionMissing
+            boolean trafficPermissionMissing,
+            TrafficNotice trafficNotice
     ) {
+    }
+
+    public record TrafficNotice(String reason, LocalDate date, LocalDate lastTrafficDate) {
     }
 
     public record RankHighlight(long repositoryId, String fullName, String queryName, int fromRank, int toRank) {

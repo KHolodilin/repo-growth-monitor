@@ -237,6 +237,39 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
+    public List<StoredTrafficDay> trackedTrafficDays(LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT r.id AS repository_id, t.traffic_date
+                        FROM traffic_daily t
+                        JOIN repository r ON r.id = t.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND t.traffic_date >= :fromDate
+                          AND t.traffic_date <= :toDate
+                        """)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new StoredTrafficDay(
+                        rs.getLong("repository_id"),
+                        rs.getObject("traffic_date", LocalDate.class)
+                ))
+                .list();
+    }
+
+    public List<LatestTrafficDate> latestTrackedTrafficDates() {
+        return jdbcClient.sql("""
+                        SELECT r.id AS repository_id, MAX(t.traffic_date) AS traffic_date
+                        FROM repository r
+                        LEFT JOIN traffic_daily t ON t.repository_id = r.id
+                        WHERE r.tracking_enabled = TRUE
+                        GROUP BY r.id
+                        """)
+                .query((rs, rowNum) -> new LatestTrafficDate(
+                        rs.getLong("repository_id"),
+                        rs.getObject("traffic_date", LocalDate.class)
+                ))
+                .list();
+    }
+
     public Optional<LocalDate> latestDate(long repositoryId) {
         return jdbcClient.sql("""
                         SELECT MAX(traffic_date)
@@ -688,6 +721,12 @@ public class TrafficJdbcRepository {
     }
 
     public record DailyTotals(LocalDate date, long views, long uniqueVisitors, long clones) {
+    }
+
+    public record StoredTrafficDay(long repositoryId, LocalDate date) {
+    }
+
+    public record LatestTrafficDate(long repositoryId, LocalDate date) {
     }
 
     public record RepositoryDayTotals(

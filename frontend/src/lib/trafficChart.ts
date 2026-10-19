@@ -1,4 +1,5 @@
-import type { GrowthEvent, TrafficPoint } from "./api";
+import type { GrowthEvent, TrafficNotice, TrafficPoint } from "./api";
+import { nextIsoDay, repositoryGapText, trafficWarningDate } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
 import { eventMarkerLabel, eventTypeLabel, eventUtcDate, groupEventsByUtcDate } from "./growthEvents";
 
@@ -129,6 +130,27 @@ export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak =
   };
 }
 
+export function trafficAxisDates(points: { date: string }[], events: GrowthEvent[], marker?: string | null) {
+  const trafficDates = points.map((point) => point.date).sort();
+  if (trafficDates.length === 0) {
+    const dates = chartDatesWithEvents([], events);
+    if (marker && !dates.includes(marker)) {
+      dates.push(marker);
+    }
+    return dates.sort();
+  }
+  let end = trafficDates[trafficDates.length - 1];
+  if (marker && marker > end) {
+    end = marker;
+  }
+  const filled: string[] = [];
+  for (let day = trafficDates[0]; day <= end; day = nextIsoDay(day)) {
+    filled.push(day);
+  }
+  const extras = chartDatesWithEvents(points, events).filter((date) => date < trafficDates[0] || date > end);
+  return [...filled, ...extras].sort();
+}
+
 export function chartDatesWithEvents(points: TrafficPoint[], events: GrowthEvent[]) {
   const dates = new Set(points.map((point) => point.date));
   for (const event of events) {
@@ -137,8 +159,15 @@ export function chartDatesWithEvents(points: TrafficPoint[], events: GrowthEvent
   return [...dates].sort();
 }
 
-export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[], period?: string) {
-  const dates = chartDatesWithEvents(points, events);
+export function trafficChartOption(
+  points: TrafficPoint[],
+  events: GrowthEvent[],
+  period?: string,
+  gap?: TrafficNotice | null,
+) {
+  const marker = trafficWarningDate(points, gap);
+  const dates = trafficAxisDates(points, events, marker);
+  const gapText = gap && marker ? repositoryGapText(gap) : "";
   const byDate = new Map(points.map((point) => [point.date, point]));
   const peak = Math.max(
     1,
@@ -152,6 +181,9 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
       formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
         if (!Array.isArray(params) || params.length === 0) {
           return "";
+        }
+        if (marker && params[0].axisValue === marker && gapText) {
+          return gapText;
         }
         const date = formatChartAxisDate(params[0].axisValue);
         const rows = params
@@ -201,6 +233,16 @@ export function trafficChartOption(points: TrafficPoint[], events: GrowthEvent[]
         symbolSize: 8,
         connectNulls: false,
         data: dates.map((date) => byDate.get(date)?.views ?? null),
+        markPoint: marker
+          ? {
+              symbol: "circle",
+              symbolSize: 22,
+              itemStyle: { color: "#fef3c7", borderColor: "#d97706", borderWidth: 1 },
+              label: { show: true, formatter: "⚠", color: "#b45309", fontSize: 14 },
+              tooltip: { formatter: () => gapText },
+              data: [{ xAxis: marker, yAxis: 0 }],
+            }
+          : undefined,
       },
       {
         name: "Visitors",
