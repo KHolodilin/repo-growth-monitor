@@ -437,7 +437,7 @@ describe("remaining coverage edges", () => {
         <DashboardPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("No traffic yet")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Collecting" })).toBeInTheDocument();
     timers.at(-1)?.();
     spy.mockRestore();
   });

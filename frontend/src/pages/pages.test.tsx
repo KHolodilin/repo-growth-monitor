@@ -85,15 +85,34 @@ describe("pages", () => {
   });
 
   it("shows empty and error dashboard states", async () => {
-    api.mockResolvedValueOnce({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [] });
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/system/status")) {
+        return json({
+          tokenState: "MISSING",
+          rateLimitReset: null,
+          planner: { timezone: "UTC", from: "10:00", to: "18:00", open: false },
+        });
+      }
+      if (String(path).includes("/dashboard")) {
+        return json({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
+      }
+      return json({});
+    });
     const { unmount } = render(
       <MemoryRouter>
         <DashboardPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/No repositories tracked yet/)).toBeInTheDocument();
+    expect(await screen.findByText("Application is running.")).toBeInTheDocument();
+    expect(screen.getByText(/Read permissions: Metadata, Contents, Administration, Issues, Pull requests/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Select repositories" })).not.toBeInTheDocument();
     unmount();
-    api.mockRejectedValueOnce(new Error("down"));
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/system/status")) {
+        return json({ tokenState: "OK", rateLimitReset: null, planner: null });
+      }
+      return Promise.reject(new Error("down"));
+    });
     render(
       <MemoryRouter>
         <DashboardPage />

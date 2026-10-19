@@ -36,4 +36,12 @@ public class PlanningWindow {
     public ZoneId zoneId() {
         return zoneId;
     }
+
+    public LocalTime from() {
+        return collectionProperties.planner().from();
+    }
+
+    public LocalTime to() {
+        return collectionProperties.planner().to();
+    }
 }

@@ -53,6 +53,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -143,6 +145,10 @@ class ApiControllersWebMvcTest {
         ));
         when(activityClassifier.classify(anyBoolean(), any())).thenReturn(ActivityStatus.ACTIVE);
         when(planningWindow.businessDate()).thenReturn(LocalDate.of(2026, 9, 23));
+        when(planningWindow.zoneId()).thenReturn(ZoneId.of("Europe/Berlin"));
+        when(planningWindow.from()).thenReturn(LocalTime.of(9, 30));
+        when(planningWindow.to()).thenReturn(LocalTime.of(17, 0));
+        when(planningWindow.isOpen()).thenReturn(true);
         CollectionRun run = new CollectionRun(1L, 13L, LocalDate.of(2026, 9, 23), CollectionRunStatus.SUCCESS, 1, 1, 0, now, now);
         when(collectionPlanner.planRepository(eq(13L), any(), eq(true))).thenReturn(run);
         when(runRepository.findById(1L)).thenReturn(Optional.of(run));
@@ -316,7 +322,11 @@ class ApiControllersWebMvcTest {
         when(gitHubClient.tokenStatus()).thenReturn(null);
         when(gitHubProperties.tokenConfigured()).thenReturn(false);
         mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk())
-                .andExpect(jsonPath("$.tokenState").value("MISSING"));
+                .andExpect(jsonPath("$.tokenState").value("MISSING"))
+                .andExpect(jsonPath("$.planner.timezone").value("Europe/Berlin"))
+                .andExpect(jsonPath("$.planner.from").value("09:30"))
+                .andExpect(jsonPath("$.planner.to").value("17:00"))
+                .andExpect(jsonPath("$.planner.open").value(true));
 
         when(gitHubProperties.tokenConfigured()).thenReturn(true);
         when(gitHubClient.tokenStatus()).thenReturn(
