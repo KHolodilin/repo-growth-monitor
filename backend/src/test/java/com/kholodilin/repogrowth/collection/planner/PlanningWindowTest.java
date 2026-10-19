@@ -28,5 +28,10 @@ class PlanningWindowTest {
         assertThat(new PlanningWindow(properties, after, app).isOpen()).isFalse();
         Clock atEnd = Clock.fixed(Instant.parse("2026-08-27T18:00:00Z"), ZoneOffset.UTC);
         assertThat(new PlanningWindow(properties, atEnd, app).isOpen()).isFalse();
+
+        PlanningWindow window = new PlanningWindow(properties, inside, new AppProperties("Europe/Moscow"));
+        assertThat(window.from()).isEqualTo(LocalTime.of(10, 0));
+        assertThat(window.to()).isEqualTo(LocalTime.of(18, 0));
+        assertThat(window.zoneId().getId()).isEqualTo("Europe/Moscow");
     }
 }

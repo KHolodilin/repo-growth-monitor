@@ -2,9 +2,17 @@ import { api } from "./api";
 
 export type TokenState = "MISSING" | "OK" | "REJECTED" | "RATE_LIMITED";
 
+export type PlannerWindow = {
+  timezone: string;
+  from: string;
+  to: string;
+  open: boolean;
+};
+
 export type GitHubAccess = {
   tokenState: TokenState;
   rateLimitReset: string | null;
+  planner: PlannerWindow | null;
 };
 
 export const TOKEN_MISSING = "Token is not configured. Set GITHUB_TOKEN in .env and restart.";
@@ -16,22 +24,41 @@ export const TRAFFIC_PERMISSION = "Missing Administration: Read. Traffic is not 
 export const PRIVATE_TRACKING =
   "Public search and topics do not rank this repository. Traffic, stars, and events will still be collected.";
 
+export function parsePlannerWindow(value: unknown): PlannerWindow | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as { timezone?: unknown; from?: unknown; to?: unknown; open?: unknown };
+  if (typeof record.from !== "string" || record.from.length === 0) {
+    return null;
+  }
+  if (typeof record.to !== "string" || record.to.length === 0) {
+    return null;
+  }
+  if (typeof record.open !== "boolean") {
+    return null;
+  }
+  const timezone = typeof record.timezone === "string" && record.timezone.length > 0 ? record.timezone : "UTC";
+  return { timezone, from: record.from, to: record.to, open: record.open };
+}
+
 export function parseGitHubAccess(value: unknown): GitHubAccess {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { tokenState: "OK", rateLimitReset: null };
+    return { tokenState: "OK", rateLimitReset: null, planner: null };
   }
-  const record = value as { tokenState?: string; rateLimitReset?: string | null };
+  const record = value as { tokenState?: string; rateLimitReset?: string | null; planner?: unknown };
+  const planner = parsePlannerWindow(record.planner);
   if (record.tokenState === "MISSING" || record.tokenState === "REJECTED" || record.tokenState === "RATE_LIMITED" || record.tokenState === "OK") {
-    return { tokenState: record.tokenState, rateLimitReset: record.rateLimitReset ?? null };
+    return { tokenState: record.tokenState, rateLimitReset: record.rateLimitReset ?? null, planner };
   }
-  return { tokenState: "OK", rateLimitReset: null };
+  return { tokenState: "OK", rateLimitReset: null, planner };
 }
 
 export async function loadGitHubAccess(): Promise<GitHubAccess> {
   try {
     return parseGitHubAccess(await api<unknown>("/api/v1/system/status"));
   } catch {
-    return { tokenState: "OK", rateLimitReset: null };
+    return { tokenState: "OK", rateLimitReset: null, planner: null };
   }
 }
 

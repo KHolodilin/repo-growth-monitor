@@ -5,7 +5,8 @@ import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
-import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
+import { loadGitHubAccess, parseGitHubAccess, type GitHubAccess, type TokenState } from "../lib/githubAccess";
+import { checklistSchedule, collectionJobLines, DEFAULT_PLANNER } from "../lib/setupChecklist";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -30,6 +31,7 @@ export function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const access = useGitHubAccess();
 
   async function load() {
     const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}`);
@@ -84,7 +86,7 @@ export function DashboardPage() {
     return <DashboardSkeleton period={period} onPeriod={setPeriod} />;
   }
   if (data.state === "NO_REPOSITORIES") {
-    return <NoRepositoriesState period={period} onPeriod={setPeriod} />;
+    return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
   }
 
   return (
@@ -115,15 +117,7 @@ export function DashboardPage() {
         />
         <StarsKpi stars={data.summary.stars} period={period} />
       </div>
-      {data.state === "FIRST_COLLECTION" && (
-        <Card>
-          <h2 className="font-medium">No traffic yet</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Use the collect button in the header to fetch GitHub stats for the tracked repositories. The chart fills in after the first successful collection.
-          </p>
-        </Card>
-      )}
-      <TrafficChart traffic={data.traffic} />
+      {data.state === "FIRST_COLLECTION" ? <CollectingCard rows={data.repositories} /> : <TrafficChart traffic={data.traffic} />}
       <PeriodHighlights highlights={data.highlights} />
       <RepositoryTable rows={data.repositories} />
     </div>
@@ -449,22 +443,140 @@ function sortValue(row: Dashboard["repositories"][number], key: SortKey): number
   return row[key];
 }
 
-function NoRepositoriesState({ period, onPeriod }: { period: Period; onPeriod: (period: Period) => void }) {
+function useGitHubAccess(): GitHubAccess | null {
+  const [access, setAccess] = useState<GitHubAccess | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const next = parseGitHubAccess(await api<unknown>("/api/v1/system/status"));
+        if (!cancelled) {
+          setAccess(next);
+        }
+      } catch {
+        if (!cancelled) {
+          setAccess(null);
+        }
+      }
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+  return access;
+}
+
+function tokenAccepted(access: GitHubAccess | null): boolean {
+  return access?.tokenState === "OK" || access?.tokenState === "RATE_LIMITED";
+}
+
+function SetupChecklist({
+  period,
+  onPeriod,
+  access,
+}: {
+  period: Period;
+  onPeriod: (period: Period) => void;
+  access: GitHubAccess | null;
+}) {
+  const accepted = tokenAccepted(access);
+  const planner = access?.planner ?? DEFAULT_PLANNER;
   return (
     <div className="space-y-6">
       <DashboardHeader period={period} onPeriod={onPeriod} />
-      <Card className="flex flex-col items-start gap-4 py-12">
-        <div>
-          <h2 className="text-lg font-medium">No repositories tracked yet.</h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            Select repositories to start collecting GitHub growth data.
-          </p>
-        </div>
-        <Link to="/repositories">
-          <Button>Select repositories</Button>
-        </Link>
+      <Card className="space-y-5">
+        <ChecklistRow done title="Application is running." />
+        <ChecklistRow done={accepted} title="GitHub accepted the token.">
+          {!accepted && <TokenHelp rejected={access?.tokenState === "REJECTED"} />}
+        </ChecklistRow>
+        <ChecklistRow done={false} title="Repositories are selected." muted={!accepted}>
+          {accepted && (
+            <Link to="/repositories" className="mt-2 inline-block">
+              <Button>Select repositories</Button>
+            </Link>
+          )}
+        </ChecklistRow>
+        <p className="text-sm text-muted-foreground">{checklistSchedule(planner)}</p>
       </Card>
     </div>
+  );
+}
+
+function ChecklistRow({
+  done,
+  title,
+  muted,
+  children,
+}: {
+  done: boolean;
+  title: string;
+  muted?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div>
+      <div className={cn("text-sm font-medium", done ? "text-emerald-700" : muted ? "text-muted-foreground" : "text-foreground")}>
+        <span className="mr-2" aria-hidden="true">
+          {done ? "✓" : "○"}
+        </span>
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TokenHelp({ rejected }: { rejected: boolean }) {
+  return (
+    <div className="mt-2 max-w-xl space-y-2 text-sm text-muted-foreground">
+      {rejected && (
+        <p>GitHub rejected the token. Stored data is kept. Update GITHUB_TOKEN in .env and restart.</p>
+      )}
+      <p>
+        <a
+          className="text-primary hover:underline"
+          href="https://github.com/settings/personal-access-tokens/new"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Create a fine-grained token
+        </a>
+      </p>
+      <p>Read permissions: Metadata, Contents, Administration, Issues, Pull requests.</p>
+      <p>Without Administration, traffic stays empty and the rest still collects.</p>
+      <p>
+        Write the token to <code className="text-foreground">.env</code> as GITHUB_TOKEN, then run{" "}
+        <code className="text-foreground">docker compose up -d</code>. There is no token field in the browser.
+      </p>
+    </div>
+  );
+}
+
+function CollectingCard({ rows }: { rows: Dashboard["repositories"] }) {
+  return (
+    <Card>
+      <h2 className="font-medium">Collecting</h2>
+      <div className="mt-4 space-y-4">
+        {rows.map((row) => (
+          <div key={row.id}>
+            <div className="text-sm font-medium">{row.fullName}</div>
+            <ul className="mt-1 space-y-1 text-sm">
+              {collectionJobLines(row.jobs, row.trafficPermissionMissing === true).map((line) => (
+                <li key={line.jobType}>
+                  <span>
+                    {line.mark} {line.label}
+                  </span>
+                  {line.detail && <div className="ml-5 text-red-700">{line.detail}</div>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }
 

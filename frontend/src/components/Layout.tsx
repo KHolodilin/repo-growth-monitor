@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, type Dashboard } from "../lib/api";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
+import { headerSchedule } from "../lib/setupChecklist";
 import { cn, formatSyncTime } from "../lib/utils";
 import { DashboardIcon, LogoMark, RepositoriesIcon } from "./icons";
 import { Button } from "./ui";
@@ -99,18 +100,28 @@ export function Layout() {
   }
 
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
+  const noToken = access?.tokenState === "MISSING";
+
+  useEffect(() => {
+    document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
+  }, [noToken]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b bg-card">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
-          <NavLink to="/" className="flex items-center gap-2.5 text-slate-900" aria-label="Repo Growth Monitor">
-            <LogoMark className="h-8 w-8 shrink-0 object-contain" />
-            <span className="flex items-baseline gap-1 text-[15px] leading-none tracking-tight">
-              <span className="font-bold">Repo Growth</span>
-              <span className="font-normal">Monitor</span>
-            </span>
-          </NavLink>
+          <div className="flex items-center gap-3">
+            <NavLink to="/" className="flex items-center gap-2.5 text-slate-900" aria-label="Repo Growth Monitor">
+              <LogoMark className="h-8 w-8 shrink-0 object-contain" />
+              <span className="flex items-baseline gap-1 text-[15px] leading-none tracking-tight">
+                <span className="font-bold">Repo Growth</span>
+                <span className="font-normal">Monitor</span>
+              </span>
+            </NavLink>
+            {noToken && (
+              <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-950">No GitHub token</span>
+            )}
+          </div>
           <nav className="flex items-center gap-6 text-sm">
             <Button
               className="py-1.5"
@@ -156,6 +167,7 @@ export function Layout() {
             <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
             paths show the latest GitHub snapshot; History has the change between snapshots.
           </div>
+          {access?.planner && <div>{headerSchedule(access.planner)}</div>}
           <div>Last sync: {syncLabel}</div>
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>

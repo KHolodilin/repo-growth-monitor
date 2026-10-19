@@ -59,7 +59,7 @@ describe("coverage gaps", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("No traffic yet")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Collecting" })).toBeInTheDocument();
     expect(screen.getByText("Last sync: —")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "all" }));
     await user.click(await screen.findByRole("button", { name: "Collect 2 repositories" }));
