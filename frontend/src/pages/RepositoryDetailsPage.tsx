@@ -386,7 +386,7 @@ export function RepositoryDetailsPage() {
           <div className="ml-auto flex items-center gap-4">
             <StatDivider />
             <a
-              className="inline-flex items-center gap-1 text-primary hover:underline"
+              className="inline-flex items-center gap-1 text-primary underline"
               href={`${repo.githubUrl ?? `https://github.com/${repo.fullName}`}/graphs/traffic`}
               target="_blank"
               rel="noreferrer"
@@ -1175,7 +1175,7 @@ function SearchPanel({
         <div className="mb-3 flex items-baseline gap-3">
           <h2 className="font-medium">Search Queries</h2>
           <a
-            className="text-sm font-normal text-muted-foreground hover:underline"
+            className="text-sm font-normal text-primary underline"
             href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
             target="_blank"
             rel="noreferrer"

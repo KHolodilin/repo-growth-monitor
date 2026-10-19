@@ -83,7 +83,7 @@ export function CompetitorCardPage() {
         ) : (
           <ul className="mt-2 flex flex-wrap gap-2">
             {card.topics.map((topic) => (
-              <li key={topic} className="rounded-full bg-muted px-2.5 py-0.5 text-xs">
+              <li key={topic} className="inline-flex rounded-full bg-[#ddf4ff] px-2.5 py-0.5 text-xs font-medium text-[#0969da]">
                 {topic}
               </li>
             ))}
