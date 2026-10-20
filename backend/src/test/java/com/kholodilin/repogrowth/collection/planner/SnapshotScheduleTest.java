@@ -53,6 +53,7 @@ class SnapshotScheduleTest {
         assertThat(schedule.slots(LocalTime.of(6, 0), LocalTime.of(18, 0), Duration.ofHours(-1))).isEmpty();
         assertThat(schedule.slots(LocalTime.of(6, 0), LocalTime.of(18, 0), null)).isEmpty();
         assertThat(schedule.slots(null, LocalTime.of(18, 0), Duration.ofHours(3))).isEmpty();
+        assertThat(schedule.slots(LocalTime.of(6, 0), null, Duration.ofHours(3))).isEmpty();
         assertThat(schedule.slots(LocalTime.of(22, 0), LocalTime.of(23, 0), Duration.ofHours(3)))
                 .containsExactly(LocalTime.of(22, 0));
     }

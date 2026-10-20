@@ -60,6 +60,17 @@ class SearchPlannerTest {
     }
 
     @Test
+    void planAllLeavesAnInFlightQueryWhenTheSnapshotIsDue() {
+        when(queryRepository.findEnabled()).thenReturn(List.of(query));
+        when(runRepository.find(5L, date)).thenReturn(Optional.of(run(SearchRunStatus.READY)));
+        when(runRepository.markMissedDays(date, 30)).thenReturn(0);
+
+        planner.planAll(date, true);
+
+        verify(runRepository, never()).requeueCompleted(9L);
+    }
+
+    @Test
     void planAllRequeuesASuccessfulQueryOnASnapshot() {
         when(queryRepository.findEnabled()).thenReturn(List.of(query));
         when(runRepository.find(5L, date)).thenReturn(Optional.of(run(SearchRunStatus.SUCCESS)));

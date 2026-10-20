@@ -66,6 +66,17 @@ class TopicPlannerTest {
     }
 
     @Test
+    void planAllLeavesAnInFlightWatchWhenTheSnapshotIsDue() {
+        when(watchRepository.findEnabled()).thenReturn(List.of(watch));
+        when(runRepository.find(7L, date)).thenReturn(Optional.of(run(SearchRunStatus.READY)));
+        when(runRepository.markMissedDays(date, 30)).thenReturn(0);
+
+        planner.planAll(date, true);
+
+        verify(runRepository, never()).requeueCompleted(anyLong());
+    }
+
+    @Test
     void planAllRequeuesAFinishedWatchWhenTheSnapshotIsDue() {
         when(watchRepository.findEnabled()).thenReturn(List.of(watch));
         when(runRepository.find(7L, date)).thenReturn(Optional.of(run(SearchRunStatus.SUCCESS)));
