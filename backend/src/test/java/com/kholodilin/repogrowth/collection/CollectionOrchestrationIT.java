@@ -199,6 +199,79 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
     }
 
     @Test
+    void plannerStopsTrafficWhenYesterdayIsStored() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        CollectionJob traffic = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        jobRepository.markSuccess(traffic.id());
+        trafficJdbcRepository.upsertDaily(repository.id(), date.minusDays(1), 4, 2, 1, 1);
+        runRepository.refreshAggregates(run.id());
+
+        collectionPlanner.planRepository(repository.id(), date, false, false);
+
+        CollectionJob unchanged = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.TRAFFIC)
+                .findFirst()
+                .orElseThrow();
+        assertThat(unchanged.status()).isEqualTo(CollectionJobStatus.SUCCESS);
+    }
+
+    @Test
+    void plannerRequeuesSnapshotJobsOnlyWhenTheSlotIsDue() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        for (CollectionJob job : jobRepository.findByRun(run.id())) {
+            jobRepository.markSuccess(job.id());
+        }
+        trafficJdbcRepository.upsertDaily(repository.id(), date.minusDays(1), 4, 2, 1, 1);
+        runRepository.refreshAggregates(run.id());
+
+        collectionPlanner.planRepository(repository.id(), date, false, false);
+        assertThat(jobRepository.findByRun(run.id()))
+                .allMatch(job -> job.status() == CollectionJobStatus.SUCCESS);
+
+        collectionPlanner.planRepository(repository.id(), date, false, true);
+        assertThat(jobRepository.findByRun(run.id()))
+                .extracting(CollectionJob::jobType, CollectionJob::status)
+                .containsExactlyInAnyOrder(
+                        tuple(CollectionJobType.TRAFFIC, CollectionJobStatus.SUCCESS),
+                        tuple(CollectionJobType.REFERRERS, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.POPULAR_PATHS, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.REPOSITORY_STATS, CollectionJobStatus.READY),
+                        tuple(CollectionJobType.GROWTH_EVENTS, CollectionJobStatus.READY)
+                );
+    }
+
+    @Test
+    void plannerRequeuesAFailedJobBetweenSnapshots() {
+        LocalDate date = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
+        for (CollectionJob job : jobRepository.findByRun(run.id())) {
+            jobRepository.markSuccess(job.id());
+        }
+        CollectionJob events = jobRepository.findByRun(run.id()).stream()
+                .filter(job -> job.jobType() == CollectionJobType.GROWTH_EVENTS)
+                .findFirst()
+                .orElseThrow();
+        jobRepository.markFailed(events.id(), "GITHUB_ERROR", "boom");
+        trafficJdbcRepository.upsertDaily(repository.id(), date.minusDays(1), 4, 2, 1, 1);
+        runRepository.refreshAggregates(run.id());
+
+        collectionPlanner.planRepository(repository.id(), date, false, false);
+
+        assertThat(jobRepository.findByRun(run.id()))
+                .extracting(CollectionJob::jobType, CollectionJob::status)
+                .contains(
+                        tuple(CollectionJobType.TRAFFIC, CollectionJobStatus.SUCCESS),
+                        tuple(CollectionJobType.REFERRERS, CollectionJobStatus.SUCCESS),
+                        tuple(CollectionJobType.GROWTH_EVENTS, CollectionJobStatus.READY)
+                );
+    }
+
+    @Test
     void collectNowRequeuesEveryJobOfTheDay() {
         LocalDate date = planningWindow.businessDate();
         CollectionRun run = collectionPlanner.planRepository(repository.id(), date);
@@ -311,6 +384,28 @@ class CollectionOrchestrationIT extends AbstractPostgresTest {
         assertThat(searchRunJdbcRepository.find(second.id(), date)).isPresent();
         searchPlanner.planAll(date);
         assertThat(searchRunJdbcRepository.find(first.id(), date)).isPresent();
+    }
+
+    @Test
+    void searchPlannerRequeuesAFinishedRunOnTheNextSnapshotAndAFailureImmediately() {
+        var query = searchQueryJdbcRepository.insert(repository.id(), "q1", "outbox", true, 50);
+        LocalDate date = planningWindow.businessDate();
+        searchPlanner.planAll(date);
+        long runId = searchRunJdbcRepository.find(query.id(), date).orElseThrow().id();
+        searchRunJdbcRepository.markSuccess(runId, 10, 1);
+
+        searchPlanner.planAll(date, false);
+        assertThat(searchRunJdbcRepository.find(query.id(), date).orElseThrow().status())
+                .isEqualTo(SearchRunStatus.SUCCESS);
+
+        searchPlanner.planAll(date, true);
+        assertThat(searchRunJdbcRepository.find(query.id(), date).orElseThrow().status())
+                .isEqualTo(SearchRunStatus.READY);
+
+        searchRunJdbcRepository.markFailed(runId, "GITHUB_ERROR", "boom");
+        searchPlanner.planAll(date, false);
+        assertThat(searchRunJdbcRepository.find(query.id(), date).orElseThrow().status())
+                .isEqualTo(SearchRunStatus.READY);
     }
 
     @Test

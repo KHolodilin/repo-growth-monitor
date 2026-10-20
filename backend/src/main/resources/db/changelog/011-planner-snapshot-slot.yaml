@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-planner-snapshot-slot
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE planner_snapshot_slot (
+                  business_date DATE PRIMARY KEY,
+                  slot_time TIME NOT NULL,
+                  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );

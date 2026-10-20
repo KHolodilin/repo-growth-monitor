@@ -41,6 +41,8 @@ import com.kholodilin.repogrowth.search.domain.SearchRun;
 import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
 import com.kholodilin.repogrowth.topic.api.TopicVisibilityController;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService;
+import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
+import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import com.kholodilin.repogrowth.topic.domain.TopicRun;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +67,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -112,6 +115,10 @@ class ApiControllersWebMvcTest {
     GrowthEventService growthEventService;
     @MockitoBean
     TopicVisibilityService topicVisibilityService;
+    @MockitoBean
+    TopicWatchSync topicWatchSync;
+    @MockitoBean
+    TopicPlanner topicPlanner;
     @MockitoBean
     AnalyticsService analyticsService;
     @MockitoBean
@@ -226,6 +233,9 @@ class ApiControllersWebMvcTest {
                 .andExpect(status().isOk());
         mockMvc.perform(post("/api/v1/repositories/13/collect")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCESS"));
+        verify(searchQueryService).runAll(13L);
+        verify(topicWatchSync).sync(13L);
+        verify(topicPlanner).planRepository(eq(13L), eq(LocalDate.of(2026, 9, 23)));
         mockMvc.perform(post("/api/v1/collection/plan")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/collection-runs/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobs[0].jobType").value("TRAFFIC"));

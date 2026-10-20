@@ -27,9 +27,11 @@ collection:
   workers: 4
   job-lease: 5m
   planner:
-    from: "10:00"
+    enabled: true
+    from: "06:00"
     to: "18:00"
     interval: 10m
+    snapshot-interval: 3h
 
 search:
   workers: 1

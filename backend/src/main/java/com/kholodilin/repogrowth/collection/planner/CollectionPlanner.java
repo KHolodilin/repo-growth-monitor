@@ -19,6 +19,12 @@ import java.util.List;
 public class CollectionPlanner {
 
     private static final CollectionJobType[] JOB_TYPES = CollectionJobType.values();
+    private static final CollectionJobType[] SNAPSHOT_JOBS = {
+            CollectionJobType.REFERRERS,
+            CollectionJobType.POPULAR_PATHS,
+            CollectionJobType.REPOSITORY_STATS,
+            CollectionJobType.GROWTH_EVENTS
+    };
 
     private final RepositoryJdbcRepository repositoryJdbcRepository;
     private final CollectionRunJdbcRepository runRepository;
@@ -39,19 +45,29 @@ public class CollectionPlanner {
 
     @Transactional
     public int planAll(LocalDate businessDate) {
+        return planAll(businessDate, false);
+    }
+
+    @Transactional
+    public int planAll(LocalDate businessDate, boolean snapshotDue) {
         List<Repository> tracked = repositoryJdbcRepository.findTracked();
         int createdRuns = 0;
         for (Repository repository : tracked) {
-            planRepository(repository.id(), businessDate, false);
+            planRepository(repository.id(), businessDate, false, snapshotDue);
             createdRuns++;
         }
-        log.info("Collection planner processed trackedRepositories={} businessDate={}", tracked.size(), businessDate);
+        log.info(
+                "Collection planner processed trackedRepositories={} snapshotDue={} businessDate={}",
+                tracked.size(),
+                snapshotDue,
+                businessDate
+        );
         return createdRuns;
     }
 
     @Transactional
     public CollectionRun planRepository(long repositoryId, LocalDate businessDate) {
-        return planRepository(repositoryId, businessDate, false);
+        return planRepository(repositoryId, businessDate, false, false);
     }
 
     /**
@@ -61,6 +77,16 @@ public class CollectionPlanner {
      */
     @Transactional
     public CollectionRun planRepository(long repositoryId, LocalDate businessDate, boolean recollect) {
+        return planRepository(repositoryId, businessDate, recollect, false);
+    }
+
+    @Transactional
+    public CollectionRun planRepository(
+            long repositoryId,
+            LocalDate businessDate,
+            boolean recollect,
+            boolean snapshotDue
+    ) {
         CollectionRun run = runRepository.insertIgnore(repositoryId, businessDate, JOB_TYPES.length);
         for (CollectionJobType type : JOB_TYPES) {
             jobRepository.insertIgnore(run.id(), repositoryId, businessDate, type);
@@ -70,16 +96,24 @@ public class CollectionPlanner {
             for (CollectionJobType type : JOB_TYPES) {
                 jobRepository.requeueCompleted(run.id(), type);
             }
-        } else if (isTrafficStale(repositoryId, businessDate)) {
-            jobRepository.requeueCompleted(run.id(), CollectionJobType.TRAFFIC);
+        } else {
+            if (isTrafficStale(repositoryId, businessDate)) {
+                jobRepository.requeueCompleted(run.id(), CollectionJobType.TRAFFIC);
+            }
+            if (snapshotDue) {
+                for (CollectionJobType type : SNAPSHOT_JOBS) {
+                    jobRepository.requeueCompleted(run.id(), type);
+                }
+            }
         }
         runRepository.refreshAggregates(run.id());
         return runRepository.findById(run.id()).orElse(run);
     }
 
     private boolean isTrafficStale(long repositoryId, LocalDate businessDate) {
+        LocalDate yesterday = businessDate.minusDays(1);
         return trafficJdbcRepository.latestDate(repositoryId)
-                .filter(latest -> !latest.isBefore(businessDate))
+                .filter(latest -> !latest.isBefore(yesterday))
                 .isEmpty();
     }
 }
