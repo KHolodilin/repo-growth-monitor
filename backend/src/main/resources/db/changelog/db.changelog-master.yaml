@@ -19,3 +19,5 @@ databaseChangeLog:
       file: db/changelog/009-competitor-profile.yaml
   - include:
       file: db/changelog/010-traffic-permission.yaml
+  - include:
+      file: db/changelog/011-planner-snapshot-slot.yaml

@@ -77,7 +77,7 @@ docker compose -f deploy/docker-compose.yml up -d
 Open http://localhost:8080
 
 1. Open **Repositories** and enable tracking.
-2. Click **Collect now**, or wait for the planner window (`10:00–18:00` UTC by default).
+2. Click **Collect now**, or wait for the planner window (`06:00–18:00` UTC by default).
 3. View the **Dashboard** and repository details.
 
 Stop with `docker compose down`. Data stays in the `pgdata` volume. Wipe everything with
@@ -178,7 +178,7 @@ Vite proxies `/api` to `http://localhost:8080`.
 | `POSTGRES_PASSWORD` | Required by the downloadable Compose file. Used by Postgres and the app. |
 | `SPRING_DATASOURCE_URL` | JDBC URL (set automatically in Compose). |
 | `APP_TIMEZONE` | Timezone for `business_date` and the planner window. Default `UTC`. |
-| `COLLECTION_PLANNER_FROM` / `TO` | Strict planning window. Default `10:00`–`18:00`. |
+| `COLLECTION_PLANNER_FROM` / `TO` | Strict planning window. Default `06:00`–`18:00`. |
 | `COLLECTION_WORKERS` | Parallel collection workers. Default `4`. |
 | `SEARCH_WORKERS` | Search worker pool. Default `1`. |
 

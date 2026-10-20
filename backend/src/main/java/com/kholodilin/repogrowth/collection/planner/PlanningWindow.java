@@ -23,10 +23,14 @@ public class PlanningWindow {
     }
 
     public boolean isOpen() {
-        LocalTime now = LocalTime.now(clock);
+        LocalTime now = localTime();
         LocalTime from = collectionProperties.planner().from();
         LocalTime to = collectionProperties.planner().to();
         return !now.isBefore(from) && now.isBefore(to);
+    }
+
+    public LocalTime localTime() {
+        return LocalTime.now(clock);
     }
 
     public LocalDate businessDate() {

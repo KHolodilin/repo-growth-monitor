@@ -19,7 +19,7 @@ class PlanningWindowTest {
         CollectionProperties properties = new CollectionProperties(
                 4,
                 Duration.ofMinutes(5),
-                new CollectionProperties.Planner(LocalTime.of(10, 0), LocalTime.of(18, 0), Duration.ofMinutes(10))
+                new CollectionProperties.Planner(true, LocalTime.of(10, 0), LocalTime.of(18, 0), Duration.ofMinutes(10), Duration.ofHours(3))
         );
         AppProperties app = new AppProperties("UTC");
         Clock inside = Clock.fixed(Instant.parse("2026-08-27T12:00:00Z"), ZoneOffset.UTC);

@@ -85,7 +85,7 @@ class WorkerPoolTest {
     }
 
     private static CollectionProperties collection(int workers) {
-        return new CollectionProperties(workers, Duration.ofMinutes(1), new CollectionProperties.Planner(LocalTime.MIDNIGHT, LocalTime.NOON, Duration.ofMinutes(5)));
+        return new CollectionProperties(workers, Duration.ofMinutes(1), new CollectionProperties.Planner(true, LocalTime.MIDNIGHT, LocalTime.NOON, Duration.ofMinutes(5), Duration.ofHours(3)));
     }
 
     private static SearchProperties search(int workers) {

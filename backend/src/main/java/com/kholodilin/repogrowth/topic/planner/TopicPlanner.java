@@ -36,19 +36,49 @@ public class TopicPlanner {
 
     @Transactional
     public int planAll(LocalDate businessDate) {
+        return planAll(businessDate, false);
+    }
+
+    @Transactional
+    public int planAll(LocalDate businessDate, boolean snapshotDue) {
         topicWatchSync.syncTracked();
         List<TopicWatch> watches = watchRepository.findEnabled();
         for (TopicWatch watch : watches) {
             runRepository.insertIgnore(watch.id(), watch.repositoryId(), businessDate);
+            requeueIfDue(watch.id(), businessDate, snapshotDue);
         }
         int missed = runRepository.markMissedDays(businessDate, searchProperties.gapLookbackDays());
         log.info(
-                "Topic planner processed watches={} missedDays={} businessDate={}",
+                "Topic planner processed watches={} missedDays={} snapshotDue={} businessDate={}",
                 watches.size(),
                 missed,
+                snapshotDue,
                 businessDate
         );
         return watches.size();
+    }
+
+    @Transactional
+    public int planRepository(long repositoryId, LocalDate businessDate) {
+        int queued = 0;
+        for (TopicWatch watch : watchRepository.findByRepository(repositoryId)) {
+            if (!watch.enabled()) {
+                continue;
+            }
+            planWatch(watch.id(), watch.repositoryId(), businessDate);
+            queued++;
+        }
+        return queued;
+    }
+
+    private void requeueIfDue(long topicWatchId, LocalDate businessDate, boolean snapshotDue) {
+        runRepository.find(topicWatchId, businessDate).ifPresent(run -> {
+            boolean failed = run.status() == SearchRunStatus.FAILED;
+            boolean finishedSnapshot = snapshotDue && run.status() == SearchRunStatus.SUCCESS;
+            if (failed || finishedSnapshot) {
+                runRepository.requeueCompleted(run.id());
+            }
+        });
     }
 
     @Transactional

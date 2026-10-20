@@ -12,12 +12,16 @@ import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
+import com.kholodilin.repogrowth.search.application.SearchQueryService;
+import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
+import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -32,6 +36,9 @@ public class CollectionController {
     private final CollectionJobJdbcRepository jobRepository;
     private final GitHubProperties gitHubProperties;
     private final GitHubClient gitHubClient;
+    private final SearchQueryService searchQueryService;
+    private final TopicWatchSync topicWatchSync;
+    private final TopicPlanner topicPlanner;
 
     public CollectionController(
             CollectionPlanner collectionPlanner,
@@ -41,7 +48,10 @@ public class CollectionController {
             CollectionRunJdbcRepository runRepository,
             CollectionJobJdbcRepository jobRepository,
             GitHubProperties gitHubProperties,
-            GitHubClient gitHubClient
+            GitHubClient gitHubClient,
+            SearchQueryService searchQueryService,
+            TopicWatchSync topicWatchSync,
+            TopicPlanner topicPlanner
     ) {
         this.collectionPlanner = collectionPlanner;
         this.planningWindow = planningWindow;
@@ -51,6 +61,9 @@ public class CollectionController {
         this.jobRepository = jobRepository;
         this.gitHubProperties = gitHubProperties;
         this.gitHubClient = gitHubClient;
+        this.searchQueryService = searchQueryService;
+        this.topicWatchSync = topicWatchSync;
+        this.topicPlanner = topicPlanner;
     }
 
     @PostMapping("/repositories/{id}/collect")
@@ -62,7 +75,11 @@ public class CollectionController {
             throw GitHubException.auth(401, "GitHub rejected the token");
         }
         repositoryService.get(id);
-        CollectionRun run = collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
+        LocalDate businessDate = planningWindow.businessDate();
+        CollectionRun run = collectionPlanner.planRepository(id, businessDate, true);
+        searchQueryService.runAll(id);
+        topicWatchSync.sync(id);
+        topicPlanner.planRepository(id, businessDate);
         return toResponse(run);
     }
 

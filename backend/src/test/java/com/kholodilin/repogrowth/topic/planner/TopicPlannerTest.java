@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,11 +56,60 @@ class TopicPlannerTest {
     @Test
     void planAllSyncsWatchesAndQueuesMissingDays() {
         when(watchRepository.findEnabled()).thenReturn(List.of(watch));
+        when(runRepository.find(7L, date)).thenReturn(Optional.of(run(SearchRunStatus.READY)));
         when(runRepository.markMissedDays(date, 30)).thenReturn(2);
 
         assertThat(planner.planAll(date)).isEqualTo(1);
         verify(topicWatchSync).syncTracked();
         verify(runRepository).insertIgnore(7L, 13L, date);
+        verify(runRepository, never()).requeueCompleted(anyLong());
+    }
+
+    @Test
+    void planAllRequeuesAFinishedWatchWhenTheSnapshotIsDue() {
+        when(watchRepository.findEnabled()).thenReturn(List.of(watch));
+        when(runRepository.find(7L, date)).thenReturn(Optional.of(run(SearchRunStatus.SUCCESS)));
+        when(runRepository.markMissedDays(date, 30)).thenReturn(0);
+
+        planner.planAll(date, true);
+
+        verify(runRepository).requeueCompleted(3L);
+    }
+
+    @Test
+    void planAllRequeuesAFailedWatchWithoutASnapshot() {
+        when(watchRepository.findEnabled()).thenReturn(List.of(watch));
+        when(runRepository.find(7L, date)).thenReturn(Optional.of(run(SearchRunStatus.FAILED)));
+        when(runRepository.markMissedDays(date, 30)).thenReturn(0);
+
+        planner.planAll(date, false);
+
+        verify(runRepository).requeueCompleted(3L);
+    }
+
+    @Test
+    void planAllLeavesAFinishedWatchUntilTheNextSnapshot() {
+        when(watchRepository.findEnabled()).thenReturn(List.of(watch));
+        when(runRepository.find(7L, date)).thenReturn(Optional.of(run(SearchRunStatus.SUCCESS)));
+        when(runRepository.markMissedDays(date, 30)).thenReturn(0);
+
+        planner.planAll(date, false);
+
+        verify(runRepository, never()).requeueCompleted(anyLong());
+    }
+
+    @Test
+    void planRepositoryQueuesEnabledWatchesOnly() {
+        Instant now = Instant.parse("2026-09-23T06:00:00Z");
+        TopicWatch disabled = new TopicWatch(8L, 13L, "kafka", null, "stars", "desc", false, 50, now, now);
+        when(watchRepository.findByRepository(13L)).thenReturn(List.of(watch, disabled));
+        when(runRepository.find(7L, date))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(run(SearchRunStatus.READY)));
+
+        assertThat(planner.planRepository(13L, date)).isEqualTo(1);
+        verify(runRepository).insertIgnore(7L, 13L, date);
+        verify(runRepository, never()).insertIgnore(org.mockito.ArgumentMatchers.eq(8L), anyLong(), any());
     }
 
     @Test

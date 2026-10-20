@@ -11,6 +11,17 @@ public record CollectionProperties(
         Duration jobLease,
         Planner planner
 ) {
-    public record Planner(LocalTime from, LocalTime to, Duration interval) {
+    public record Planner(
+            boolean enabled,
+            LocalTime from,
+            LocalTime to,
+            Duration interval,
+            Duration snapshotInterval
+    ) {
+        public Planner {
+            if (snapshotInterval == null || snapshotInterval.compareTo(Duration.ofMinutes(1)) < 0) {
+                throw new IllegalArgumentException("collection.planner.snapshot-interval must be at least 1 minute");
+            }
+        }
     }
 }

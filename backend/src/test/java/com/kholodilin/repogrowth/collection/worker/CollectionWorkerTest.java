@@ -76,7 +76,7 @@ class CollectionWorkerTest {
                 lock,
                 new RetryPolicy(),
                 new CollectionProperties(1, Duration.ofMinutes(5),
-                        new CollectionProperties.Planner(LocalTime.of(3, 0), LocalTime.of(6, 0), Duration.ofHours(24))),
+                        new CollectionProperties.Planner(true, LocalTime.of(3, 0), LocalTime.of(6, 0), Duration.ofHours(24), Duration.ofHours(3))),
                 transactions
         );
 
@@ -113,7 +113,7 @@ class CollectionWorkerTest {
                 lock,
                 new RetryPolicy(),
                 new CollectionProperties(1, Duration.ofMinutes(5),
-                        new CollectionProperties.Planner(LocalTime.of(3, 0), LocalTime.of(6, 0), Duration.ofHours(24))),
+                        new CollectionProperties.Planner(true, LocalTime.of(3, 0), LocalTime.of(6, 0), Duration.ofHours(24), Duration.ofHours(3))),
                 transactions
         );
         when(transactions.execute(any())).thenReturn(Optional.of(new CollectionJob(

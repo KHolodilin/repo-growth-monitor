@@ -74,7 +74,7 @@ jobs:
             Open http://localhost:8080
 
             1. Open **Repositories** and enable tracking.
-            2. Click **Collect now**, or wait for the planner window (`10:00–18:00` UTC by default).
+            2. Click **Collect now**, or wait for the planner window (`06:00–18:00` UTC by default).
             3. View the **Dashboard** and repository details.
 
             The first start creates an empty database. Stop with `docker compose down`. Data stays in the `pgdata` volume.

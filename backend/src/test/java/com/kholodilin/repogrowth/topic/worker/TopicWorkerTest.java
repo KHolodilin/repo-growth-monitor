@@ -171,7 +171,7 @@ class TopicWorkerTest {
                 gitHubClient,
                 repositoryLock,
                 new RetryPolicy(),
-                new CollectionProperties(1, lease, new CollectionProperties.Planner(LocalTime.of(10, 0), LocalTime.of(18, 0), Duration.ofMinutes(5))),
+                new CollectionProperties(1, lease, new CollectionProperties.Planner(true, LocalTime.of(10, 0), LocalTime.of(18, 0), Duration.ofMinutes(5), Duration.ofHours(3))),
                 transactionTemplate
         );
     }
