@@ -221,15 +221,15 @@ public class AnalyticsService {
         StatsHistoryPoint first = comparable ? points.getFirst() : null;
         StatsHistoryPoint last = comparable ? points.getLast() : null;
         return new StatsTotals(
-                level(latest == null ? null : latest.stars(), first == null ? null : first.stars(), last == null ? null : last.stars(), comparable),
-                level(latest == null ? null : latest.forks(), first == null ? null : first.forks(), last == null ? null : last.forks(), comparable),
-                level(latest == null ? null : latest.watchers(), first == null ? null : first.watchers(), last == null ? null : last.watchers(), comparable),
-                level(latest == null ? null : latest.contributors(), first == null ? null : first.contributors(), last == null ? null : last.contributors(), comparable)
+                level(latest == null ? null : latest.stars(), first == null ? 0 : first.stars(), last == null ? 0 : last.stars(), comparable),
+                level(latest == null ? null : latest.forks(), first == null ? 0 : first.forks(), last == null ? 0 : last.forks(), comparable),
+                level(latest == null ? null : latest.watchers(), first == null ? 0 : first.watchers(), last == null ? 0 : last.watchers(), comparable),
+                level(latest == null ? null : latest.contributors(), first == null ? 0 : first.contributors(), last == null ? 0 : last.contributors(), comparable)
         );
     }
 
-    private static StatsMetricTotal level(Integer latest, Integer baseline, Integer current, boolean comparable) {
-        if (!comparable || latest == null || baseline == null || current == null) {
+    private static StatsMetricTotal level(Integer latest, int baseline, int current, boolean comparable) {
+        if (!comparable) {
             return new StatsMetricTotal(latest, null, null);
         }
         return new StatsMetricTotal(latest, current - baseline, GrowthMath.percent(current, baseline));
