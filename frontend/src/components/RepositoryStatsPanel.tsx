@@ -6,7 +6,15 @@ import { formatChartAxisDate, formatNumber } from "../lib/utils";
 import { type Period } from "./PeriodSelector";
 import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
+import { TrafficKpiCard } from "./TrafficKpiCard";
 import { Card } from "./ui";
+
+const STATS_CARDS = [
+  { key: "stars", label: "Stars", color: "#5470c6" },
+  { key: "forks", label: "Forks", color: "#91cc75" },
+  { key: "watchers", label: "Watchers", color: "#fac858" },
+  { key: "contributors", label: "Contributors", color: "#ee6666" },
+] as const;
 
 export function RepositoryStatsPanel({
   repositoryId,
@@ -55,6 +63,23 @@ export function RepositoryStatsPanel({
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {STATS_CARDS.map((card) => {
+          const total = history.totals[card.key];
+          return (
+            <TrafficKpiCard
+              key={card.key}
+              label={card.label}
+              value={total.value}
+              growthPercent={total.growthPercent}
+              absoluteChange={total.absoluteChange}
+              period={period}
+              series={history.points.map((point) => point[card.key])}
+              sparklineColor={card.color}
+            />
+          );
+        })}
+      </div>
       <ChartCard title="Stats">
         {history.points.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">

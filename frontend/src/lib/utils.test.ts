@@ -6,6 +6,7 @@ import {
   formatActivity,
   formatActivityPresentation,
   formatChartAxisDate,
+  formatAbsoluteGrowth,
   formatDelta,
   formatGrowth,
   formatNumber,
@@ -36,6 +37,16 @@ describe("utils", () => {
     expect(formatGrowth(12.54)).toEqual({ direction: "up", label: "↑ 12.5%" });
     expect(formatGrowth(-1)).toEqual({ direction: "down", label: "↓ 1%" });
     expect(formatGrowth(0)).toEqual({ direction: "flat", label: "→ 0%" });
+    expect(formatAbsoluteGrowth(null, 12.5)).toBeNull();
+    expect(formatAbsoluteGrowth(Number.NaN, 1)).toBeNull();
+    expect(formatAbsoluteGrowth(0, 0)).toEqual({ direction: "flat", label: "— No change" });
+    expect(formatAbsoluteGrowth(6, 28.6)).toEqual({ direction: "up", label: "↑ +6 (+28.6%)" });
+    expect(formatAbsoluteGrowth(2, 25)).toEqual({ direction: "up", label: "↑ +2 (+25.0%)" });
+    expect(formatAbsoluteGrowth(-3, -13.6)).toEqual({ direction: "down", label: "↓ -3 (-13.6%)" });
+    expect(formatAbsoluteGrowth(6, null)).toEqual({ direction: "up", label: "↑ +6" });
+    expect(formatAbsoluteGrowth(1, Number.NaN)).toEqual({ direction: "up", label: "↑ +1" });
+    expect(formatAbsoluteGrowth(1, 0)).toEqual({ direction: "up", label: "↑ +1 (0.0%)" });
+    expect(formatAbsoluteGrowth(1200, 1)).toEqual({ direction: "up", label: "↑ +1,200 (+1.0%)" });
     expect(formatDelta(null)).toBe("—");
     expect(formatDelta(2)).toBe("↑2");
     expect(formatDelta(-3)).toBe("↓3");

@@ -323,11 +323,63 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 new AnalyticsService.StatsHistoryPoint(today.minusDays(3), 40, 3, 9, 5),
                 new AnalyticsService.StatsHistoryPoint(today, 41, 3, 10, 6)
         );
+        assertThat(week.totals().stars()).isEqualTo(new AnalyticsService.StatsMetricTotal(41, 1, 2.5));
+        assertThat(week.totals().forks()).isEqualTo(new AnalyticsService.StatsMetricTotal(3, 0, 0.0));
+        assertThat(week.totals().watchers()).isEqualTo(new AnalyticsService.StatsMetricTotal(10, 1, 11.1));
+        assertThat(week.totals().contributors()).isEqualTo(new AnalyticsService.StatsMetricTotal(6, 1, 20.0));
 
         AnalyticsService.RepositoryStatsHistory all = analyticsService.statsHistory(kafka.id(), "all");
         assertThat(all.points()).extracting(AnalyticsService.StatsHistoryPoint::date)
                 .containsExactly(today.minusDays(10), today.minusDays(3), today);
         assertThat(all.points().getFirst().contributors()).isEqualTo(4);
+        assertThat(all.totals().stars()).isEqualTo(new AnalyticsService.StatsMetricTotal(41, null, null));
+        assertThat(all.totals().forks().value()).isEqualTo(3);
+        assertThat(all.totals().watchers().absoluteChange()).isNull();
+        assertThat(all.totals().contributors().growthPercent()).isNull();
+    }
+
+    @Test
+    void statsHistoryKeepsTheLatestLevelWhenTheWindowHasNoChange() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        AnalyticsService.RepositoryStatsHistory empty = analyticsService.statsHistory(kafka.id(), "30d");
+        assertThat(empty.points()).isEmpty();
+        assertThat(empty.totals().stars().value()).isNull();
+        assertThat(empty.totals().stars().absoluteChange()).isNull();
+
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 4);
+
+        AnalyticsService.RepositoryStatsHistory day = analyticsService.statsHistory(kafka.id(), "1d");
+        assertThat(day.points()).isEmpty();
+        assertThat(day.totals().stars()).isEqualTo(new AnalyticsService.StatsMetricTotal(35, null, null));
+        assertThat(day.totals().forks().value()).isEqualTo(2);
+        assertThat(day.totals().watchers().value()).isEqualTo(8);
+        assertThat(day.totals().contributors().value()).isEqualTo(4);
+
+        AnalyticsService.RepositoryStatsHistory month = analyticsService.statsHistory(kafka.id(), "30d");
+        assertThat(month.points()).containsExactly(
+                new AnalyticsService.StatsHistoryPoint(today.minusDays(10), 35, 2, 8, 4)
+        );
+        assertThat(month.totals().stars()).isEqualTo(new AnalyticsService.StatsMetricTotal(35, null, null));
+        assertThat(analyticsService.statsHistory(kafka.id(), "all").totals().stars().value()).isEqualTo(35);
+    }
+
+    @Test
+    void statsHistoryUsesTheLevelChangeInsideTheWindow() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 0, 0, 22, 0, 8);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today, 6, 0, 19, 0, 10);
+
+        AnalyticsService.RepositoryStatsHistory month = analyticsService.statsHistory(kafka.id(), "30d");
+        assertThat(month.totals().stars()).isEqualTo(new AnalyticsService.StatsMetricTotal(6, 6, null));
+        assertThat(month.totals().forks()).isEqualTo(new AnalyticsService.StatsMetricTotal(19, -3, -13.6));
+        assertThat(month.totals().watchers()).isEqualTo(new AnalyticsService.StatsMetricTotal(0, 0, 0.0));
+        assertThat(month.totals().contributors()).isEqualTo(new AnalyticsService.StatsMetricTotal(10, 2, 25.0));
+
+        AnalyticsService.RepositoryStatsHistory week = analyticsService.statsHistory(kafka.id(), "7d");
+        assertThat(week.totals().stars().value()).isEqualTo(month.totals().stars().value());
+        assertThat(week.totals().forks()).isEqualTo(month.totals().forks());
     }
 
     @Test

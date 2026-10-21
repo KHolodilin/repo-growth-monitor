@@ -182,6 +182,11 @@ public class AnalyticsService {
         );
     }
 
+    /**
+     * Stars, forks, watchers, and contributors are levels. The card value is the latest stored
+     * snapshot and does not follow the selected window. The change is the last point in that
+     * window minus the first. All-time, and a window with fewer than two points, has no change.
+     */
     public RepositoryStatsHistory statsHistory(long repositoryId, String periodParam) {
         repositoryService.get(repositoryId);
         DashboardPeriod period = periodForStats(repositoryId, periodParam);
@@ -197,7 +202,37 @@ public class AnalyticsService {
                         day.contributors()
                 ))
                 .toList();
-        return new RepositoryStatsHistory(repositoryId, period.value(), points);
+        TrafficJdbcRepository.RepositoryDailyStats latest =
+                trafficJdbcRepository.latestDailyStats(repositoryId).orElse(null);
+        return new RepositoryStatsHistory(
+                repositoryId,
+                period.value(),
+                statsTotals(latest, points, period.allTime()),
+                points
+        );
+    }
+
+    private static StatsTotals statsTotals(
+            TrafficJdbcRepository.RepositoryDailyStats latest,
+            List<StatsHistoryPoint> points,
+            boolean allTime
+    ) {
+        boolean comparable = !allTime && points.size() >= 2;
+        StatsHistoryPoint first = comparable ? points.getFirst() : null;
+        StatsHistoryPoint last = comparable ? points.getLast() : null;
+        return new StatsTotals(
+                level(latest == null ? null : latest.stars(), first == null ? null : first.stars(), last == null ? null : last.stars(), comparable),
+                level(latest == null ? null : latest.forks(), first == null ? null : first.forks(), last == null ? null : last.forks(), comparable),
+                level(latest == null ? null : latest.watchers(), first == null ? null : first.watchers(), last == null ? null : last.watchers(), comparable),
+                level(latest == null ? null : latest.contributors(), first == null ? null : first.contributors(), last == null ? null : last.contributors(), comparable)
+        );
+    }
+
+    private static StatsMetricTotal level(Integer latest, Integer baseline, Integer current, boolean comparable) {
+        if (!comparable || latest == null || baseline == null || current == null) {
+            return new StatsMetricTotal(latest, null, null);
+        }
+        return new StatsMetricTotal(latest, current - baseline, GrowthMath.percent(current, baseline));
     }
 
     /**
@@ -754,8 +789,21 @@ public class AnalyticsService {
     public record RepositoryStatsHistory(
             long repositoryId,
             String period,
+            StatsTotals totals,
             List<StatsHistoryPoint> points
     ) {
+    }
+
+    public record StatsTotals(
+            StatsMetricTotal stars,
+            StatsMetricTotal forks,
+            StatsMetricTotal watchers,
+            StatsMetricTotal contributors
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record StatsMetricTotal(Integer value, Integer absoluteChange, Double growthPercent) {
     }
 
     public record StatsHistoryPoint(

@@ -127,6 +127,19 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
+    public Optional<RepositoryDailyStats> latestDailyStats(long repositoryId) {
+        return jdbcClient.sql("""
+                        SELECT stat_date, stars, watchers, forks, contributors
+                        FROM repository_daily_stats
+                        WHERE repository_id = :repositoryId
+                        ORDER BY stat_date DESC
+                        LIMIT 1
+                        """)
+                .param("repositoryId", repositoryId)
+                .query(DAILY_STATS_MAPPER)
+                .optional();
+    }
+
     public Optional<LocalDate> earliestDailyStatsDate(long repositoryId) {
         return jdbcClient.sql("""
                         SELECT MIN(stat_date)

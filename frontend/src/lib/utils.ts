@@ -35,6 +35,26 @@ export function formatGrowth(value?: number | null) {
   return { direction: "flat" as const, label: "→ 0%" };
 }
 
+export function formatAbsoluteGrowth(absoluteChange?: number | null, growthPercent?: number | null) {
+  if (absoluteChange === null || absoluteChange === undefined || Number.isNaN(absoluteChange)) {
+    return null;
+  }
+  if (absoluteChange === 0) {
+    return { direction: "flat" as const, label: "— No change" };
+  }
+  const direction = absoluteChange > 0 ? ("up" as const) : ("down" as const);
+  const arrow = absoluteChange > 0 ? "↑" : "↓";
+  const magnitude = formatNumber(Math.abs(absoluteChange));
+  const signed = absoluteChange > 0 ? `+${magnitude}` : `-${magnitude}`;
+  if (growthPercent === null || growthPercent === undefined || Number.isNaN(growthPercent)) {
+    return { direction, label: `${arrow} ${signed}` };
+  }
+  const rounded = Math.round(growthPercent * 10) / 10;
+  const text = Math.abs(rounded).toFixed(1);
+  const signedPercent = rounded > 0 ? `+${text}%` : rounded < 0 ? `-${text}%` : `${text}%`;
+  return { direction, label: `${arrow} ${signed} (${signedPercent})` };
+}
+
 export function formatChartAxisDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(
     new Date(`${value}T00:00:00`),
