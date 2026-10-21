@@ -239,7 +239,19 @@ describe("coverage gaps", () => {
         return { ...traffic, lastCollection: undefined, pathSnapshotAt: undefined, referrerSnapshotAt: undefined };
       }
       if (url.includes("visibility") || url.includes("growth-events") || url.includes("stats-history")) {
-        return url.includes("stats-history") ? { repositoryId: 13, period: "1d", points: [] } : [];
+        return url.includes("stats-history")
+          ? {
+              repositoryId: 13,
+              period: "1d",
+              totals: {
+                stars: { value: null, absoluteChange: null, growthPercent: null },
+                forks: { value: null, absoluteChange: null, growthPercent: null },
+                watchers: { value: null, absoluteChange: null, growthPercent: null },
+                contributors: { value: null, absoluteChange: null, growthPercent: null },
+              },
+              points: [],
+            }
+          : [];
       }
       if (url.includes("growth-event-settings")) {
         return [{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }];

@@ -45,4 +45,113 @@ describe("TrafficKpiCard", () => {
     expect(screen.queryByText("→ 0%")).not.toBeInTheDocument();
     expect(container.querySelector("polyline")).toBeNull();
   });
+
+  it("shows an absolute level change and keeps the series color", () => {
+    const { container, rerender } = render(
+      <TrafficKpiCard
+        label="Stars"
+        value={27}
+        growthPercent={28.6}
+        absoluteChange={6}
+        period="30d"
+        series={[21, 27]}
+        sparklineColor="#5470c6"
+      />,
+    );
+    expect(screen.getByText("27")).toBeInTheDocument();
+    expect(screen.getByText("↑ +6 (+28.6%)")).toHaveClass("text-emerald-700");
+    expect(screen.getByText("vs prev 30d")).toBeInTheDocument();
+    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe("#5470c6");
+
+    rerender(
+      <TrafficKpiCard
+        label="Forks"
+        value={19}
+        growthPercent={-13.6}
+        absoluteChange={-3}
+        period="30d"
+        series={[22, 19]}
+        sparklineColor="#91cc75"
+      />,
+    );
+    expect(screen.getByText("↓ -3 (-13.6%)")).toHaveClass("text-red-700");
+    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe("#91cc75");
+
+    rerender(
+      <TrafficKpiCard
+        label="Watchers"
+        value={0}
+        growthPercent={0}
+        absoluteChange={0}
+        period="30d"
+        series={[0, 0]}
+        sparklineColor="#fac858"
+      />,
+    );
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("— No change")).toHaveClass("text-muted-foreground");
+    expect(screen.getByText("vs prev 30d")).toBeInTheDocument();
+    const points = container.querySelector("polyline")?.getAttribute("points")?.split(" ") ?? [];
+    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe("#fac858");
+    expect(new Set(points.map((point) => point.split(",")[1])).size).toBe(1);
+
+    rerender(
+      <TrafficKpiCard
+        label="Stars"
+        value={6}
+        growthPercent={null}
+        absoluteChange={6}
+        period="7d"
+        series={[0, 6]}
+        sparklineColor="#5470c6"
+      />,
+    );
+    expect(screen.getByText("↑ +6")).toBeInTheDocument();
+    expect(screen.queryByText(/\(%/)).not.toBeInTheDocument();
+    expect(screen.getByText("vs prev 7d")).toBeInTheDocument();
+
+    rerender(
+      <TrafficKpiCard
+        label="Stars"
+        value={35}
+        growthPercent={null}
+        absoluteChange={null}
+        period="1d"
+        series={[35]}
+        sparklineColor="#5470c6"
+      />,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
+    expect(container.querySelector("polyline")).not.toBeNull();
+
+    rerender(
+      <TrafficKpiCard
+        label="Stars"
+        value={null}
+        growthPercent={null}
+        absoluteChange={null}
+        period="30d"
+        series={[]}
+      />,
+    );
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(container.querySelector("polyline")).toBeNull();
+
+    rerender(
+      <TrafficKpiCard
+        label="Stars"
+        value={27}
+        growthPercent={28.6}
+        absoluteChange={6}
+        period="all"
+        series={[21, 27]}
+        sparklineColor="#5470c6"
+      />,
+    );
+    expect(screen.getByText("27")).toBeInTheDocument();
+    expect(screen.queryByText("↑ +6 (+28.6%)")).not.toBeInTheDocument();
+    expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
+    expect(container.querySelector("polyline")).toBeNull();
+  });
 });

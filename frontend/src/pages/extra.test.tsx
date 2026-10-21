@@ -287,6 +287,12 @@ describe("extra coverage", () => {
     api.mockResolvedValueOnce({
       repositoryId: 13,
       period: "30d",
+      totals: {
+        stars: { value: 21, absoluteChange: null, growthPercent: null },
+        forks: { value: 16, absoluteChange: null, growthPercent: null },
+        watchers: { value: 0, absoluteChange: null, growthPercent: null },
+        contributors: { value: 7, absoluteChange: null, growthPercent: null },
+      },
       points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 }],
     });
     const stats = render(
@@ -295,7 +301,67 @@ describe("extra coverage", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();
+    expect(screen.getAllByText("Stars").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
     stats.unmount();
+  });
+
+  it("shows stats kpi cards from the history totals", async () => {
+    api.mockResolvedValueOnce({
+      repositoryId: 13,
+      period: "30d",
+      totals: {
+        stars: { value: 27, absoluteChange: 6, growthPercent: 28.6 },
+        forks: { value: 19, absoluteChange: -3, growthPercent: -13.6 },
+        watchers: { value: 0, absoluteChange: 0, growthPercent: 0 },
+        contributors: { value: 10, absoluteChange: 2, growthPercent: 25 },
+      },
+      points: [
+        { date: "2026-09-01", stars: 21, forks: 22, watchers: 0, contributors: 8 },
+        { date: "2026-09-23", stars: 27, forks: 19, watchers: 0, contributors: 10 },
+      ],
+    });
+    const stats = render(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={13} period="30d" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("↑ +6 (+28.6%)")).toBeInTheDocument();
+    expect(screen.getByText("↓ -3 (-13.6%)")).toHaveClass("text-red-700");
+    expect(screen.getByText("— No change")).toHaveClass("text-muted-foreground");
+    expect(screen.getByText("↑ +2 (+25.0%)")).toBeInTheDocument();
+    expect(screen.getAllByText("vs prev 30d")).toHaveLength(4);
+    expect(screen.getByText("Daily totals")).toBeInTheDocument();
+    expect(
+      [...stats.container.querySelectorAll("polyline")].map((line) => line.getAttribute("stroke")),
+    ).toEqual(["#5470c6", "#91cc75", "#fac858", "#ee6666"]);
+    stats.unmount();
+
+    api.mockResolvedValueOnce({
+      repositoryId: 13,
+      period: "all",
+      totals: {
+        stars: { value: 27, absoluteChange: null, growthPercent: null },
+        forks: { value: 19, absoluteChange: null, growthPercent: null },
+        watchers: { value: 0, absoluteChange: null, growthPercent: null },
+        contributors: { value: 10, absoluteChange: null, growthPercent: null },
+      },
+      points: [
+        { date: "2026-09-01", stars: 21, forks: 22, watchers: 0, contributors: 8 },
+        { date: "2026-09-23", stars: 27, forks: 19, watchers: 0, contributors: 10 },
+      ],
+    });
+    const all = render(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={13} period="all" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("Daily totals")).toBeInTheDocument();
+    expect(screen.getAllByText("27").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
+    expect(screen.queryByText("↑ +6 (+28.6%)")).not.toBeInTheDocument();
+    expect(all.container.querySelector("polyline")).toBeNull();
   });
 
   it("edits a manual growth event and sorts search topic tables", async () => {

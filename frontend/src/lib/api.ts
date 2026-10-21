@@ -208,9 +208,21 @@ export type StatsHistoryPoint = {
   contributors: number;
 };
 
+export type StatsMetricTotal = {
+  value: number | null;
+  absoluteChange: number | null;
+  growthPercent: number | null;
+};
+
 export type RepositoryStatsHistory = {
   repositoryId: number;
   period: string;
+  totals: {
+    stars: StatsMetricTotal;
+    forks: StatsMetricTotal;
+    watchers: StatsMetricTotal;
+    contributors: StatsMetricTotal;
+  };
   points: StatsHistoryPoint[];
 };
 

@@ -164,6 +164,12 @@ describe("pages", () => {
         return json({
           repositoryId: 13,
           period: "30d",
+          totals: {
+            stars: { value: 21, absoluteChange: null, growthPercent: null },
+            forks: { value: 16, absoluteChange: null, growthPercent: null },
+            watchers: { value: 0, absoluteChange: null, growthPercent: null },
+            contributors: { value: 7, absoluteChange: null, growthPercent: null },
+          },
           points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 }],
         });
       }
