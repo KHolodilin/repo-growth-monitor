@@ -1,0 +1,29 @@
+---
+description: Checklist for executing an existing GitHub issue up to a ready PR
+alwaysApply: true
+---
+
+# Issue execution
+
+When the issue already exists and the user asks to implement it — follow the steps in order. Do not merge the PR. Do not create a release tag.
+
+## Steps
+
+1. **Branch from `main`.** `git fetch` and check out current `main`, then create `issue-{N}-{kebab-slug}`. Do not branch off an old feature branch.
+2. **Implementation.** Issue scope only. Do not expand it.
+3. **Tests and coverage ≥ 95%.** Add or update tests for the code you touched. Backend: `mvn -B -f backend/pom.xml clean test` (JaCoCo). Frontend: `npm test` in `frontend/` (Vitest coverage). Line coverage for the changed parts and overall must stay at least 95%. If the repo JaCoCo check in the pom is lower, still do not leave holes in new code.
+4. **Integration tests.** Run ITs (`*IT` / Testcontainers). All green.
+5. **UI.** If UI, routes, client state, or on-screen data changed — open the app in the browser and walk the changed flow as a user: click, type, navigate. A screenshot is not enough. Check sibling screens that share the same state, plus empty and error states.
+6. **Commit and push.** Commit first (message is the "why", match repo style), then `git push -u origin HEAD`. Do not push secrets.
+7. **PR into `main`.** One PR per issue. Body: Summary, `Fixes #{N}`, Test plan from Acceptance. If a PR is already open — do not open a second one.
+8. **GitHub Actions.** Wait for CI on the PR (`.github/workflows/ci.yml`). Every job green: backend `mvn test`, frontend `npm test`, no failure artifacts.
+9. **Codecov.** Check the Codecov status/comment on the PR: no errors and no warnings (patch/project). Empty upload or a red check — fix it.
+10. **Fixes.** If CI or Codecov is red — fix, commit, push, repeat steps 8–9 until clean.
+11. **Docker.** When CI is green, rebuild and restart the local app: `docker compose up -d --build`. The container on port 8080 must match this branch. Leave the Postgres volume.
+12. **Done.** Leave the PR open. No merge, no tag, no release — until the user asks.
+
+## Do not
+
+- Do not create an empty commit.
+- Do not use `--no-verify`. Do not force-push to `main`.
+- Do not close the issue by hand: merging the PR with `Fixes #{N}` will close it.

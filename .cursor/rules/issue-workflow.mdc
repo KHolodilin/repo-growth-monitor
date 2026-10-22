@@ -1,0 +1,40 @@
+---
+description: How to open a GitHub issue from a spec and then execute it through PR and release
+alwaysApply: true
+---
+
+# Issue → execution
+
+When the user gives an idea, a spec, or says "add an issue / branch / do it all" — do not write code before the spec is agreed. Create the issue first, then follow its items exactly.
+
+## 1. Spec first, then the issue
+
+- If they ask only for a plan / spec — text only, no commits or files.
+- The spec must lock: goal, behavior, out of scope, acceptance, work order.
+- Work order always includes: issue, branch `issue-{N}-{slug}`, versions if a release is needed, tests, docker when the image changes, commit, push, PR, release tag only after merge to `main`.
+- Create the issue with `gh issue create` (or GitHub MCP). Search for duplicates first.
+- Title: one sentence of what the user gets. Example: `Topics Visibility: rank the repository on its GitHub topics`.
+- Issue body is the compressed spec:
+
+```markdown
+## Summary
+<why>
+
+## Behavior
+- <visible behavior and constraints>
+
+## Out of scope
+- <what we will not do>
+
+## Acceptance
+- <how to verify>
+```
+
+## 2. Execution
+
+Once the issue exists and it should be implemented — follow only the checklist in `issue-execution.mdc` (branch, code, 95% coverage, ITs, UI, commit/push, PR, CI, Codecov, restart Docker, leave the PR open).
+
+## 3. After merge
+
+- Push a `vX.Y.Z` release tag only from `main` after green CI, and only when the user asks for a release.
+- The tag starts `.github/workflows/release.yml` (GHCR + GitHub Release).
