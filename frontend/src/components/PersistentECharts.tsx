@@ -9,9 +9,11 @@ type SeriesRef = { key: string; name: string };
 type Props = {
   chartId: string;
   series: readonly SeriesRef[];
+  /** Rank History uses the query table instead of the legend cookie. */
+  persistSelection?: boolean;
 } & ComponentProps<typeof ReactECharts>;
 
-export function PersistentECharts({ chartId, series, option, onEvents, ...rest }: Props) {
+export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, ...rest }: Props) {
   const chartRef = useRef<ReactECharts>(null);
   const [stored, setStored] = useState<Record<string, boolean> | null>(() => readChartSelection(chartId));
 
@@ -22,10 +24,12 @@ export function PersistentECharts({ chartId, series, option, onEvents, ...rest }
   const selectedByName = useMemo(() => {
     const selected: Record<string, boolean> = {};
     for (const item of series) {
-      selected[item.name] = stored && Object.prototype.hasOwnProperty.call(stored, item.key) ? stored[item.key] : true;
+      selected[item.name] = !persistSelection || !(stored && Object.prototype.hasOwnProperty.call(stored, item.key))
+        ? true
+        : stored[item.key];
     }
     return selected;
-  }, [series, stored]);
+  }, [series, stored, persistSelection]);
 
   const mergedOption = useMemo(() => {
     const legend = (option as { legend?: unknown }).legend;
@@ -58,7 +62,10 @@ export function PersistentECharts({ chartId, series, option, onEvents, ...rest }
     <ReactECharts
       option={mergedOption}
       notMerge
-      onEvents={{ ...onEvents, legendselectchanged: onLegendSelectChanged }}
+      onEvents={{
+        ...onEvents,
+        ...(persistSelection ? { legendselectchanged: onLegendSelectChanged } : {}),
+      }}
       {...rest}
       ref={chartRef}
     />

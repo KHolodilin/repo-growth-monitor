@@ -3,7 +3,11 @@ import { eventMarkOverlays } from "./trafficChart";
 import { eventUtcDate } from "./growthEvents";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
-const COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
+export const RANK_LINE_COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
+
+export function rankLineColor(index: number) {
+  return RANK_LINE_COLORS[index % RANK_LINE_COLORS.length];
+}
 const MISSED_COLOR = "#9ca3af";
 
 export type RankHistoryPoint = { date: string; position: number | null };
@@ -16,6 +20,8 @@ export type RankHistorySeries = {
   missedDates?: string[];
   highlighted?: boolean;
   dimmed?: boolean;
+  /** Stable color so hiding another query does not repaint this line. */
+  color?: string;
 };
 
 export function rankTooltipText(point: RankHistoryPoint | undefined, limit: number, missed = false) {
@@ -35,12 +41,15 @@ export function rankHistoryOption({
   dates,
   series,
   legend = false,
+  legendToggle = true,
   events = [],
   formatAxis = formatChartAxisDate,
 }: {
   dates: string[];
   series: RankHistorySeries[];
   legend?: boolean;
+  /** False when the table checkboxes are the only way to show or hide a line. */
+  legendToggle?: boolean;
   events?: GrowthEvent[];
   formatAxis?: (value: string) => string;
 }) {
@@ -48,7 +57,7 @@ export function rankHistoryOption({
   const overlays = events.length > 0 ? eventMarkOverlays(axisDates, events, 1) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
   const lines = series.flatMap((item, index) => {
-    const color = COLORS[index % COLORS.length];
+    const color = item.color ?? rankLineColor(index);
     const byDate = new Map(item.points.map((point) => [point.date, point]));
     const missed = new Set(item.missedDates ?? []);
     return [
@@ -122,7 +131,14 @@ export function rankHistoryOption({
         return `<div>${formatAxis(date)}<br/>${rows}${eventRows}</div>`;
       },
     },
-    legend: legend ? { top: 0, type: "scroll", data: series.map((item) => item.name) } : undefined,
+    legend: legend
+      ? {
+          top: 0,
+          type: "scroll",
+          data: series.map((item) => item.name),
+          ...(legendToggle ? {} : { selectedMode: false }),
+        }
+      : undefined,
     grid: { left: 48, right: 72, top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24, bottom: 40, containLabel: false },
     xAxis: {
       type: "category",

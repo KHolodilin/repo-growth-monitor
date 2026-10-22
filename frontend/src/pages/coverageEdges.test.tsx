@@ -369,7 +369,7 @@ describe("remaining coverage edges", () => {
     expect(await screen.findByText(/MYSTERY/)).toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByText(/MYSTERY/));
     await user.click(screen.getByRole("button", { name: "Search Visibility" }));
-    expect(await screen.findByText("Search Queries")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Search Queries" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText(/No topics yet/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Growth Events" }));

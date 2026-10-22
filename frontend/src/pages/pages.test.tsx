@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -55,6 +55,7 @@ function renderPath(path: string, ui: ReactNode) {
 describe("pages", () => {
   beforeEach(() => {
     api.mockReset();
+    document.cookie = "search_visibility_queries_13=; path=/; max-age=0";
   });
 
   it("renders dashboard ready state and sorts repositories", async () => {
@@ -239,19 +240,24 @@ describe("pages", () => {
     expect(syntax).toHaveAttribute("rel", "noreferrer");
     expect(syntax.parentElement).toHaveTextContent("Search Queries");
     expect(syntax.parentElement?.querySelector("input")).toBeNull();
+    expect(screen.getByText("1 / 50")).toBeInTheDocument();
+    expect(screen.getByText("49 available")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "mark-empty" }));
     expect(screen.queryByRole("heading", { name: "Growth event" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "mark" }));
     expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit" }));
     await user.click(screen.getByRole("button", { name: "mark" }));
-    const deletes = screen.getAllByRole("button", { name: "Delete" });
+    const dialog = screen.getByRole("heading", { name: "Growth event" }).closest(".fixed");
     api.mockResolvedValueOnce({});
-    await user.click(deletes[deletes.length - 1]);
+    await user.click(within(dialog as HTMLElement).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByText("A match in time does not prove a cause.")).not.toBeInTheDocument());
     expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByText(searchHistory.query.name));
     fireEvent.mouseLeave(screen.getByText(searchHistory.query.name));
+    await user.click(screen.getByRole("checkbox", { name: `Chart line for ${searchHistory.query.name}` }));
+    expect(screen.getByText("Select search queries from the table to display rank history")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: `Chart line for ${searchHistory.query.name}` }));
     for (const name of ["Search Query", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
       await user.click(screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]);
     }
@@ -471,5 +477,38 @@ describe("pages", () => {
     await act(async () => {
       await Promise.resolve();
     });
+  });
+
+  it("checks all search chart lines, some of them, and none", async () => {
+    const user = userEvent.setup();
+    const second = {
+      ...searchHistory,
+      query: { ...searchHistory.query, id: 6, name: "kafka language:java", query: "kafka language:java" },
+      currentRank: 8,
+    };
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("search-visibility")) {
+        return json([searchHistory, second]);
+      }
+      return json([]);
+    });
+    document.cookie = "search_visibility_queries_13=; path=/; max-age=0";
+    renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    expect(await screen.findByText("2 / 50")).toBeInTheDocument();
+    const header = await screen.findByRole("checkbox", { name: "Chart lines", checked: true });
+    await user.click(header);
+    expect(screen.getByText("Select search queries from the table to display rank history")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: "Chart line for kafka language:java" }));
+    expect((header as HTMLInputElement).indeterminate).toBe(true);
+    await user.click(header);
+    expect(header).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: `Chart line for ${searchHistory.query.name}` })).toBeChecked();
   });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import {
@@ -15,7 +15,7 @@ import {
 import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
-import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
+import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
@@ -28,6 +28,8 @@ import { SnapshotCards } from "../components/SnapshotCards";
 import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
+import { resolveSearchQuerySelection, writeSearchQuerySelection } from "../lib/searchQuerySelection";
+import { SearchVisibilityKpis } from "../components/SearchVisibilityKpis";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
@@ -420,7 +422,7 @@ export function RepositoryDetailsPage() {
             </button>
           ))}
         </div>
-        {(tab === "traffic" || tab === "stats" || tab === "growth-events") && (
+        {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "growth-events") && (
           <PeriodSelector period={period} onPeriod={setPeriod} />
         )}
       </div>
@@ -458,6 +460,7 @@ export function RepositoryDetailsPage() {
       {tab === "search" && (
         <SearchPanel
           repositoryId={repo.id}
+          period={period}
           visibility={visibility}
           queryText={queryText}
           setQueryText={(value) => {
@@ -1111,6 +1114,7 @@ function CombinedTopicRankChart({
 
 function SearchPanel({
   repositoryId,
+  period,
   visibility,
   queryText,
   setQueryText,
@@ -1123,6 +1127,7 @@ function SearchPanel({
   onDelete,
 }: {
   repositoryId: number;
+  period: Period;
   visibility: SearchHistory[];
   queryText: string;
   setQueryText: (value: string) => void;
@@ -1135,6 +1140,13 @@ function SearchPanel({
   onDelete: (id: number) => void;
 }) {
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  useEffect(() => {
+    setSelectedIds(resolveSearchQuerySelection(
+      repositoryId,
+      visibility.map((item) => ({ id: item.query.id, rank: item.currentRank })),
+    ));
+  }, [repositoryId, visibility]);
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "search-queries",
     scope: repositoryId,
@@ -1169,8 +1181,29 @@ function SearchPanel({
       (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
     );
 
+  const selected = new Set(selectedIds);
+  const allChecked = visibility.length > 0 && visibility.every((item) => selected.has(item.query.id));
+  const headerCheckbox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (headerCheckbox.current) {
+      headerCheckbox.current.indeterminate = selectedIds.length > 0 && !allChecked;
+    }
+  }, [selectedIds, allChecked]);
+
+  function writeSelection(ids: number[]) {
+    setSelectedIds(ids);
+    writeSearchQuerySelection(repositoryId, ids);
+  }
+
   return (
     <div className="space-y-4">
+      <SearchVisibilityKpis queries={visibility} period={period} />
+      <CombinedRankChart
+        repositoryId={repositoryId}
+        visibility={visibility}
+        highlightQueryId={hoveredQueryId}
+        selectedIds={selectedIds}
+      />
       <Card>
         <div className="mb-3 flex items-baseline gap-3">
           <h2 className="font-medium">Search Queries</h2>
@@ -1208,9 +1241,19 @@ function SearchPanel({
             </p>
           )}
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-muted-foreground">
+              <th className="py-2 pr-3">
+                <input
+                  ref={headerCheckbox}
+                  type="checkbox"
+                  aria-label="Chart lines"
+                  checked={allChecked}
+                  onChange={() => writeSelection(allChecked ? [] : visibility.map((item) => item.query.id))}
+                />
+              </th>
               <QuerySortHeader
                 label="Search Query"
                 align="left"
@@ -1244,13 +1287,34 @@ function SearchPanel({
                   onMouseEnter={() => setHoveredQueryId(item.query.id)}
                   onMouseLeave={() => setHoveredQueryId(null)}
                 >
+                  <td className="py-3 pr-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Chart line for ${item.query.name}`}
+                      checked={selected.has(item.query.id)}
+                      onChange={(event) => {
+                        const next = event.target.checked
+                          ? [...selectedIds, item.query.id]
+                          : selectedIds.filter((id) => id !== item.query.id);
+                        writeSelection(next);
+                      }}
+                    />
+                  </td>
                   <td className="py-3 pr-4">
-                    <Link
-                      className="text-primary hover:underline"
-                      to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
-                    >
-                      {item.query.name}
-                    </Link>
+                    <span className="inline-flex items-center gap-2">
+                      {selected.has(item.query.id) && (
+                        <span
+                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)) }}
+                        />
+                      )}
+                      <Link
+                        className="text-primary hover:underline"
+                        to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
+                      >
+                        {item.query.name}
+                      </Link>
+                    </span>
                   </td>
                   <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
                   <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
@@ -1286,8 +1350,8 @@ function SearchPanel({
             })}
           </tbody>
         </table>
+        </div>
       </Card>
-      <CombinedRankChart repositoryId={repositoryId} visibility={visibility} highlightQueryId={hoveredQueryId} />
     </div>
   );
 }
@@ -1325,10 +1389,12 @@ function CombinedRankChart({
   repositoryId,
   visibility,
   highlightQueryId,
+  selectedIds,
 }: {
   repositoryId: number;
   visibility: SearchHistory[];
   highlightQueryId: number | null;
+  selectedIds: number[];
 }) {
   const [events, setEvents] = useState<GrowthEvent[]>([]);
   const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
@@ -1351,33 +1417,45 @@ function CombinedRankChart({
     };
   }, [repositoryId]);
 
+  const drawn = useMemo(
+    () => visibility.filter((item) => selectedIds.includes(item.query.id)),
+    [visibility, selectedIds],
+  );
+
   const option = useMemo(() => {
+    const rows = visibility.filter((item) => selectedIds.includes(item.query.id));
     const dates = datesFromHistory(
-      visibility.map((item) => item.points),
-      visibility.flatMap((item) => item.missedDates),
+      rows.map((item) => item.points),
+      rows.flatMap((item) => item.missedDates),
     );
     return rankHistoryOption({
       dates,
       legend: true,
+      legendToggle: false,
       events,
-      series: visibility.map((item) => ({
+      series: rows.map((item) => ({
         name: item.query.name,
         points: item.points,
         limit: item.query.resultLimit,
         missedDates: item.missedDates,
         highlighted: highlightQueryId === item.query.id,
         dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
+        color: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)),
       })),
     });
-  }, [visibility, highlightQueryId, events]);
+  }, [visibility, selectedIds, highlightQueryId, events]);
 
   const series = useMemo(
-    () => visibility.map((item) => ({ key: String(item.query.id), name: item.query.name })),
-    [visibility],
+    () => drawn.map((item) => ({ key: String(item.query.id), name: item.query.name })),
+    [drawn],
   );
 
-  if (visibility.length === 0) {
-    return null;
+  if (drawn.length === 0) {
+    return (
+      <ChartCard title="Rank History">
+        <p className="text-sm text-muted-foreground">Select search queries from the table to display rank history</p>
+      </ChartCard>
+    );
   }
   return (
     <>
@@ -1385,6 +1463,7 @@ function CombinedRankChart({
         <PersistentECharts
           chartId={repoSearchChartId(repositoryId)}
           series={series}
+          persistSelection={false}
           option={option}
           style={{ height: 360, width: "100%" }}
           onEvents={{
