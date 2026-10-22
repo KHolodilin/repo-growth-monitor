@@ -1194,6 +1194,7 @@ function SearchPanel({
       <SearchVisibilityKpis queries={visibility} period={period} />
       <CombinedRankChart
         repositoryId={repositoryId}
+        period={period}
         visibility={visibility}
         highlightQueryId={hoveredQueryId}
         selectedIds={selectedIds}
@@ -1385,11 +1386,13 @@ function QuerySortHeader({
 
 function CombinedRankChart({
   repositoryId,
+  period,
   visibility,
   highlightQueryId,
   selectedIds,
 }: {
   repositoryId: number;
+  period: Period;
   visibility: SearchHistory[];
   highlightQueryId: number | null;
   selectedIds: number[];
@@ -1399,7 +1402,7 @@ function CombinedRankChart({
 
   useEffect(() => {
     let cancelled = false;
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=all`)
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => {
         if (!cancelled) {
           setEvents(Array.isArray(rows) ? rows : []);
@@ -1413,7 +1416,7 @@ function CombinedRankChart({
     return () => {
       cancelled = true;
     };
-  }, [repositoryId]);
+  }, [repositoryId, period]);
 
   const drawn = useMemo(
     () => visibility.filter((item) => selectedIds.includes(item.query.id)),
@@ -1430,6 +1433,7 @@ function CombinedRankChart({
       dates,
       legend: true,
       legendToggle: false,
+      period,
       events,
       series: rows.map((item) => ({
         name: item.query.name,
@@ -1441,7 +1445,7 @@ function CombinedRankChart({
         color: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)),
       })),
     });
-  }, [visibility, selectedIds, highlightQueryId, events]);
+  }, [visibility, selectedIds, highlightQueryId, events, period]);
 
   const series = useMemo(
     () => drawn.map((item) => ({ key: String(item.query.id), name: item.query.name })),

@@ -71,6 +71,48 @@ describe("rankChart", () => {
     expect(hint).not.toContain("Before");
   });
 
+  it("keeps the axis inside the selected period and drops older events", () => {
+    const option = rankHistoryOption({
+      dates: ["2026-08-01", "2026-10-22"],
+      period: "7d",
+      today: "2026-10-22",
+      events: [
+        {
+          id: 1,
+          repositoryId: 13,
+          eventAt: "2026-08-01T12:00:00Z",
+          category: "PROMOTION",
+          type: "LINKEDIN_POST",
+          title: "Old launch",
+          source: "MANUAL",
+        },
+      ],
+      series: [
+        {
+          name: "outbox",
+          limit: 50,
+          points: [
+            { date: "2026-08-01", position: 4 },
+            { date: "2026-10-22", position: 2 },
+          ],
+        },
+      ],
+    });
+    expect(option.xAxis.data).toEqual([
+      "2026-10-16",
+      "2026-10-17",
+      "2026-10-18",
+      "2026-10-19",
+      "2026-10-20",
+      "2026-10-21",
+      "2026-10-22",
+    ]);
+    const line = option.series[0] as { data: (number | null)[] };
+    expect(line.data[0]).toBeNull();
+    expect(line.data[6]).toBe(2);
+    expect(option.series).toHaveLength(3);
+  });
+
   it("collects dates and recent misses", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bandKpi, searchQueryUsage, type RankSample } from "./searchVisibilityKpi";
+import { bandKpi, periodDates, searchQueryUsage, type RankSample } from "./searchVisibilityKpi";
 
 const today = "2026-10-22";
 
@@ -13,6 +13,21 @@ function query(partial: Partial<RankSample> & Pick<RankSample, "id">): RankSampl
 }
 
 describe("search visibility KPIs", () => {
+  it("builds the chart window for the selected period", () => {
+    expect(periodDates("all", today)).toBeNull();
+    expect(periodDates("1d", today)).toEqual(["2026-10-21"]);
+    expect(periodDates("7d", today)).toEqual([
+      "2026-10-16",
+      "2026-10-17",
+      "2026-10-18",
+      "2026-10-19",
+      "2026-10-20",
+      "2026-10-21",
+      "2026-10-22",
+    ]);
+    expect(periodDates("30d", today)).toHaveLength(30);
+  });
+
   it("counts queries against the limit", () => {
     expect(searchQueryUsage(15)).toEqual({ used: 15, limit: 50, available: 35, progress: 30 });
     expect(searchQueryUsage(50)).toEqual({ used: 50, limit: 50, available: 0, progress: 100 });

@@ -23,6 +23,14 @@ export function searchQueryUsage(count: number, limit = SEARCH_QUERY_LIMIT) {
   return { used, limit, available, progress };
 }
 
+/** Days on the chart for the selected period. `all` keeps the history the points already cover. */
+export function periodDates(period: Period, today: string): string[] | null {
+  if (period === "all") {
+    return null;
+  }
+  return periodWindow(period, today, []).days;
+}
+
 export function bandKpi(queries: RankSample[], band: number, period: Period, today: string): BandKpi {
   const active = queries.filter((query) => query.enabled);
   const window = periodWindow(period, today, active);

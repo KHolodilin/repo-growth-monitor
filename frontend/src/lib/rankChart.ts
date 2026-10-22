@@ -1,6 +1,8 @@
+import type { Period } from "../components/PeriodSelector";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { eventUtcDate } from "./growthEvents";
+import { periodDates } from "./searchVisibilityKpi";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
 export const RANK_LINE_COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
@@ -43,6 +45,8 @@ export function rankHistoryOption({
   legend = false,
   legendToggle = true,
   events = [],
+  period,
+  today = new Date().toISOString().slice(0, 10),
   formatAxis = formatChartAxisDate,
 }: {
   dates: string[];
@@ -51,10 +55,18 @@ export function rankHistoryOption({
   /** False when the table checkboxes are the only way to show or hide a line. */
   legendToggle?: boolean;
   events?: GrowthEvent[];
+  /** Same window as Traffic. Omitted or `all` keeps the full history. */
+  period?: Period;
+  today?: string;
   formatAxis?: (value: string) => string;
 }) {
-  const axisDates = events.length > 0 ? calendarDates([...dates, ...events.map((event) => eventUtcDate(event))]) : dates;
-  const overlays = events.length > 0 ? rankEventOverlays(axisDates, events) : null;
+  const windowDates = period ? periodDates(period, today) : null;
+  const visibleEvents = windowDates
+    ? events.filter((event) => windowDates.includes(eventUtcDate(event)))
+    : events;
+  const axisDates = windowDates
+    ?? (visibleEvents.length > 0 ? calendarDates([...dates, ...visibleEvents.map((event) => eventUtcDate(event))]) : dates);
+  const overlays = visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
   const lines = series.flatMap((item, index) => {
     const color = item.color ?? rankLineColor(index);
@@ -193,8 +205,8 @@ export function rankHistoryOption({
  * The pin balloons stay on Traffic, where they sit on the peak above the lines. On this
  * inverted axis they cover the rank dots, so Rank History keeps only the dashed line.
  */
-function rankEventOverlays(dates: string[], events: GrowthEvent[]) {
-  const overlays = eventMarkOverlays(dates, events, 1);
+function rankEventOverlays(dates: string[], events: GrowthEvent[], period?: Period) {
+  const overlays = eventMarkOverlays(dates, events, 1, period);
   const label = { ...overlays.markLine.label, position: "start" as const };
   return {
     ...overlays,
