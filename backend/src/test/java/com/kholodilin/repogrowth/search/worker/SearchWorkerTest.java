@@ -35,13 +35,17 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -267,5 +271,134 @@ class SearchWorkerTest {
         );
         when(runRepository.claim(eq("w1"), any())).thenReturn(Optional.empty());
         assertThat(worker.poll("w1")).isFalse();
+    }
+
+    @Test
+    void pollRetriesWhenTheResultListIsShorterThanTheDepth() throws Exception {
+        claimRun(run);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, List.of(other(100L))));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markRetry(eq(9L), any(), eq("SEARCH_RESULTS_INCOMPLETE"), eq("Search results were shorter than the requested depth"));
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+    }
+
+    @Test
+    void pollFailsAShortResultListAfterTheRetryBudget() throws Exception {
+        SearchRun lastAttempt = runWith(8, null);
+        claimRun(lastAttempt);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, List.of()));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markFailed(9L, "SEARCH_RESULTS_INCOMPLETE", "Search results were shorter than the requested depth");
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+    }
+
+    @Test
+    void pollConfirmsOnceWhenARankedRepositoryDisappearsFromAFullList() throws Exception {
+        claimRun(run);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, 1)));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markRetry(
+                eq(9L),
+                any(),
+                eq("SEARCH_RANK_UNCONFIRMED"),
+                eq("Tracked repository was inside the depth and is missing from a full result list")
+        );
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+    }
+
+    @Test
+    void pollStoresANullPositionAfterTheMissingRankIsConfirmed() throws Exception {
+        SearchRun confirmation = runWith(2, null, "SEARCH_RANK_UNCONFIRMED");
+        claimRun(confirmation);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(resultRepository.findByRun(9L)).thenReturn(List.of());
+        stubStoredResults();
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 80, null);
+        verify(runRepository, never()).markRetry(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void pollStoresANullPositionWhenThePreviousRankIsOutsideTheLimit() throws Exception {
+        claimRun(run);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(51)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, 51)));
+        when(resultRepository.findByRun(9L)).thenReturn(List.of());
+        stubStoredResults();
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 80, null);
+        verify(runRepository, never()).markRetry(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void pollStoresANullPositionWhenNothingWasMeasuredBefore() throws Exception {
+        claimRun(run);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.empty());
+        when(resultRepository.findByRun(9L)).thenReturn(List.of());
+        stubStoredResults();
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 80, null);
+    }
+
+    @Test
+    void pollStoresANullPositionWhenTheFullListHasNoPreviousRank() throws Exception {
+        claimRun(run);
+        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(20, others(20)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, null)));
+        when(resultRepository.findByRun(9L)).thenReturn(List.of());
+        stubStoredResults();
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 20, null);
+    }
+
+    private void claimRun(SearchRun claimed) throws Exception {
+        when(runRepository.claim(eq("w1"), any())).thenReturn(Optional.of(claimed));
+        when(repositoryLock.openConnection()).thenReturn(connection);
+        when(repositoryLock.tryLock(connection, 13L)).thenReturn(true);
+        when(queryRepository.findById(5L)).thenReturn(Optional.of(query));
+        when(repositoryJdbcRepository.findById(13L)).thenReturn(Optional.of(repository));
+    }
+
+    private void stubStoredResults() {
+        when(repositoryEnricher.fromSearchItem(eq(9L), anyInt(), any())).thenAnswer(invocation -> {
+            GitHubSearchItem item = invocation.getArgument(2);
+            int position = invocation.getArgument(1);
+            return new SearchResult(
+                    1L, 9L, position, item.id(), item.fullName(), "acme", 1, 0, 0, 0, "Java", "desc",
+                    item.htmlUrl(), null, null, null, ActivityStatus.ACTIVE, null
+            );
+        });
+    }
+
+    private SearchRun runWith(int attempt, Integer position) {
+        return runWith(attempt, position, null);
+    }
+
+    private SearchRun runWith(int attempt, Integer position, String errorCode) {
+        Instant now = Instant.parse("2026-09-23T06:00:00Z");
+        return new SearchRun(
+                9L, 5L, 13L, LocalDate.of(2026, 9, 23), SearchRunStatus.RUNNING, attempt,
+                null, "w1", now, now, null, null, null, position, null, errorCode, null
+        );
+    }
+
+    private List<GitHubSearchItem> others(int count) {
+        return IntStream.range(0, count).mapToObj(index -> other(1_000L + index)).toList();
+    }
+
+    private GitHubSearchItem other(long id) {
+        return new GitHubSearchItem(
+                id, "acme/other-" + id, null, 1, 0, "Java", "desc", "https://github.com/acme/other-" + id,
+                Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-09-23T00:00:00Z"), Instant.parse("2026-09-11T00:00:00Z")
+        );
     }
 }
