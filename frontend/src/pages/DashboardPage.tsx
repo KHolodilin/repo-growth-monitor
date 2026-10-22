@@ -27,6 +27,8 @@ const PORTFOLIO_STATS = [
   { key: "contributors", label: "Contributors", color: "#ee6666", note: "Sum of repository counts" },
 ] as const;
 
+const KPI_CARD_CLASS = "min-h-44";
+
 export function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "stats" ? "stats" : "traffic";
@@ -82,16 +84,6 @@ export function DashboardPage() {
     return () => window.removeEventListener("repos-collected", onCollected);
   }, [period]);
 
-  if (error) {
-    return <p className="text-red-600">{error}</p>;
-  }
-  if (loading || !data) {
-    return <DashboardSkeleton period={period} onPeriod={setPeriod} />;
-  }
-  if (data.state === "NO_REPOSITORIES") {
-    return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
-  }
-
   function setTab(next: "traffic" | "stats") {
     const params = new URLSearchParams(searchParams);
     if (next === "stats") {
@@ -102,31 +94,24 @@ export function DashboardPage() {
     setSearchParams(params, { replace: true });
   }
 
+  if (error) {
+    return <p className="text-red-600">{error}</p>;
+  }
+  if (loading || !data) {
+    return <DashboardSkeleton period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />;
+  }
+  if (data.state === "NO_REPOSITORIES") {
+    return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
+  }
+
   return (
     <div className="space-y-4">
-      <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
-      <div className="inline-flex rounded-lg border bg-muted p-1">
-        {([
-          ["traffic", "Traffic"],
-          ["stats", "Stats"],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium",
-              tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <DashboardHeader data={data} period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />
       {tab === "traffic" ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard label="Repositories" value={data.summary.repositories} />
           <TrafficKpiCard
+            className={KPI_CARD_CLASS}
             label="Views"
             value={data.summary.views.value}
             growthPercent={data.summary.views.growthPercent}
@@ -134,6 +119,7 @@ export function DashboardPage() {
             series={data.traffic.map((point) => point.views)}
           />
           <TrafficKpiCard
+            className={KPI_CARD_CLASS}
             label="Visitors"
             value={data.summary.visitors.value}
             growthPercent={data.summary.visitors.growthPercent}
@@ -141,6 +127,7 @@ export function DashboardPage() {
             series={data.traffic.map((point) => point.visitors)}
           />
           <TrafficKpiCard
+            className={KPI_CARD_CLASS}
             label="Clones"
             value={data.summary.clones.value}
             growthPercent={data.summary.clones.growthPercent}
@@ -155,6 +142,7 @@ export function DashboardPage() {
             return (
               <TrafficKpiCard
                 key={card.key}
+                className={KPI_CARD_CLASS}
                 label={card.label}
                 value={total.value}
                 growthPercent={total.growthPercent}
@@ -185,17 +173,21 @@ function DashboardHeader({
   data,
   period,
   onPeriod,
+  tab,
+  onTab,
 }: {
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
+  tab: "traffic" | "stats";
+  onTab: (tab: "traffic" | "stats") => void;
 }) {
   const [open, setOpen] = useState(false);
   const problems = (data?.repositories ?? [])
     .map((row) => ({ row, lines: repositoryProblemLines(row) }))
     .filter((item) => item.lines.length > 0);
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Portfolio</h1>
         {problems.length > 0 && (
@@ -224,8 +216,24 @@ function DashboardHeader({
           </div>
         )}
       </div>
-      <div className="flex flex-col items-end gap-3">
-        <PeriodSelector period={period} onPeriod={onPeriod} />
+      <div className="inline-flex max-w-full flex-wrap rounded-lg border bg-muted p-1">
+        {([
+          ["traffic", "Traffic"],
+          ["stats", "Stats"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium",
+              tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => onTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+        <PeriodSelector embedded period={period} onPeriod={onPeriod} />
       </div>
     </div>
   );
@@ -233,7 +241,7 @@ function DashboardHeader({
 
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="p-3">
+    <Card className={cn("flex h-full flex-col p-3", KPI_CARD_CLASS)}>
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-semibold">{formatNumber(value)}</div>
     </Card>
@@ -642,13 +650,23 @@ function CollectingCard({ rows }: { rows: Dashboard["repositories"] }) {
   );
 }
 
-function DashboardSkeleton({ period, onPeriod }: { period: Period; onPeriod: (period: Period) => void }) {
+function DashboardSkeleton({
+  period,
+  onPeriod,
+  tab,
+  onTab,
+}: {
+  period: Period;
+  onPeriod: (period: Period) => void;
+  tab: "traffic" | "stats";
+  onTab: (tab: "traffic" | "stats") => void;
+}) {
   return (
     <div className="space-y-6">
-      <DashboardHeader period={period} onPeriod={onPeriod} />
+      <DashboardHeader period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-28" />
+          <Skeleton key={index} className="h-44" />
         ))}
       </div>
       <Skeleton className="h-96" />

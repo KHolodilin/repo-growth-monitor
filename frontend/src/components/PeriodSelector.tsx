@@ -73,22 +73,30 @@ export function usePeriod(repoId?: string) {
   return [period, setPeriod] as const;
 }
 
-export function PeriodSelector({ period, onPeriod }: { period: Period; onPeriod: (period: Period) => void }) {
-  return (
-    <div className="inline-flex rounded-lg border bg-muted p-1">
-      {PERIODS.map((item) => (
-        <button
-          key={item}
-          type="button"
-          className={cn(
-            "rounded-md px-3 py-1.5 text-sm font-medium",
-            period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-          )}
-          onClick={() => onPeriod(item)}
-        >
-          {item}
-        </button>
-      ))}
-    </div>
-  );
+export function PeriodSelector({
+  period,
+  onPeriod,
+  embedded = false,
+}: {
+  period: Period;
+  onPeriod: (period: Period) => void;
+  embedded?: boolean;
+}) {
+  const buttons = PERIODS.map((item) => (
+    <button
+      key={item}
+      type="button"
+      className={cn(
+        "rounded-md px-3 py-1.5 text-sm font-medium",
+        period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+      )}
+      onClick={() => onPeriod(item)}
+    >
+      {item}
+    </button>
+  ));
+  if (embedded) {
+    return buttons;
+  }
+  return <div className="inline-flex rounded-lg border bg-muted p-1">{buttons}</div>;
 }

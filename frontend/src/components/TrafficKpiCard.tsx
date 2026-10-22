@@ -11,6 +11,7 @@ export function TrafficKpiCard({
   series,
   sparklineColor,
   note,
+  className,
 }: {
   label: string;
   value: number | null;
@@ -20,6 +21,7 @@ export function TrafficKpiCard({
   series?: (number | null | undefined)[];
   sparklineColor?: string;
   note?: string;
+  className?: string;
 }) {
   const growth =
     period === "all"
@@ -29,14 +31,14 @@ export function TrafficKpiCard({
         : formatAbsoluteGrowth(absoluteChange, growthPercent);
   const points = (series ?? []).filter((point): point is number => point != null);
   return (
-    <Card className="p-3">
+    <Card className={cn("flex h-full flex-col p-3", className)}>
       <div className="text-sm text-muted-foreground">
         {label}
         {note && <div className="text-xs">{note}</div>}
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{formatNumber(value)}</div>
       {period !== "all" && (
-        <div className="mt-1 flex items-end justify-between gap-2">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
           <div className={cn("text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
             {growth?.label ?? "—"}
             {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}

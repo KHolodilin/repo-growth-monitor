@@ -116,6 +116,15 @@ describe("coverage gaps", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole("heading", { name: "Traffic" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Traffic" }).parentElement).toBe(
+      screen.getByRole("button", { name: "30d" }).parentElement,
+    );
+    const card = (label: string) =>
+      screen.getAllByText(label).find((element) => element.className.includes("text-muted-foreground"))?.closest("div.rounded-xl");
+    const repositories = card("Repositories");
+    const views = card("Views");
+    expect(repositories?.className).toContain("min-h-44");
+    expect(views?.className).toContain("min-h-44");
     expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
