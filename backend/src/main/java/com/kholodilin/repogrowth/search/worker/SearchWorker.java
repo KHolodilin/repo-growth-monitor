@@ -95,18 +95,23 @@ public class SearchWorker {
                 SearchQuery query = queryRepository.findById(run.searchQueryId()).orElseThrow();
                 Repository repository = repositoryJdbcRepository.findById(run.repositoryId()).orElseThrow();
                 GitHubSearchResponse response = gitHubClient.searchRepositories(query.query(), query.resultLimit());
-                List<SearchResult> results = new ArrayList<>();
-                Integer position = null;
-                int index = 1;
                 List<GitHubSearchItem> items = response.itemsOrEmpty();
+                Integer position = trackedPosition(items, repository.githubId(), query.resultLimit());
+                if (position == null && items.size() < expectedResultCount(query.resultLimit(), response.totalCount())) {
+                    retryIncomplete(run);
+                    return;
+                }
+                if (position == null && missingRankNeedsConfirmation(run, query)) {
+                    confirmMissingRank(run);
+                    return;
+                }
+                List<SearchResult> results = new ArrayList<>();
+                int index = 1;
                 for (GitHubSearchItem item : items) {
                     if (index > query.resultLimit()) {
                         break;
                     }
                     results.add(repositoryEnricher.fromSearchItem(run.id(), index, item));
-                    if (item.id() == repository.githubId()) {
-                        position = index;
-                    }
                     index++;
                 }
                 Integer trackedPosition = position;
@@ -146,6 +151,69 @@ public class SearchWorker {
             }
         }
         runRepository.markEnrichment(searchRunId, partial ? "PARTIAL" : "SUCCESS");
+    }
+
+    /**
+     * A null position is a real miss only when GitHub returned a full page. Fewer rows than
+     * {@code min(limit, totalCount)} is a truncated response and must not become "left the top".
+     */
+    private static int expectedResultCount(int resultLimit, int totalCount) {
+        return Math.min(resultLimit, totalCount);
+    }
+
+    private static Integer trackedPosition(List<GitHubSearchItem> items, long githubId, int resultLimit) {
+        int index = 1;
+        for (GitHubSearchItem item : items) {
+            if (index > resultLimit) {
+                return null;
+            }
+            if (item.id() == githubId) {
+                return index;
+            }
+            index++;
+        }
+        return null;
+    }
+
+    private void retryIncomplete(SearchRun run) {
+        String message = "Search results were shorter than the requested depth";
+        log.warn("Search run incomplete attempt={} queryId={}", run.attempt(), run.searchQueryId());
+        transactionTemplate.executeWithoutResult(status -> {
+            if (retryPolicy.exhausted(run.attempt())) {
+                runRepository.markFailed(run.id(), "SEARCH_RESULTS_INCOMPLETE", message);
+            } else {
+                runRepository.markRetry(
+                        run.id(),
+                        retryPolicy.nextAttemptAt(run.attempt(), null),
+                        "SEARCH_RESULTS_INCOMPLETE",
+                        message
+                );
+            }
+        });
+    }
+
+    /**
+     * One confirmation before accepting that a repository ranked inside the depth has disappeared.
+     * The confirmation attempt keeps {@code SEARCH_RANK_UNCONFIRMED} and may store a null position.
+     */
+    private boolean missingRankNeedsConfirmation(SearchRun run, SearchQuery query) {
+        if ("SEARCH_RANK_UNCONFIRMED".equals(run.errorCode())) {
+            return false;
+        }
+        return runRepository.previousSnapshot(run.searchQueryId(), run.businessDate())
+                .map(SearchRun::trackedRepositoryPosition)
+                .filter(position -> position <= query.resultLimit())
+                .isPresent();
+    }
+
+    private void confirmMissingRank(SearchRun run) {
+        log.warn("Search rank missing inside the previous depth queryId={}", run.searchQueryId());
+        transactionTemplate.executeWithoutResult(status -> runRepository.markRetry(
+                run.id(),
+                retryPolicy.nextAttemptAt(run.attempt(), null),
+                "SEARCH_RANK_UNCONFIRMED",
+                "Tracked repository was inside the depth and is missing from a full result list"
+        ));
     }
 
     private void handleFailure(
