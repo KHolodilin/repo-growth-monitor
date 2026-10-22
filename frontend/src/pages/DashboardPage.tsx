@@ -24,10 +24,8 @@ const PORTFOLIO_STATS = [
   { key: "stars", label: "Stars", color: "#5470c6" },
   { key: "forks", label: "Forks", color: "#91cc75" },
   { key: "watchers", label: "Watchers", color: "#fac858" },
-  { key: "contributors", label: "Contributors", color: "#ee6666", note: "Sum of repository counts" },
+  { key: "contributors", label: "Contributors", color: "#ee6666" },
 ] as const;
-
-const KPI_CARD_CLASS = "min-h-44";
 
 export function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -111,7 +109,6 @@ export function DashboardPage() {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard label="Repositories" value={data.summary.repositories} />
           <TrafficKpiCard
-            className={KPI_CARD_CLASS}
             label="Views"
             value={data.summary.views.value}
             growthPercent={data.summary.views.growthPercent}
@@ -119,7 +116,6 @@ export function DashboardPage() {
             series={data.traffic.map((point) => point.views)}
           />
           <TrafficKpiCard
-            className={KPI_CARD_CLASS}
             label="Visitors"
             value={data.summary.visitors.value}
             growthPercent={data.summary.visitors.growthPercent}
@@ -127,7 +123,6 @@ export function DashboardPage() {
             series={data.traffic.map((point) => point.visitors)}
           />
           <TrafficKpiCard
-            className={KPI_CARD_CLASS}
             label="Clones"
             value={data.summary.clones.value}
             growthPercent={data.summary.clones.growthPercent}
@@ -142,7 +137,6 @@ export function DashboardPage() {
             return (
               <TrafficKpiCard
                 key={card.key}
-                className={KPI_CARD_CLASS}
                 label={card.label}
                 value={total.value}
                 growthPercent={total.growthPercent}
@@ -150,7 +144,6 @@ export function DashboardPage() {
                 period={period}
                 series={data.stats.points.map((point) => point[card.key])}
                 sparklineColor={card.color}
-                note={"note" in card ? card.note : undefined}
               />
             );
           })}
@@ -233,6 +226,7 @@ function DashboardHeader({
             {label}
           </button>
         ))}
+        <span className="mx-1 my-1 w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
         <PeriodSelector embedded period={period} onPeriod={onPeriod} />
       </div>
     </div>
@@ -241,7 +235,7 @@ function DashboardHeader({
 
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <Card className={cn("flex h-full flex-col p-3", KPI_CARD_CLASS)}>
+    <Card className="flex h-full flex-col p-3">
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-semibold">{formatNumber(value)}</div>
     </Card>
@@ -666,7 +660,7 @@ function DashboardSkeleton({
       <DashboardHeader period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <Skeleton key={index} className="h-44" />
+          <Skeleton key={index} className="h-28" />
         ))}
       </div>
       <Skeleton className="h-96" />

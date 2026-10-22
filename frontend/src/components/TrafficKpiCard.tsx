@@ -38,7 +38,7 @@ export function TrafficKpiCard({
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{formatNumber(value)}</div>
       {period !== "all" && (
-        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+        <div className="mt-1 flex items-end justify-between gap-2">
           <div className={cn("text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
             {growth?.label ?? "—"}
             {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}

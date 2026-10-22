@@ -119,16 +119,11 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("button", { name: "Traffic" }).parentElement).toBe(
       screen.getByRole("button", { name: "30d" }).parentElement,
     );
-    const card = (label: string) =>
-      screen.getAllByText(label).find((element) => element.className.includes("text-muted-foreground"))?.closest("div.rounded-xl");
-    const repositories = card("Repositories");
-    const views = card("Views");
-    expect(repositories?.className).toContain("min-h-44");
-    expect(views?.className).toContain("min-h-44");
+    expect(screen.getByRole("button", { name: "Stats" }).nextElementSibling).toHaveClass("w-px");
     expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
-    expect(screen.getByText("Sum of repository counts")).toBeInTheDocument();
+    expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     expect(screen.getAllByText("— No change").length).toBeGreaterThan(0);
     expect(screen.getByText("Rank")).toBeInTheDocument();
     const stars = screen.getAllByText("Stars").find((element) => element.tagName === "DIV");
@@ -138,7 +133,6 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Traffic" }));
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
-    expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
   });
 
   it("shows an empty stats chart when the portfolio has no snapshots in the period", async () => {
@@ -162,7 +156,7 @@ describe("coverage gaps", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("No stats for this period.")).toBeInTheDocument();
-    expect(screen.getByText("Sum of repository counts")).toBeInTheDocument();
+    expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "all" }));
     expect(screen.queryByText("vs prev")).not.toBeInTheDocument();
   });
