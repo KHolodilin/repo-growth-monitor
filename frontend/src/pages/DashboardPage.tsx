@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type Dashboard, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
+import { statsChartOption } from "../lib/statsChart";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -12,14 +13,23 @@ import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSele
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
-import { dashboardTrafficChartId, TRAFFIC_SERIES } from "../lib/chartLegend";
+import { dashboardStatsChartId, dashboardTrafficChartId, STATS_SERIES, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 
 const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
 
+const PORTFOLIO_STATS = [
+  { key: "stars", label: "Stars", color: "#5470c6" },
+  { key: "forks", label: "Forks", color: "#91cc75" },
+  { key: "watchers", label: "Watchers", color: "#fac858" },
+  { key: "contributors", label: "Contributors", color: "#ee6666" },
+] as const;
+
 export function DashboardPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "stats" ? "stats" : "traffic";
   const [period, setPeriod] = usePeriod();
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +82,21 @@ export function DashboardPage() {
     return () => window.removeEventListener("repos-collected", onCollected);
   }, [period]);
 
+  function setTab(next: "traffic" | "stats") {
+    const params = new URLSearchParams(searchParams);
+    if (next === "stats") {
+      params.set("tab", "stats");
+    } else {
+      params.delete("tab");
+    }
+    setSearchParams(params, { replace: true });
+  }
+
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
   if (loading || !data) {
-    return <DashboardSkeleton period={period} onPeriod={setPeriod} />;
+    return <DashboardSkeleton period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />;
   }
   if (data.state === "NO_REPOSITORIES") {
     return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
@@ -84,33 +104,58 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <DashboardHeader data={data} period={period} onPeriod={setPeriod} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <KpiCard label="Repositories" value={data.summary.repositories} />
-        <TrafficKpiCard
-          label="Views"
-          value={data.summary.views.value}
-          growthPercent={data.summary.views.growthPercent}
-          period={period}
-          series={data.traffic.map((point) => point.views)}
-        />
-        <TrafficKpiCard
-          label="Visitors"
-          value={data.summary.visitors.value}
-          growthPercent={data.summary.visitors.growthPercent}
-          period={period}
-          series={data.traffic.map((point) => point.visitors)}
-        />
-        <TrafficKpiCard
-          label="Clones"
-          value={data.summary.clones.value}
-          growthPercent={data.summary.clones.growthPercent}
-          period={period}
-          series={data.traffic.map((point) => point.clones)}
-        />
-        <StarsKpi stars={data.summary.stars} period={period} />
-      </div>
-      {data.state === "FIRST_COLLECTION" ? <CollectingCard rows={data.repositories} /> : <TrafficChart traffic={data.traffic} />}
+      <DashboardHeader data={data} period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />
+      {tab === "traffic" ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard label="Repositories" value={data.summary.repositories} />
+          <TrafficKpiCard
+            label="Views"
+            value={data.summary.views.value}
+            growthPercent={data.summary.views.growthPercent}
+            period={period}
+            series={data.traffic.map((point) => point.views)}
+          />
+          <TrafficKpiCard
+            label="Visitors"
+            value={data.summary.visitors.value}
+            growthPercent={data.summary.visitors.growthPercent}
+            period={period}
+            series={data.traffic.map((point) => point.visitors)}
+          />
+          <TrafficKpiCard
+            label="Clones"
+            value={data.summary.clones.value}
+            growthPercent={data.summary.clones.growthPercent}
+            period={period}
+            series={data.traffic.map((point) => point.clones)}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {PORTFOLIO_STATS.map((card) => {
+            const total = data.stats.totals[card.key];
+            return (
+              <TrafficKpiCard
+                key={card.key}
+                label={card.label}
+                value={total.value}
+                growthPercent={total.growthPercent}
+                absoluteChange={total.absoluteChange}
+                period={period}
+                series={data.stats.points.map((point) => point[card.key])}
+                sparklineColor={card.color}
+              />
+            );
+          })}
+        </div>
+      )}
+      {data.state === "FIRST_COLLECTION" ? (
+        <CollectingCard rows={data.repositories} />
+      ) : tab === "traffic" ? (
+        <TrafficChart traffic={data.traffic} />
+      ) : (
+        <StatsChart points={data.stats.points} />
+      )}
       <PeriodHighlights highlights={data.highlights} />
       <RepositoryTable rows={data.repositories} />
     </div>
@@ -121,17 +166,21 @@ function DashboardHeader({
   data,
   period,
   onPeriod,
+  tab,
+  onTab,
 }: {
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
+  tab: "traffic" | "stats";
+  onTab: (tab: "traffic" | "stats") => void;
 }) {
   const [open, setOpen] = useState(false);
   const problems = (data?.repositories ?? [])
     .map((row) => ({ row, lines: repositoryProblemLines(row) }))
     .filter((item) => item.lines.length > 0);
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Portfolio</h1>
         {problems.length > 0 && (
@@ -160,8 +209,25 @@ function DashboardHeader({
           </div>
         )}
       </div>
-      <div className="flex flex-col items-end gap-3">
-        <PeriodSelector period={period} onPeriod={onPeriod} />
+      <div className="inline-flex max-w-full flex-wrap rounded-lg border bg-muted p-1">
+        {([
+          ["traffic", "Traffic"],
+          ["stats", "Stats"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm font-medium",
+              tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => onTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="mx-1 my-1 w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
+        <PeriodSelector embedded period={period} onPeriod={onPeriod} />
       </div>
     </div>
   );
@@ -169,26 +235,9 @@ function DashboardHeader({
 
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="p-3">
+    <Card className="flex h-full flex-col p-3">
       <div className="text-sm text-muted-foreground">{label}</div>
       <div className="mt-1 text-2xl font-semibold">{formatNumber(value)}</div>
-    </Card>
-  );
-}
-
-function StarsKpi({ stars, period }: { stars: { total: number; change: number | null }; period: Period }) {
-  const change = stars.change;
-  return (
-    <Card className="p-3">
-      <div className="text-sm text-muted-foreground">Stars</div>
-      <div className="mt-1 text-2xl font-semibold">
-        {formatNumber(stars.total)} <span className="text-sm font-normal text-muted-foreground">total</span>
-      </div>
-      {period !== "all" && (
-        <div className={cn("mt-1 text-sm font-medium", (change ?? 0) > 0 ? "text-emerald-700" : (change ?? 0) < 0 ? "text-red-700" : "text-muted-foreground")}>
-          {change !== null && change !== undefined ? `${change > 0 ? "+" : ""}${formatNumber(change)} in ${period}` : "—"}
-        </div>
-      )}
     </Card>
   );
 }
@@ -205,6 +254,26 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
         style={{ height: 360, width: "100%" }}
         opts={{ renderer: "canvas" }}
       />
+    </ChartCard>
+  );
+}
+
+function StatsChart({ points }: { points: Dashboard["stats"]["points"] }) {
+  const option = useMemo(() => statsChartOption(points), [points]);
+  return (
+    <ChartCard title="Stats">
+      {points.length === 0 ? (
+        <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+          <div className="font-medium text-foreground">No stats for this period.</div>
+        </div>
+      ) : (
+        <PersistentECharts
+          chartId={dashboardStatsChartId()}
+          series={STATS_SERIES}
+          option={option}
+          style={{ height: 360, width: "100%" }}
+        />
+      )}
     </ChartCard>
   );
 }
@@ -575,12 +644,22 @@ function CollectingCard({ rows }: { rows: Dashboard["repositories"] }) {
   );
 }
 
-function DashboardSkeleton({ period, onPeriod }: { period: Period; onPeriod: (period: Period) => void }) {
+function DashboardSkeleton({
+  period,
+  onPeriod,
+  tab,
+  onTab,
+}: {
+  period: Period;
+  onPeriod: (period: Period) => void;
+  tab: "traffic" | "stats";
+  onTab: (tab: "traffic" | "stats") => void;
+}) {
   return (
     <div className="space-y-6">
-      <DashboardHeader period={period} onPeriod={onPeriod} />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, index) => (
+      <DashboardHeader period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-28" />
         ))}
       </div>

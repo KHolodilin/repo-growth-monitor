@@ -180,6 +180,18 @@ export const dashboardReady: Dashboard = {
       discoverabilityPassed: 11,
     },
   ],
+  stats: {
+    totals: {
+      stars: { value: 21, absoluteChange: 3, growthPercent: 16.7 },
+      forks: { value: 16, absoluteChange: 0, growthPercent: 0 },
+      watchers: { value: 0, absoluteChange: 0, growthPercent: 0 },
+      contributors: { value: 4, absoluteChange: 4, growthPercent: null },
+    },
+    points: [
+      { date: "2026-09-22", stars: 18, forks: 16, watchers: 0, contributors: 0, missingRepositories: 0 },
+      { date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 4, missingRepositories: 1 },
+    ],
+  },
 };
 
 export const snapshotHistory: SnapshotHistory = {

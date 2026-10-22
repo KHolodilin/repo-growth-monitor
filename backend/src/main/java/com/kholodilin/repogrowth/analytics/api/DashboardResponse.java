@@ -19,7 +19,8 @@ public record DashboardResponse(
         DashboardSummary summary,
         List<TrafficPoint> traffic,
         List<RepositoryRow> repositories,
-        Highlights highlights
+        Highlights highlights,
+        PortfolioStats stats
 ) {
 
     public enum DashboardState {
@@ -121,5 +122,32 @@ public record DashboardResponse(
     }
 
     public record JobStatus(String jobType, String status, String errorMessage) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record PortfolioStats(StatsTotals totals, List<StatsPoint> points) {
+        public static PortfolioStats empty() {
+            StatsTotal none = new StatsTotal(null, null, null);
+            return new PortfolioStats(new StatsTotals(none, none, none, none), List.of());
+        }
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record StatsTotals(StatsTotal stars, StatsTotal forks, StatsTotal watchers, StatsTotal contributors) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record StatsTotal(Integer value, Integer absoluteChange, Double growthPercent) {
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record StatsPoint(
+            LocalDate date,
+            Integer stars,
+            Integer forks,
+            Integer watchers,
+            Integer contributors,
+            int missingRepositories
+    ) {
     }
 }

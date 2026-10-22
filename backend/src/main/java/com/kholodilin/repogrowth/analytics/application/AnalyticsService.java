@@ -13,6 +13,9 @@ import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficNotice;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StarsMetric;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficLeader;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.Highlights;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.PortfolioStats;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StatsPoint;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StatsTotal;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService.DiscoverabilityScore;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
@@ -39,6 +42,7 @@ import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.PathSnapshot;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.ReferrerSnapshot;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryDayTotals;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryStatDay;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.TrafficTotals;
 import org.slf4j.Logger;
@@ -58,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.function.ToIntFunction;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
@@ -393,7 +398,8 @@ public class AnalyticsService {
                 ),
                 traffic,
                 rows,
-                highlightsService.build(period, rows)
+                highlightsService.build(period, rows),
+                portfolioStats(period, tracked.size())
         );
     }
 
@@ -459,7 +465,8 @@ public class AnalyticsService {
                 ),
                 List.of(),
                 rows,
-                highlightsService.build(period, rows)
+                highlightsService.build(period, rows),
+                PortfolioStats.empty()
         );
     }
 
@@ -482,7 +489,8 @@ public class AnalyticsService {
                 ),
                 List.of(),
                 List.of(),
-                Highlights.none()
+                Highlights.none(),
+                PortfolioStats.empty()
         );
     }
 
@@ -627,6 +635,111 @@ public class AnalyticsService {
             ));
         }
         return points;
+    }
+
+    private PortfolioStats portfolioStats(DashboardPeriod period, int tracked) {
+        Map<LocalDate, List<RepositoryStatDay>> byDate = new TreeMap<>();
+        for (RepositoryStatDay row : trafficJdbcRepository.trackedDailyStats(period.from(), period.to())) {
+            byDate.computeIfAbsent(row.date(), date -> new ArrayList<>()).add(row);
+        }
+        List<StatsPoint> points = portfolioStatsSeries(
+                period.from(),
+                period.to(),
+                LocalDate.now(clock),
+                tracked,
+                byDate
+        );
+        return portfolioStats(trafficJdbcRepository.latestTrackedDailyStats(), period.allTime(), points);
+    }
+
+    /**
+     * The same window as portfolio traffic: today is left out, a hole stays null, and a partial day
+     * is the sum of the repositories that have a snapshot plus how many are missing.
+     */
+    static List<StatsPoint> portfolioStatsSeries(
+            LocalDate from,
+            LocalDate to,
+            LocalDate today,
+            int tracked,
+            Map<LocalDate, List<RepositoryStatDay>> byDate
+    ) {
+        LocalDate expectedEnd = to.isBefore(today.minusDays(1)) ? to : today.minusDays(1);
+        LocalDate first = null;
+        LocalDate last = null;
+        for (LocalDate day : byDate.keySet()) {
+            if (day.isBefore(from) || day.isAfter(expectedEnd) || byDate.get(day).isEmpty()) {
+                continue;
+            }
+            if (first == null || day.isBefore(first)) {
+                first = day;
+            }
+            if (last == null || day.isAfter(last)) {
+                last = day;
+            }
+        }
+        if (first == null) {
+            return List.of();
+        }
+        List<StatsPoint> points = new ArrayList<>();
+        for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
+            List<RepositoryStatDay> rows = byDate.getOrDefault(day, List.of());
+            if (rows.isEmpty()) {
+                points.add(new StatsPoint(day, null, null, null, null, tracked));
+                continue;
+            }
+            int stars = 0;
+            int forks = 0;
+            int watchers = 0;
+            int contributors = 0;
+            Set<Long> ids = new HashSet<>();
+            for (RepositoryStatDay row : rows) {
+                stars += row.stars();
+                forks += row.forks();
+                watchers += row.watchers();
+                contributors += row.contributors();
+                ids.add(row.repositoryId());
+            }
+            points.add(new StatsPoint(day, stars, forks, watchers, contributors, Math.max(0, tracked - ids.size())));
+        }
+        return points;
+    }
+
+    static PortfolioStats portfolioStats(List<RepositoryStatDay> latest, boolean allTime, List<StatsPoint> points) {
+        List<StatsPoint> present = points.stream().filter(point -> point.stars() != null).toList();
+        boolean comparable = !allTime && present.size() >= 2;
+        StatsPoint first = comparable ? present.getFirst() : null;
+        StatsPoint last = comparable ? present.getLast() : null;
+        return new PortfolioStats(
+                new DashboardResponse.StatsTotals(
+                        portfolioLevel(sum(latest, RepositoryStatDay::stars), comparable, pointValue(first == null ? null : first.stars()), pointValue(last == null ? null : last.stars())),
+                        portfolioLevel(sum(latest, RepositoryStatDay::forks), comparable, pointValue(first == null ? null : first.forks()), pointValue(last == null ? null : last.forks())),
+                        portfolioLevel(sum(latest, RepositoryStatDay::watchers), comparable, pointValue(first == null ? null : first.watchers()), pointValue(last == null ? null : last.watchers())),
+                        portfolioLevel(sum(latest, RepositoryStatDay::contributors), comparable, pointValue(first == null ? null : first.contributors()), pointValue(last == null ? null : last.contributors()))
+                ),
+                points
+        );
+    }
+
+    private static Integer sum(List<RepositoryStatDay> rows, ToIntFunction<RepositoryStatDay> metric) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+        int total = 0;
+        for (RepositoryStatDay row : rows) {
+            total += metric.applyAsInt(row);
+        }
+        return total;
+    }
+
+    private static int pointValue(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private static StatsTotal portfolioLevel(Integer latest, boolean comparable, int baseline, int current) {
+        if (!comparable) {
+            return new StatsTotal(latest, null, null);
+        }
+        return new StatsTotal(latest, current - baseline, GrowthMath.percent(current, baseline));
     }
 
     /** Up to three tracked repositories with the largest positive share. Equal shares keep the earlier name. */

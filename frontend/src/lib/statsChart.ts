@@ -1,7 +1,9 @@
 import type { StatsHistoryPoint } from "./api";
+import { partialDayTooltip } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
 export function statsChartOption(points: StatsHistoryPoint[]) {
+  const byDate = new Map(points.map((point) => [point.date, point]));
   const dates = points.map((point) => point.date);
   return {
     animation: false,
@@ -11,14 +13,20 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         if (!params.length) {
           return "";
         }
-        const date = formatChartAxisDate(params[0].axisValue);
+        const dateKey = params[0].axisValue;
+        const point = byDate.get(dateKey);
+        const missing = point?.missingRepositories ?? 0;
+        const partial = missing > 0 && point?.stars != null
+          ? `<div>${partialDayTooltip(missing, dateKey, "stats")}</div>`
+          : "";
+        const date = formatChartAxisDate(dateKey);
         const rows = params
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
           })
           .join("");
-        return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}</div>`;
+        return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${partial}${rows}</div>`;
       },
     },
     legend: { top: 0, data: ["Stars", "Forks", "Watchers", "Contributors"] },

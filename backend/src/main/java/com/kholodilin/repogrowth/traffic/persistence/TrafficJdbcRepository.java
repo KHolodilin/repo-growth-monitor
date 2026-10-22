@@ -140,6 +140,63 @@ public class TrafficJdbcRepository {
                 .optional();
     }
 
+    public List<RepositoryStatDay> trackedDailyStats(LocalDate fromInclusive, LocalDate toInclusive) {
+        return jdbcClient.sql("""
+                        SELECT s.repository_id,
+                               r.full_name,
+                               s.stat_date,
+                               s.stars,
+                               s.watchers,
+                               s.forks,
+                               s.contributors
+                        FROM repository_daily_stats s
+                        JOIN repository r ON r.id = s.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                          AND s.stat_date >= :fromDate
+                          AND s.stat_date <= :toDate
+                        ORDER BY s.stat_date, r.full_name
+                        """)
+                .param("fromDate", fromInclusive)
+                .param("toDate", toInclusive)
+                .query((rs, rowNum) -> new RepositoryStatDay(
+                        rs.getLong("repository_id"),
+                        rs.getString("full_name"),
+                        rs.getObject("stat_date", LocalDate.class),
+                        rs.getInt("stars"),
+                        rs.getInt("forks"),
+                        rs.getInt("watchers"),
+                        rs.getInt("contributors")
+                ))
+                .list();
+    }
+
+    public List<RepositoryStatDay> latestTrackedDailyStats() {
+        return jdbcClient.sql("""
+                        SELECT DISTINCT ON (s.repository_id)
+                               s.repository_id,
+                               r.full_name,
+                               s.stat_date,
+                               s.stars,
+                               s.watchers,
+                               s.forks,
+                               s.contributors
+                        FROM repository_daily_stats s
+                        JOIN repository r ON r.id = s.repository_id
+                        WHERE r.tracking_enabled = TRUE
+                        ORDER BY s.repository_id, s.stat_date DESC
+                        """)
+                .query((rs, rowNum) -> new RepositoryStatDay(
+                        rs.getLong("repository_id"),
+                        rs.getString("full_name"),
+                        rs.getObject("stat_date", LocalDate.class),
+                        rs.getInt("stars"),
+                        rs.getInt("forks"),
+                        rs.getInt("watchers"),
+                        rs.getInt("contributors")
+                ))
+                .list();
+    }
+
     public Optional<LocalDate> earliestDailyStatsDate(long repositoryId) {
         return jdbcClient.sql("""
                         SELECT MIN(stat_date)
@@ -729,6 +786,17 @@ public class TrafficJdbcRepository {
             int stars,
             int watchers,
             int forks,
+            int contributors
+    ) {
+    }
+
+    public record RepositoryStatDay(
+            long repositoryId,
+            String fullName,
+            LocalDate date,
+            int stars,
+            int forks,
+            int watchers,
             int contributors
     ) {
     }
