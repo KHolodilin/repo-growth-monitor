@@ -54,7 +54,7 @@ export function rankHistoryOption({
   formatAxis?: (value: string) => string;
 }) {
   const axisDates = events.length > 0 ? calendarDates([...dates, ...events.map((event) => eventUtcDate(event))]) : dates;
-  const overlays = events.length > 0 ? eventMarkOverlays(axisDates, events, 1) : null;
+  const overlays = events.length > 0 ? rankEventOverlays(axisDates, events) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
   const lines = series.flatMap((item, index) => {
     const color = item.color ?? rankLineColor(index);
@@ -127,7 +127,12 @@ export function rankHistoryOption({
           })
           .join("<br/>");
         const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];
-        const eventRows = dayEvents.length === 0 ? "" : `<br/>${dayEvents.map((item) => item.title).join("<br/>")}`;
+        const eventRows =
+          dayEvents.length === 0
+            ? ""
+            : `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.08)">${dayEvents
+                .map((item) => `<div>${item.title}</div>`)
+                .join("")}</div>`;
         return `<div>${formatAxis(date)}<br/>${rows}${eventRows}</div>`;
       },
     },
@@ -179,6 +184,27 @@ export function rankHistoryOption({
           ]
         : []),
     ],
+  };
+}
+
+/**
+ * Traffic draws the caption at the end of the line, which is the top of an upward axis.
+ * Rank is inverted, so that same end is the bottom and the caption lands on the dates.
+ * "start" is rank 1, the top of this axis, which puts the caption in the same upper margin.
+ */
+function rankEventOverlays(dates: string[], events: GrowthEvent[]) {
+  const overlays = eventMarkOverlays(dates, events, 1);
+  const label = { ...overlays.markLine.label, position: "start" as const };
+  return {
+    ...overlays,
+    markLine: {
+      ...overlays.markLine,
+      label,
+      data: overlays.markLine.data.map((item) => ({
+        ...item,
+        label: { ...item.label, position: "start" as const },
+      })),
+    },
   };
 }
 
