@@ -60,8 +60,10 @@ describe("rankChart", () => {
     expect(marked.grid.top).toBe(64);
     const eventLine = marked.series[3] as {
       markLine: { data: { label: { position: string } }[] };
+      markPoint?: unknown;
     };
     expect(eventLine.markLine.data[0].label.position).toBe("start");
+    expect(eventLine.markPoint).toBeUndefined();
     expect(marked.xAxis.data).toEqual(["2026-09-22", "2026-09-23"]);
     const markedTooltip = marked.tooltip.formatter as (params: { axisValue: string }[]) => string;
     const hint = markedTooltip([{ axisValue: "2026-09-22" }]);

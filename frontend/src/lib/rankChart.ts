@@ -179,7 +179,6 @@ export function rankHistoryOption({
               lineStyle: { opacity: 0, width: 0 },
               tooltip: { show: false },
               markLine: overlays.markLine,
-              markPoint: overlays.markPoint,
             },
           ]
         : []),
@@ -191,6 +190,8 @@ export function rankHistoryOption({
  * Traffic draws the caption at the end of the line, which is the top of an upward axis.
  * Rank is inverted, so that same end is the bottom and the caption lands on the dates.
  * "start" is rank 1, the top of this axis, which puts the caption in the same upper margin.
+ * The pin balloons stay on Traffic, where they sit on the peak above the lines. On this
+ * inverted axis they cover the rank dots, so Rank History keeps only the dashed line.
  */
 function rankEventOverlays(dates: string[], events: GrowthEvent[]) {
   const overlays = eventMarkOverlays(dates, events, 1);
