@@ -10,6 +10,7 @@ export function TrafficKpiCard({
   period,
   series,
   sparklineColor,
+  note,
 }: {
   label: string;
   value: number | null;
@@ -18,6 +19,7 @@ export function TrafficKpiCard({
   period: Period;
   series?: (number | null | undefined)[];
   sparklineColor?: string;
+  note?: string;
 }) {
   const growth =
     period === "all"
@@ -28,7 +30,10 @@ export function TrafficKpiCard({
   const points = (series ?? []).filter((point): point is number => point != null);
   return (
     <Card className="p-3">
-      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="text-sm text-muted-foreground">
+        {label}
+        {note && <div className="text-xs">{note}</div>}
+      </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{formatNumber(value)}</div>
       {period !== "all" && (
         <div className="mt-1 flex items-end justify-between gap-2">

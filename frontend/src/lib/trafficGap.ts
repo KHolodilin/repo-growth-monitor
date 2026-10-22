@@ -61,9 +61,10 @@ export function repositoryProblemBadge(count: number) {
   return count === 1 ? "1 repository" : `${count} repositories`;
 }
 
-export function partialDayTooltip(missing: number, date: string) {
+export function partialDayTooltip(missing: number, date: string, kind: "traffic" | "stats" = "traffic") {
   const repos = missing === 1 ? "repository" : "repositories";
-  return `Partial data — ${missing} ${repos} missing traffic data for ${formatDayMonth(date)}`;
+  const subject = kind === "stats" ? "stats" : "traffic";
+  return `Partial data — ${missing} ${repos} missing ${subject} data for ${formatDayMonth(date)}`;
 }
 
 export function repositoryGapText(notice: TrafficNotice) {

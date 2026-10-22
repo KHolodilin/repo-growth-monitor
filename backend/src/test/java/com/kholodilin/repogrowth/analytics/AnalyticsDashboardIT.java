@@ -71,6 +71,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.state()).isEqualTo(DashboardState.NO_REPOSITORIES);
         assertThat(dashboard.summary().repositories()).isZero();
         assertThat(dashboard.traffic()).isEmpty();
+        assertThat(dashboard.stats().points()).isEmpty();
+        assertThat(dashboard.stats().totals().stars().value()).isNull();
         assertThat(dashboard.repositories()).isEmpty();
         assertThat(dashboard.highlights()).isEqualTo(DashboardResponse.Highlights.none());
     }
@@ -83,6 +85,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.summary().repositories()).isEqualTo(2);
         assertThat(dashboard.summary().views().value()).isZero();
         assertThat(dashboard.traffic()).isEmpty();
+        assertThat(dashboard.stats().points()).isEmpty();
+        assertThat(dashboard.stats().totals().stars().value()).isNull();
         assertThat(dashboard.repositories()).hasSize(2);
         assertThat(dashboard.repositories()).extracting(DashboardResponse.RepositoryRow::fullName)
                 .containsExactlyInAnyOrder("acme/kafka-starter", "acme/spring-outbox");
@@ -137,6 +141,9 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.summary().clones().value()).isEqualTo(28);
         assertThat(dashboard.summary().stars().total()).isEqualTo(169);
         assertThat(dashboard.summary().stars().change()).isEqualTo(14);
+        assertThat(dashboard.stats().totals().stars().value()).isEqualTo(155);
+        assertThat(dashboard.stats().totals().stars().absoluteChange()).isNull();
+        assertThat(dashboard.stats().points()).isEmpty();
         assertThat(dashboard.partialData()).isNull();
         assertThat(dashboard.collectionWarning()).isNotNull();
         assertThat(dashboard.collectionWarning().partialRepositories()).isEqualTo(1);
@@ -437,6 +444,44 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     private void succeed(long queryId, long repositoryId, LocalDate date, int position) {
         searchRunJdbcRepository.insertIgnore(queryId, repositoryId, date);
         searchRunJdbcRepository.markSuccess(searchRunJdbcRepository.find(queryId, date).orElseThrow().id(), 50, position);
+    }
+
+    @Test
+    void portfolioStatsSumsTrackedSnapshotsInsideTheWindow() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(1), 1, 1, 0, 0);
+        trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(1), 1, 1, 0, 0);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(4), 100, 4, 2, 0, 0);
+        trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(4), 50, 1, 1, 0, 0);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(2), 106, 4, 2, 0, 4);
+        trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 110, 4, 2, 0, 4);
+        trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(1), 50, 1, 1, 0, 0);
+
+        DashboardResponse week = analyticsService.dashboard("7d");
+        assertThat(week.stats().points()).extracting(DashboardResponse.StatsPoint::date).containsExactly(
+                today.minusDays(4),
+                today.minusDays(3),
+                today.minusDays(2),
+                today.minusDays(1)
+        );
+        assertThat(week.stats().points().get(1).stars()).isNull();
+        assertThat(week.stats().points().get(2).stars()).isEqualTo(106);
+        assertThat(week.stats().points().get(2).missingRepositories()).isEqualTo(1);
+        assertThat(week.stats().totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(160, 10, 6.7));
+        assertThat(week.stats().totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, 0, 0.0));
+        assertThat(week.stats().totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, 0, 0.0));
+        assertThat(week.stats().totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(4, 4, null));
+
+        DashboardResponse day = analyticsService.dashboard("1d");
+        assertThat(day.stats().points()).extracting(DashboardResponse.StatsPoint::date).containsExactly(today.minusDays(1));
+        assertThat(day.stats().totals().stars().value()).isEqualTo(160);
+        assertThat(day.stats().totals().stars().absoluteChange()).isNull();
+
+        DashboardResponse all = analyticsService.dashboard("all");
+        assertThat(all.stats().totals().stars().value()).isEqualTo(160);
+        assertThat(all.stats().totals().stars().absoluteChange()).isNull();
+        assertThat(all.stats().totals().stars().growthPercent()).isNull();
     }
 
     private void createRepos() {

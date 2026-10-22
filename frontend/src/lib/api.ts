@@ -115,6 +115,15 @@ export type Dashboard = {
     events: EventHighlight | null;
     visitors: VisitorHighlight | null;
   } | null;
+  stats: {
+    totals: {
+      stars: StatsMetricTotal;
+      forks: StatsMetricTotal;
+      watchers: StatsMetricTotal;
+      contributors: StatsMetricTotal;
+    };
+    points: StatsHistoryPoint[];
+  };
 };
 
 export type RankHighlight = {
@@ -202,10 +211,11 @@ export type SnapshotHistory = {
 
 export type StatsHistoryPoint = {
   date: string;
-  stars: number;
-  forks: number;
-  watchers: number;
-  contributors: number;
+  stars: number | null;
+  forks: number | null;
+  watchers: number | null;
+  contributors: number | null;
+  missingRepositories?: number;
 };
 
 export type StatsMetricTotal = {

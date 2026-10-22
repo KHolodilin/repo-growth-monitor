@@ -1,8 +1,12 @@
 package com.kholodilin.repogrowth.analytics.application;
 
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.PortfolioStats;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.StatsPoint;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficLeader;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryDayTotals;
+import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryStatDay;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -129,5 +133,66 @@ class DashboardPartialDataTest {
                 List.of(new RepositoryDayTotals(day, "owner/quiet", 0, 0, 0)),
                 RepositoryDayTotals::views
         )).isEmpty();
+    }
+
+    @Test
+    void portfolioStatsSumsSnapshotsAndLeavesHolesEmpty() {
+        LocalDate today = LocalDate.of(2026, 8, 23);
+        LocalDate first = LocalDate.of(2026, 8, 20);
+        LocalDate hole = LocalDate.of(2026, 8, 21);
+        LocalDate partial = LocalDate.of(2026, 8, 22);
+        List<StatsPoint> points = AnalyticsService.portfolioStatsSeries(
+                LocalDate.of(2026, 8, 18),
+                today,
+                today,
+                2,
+                Map.of(
+                        LocalDate.of(2026, 8, 1), List.of(stat(1, LocalDate.of(2026, 8, 1), 1, 1, 1, 1)),
+                        LocalDate.of(2026, 8, 19), List.of(),
+                        first, List.of(
+                                stat(1, first, 100, 2, 4, 0),
+                                stat(2, first, 50, 1, 1, 0)
+                        ),
+                        partial, List.of(stat(1, partial, 106, 2, 4, 4)),
+                        today, List.of(stat(1, today, 999, 9, 9, 9))
+                )
+        );
+        assertThat(AnalyticsService.portfolioStatsSeries(first, today, today, 2, Map.of())).isEmpty();
+        Map<LocalDate, List<RepositoryStatDay>> laterFirst = new LinkedHashMap<>();
+        laterFirst.put(partial, List.of(stat(1, partial, 106, 2, 4, 4)));
+        laterFirst.put(first, List.of(stat(1, first, 100, 2, 4, 0), stat(2, first, 50, 1, 1, 0)));
+        assertThat(AnalyticsService.portfolioStatsSeries(LocalDate.of(2026, 8, 18), hole, today, 2, laterFirst))
+                .extracting(StatsPoint::date)
+                .containsExactly(first);
+        assertThat(AnalyticsService.portfolioStatsSeries(LocalDate.of(2026, 8, 18), today, today, 2, laterFirst))
+                .extracting(StatsPoint::date)
+                .containsExactly(first, hole, partial);
+        assertThat(points).extracting(StatsPoint::date).containsExactly(first, hole, partial);
+        assertThat(points.get(0)).isEqualTo(new StatsPoint(first, 150, 3, 5, 0, 0));
+        assertThat(points.get(1).stars()).isNull();
+        assertThat(points.get(1).missingRepositories()).isEqualTo(2);
+        assertThat(points.get(2)).isEqualTo(new StatsPoint(partial, 106, 2, 4, 4, 1));
+
+        PortfolioStats stats = AnalyticsService.portfolioStats(
+                List.of(stat(1, partial, 106, 2, 4, 4), stat(2, first, 50, 1, 1, 1)),
+                false,
+                points
+        );
+        assertThat(stats.totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(156,  -44, -29.3));
+        assertThat(stats.totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, -1, -33.3));
+        assertThat(stats.totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, -1, -20.0));
+        assertThat(stats.totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(5, 4, null));
+
+        PortfolioStats all = AnalyticsService.portfolioStats(List.of(), true, points);
+        assertThat(all.totals().stars().value()).isNull();
+        assertThat(all.totals().stars().absoluteChange()).isNull();
+        assertThat(all.totals().contributors().growthPercent()).isNull();
+
+        assertThat(AnalyticsService.portfolioStats(List.of(stat(1, first, 10, 0, 0, 0)), false, List.of(points.get(0)))
+                .totals().stars().absoluteChange()).isNull();
+    }
+
+    private static RepositoryStatDay stat(long id, LocalDate date, int stars, int forks, int watchers, int contributors) {
+        return new RepositoryStatDay(id, "owner/" + id, date, stars, forks, watchers, contributors);
     }
 }

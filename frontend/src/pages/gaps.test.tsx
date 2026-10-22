@@ -85,7 +85,6 @@ describe("coverage gaps", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("KHolodilin/other")).toBeInTheDocument();
-    expect(screen.getByText("0 in 30d")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Visitors/ }));
     await user.click(screen.getByRole("button", { name: /Views/ }));
     await user.click(screen.getByRole("button", { name: /Clones/ }));
@@ -97,19 +96,66 @@ describe("coverage gaps", () => {
     expect(await screen.findByText("opened")).toBeInTheDocument();
   });
 
-  it("shows a dash when the star change has no baseline", async () => {
+  it("shows portfolio stats and keeps the period when the tab changes", async () => {
+    const user = userEvent.setup();
     api.mockResolvedValue({
       ...dashboardReady,
-      summary: { ...dashboardReady.summary, stars: { total: 21, change: null } },
+      stats: {
+        totals: {
+          stars: { value: 21, absoluteChange: null, growthPercent: null },
+          forks: { value: 16, absoluteChange: 0, growthPercent: 0 },
+          watchers: { value: 0, absoluteChange: 0, growthPercent: 0 },
+          contributors: { value: 4, absoluteChange: 4, growthPercent: null },
+        },
+        points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 4, missingRepositories: 0 }],
+      },
     });
     render(
       <MemoryRouter>
         <DashboardPage />
       </MemoryRouter>,
     );
-    const stars = (await screen.findAllByText("Stars")).find((element) => element.tagName === "DIV");
+    expect(await screen.findByRole("heading", { name: "Traffic" })).toBeInTheDocument();
+    expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Stats" }));
+    expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
+    expect(screen.getByText("Sum of repository counts")).toBeInTheDocument();
+    expect(screen.getAllByText("— No change").length).toBeGreaterThan(0);
+    expect(screen.getByText("Rank")).toBeInTheDocument();
+    const stars = screen.getAllByText("Stars").find((element) => element.tagName === "DIV");
     expect(stars?.parentElement?.textContent).toContain("—");
-    expect(stars?.parentElement?.textContent).not.toContain("in 30d");
+    expect(stars?.parentElement?.textContent).not.toContain("vs prev");
+    await user.click(screen.getByRole("button", { name: "7d" }));
+    expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Traffic" }));
+    expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
+    expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty stats chart when the portfolio has no snapshots in the period", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue({
+      ...dashboardReady,
+      stats: {
+        ...dashboardReady.stats,
+        points: [],
+        totals: {
+          stars: { value: null, absoluteChange: null, growthPercent: null },
+          forks: { value: null, absoluteChange: null, growthPercent: null },
+          watchers: { value: null, absoluteChange: null, growthPercent: null },
+          contributors: { value: null, absoluteChange: null, growthPercent: null },
+        },
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={["/?tab=stats"]}>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("No stats for this period.")).toBeInTheDocument();
+    expect(screen.getByText("Sum of repository counts")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "all" }));
+    expect(screen.queryByText("vs prev")).not.toBeInTheDocument();
   });
 
   it("sorts every results column and opens snapshot source picker", async () => {

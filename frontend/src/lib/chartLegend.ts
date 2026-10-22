@@ -41,6 +41,10 @@ export function repoStatsChartId(repoId: number | string) {
   return `${repoId}:stats`;
 }
 
+export function dashboardStatsChartId() {
+  return "dashboard:stats";
+}
+
 function parseAll(parsed: unknown): Record<string, Record<string, boolean>> | null {
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     return null;

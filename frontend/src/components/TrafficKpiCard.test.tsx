@@ -147,9 +147,11 @@ describe("TrafficKpiCard", () => {
         period="all"
         series={[21, 27]}
         sparklineColor="#5470c6"
+        note="Sum of repository counts"
       />,
     );
     expect(screen.getByText("27")).toBeInTheDocument();
+    expect(screen.getByText("Sum of repository counts")).toBeInTheDocument();
     expect(screen.queryByText("↑ +6 (+28.6%)")).not.toBeInTheDocument();
     expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
     expect(container.querySelector("polyline")).toBeNull();
