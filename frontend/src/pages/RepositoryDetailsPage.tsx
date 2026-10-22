@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import {
@@ -1183,12 +1183,6 @@ function SearchPanel({
 
   const selected = new Set(selectedIds);
   const allChecked = visibility.length > 0 && visibility.every((item) => selected.has(item.query.id));
-  const headerCheckbox = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (headerCheckbox.current) {
-      headerCheckbox.current.indeterminate = selectedIds.length > 0 && !allChecked;
-    }
-  }, [selectedIds, allChecked]);
 
   function writeSelection(ids: number[]) {
     setSelectedIds(ids);
@@ -1247,7 +1241,11 @@ function SearchPanel({
             <tr className="text-left text-muted-foreground">
               <th className="py-2 pr-3">
                 <input
-                  ref={headerCheckbox}
+                  ref={(node) => {
+                    if (node) {
+                      node.indeterminate = selectedIds.length > 0 && !allChecked;
+                    }
+                  }}
                   type="checkbox"
                   aria-label="Chart lines"
                   checked={allChecked}

@@ -78,9 +78,6 @@ function countAsOf(queries: RankSample[], band: number, asOf: string) {
   let count = 0;
   for (const query of existing) {
     const point = latestOnOrBefore(query, asOf);
-    if (!point) {
-      return null;
-    }
     if (inBand(point.position, band)) {
       count += 1;
     }
@@ -128,7 +125,7 @@ function latestOnOrBefore(query: RankSample, date: string) {
       best = point;
     }
   }
-  return best;
+  return best!;
 }
 
 function eachDate(from: string, to: string) {

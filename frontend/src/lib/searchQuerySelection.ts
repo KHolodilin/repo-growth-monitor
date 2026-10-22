@@ -6,9 +6,6 @@ export function searchQuerySelectionCookie(repositoryId: number) {
 }
 
 export function readSearchQuerySelection(repositoryId: number): number[] | null {
-  if (typeof document === "undefined") {
-    return null;
-  }
   const name = searchQuerySelectionCookie(repositoryId);
   const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
   if (!match) {
@@ -26,16 +23,13 @@ export function readSearchQuerySelection(repositoryId: number): number[] | null 
 }
 
 export function writeSearchQuerySelection(repositoryId: number, ids: number[], protocol = currentProtocol()) {
-  if (typeof document === "undefined") {
-    return;
-  }
   const secure = protocol === "https:" ? "; Secure" : "";
   const value = encodeURIComponent(JSON.stringify(ids));
   document.cookie = `${searchQuerySelectionCookie(repositoryId)}=${value}; path=/; max-age=${MAX_AGE}; SameSite=Lax${secure}`;
 }
 
 function currentProtocol() {
-  return typeof location !== "undefined" ? location.protocol : "http:";
+  return location.protocol;
 }
 
 export function defaultSearchQueryIds(queries: { id: number; rank: number | null }[]) {

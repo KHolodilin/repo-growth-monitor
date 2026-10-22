@@ -101,6 +101,21 @@ describe("search visibility KPIs", () => {
     expect(bandKpi([query({ id: 2 })], 3, "all", today).value).toBeNull();
   });
 
+  it("uses the newest measurement when the points are out of order", () => {
+    const result = bandKpi([
+      query({
+        id: 1,
+        currentRank: 2,
+        points: [
+          { date: "2026-10-01", position: 2 },
+          { date: "2026-09-01", position: 15 },
+        ],
+      }),
+    ], 10, "1d", today);
+    expect(result.value).toBe(1);
+    expect(result.absoluteChange).toBe(0);
+  });
+
   it("does not treat a checked miss as a rank inside the band", () => {
     const result = bandKpi([
       query({
