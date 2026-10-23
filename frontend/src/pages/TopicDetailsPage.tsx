@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
+import { writeTopicScope } from "../lib/topicScope";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -84,8 +85,29 @@ export function TopicDetailsPage() {
   }
 
   function setScope(next: "all" | "language") {
+    if (repositoryId) {
+      writeTopicScope(Number(repositoryId), next);
+    }
     setSearchParams(next === "all" ? {} : { scope: next }, { replace: true });
   }
+
+  useEffect(() => {
+    if (!repositoryId || !repo || String(repo.id) !== repositoryId) {
+      return;
+    }
+    const raw = searchParams.get("scope");
+    if (raw == null) {
+      return;
+    }
+    if (raw === "language" && repo.language) {
+      writeTopicScope(repo.id, "language");
+      return;
+    }
+    writeTopicScope(repo.id, "all");
+    if (raw === "language") {
+      setSearchParams({}, { replace: true });
+    }
+  }, [repositoryId, repo, searchParams, setSearchParams]);
 
   const option = useMemo(() => {
     if (!history) {
@@ -136,7 +158,7 @@ export function TopicDetailsPage() {
                 label: repo.fullName,
                 repoSwitcher: {
                   currentId: repo.id,
-                  hrefFor: (id) => `/repositories/${id}?tab=topics${scope === "language" ? "&scope=language" : ""}`,
+                  hrefFor: (id) => `/repositories/${id}?tab=topics`,
                 },
               },
               { label: "Topics Visibility", to: `/repositories/${repo.id}?tab=topics${scope === "language" ? "&scope=language" : ""}` },

@@ -25,6 +25,8 @@ vi.mock("../lib/api", async (importOriginal) => {
 describe("coverage gaps", () => {
   beforeEach(() => {
     api.mockReset();
+    document.cookie = "topics_visibility_scope_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_scope_8=; path=/; max-age=0";
   });
 
   it("covers dashboard first collection, all-period KPIs and failed collect", async () => {
