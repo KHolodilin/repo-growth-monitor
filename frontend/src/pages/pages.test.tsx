@@ -56,6 +56,7 @@ describe("pages", () => {
   beforeEach(() => {
     api.mockReset();
     document.cookie = "search_visibility_queries_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_topics_13=; path=/; max-age=0";
   });
 
   it("renders dashboard ready state and sorts repositories", async () => {
@@ -153,7 +154,13 @@ describe("pages", () => {
         return json([searchHistory]);
       }
       if (url.includes("topics-visibility")) {
-        return json([topicHistory, { ...topicHistory, watch: { ...topicHistory.watch, id: 8, topic: "kafka" }, currentRank: null }]);
+        const kafka = {
+          ...topicHistory,
+          watch: { ...topicHistory.watch, id: 8, topic: "kafka" },
+          currentRank: null,
+          missedDates: undefined,
+        };
+        return json([topicHistory, kafka]);
       }
       if (url.includes("growth-events") && !url.includes("settings") && init?.method !== "POST") {
         return json([growthEvent]);
@@ -267,7 +274,32 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Run all" }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
-    expect(await screen.findByText("outbox")).toBeInTheDocument();
+    expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
+    expect(screen.getByText("outbox")).toBeInTheDocument();
+    const scopeBar = screen.getByRole("button", { name: "All" }).parentElement as HTMLElement;
+    expect(scopeBar).toHaveTextContent("Java");
+    expect(scopeBar).not.toHaveTextContent("7d");
+    expect(scopeBar.parentElement?.contains(screen.getAllByRole("button", { name: "7d" })[0])).toBe(true);
+    const outboxLine = screen.getByRole("checkbox", { name: "Chart line for outbox" });
+    await user.click(outboxLine);
+    await user.click(outboxLine);
+    fireEvent.mouseEnter(screen.getByText("outbox"));
+    fireEvent.mouseLeave(screen.getByText("outbox"));
+    await user.click(screen.getByRole("button", { name: "mark-empty" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    const topicDialog = screen.getByRole("heading", { name: "Growth event" }).closest(".fixed");
+    api.mockResolvedValueOnce({});
+    await user.click(within(topicDialog as HTMLElement).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByText("A match in time does not prove a cause.")).not.toBeInTheDocument());
+    const topicHeader = await screen.findByRole("checkbox", { name: "Chart lines", checked: true });
+    await user.click(topicHeader);
+    expect(screen.getByText("Select topics from the table to display rank history")).toBeInTheDocument();
+    await user.click(topicHeader);
     for (const name of ["Topic", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
       const buttons = screen.getAllByRole("button", { name: new RegExp(`^${name}`) });
       await user.click(buttons[buttons.length - 1]);
@@ -285,7 +317,44 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
   }, 20000);
 
+  it("drops a topic event response that arrives after the period changes", async () => {
+    const user = userEvent.setup();
+    const pending: { resolve: (value: unknown) => void; reject: (error: Error) => void }[] = [];
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("topics-visibility")) {
+        return json([topicHistory]);
+      }
+      if (url.includes("growth-events") && !url.includes("settings")) {
+        return new Promise((resolve, reject) => {
+          pending.push({ resolve, reject });
+        });
+      }
+      return json([]);
+    });
+    renderPath("/repositories/13?tab=topics", <RepositoryDetailsPage />);
+    expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
+    await waitFor(() => expect(pending).toHaveLength(1));
+    await user.click(screen.getAllByRole("button", { name: "7d" })[0]);
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].resolve([]);
+    await user.click(screen.getAllByRole("button", { name: "30d" })[0]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    pending[1].reject(new Error("late"));
+    await act(async () => {
+      pending[2].resolve({});
+    });
+    expect(screen.getByText("outbox")).toBeInTheDocument();
+  });
+
   it("shows collection failure and load error on repository page", async () => {
+    const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/repositories/13")) {
@@ -318,6 +387,10 @@ describe("pages", () => {
     expect(screen.queryByRole("heading", { name: "About this repository" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tooltip", { hidden: true })).not.toBeInTheDocument();
     expect(screen.getByText("No topics yet.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
+    expect(await screen.findByText(/No topics yet. Add topics/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1d" })).toBeInTheDocument();
 
     api.mockRejectedValueOnce(new Error("missing"));
     renderPath("/repositories/13", <RepositoryDetailsPage />);

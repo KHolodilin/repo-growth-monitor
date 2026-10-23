@@ -156,7 +156,7 @@ export function rankHistoryOption({
           ...(legendToggle ? {} : { selectedMode: false }),
         }
       : undefined,
-    grid: { left: 48, right: 72, top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24, bottom: 40, containLabel: false },
+    grid: { left: 48, right: 24, top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24, bottom: 8, containLabel: true },
     xAxis: {
       type: "category",
       data: axisDates,
@@ -165,8 +165,6 @@ export function rankHistoryOption({
         hideOverlap: true,
         showMinLabel: true,
         showMaxLabel: true,
-        alignMinLabel: "left",
-        alignMaxLabel: "right",
         formatter: (value: string) => formatAxis(String(value)),
       },
     },

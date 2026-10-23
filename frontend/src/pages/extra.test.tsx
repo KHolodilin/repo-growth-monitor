@@ -259,7 +259,13 @@ describe("extra coverage", () => {
           lastCollection: { ...traffic.lastCollection, status: "RUNNING", jobs: [{ jobType: "TRAFFIC", status: "RUNNING" }] },
         };
       }
-      return url.includes("visibility") ? [{ ...searchHistory, searchStatus: "READY" }] : [];
+      if (url.includes("topics-visibility")) {
+        return [topicHistory];
+      }
+      if (url.includes("search-visibility")) {
+        return [{ ...searchHistory, searchStatus: "READY" }];
+      }
+      return [];
     });
     const running = renderAt("/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText(/RUNNING/)).toBeInTheDocument();
