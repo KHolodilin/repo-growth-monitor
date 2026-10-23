@@ -46,6 +46,8 @@ function renderAt(path: string, ui: ReactNode) {
 describe("extra coverage", () => {
   beforeEach(() => {
     api.mockReset();
+    document.cookie = "topics_visibility_scope_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_scope_8=; path=/; max-age=0";
   });
 
   it("covers repo switcher search keyboard and errors", async () => {

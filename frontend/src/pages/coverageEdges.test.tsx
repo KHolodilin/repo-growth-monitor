@@ -36,6 +36,8 @@ vi.mock("../lib/api", async (importOriginal) => {
 describe("remaining coverage edges", () => {
   beforeEach(() => {
     api.mockReset();
+    document.cookie = "topics_visibility_scope_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_scope_8=; path=/; max-age=0";
   });
 
   it("sorts topic and search rows through every empty comparison", async () => {

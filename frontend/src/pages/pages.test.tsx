@@ -57,6 +57,8 @@ describe("pages", () => {
     api.mockReset();
     document.cookie = "search_visibility_queries_13=; path=/; max-age=0";
     document.cookie = "topics_visibility_topics_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_scope_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_scope_8=; path=/; max-age=0";
   });
 
   it("renders dashboard ready state and sorts repositories", async () => {

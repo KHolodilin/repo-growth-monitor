@@ -52,6 +52,7 @@ import { resolveSearchQuerySelection, writeSearchQuerySelection } from "../lib/s
 import { SearchVisibilityKpis } from "../components/SearchVisibilityKpis";
 import { TopicVisibilityKpis } from "../components/TopicVisibilityKpis";
 import { resolveTopicSelection, writeTopicSelection } from "../lib/topicSelection";
+import { readTopicScope, resolveVisibleScope, writeTopicScope, type TopicScope } from "../lib/topicScope";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
@@ -60,7 +61,6 @@ import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/qu
 import { useTableSort } from "../lib/tableSortPrefs";
 
 type Tab = "overview" | "traffic" | "stats" | "search" | "topics" | "growth-events";
-type TopicScope = "all" | "language";
 
 const TAB_LABEL: Record<Tab, string> = {
   traffic: "Traffic",
@@ -70,10 +70,6 @@ const TAB_LABEL: Record<Tab, string> = {
   overview: "Overview",
   "growth-events": "Growth Events",
 };
-
-function parseScope(value: string | null): TopicScope {
-  return value === "language" ? "language" : "all";
-}
 
 function parseTab(tabParam: string | null): Tab {
   if (
@@ -96,10 +92,14 @@ export function RepositoryDetailsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
-  const scope = parseScope(searchParams.get("scope"));
+  const scopeQuery = searchParams.get("scope");
   const [period, setPeriod] = usePeriod(id);
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
+  const storedScope = readTopicScope(Number(id));
+  const scope: TopicScope = tab === "topics"
+    ? resolveVisibleScope(scopeQuery, storedScope, Boolean(repo?.language))
+    : "all";
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
   const [plainTopics, setPlainTopics] = useState<TopicHistory[]>([]);
@@ -131,6 +131,8 @@ export function RepositoryDetailsPage() {
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
   const [runningAll, setRunningAll] = useState(false);
   const [focusHealth, setFocusHealth] = useState(false);
+  const scopeIntent = useRef<TopicScope | null>(null);
+  const [scopeChoice, setScopeChoice] = useState(0);
 
   function setTab(next: Tab) {
     if (next === "traffic") {
@@ -138,15 +140,55 @@ export function RepositoryDetailsPage() {
       return;
     }
     if (next === "topics") {
-      setSearchParams(scope === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
+      const nextScope = resolveVisibleScope(null, readTopicScope(Number(id)), Boolean(repo?.language));
+      setSearchParams(nextScope === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
       return;
     }
     setSearchParams({ tab: next }, { replace: true });
   }
 
   function setScope(next: TopicScope) {
-    setSearchParams(next === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
+    scopeIntent.current = next;
+    writeTopicScope(Number(id), next);
+    setScopeChoice((value) => value + 1);
   }
+
+  useEffect(() => {
+    scopeIntent.current = null;
+  }, [id]);
+
+  useEffect(() => {
+    if (tab !== "topics" || !repo || !id || String(repo.id) !== id) {
+      return;
+    }
+    const hasLanguage = Boolean(repo.language);
+    if (scopeIntent.current) {
+      const desired = scopeIntent.current;
+      writeTopicScope(repo.id, desired);
+      const shown: TopicScope = scopeQuery === "language" ? "language" : "all";
+      if (shown !== desired) {
+        setSearchParams(
+          desired === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" },
+          { replace: true },
+        );
+      }
+      return;
+    }
+    if (scopeQuery != null) {
+      const next: TopicScope = scopeQuery === "language" && hasLanguage ? "language" : "all";
+      writeTopicScope(repo.id, next);
+      if (next === "all") {
+        setSearchParams({ tab: "topics" }, { replace: true });
+      }
+      return;
+    }
+    const stored = readTopicScope(repo.id);
+    if (stored === "language" && hasLanguage) {
+      setSearchParams({ tab: "topics", scope: "language" }, { replace: true });
+    } else if (stored === "language") {
+      writeTopicScope(repo.id, "all");
+    }
+  }, [tab, repo, id, scopeQuery, setSearchParams, scopeChoice]);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -364,9 +406,7 @@ export function RepositoryDetailsPage() {
                 hrefFor: (repositoryId) =>
                   tab === "traffic"
                     ? `/repositories/${repositoryId}`
-                    : tab === "topics" && scope === "language"
-                      ? `/repositories/${repositoryId}?tab=topics&scope=language`
-                      : `/repositories/${repositoryId}?tab=${tab}`,
+                    : `/repositories/${repositoryId}?tab=${tab}`,
               },
             },
             { label: TAB_LABEL[tab] },
