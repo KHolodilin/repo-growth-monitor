@@ -25,7 +25,7 @@ export function topicBandKpi(
   today: string,
 ): TopicBandKpi {
   const value = currentCount(topics, band);
-  const days = period === "all" ? eachDate(earliest(topics) ?? today, today) : periodDates(period, today) ?? [];
+  const days = periodDates(period, today) ?? eachDate(earliest(topics) ?? today, today);
   const series = days.map((day) => countOnDay(topics, band, day));
   if (period === "all") {
     return { value, absoluteChange: null, growthPercent: null, series };

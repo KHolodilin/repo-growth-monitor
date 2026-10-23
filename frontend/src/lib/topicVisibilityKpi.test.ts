@@ -63,6 +63,7 @@ describe("topic visibility bands", () => {
   it("returns zero for an empty scope and N/A when nothing has been measured", () => {
     expect(topicBandKpi([], 3, "7d", today).value).toBe(0);
     expect(topicBandKpi([topic("alpha", null, [])], 3, "7d", today).value).toBeNull();
+    expect(topicBandKpi([topic("alpha", null, [])], 3, "all", today).series).toEqual([null]);
   });
 
   it("rounds a percent from the first measured count", () => {

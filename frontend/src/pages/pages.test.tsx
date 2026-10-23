@@ -154,7 +154,13 @@ describe("pages", () => {
         return json([searchHistory]);
       }
       if (url.includes("topics-visibility")) {
-        return json([topicHistory, { ...topicHistory, watch: { ...topicHistory.watch, id: 8, topic: "kafka" }, currentRank: null }]);
+        const kafka = {
+          ...topicHistory,
+          watch: { ...topicHistory.watch, id: 8, topic: "kafka" },
+          currentRank: null,
+          missedDates: undefined,
+        };
+        return json([topicHistory, kafka]);
       }
       if (url.includes("growth-events") && !url.includes("settings") && init?.method !== "POST") {
         return json([growthEvent]);
@@ -271,6 +277,22 @@ describe("pages", () => {
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
     expect(screen.getByText("outbox")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All" }).parentElement).toHaveTextContent("7d");
+    const outboxLine = screen.getByRole("checkbox", { name: "Chart line for outbox" });
+    await user.click(outboxLine);
+    await user.click(outboxLine);
+    fireEvent.mouseEnter(screen.getByText("outbox"));
+    fireEvent.mouseLeave(screen.getByText("outbox"));
+    await user.click(screen.getByRole("button", { name: "mark-empty" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "mark" }));
+    const topicDialog = screen.getByRole("heading", { name: "Growth event" }).closest(".fixed");
+    api.mockResolvedValueOnce({});
+    await user.click(within(topicDialog as HTMLElement).getByRole("button", { name: "Delete" }));
+    await waitFor(() => expect(screen.queryByText("A match in time does not prove a cause.")).not.toBeInTheDocument());
     const topicHeader = await screen.findByRole("checkbox", { name: "Chart lines", checked: true });
     await user.click(topicHeader);
     expect(screen.getByText("Select topics from the table to display rank history")).toBeInTheDocument();
