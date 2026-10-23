@@ -364,6 +364,44 @@ describe("pages", () => {
     expect(screen.getByText("outbox")).toBeInTheDocument();
   });
 
+  it("shows dashes when overview fields and topics were never stored", async () => {
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json({
+          ...repository,
+          topics: undefined,
+          language: undefined,
+          defaultBranch: undefined,
+          lastCommitAt: undefined,
+          githubUpdatedAt: undefined,
+          githubUrl: undefined,
+        });
+      }
+      if (url.includes("/traffic?")) {
+        return json({
+          ...traffic,
+          lastCollection: {
+            ...traffic.lastCollection,
+            status: "PARTIAL",
+            completedAt: null,
+            jobs: [{ jobType: "MYSTERY", status: "PLANNED" }],
+          },
+        });
+      }
+      return json([]);
+    });
+    renderPath("/repositories/13?tab=overview", <RepositoryDetailsPage />);
+    expect(await screen.findByText("No topics yet.")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByRole("link", { name: "Open repository" })).toHaveAttribute(
+      "href",
+      `https://github.com/${repository.fullName}`,
+    );
+    expect(screen.getByText("MYSTERY")).toBeInTheDocument();
+    expect(screen.queryByText("Collection failed")).not.toBeInTheDocument();
+  });
+
   it("shows collection failure and load error on repository page", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
