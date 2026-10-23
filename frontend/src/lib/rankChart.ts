@@ -1,9 +1,15 @@
+import type { Period } from "../components/PeriodSelector";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { eventUtcDate } from "./growthEvents";
+import { periodDates } from "./searchVisibilityKpi";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
-const COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
+export const RANK_LINE_COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
+
+export function rankLineColor(index: number) {
+  return RANK_LINE_COLORS[index % RANK_LINE_COLORS.length];
+}
 const MISSED_COLOR = "#9ca3af";
 
 export type RankHistoryPoint = { date: string; position: number | null };
@@ -16,6 +22,8 @@ export type RankHistorySeries = {
   missedDates?: string[];
   highlighted?: boolean;
   dimmed?: boolean;
+  /** Stable color so hiding another query does not repaint this line. */
+  color?: string;
 };
 
 export function rankTooltipText(point: RankHistoryPoint | undefined, limit: number, missed = false) {
@@ -35,20 +43,33 @@ export function rankHistoryOption({
   dates,
   series,
   legend = false,
+  legendToggle = true,
   events = [],
+  period,
+  today = new Date().toISOString().slice(0, 10),
   formatAxis = formatChartAxisDate,
 }: {
   dates: string[];
   series: RankHistorySeries[];
   legend?: boolean;
+  /** False when the table checkboxes are the only way to show or hide a line. */
+  legendToggle?: boolean;
   events?: GrowthEvent[];
+  /** Same window as Traffic. Omitted or `all` keeps the full history. */
+  period?: Period;
+  today?: string;
   formatAxis?: (value: string) => string;
 }) {
-  const axisDates = events.length > 0 ? calendarDates([...dates, ...events.map((event) => eventUtcDate(event))]) : dates;
-  const overlays = events.length > 0 ? eventMarkOverlays(axisDates, events, 1) : null;
+  const windowDates = period ? periodDates(period, today) : null;
+  const visibleEvents = windowDates
+    ? events.filter((event) => windowDates.includes(eventUtcDate(event)))
+    : events;
+  const axisDates = windowDates
+    ?? (visibleEvents.length > 0 ? calendarDates([...dates, ...visibleEvents.map((event) => eventUtcDate(event))]) : dates);
+  const overlays = visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
   const lines = series.flatMap((item, index) => {
-    const color = COLORS[index % COLORS.length];
+    const color = item.color ?? rankLineColor(index);
     const byDate = new Map(item.points.map((point) => [point.date, point]));
     const missed = new Set(item.missedDates ?? []);
     return [
@@ -118,11 +139,23 @@ export function rankHistoryOption({
           })
           .join("<br/>");
         const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];
-        const eventRows = dayEvents.length === 0 ? "" : `<br/>${dayEvents.map((item) => item.title).join("<br/>")}`;
+        const eventRows =
+          dayEvents.length === 0
+            ? ""
+            : `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.08)">${dayEvents
+                .map((item) => `<div>${item.title}</div>`)
+                .join("")}</div>`;
         return `<div>${formatAxis(date)}<br/>${rows}${eventRows}</div>`;
       },
     },
-    legend: legend ? { top: 0, type: "scroll", data: series.map((item) => item.name) } : undefined,
+    legend: legend
+      ? {
+          top: 0,
+          type: "scroll",
+          data: series.map((item) => item.name),
+          ...(legendToggle ? {} : { selectedMode: false }),
+        }
+      : undefined,
     grid: { left: 48, right: 72, top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24, bottom: 40, containLabel: false },
     xAxis: {
       type: "category",
@@ -158,11 +191,33 @@ export function rankHistoryOption({
               lineStyle: { opacity: 0, width: 0 },
               tooltip: { show: false },
               markLine: overlays.markLine,
-              markPoint: overlays.markPoint,
             },
           ]
         : []),
     ],
+  };
+}
+
+/**
+ * Traffic draws the caption at the end of the line, which is the top of an upward axis.
+ * Rank is inverted, so that same end is the bottom and the caption lands on the dates.
+ * "start" is rank 1, the top of this axis, which puts the caption in the same upper margin.
+ * The pin balloons stay on Traffic, where they sit on the peak above the lines. On this
+ * inverted axis they cover the rank dots, so Rank History keeps only the dashed line.
+ */
+function rankEventOverlays(dates: string[], events: GrowthEvent[], period?: Period) {
+  const overlays = eventMarkOverlays(dates, events, 1, period);
+  const label = { ...overlays.markLine.label, position: "start" as const };
+  return {
+    ...overlays,
+    markLine: {
+      ...overlays.markLine,
+      label,
+      data: overlays.markLine.data.map((item) => ({
+        ...item,
+        label: { ...item.label, position: "start" as const },
+      })),
+    },
   };
 }
 

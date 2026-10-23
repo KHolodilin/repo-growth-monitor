@@ -155,5 +155,19 @@ describe("TrafficKpiCard", () => {
     expect(screen.queryByText("↑ +6 (+28.6%)")).not.toBeInTheDocument();
     expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
     expect(container.querySelector("polyline")).toBeNull();
+
+    rerender(
+      <TrafficKpiCard
+        label="Top 10"
+        value={null}
+        growthPercent={null}
+        absoluteChange={null}
+        period="30d"
+        preserveGaps
+        missingHistory
+      />,
+    );
+    expect(screen.getAllByText("N/A").length).toBeGreaterThan(0);
+    expect(container.querySelector("polyline")).toBeNull();
   });
 });

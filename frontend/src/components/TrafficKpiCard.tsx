@@ -12,6 +12,8 @@ export function TrafficKpiCard({
   sparklineColor,
   note,
   className,
+  preserveGaps = false,
+  missingHistory = false,
 }: {
   label: string;
   value: number | null;
@@ -22,6 +24,9 @@ export function TrafficKpiCard({
   sparklineColor?: string;
   note?: string;
   className?: string;
+  /** Keep nulls as breaks instead of connecting the measured days. */
+  preserveGaps?: boolean;
+  missingHistory?: boolean;
 }) {
   const growth =
     period === "all"
@@ -29,21 +34,24 @@ export function TrafficKpiCard({
       : absoluteChange === undefined
         ? formatGrowth(growthPercent)
         : formatAbsoluteGrowth(absoluteChange, growthPercent);
-  const points = (series ?? []).filter((point): point is number => point != null);
+  const sparklineValues = preserveGaps ? (series ?? []) : (series ?? []).filter((point): point is number => point != null);
+  const hasSparkline = sparklineValues.some((point) => point != null);
   return (
     <Card className={cn("flex h-full flex-col p-3", className)}>
       <div className="text-sm text-muted-foreground">
         {label}
         {note && <div className="text-xs">{note}</div>}
       </div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{formatNumber(value)}</div>
+      <div className="mt-1 text-2xl font-semibold tabular-nums">{missingHistory && value == null ? "N/A" : formatNumber(value)}</div>
       {period !== "all" && (
         <div className="mt-1 flex items-end justify-between gap-2">
           <div className={cn("text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
-            {growth?.label ?? "—"}
+            {missingHistory && !growth ? "N/A" : (growth?.label ?? "—")}
             {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}
           </div>
-          {points.length > 0 && <Sparkline values={points} direction={growth?.direction} color={sparklineColor} />}
+          {hasSparkline && (
+            <Sparkline values={sparklineValues} direction={growth?.direction} color={sparklineColor} />
+          )}
         </div>
       )}
     </Card>
@@ -55,26 +63,39 @@ function Sparkline({
   direction,
   color,
 }: {
-  values: number[];
+  values: (number | null | undefined)[];
   direction?: "up" | "down" | "flat";
   color?: string;
 }) {
   const width = 72;
   const height = 24;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const numeric = values.filter((value): value is number => value != null);
+  const min = Math.min(...numeric);
+  const max = Math.max(...numeric);
   const span = max - min || 1;
-  const points = values
-    .map((value, index) => {
-      const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-      const y = height - ((value - min) / span) * (height - 2) - 1;
-      return `${x},${y}`;
-    })
-    .join(" ");
+  const segments: string[] = [];
+  let current: string[] = [];
+  values.forEach((value, index) => {
+    if (value == null) {
+      if (current.length > 0) {
+        segments.push(current.join(" "));
+        current = [];
+      }
+      return;
+    }
+    const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
+    const y = height - ((value - min) / span) * (height - 2) - 1;
+    current.push(`${x},${y}`);
+  });
+  if (current.length > 0) {
+    segments.push(current.join(" "));
+  }
   const stroke = color ?? (direction === "down" ? "#b91c1c" : direction === "flat" || direction == null ? "#6b7280" : "#047857");
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-6 w-16 shrink-0" aria-hidden="true">
-      <polyline fill="none" stroke={stroke} strokeWidth="1.5" points={points} />
+      {segments.map((points) => (
+        <polyline key={points} fill="none" stroke={stroke} strokeWidth="1.5" points={points} />
+      ))}
     </svg>
   );
 }
