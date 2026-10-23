@@ -95,17 +95,23 @@ public class TopicWorker {
                         watch.sort(),
                         watch.sortOrder()
                 );
+                List<GitHubSearchItem> items = response.itemsOrEmpty();
+                Integer position = trackedPosition(items, repository.githubId(), watch.resultLimit());
+                if (position == null && items.size() < expectedResultCount(watch.resultLimit(), response.totalCount())) {
+                    retryIncomplete(run);
+                    return;
+                }
+                if (position == null && missingRankNeedsConfirmation(run, watch)) {
+                    confirmMissingRank(run);
+                    return;
+                }
                 List<TopicResult> results = new ArrayList<>();
-                Integer position = null;
                 int index = 1;
-                for (GitHubSearchItem item : response.itemsOrEmpty()) {
+                for (GitHubSearchItem item : items) {
                     if (index > watch.resultLimit()) {
                         break;
                     }
                     results.add(fromItem(run.id(), index, item));
-                    if (item.id() == repository.githubId()) {
-                        position = index;
-                    }
                     index++;
                 }
                 Integer trackedPosition = position;
@@ -125,6 +131,63 @@ public class TopicWorker {
             sample.stop(Timer.builder("topic.duration").register(Metrics.globalRegistry));
             LogMdc.clearJob();
         }
+    }
+
+    /** A short page is an incomplete search, same rule as a repository search run. */
+    private static int expectedResultCount(int resultLimit, int totalCount) {
+        return Math.min(resultLimit, totalCount);
+    }
+
+    private static Integer trackedPosition(List<GitHubSearchItem> items, long githubId, int resultLimit) {
+        int index = 1;
+        for (GitHubSearchItem item : items) {
+            if (index > resultLimit) {
+                return null;
+            }
+            if (item.id() == githubId) {
+                return index;
+            }
+            index++;
+        }
+        return null;
+    }
+
+    private void retryIncomplete(TopicRun run) {
+        String message = "Search results were shorter than the requested depth";
+        log.warn("Topic run incomplete attempt={} watchId={}", run.attempt(), run.topicWatchId());
+        transactionTemplate.executeWithoutResult(status -> {
+            if (retryPolicy.exhausted(run.attempt())) {
+                runRepository.markFailed(run.id(), "SEARCH_RESULTS_INCOMPLETE", message);
+            } else {
+                runRepository.markRetry(
+                        run.id(),
+                        retryPolicy.nextAttemptAt(run.attempt(), null),
+                        "SEARCH_RESULTS_INCOMPLETE",
+                        message
+                );
+            }
+        });
+    }
+
+    /** One confirmation before a topic that was inside the depth is stored as missing. */
+    private boolean missingRankNeedsConfirmation(TopicRun run, TopicWatch watch) {
+        if ("SEARCH_RANK_UNCONFIRMED".equals(run.errorCode())) {
+            return false;
+        }
+        return runRepository.previousSnapshot(run.topicWatchId(), run.businessDate())
+                .map(TopicRun::trackedRepositoryPosition)
+                .filter(position -> position <= watch.resultLimit())
+                .isPresent();
+    }
+
+    private void confirmMissingRank(TopicRun run) {
+        log.warn("Topic rank missing inside the previous depth watchId={}", run.topicWatchId());
+        transactionTemplate.executeWithoutResult(status -> runRepository.markRetry(
+                run.id(),
+                retryPolicy.nextAttemptAt(run.attempt(), null),
+                "SEARCH_RANK_UNCONFIRMED",
+                "Tracked repository was inside the depth and is missing from a full result list"
+        ));
     }
 
     private static TopicResult fromItem(long topicRunId, int position, GitHubSearchItem item) {

@@ -56,6 +56,7 @@ describe("pages", () => {
   beforeEach(() => {
     api.mockReset();
     document.cookie = "search_visibility_queries_13=; path=/; max-age=0";
+    document.cookie = "topics_visibility_topics_13=; path=/; max-age=0";
   });
 
   it("renders dashboard ready state and sorts repositories", async () => {
@@ -267,7 +268,13 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Run all" }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
-    expect(await screen.findByText("outbox")).toBeInTheDocument();
+    expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
+    expect(screen.getByText("outbox")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All" }).parentElement).toHaveTextContent("7d");
+    const topicHeader = await screen.findByRole("checkbox", { name: "Chart lines", checked: true });
+    await user.click(topicHeader);
+    expect(screen.getByText("Select topics from the table to display rank history")).toBeInTheDocument();
+    await user.click(topicHeader);
     for (const name of ["Topic", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
       const buttons = screen.getAllByRole("button", { name: new RegExp(`^${name}`) });
       await user.click(buttons[buttons.length - 1]);

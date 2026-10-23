@@ -32,13 +32,16 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -160,6 +163,106 @@ class TopicWorkerTest {
         worker = worker(null);
         when(runRepository.claim(eq("w1"), eq(Duration.ofMinutes(5)))).thenReturn(Optional.empty());
         assertThat(worker.poll("w1")).isFalse();
+    }
+
+    @Test
+    void pollRetriesWhenTheResultListIsShorterThanTheDepth() throws Exception {
+        claim(run, watch(50));
+        when(gitHubClient.searchRepositories("topic:kafka", 50, "stars", "desc"))
+                .thenReturn(new GitHubSearchResponse(80, List.of(item(9L, "other/lib"))));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markRetry(eq(9L), any(), eq("SEARCH_RESULTS_INCOMPLETE"), eq("Search results were shorter than the requested depth"));
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+    }
+
+    @Test
+    void pollFailsAShortResultListAfterTheRetryBudget() throws Exception {
+        TopicRun lastAttempt = runWith(8, null, null);
+        claim(lastAttempt, watch(50));
+        when(gitHubClient.searchRepositories("topic:kafka", 50, "stars", "desc"))
+                .thenReturn(new GitHubSearchResponse(80, List.of()));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markFailed(9L, "SEARCH_RESULTS_INCOMPLETE", "Search results were shorter than the requested depth");
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+    }
+
+    @Test
+    void pollConfirmsOnceWhenARankedRepositoryDisappearsFromAFullList() throws Exception {
+        claim(run, watch(50));
+        when(gitHubClient.searchRepositories("topic:kafka", 50, "stars", "desc"))
+                .thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, 1, null)));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markRetry(
+                eq(9L),
+                any(),
+                eq("SEARCH_RANK_UNCONFIRMED"),
+                eq("Tracked repository was inside the depth and is missing from a full result list")
+        );
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+    }
+
+    @Test
+    void pollStoresANullPositionAfterTheMissingRankIsConfirmed() throws Exception {
+        claim(runWith(2, null, "SEARCH_RANK_UNCONFIRMED"), watch(50));
+        when(gitHubClient.searchRepositories("topic:kafka", 50, "stars", "desc"))
+                .thenReturn(new GitHubSearchResponse(80, others(50)));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 80, null);
+        verify(runRepository, never()).markRetry(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    void pollStoresANullPositionWhenThePreviousRankIsOutsideTheLimit() throws Exception {
+        claim(run, watch(50));
+        when(gitHubClient.searchRepositories("topic:kafka", 50, "stars", "desc"))
+                .thenReturn(new GitHubSearchResponse(80, others(51)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, 51, null)));
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 80, null);
+    }
+
+    @Test
+    void pollStoresANullPositionWhenNothingWasMeasuredBefore() throws Exception {
+        claim(run, watch(50));
+        when(gitHubClient.searchRepositories("topic:kafka", 50, "stars", "desc"))
+                .thenReturn(new GitHubSearchResponse(20, others(20)));
+        when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.empty());
+
+        assertThat(worker.poll("w1")).isTrue();
+        verify(runRepository).markSuccess(9L, 20, null);
+    }
+
+    private void claim(TopicRun claimed, TopicWatch watch) throws Exception {
+        Repository repository = new Repository(
+                13L, 301L, 1L, "demo", "acme/demo", "demo", "PUBLIC", "main", "Java",
+                false, false, 1, 0, 0, 0, 0, true, Instant.EPOCH, Instant.EPOCH, null, null, null, null, null, null
+        );
+        when(runRepository.claim(eq("w1"), any())).thenReturn(Optional.of(claimed));
+        when(repositoryLock.openConnection()).thenReturn(connection);
+        when(repositoryLock.tryLock(connection, 13L)).thenReturn(true);
+        when(watchRepository.findById(5L)).thenReturn(Optional.of(watch));
+        when(repositoryJdbcRepository.findById(13L)).thenReturn(Optional.of(repository));
+    }
+
+    private static TopicWatch watch(int limit) {
+        return new TopicWatch(5L, 13L, "kafka", null, "stars", "desc", true, limit, Instant.EPOCH, Instant.EPOCH);
+    }
+
+    private static TopicRun runWith(int attempt, Integer position, String errorCode) {
+        return new TopicRun(
+                9L, 5L, 13L, LocalDate.of(2026, 9, 23), SearchRunStatus.RUNNING, attempt,
+                null, "w1", Instant.EPOCH, Instant.EPOCH, null, null, null, position, errorCode, null
+        );
+    }
+
+    private static List<GitHubSearchItem> others(int count) {
+        return IntStream.range(0, count).mapToObj(index -> item(1_000L + index, "other/lib-" + index)).toList();
     }
 
     private TopicWorker worker(Duration lease) {

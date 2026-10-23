@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import {
@@ -30,6 +30,8 @@ import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
 import { resolveSearchQuerySelection, writeSearchQuerySelection } from "../lib/searchQuerySelection";
 import { SearchVisibilityKpis } from "../components/SearchVisibilityKpis";
+import { TopicVisibilityKpis } from "../components/TopicVisibilityKpis";
+import { resolveTopicSelection, writeTopicSelection } from "../lib/topicSelection";
 import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
 import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
@@ -80,7 +82,12 @@ export function RepositoryDetailsPage() {
   const [repo, setRepo] = useState<Repository | null>(null);
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
-  const [topicsVisibility, setTopicsVisibility] = useState<TopicHistory[]>([]);
+  const [plainTopics, setPlainTopics] = useState<TopicHistory[]>([]);
+  const [languageTopics, setLanguageTopics] = useState<TopicHistory[]>([]);
+  const topicsVisibility = scope === "language" ? languageTopics : plainTopics;
+  const knownTopics = [...plainTopics, ...languageTopics].filter(
+    (item, index, list) => list.findIndex((other) => other.watch.topic === item.watch.topic) === index,
+  );
   const [queryText, setQueryText] = useState("");
   const [queryError, setQueryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,19 +132,21 @@ export function RepositoryDetailsPage() {
     if (!id) {
       return;
     }
-    const [repository, trafficData, searchData, topicData] = await Promise.all([
+    const [repository, trafficData, searchData, plainTopicData, languageTopicData] = await Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
       api<RepositoryTraffic>(
         `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
       ),
       api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=${scope}`),
+      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=all`),
+      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=language`),
     ]);
     setRepo(repository);
     setTraffic(trafficData);
     setVisibility(searchData);
-    setTopicsVisibility(topicData);
-  }, [id, period, showServicePaths, scope]);
+    setPlainTopics(plainTopicData);
+    setLanguageTopics(languageTopicData);
+  }, [id, period, showServicePaths]);
 
   useEffect(() => {
     function onCollected() {
@@ -155,9 +164,12 @@ export function RepositoryDetailsPage() {
     setFocusHealth(false);
   }, [focusHealth, tab, loading, searchParams]);
 
+  const loadedRepositoryId = useRef<string | undefined>(undefined);
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (loadedRepositoryId.current !== id) {
+      setLoading(true);
+    }
     load()
       .catch((err: Error) => {
         if (!cancelled) {
@@ -166,13 +178,14 @@ export function RepositoryDetailsPage() {
       })
       .finally(() => {
         if (!cancelled) {
+          loadedRepositoryId.current = id;
           setLoading(false);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [load]);
+  }, [load, id]);
 
   const runStatus = traffic?.lastCollection?.status;
   const runActive = runStatus === "RUNNING" || runStatus === "PLANNED";
@@ -180,7 +193,7 @@ export function RepositoryDetailsPage() {
     const status = item.searchStatus;
     return status === "RUNNING" || status === "READY" || status === "RETRY";
   });
-  const topicsActive = topicsVisibility.some((item) => {
+  const topicsActive = knownTopics.some((item) => {
     const status = item.searchStatus;
     return status === "RUNNING" || status === "READY" || status === "RETRY";
   });
@@ -247,6 +260,7 @@ export function RepositoryDetailsPage() {
       await load();
     } catch (err) {
       setQueryError((err as Error).message);
+    } finally {
       setRunningAll(false);
     }
   }
@@ -274,6 +288,7 @@ export function RepositoryDetailsPage() {
       await load();
     } catch (err) {
       setError((err as Error).message);
+    } finally {
       setRunningAll(false);
     }
   }
@@ -450,7 +465,10 @@ export function RepositoryDetailsPage() {
           language={repo.language}
           scope={scope}
           onScope={setScope}
+          period={period}
+          onPeriod={setPeriod}
           visibility={topicsVisibility}
+          knownTopics={knownTopics}
           runningQueryId={runningQueryId}
           runningAll={runningAll}
           onRun={runTopicWatch}
@@ -906,7 +924,10 @@ function TopicsPanel({
   language,
   scope,
   onScope,
+  period,
+  onPeriod,
   visibility,
+  knownTopics,
   runningQueryId,
   runningAll,
   onRun,
@@ -916,13 +937,28 @@ function TopicsPanel({
   language?: string;
   scope: TopicScope;
   onScope: (scope: TopicScope) => void;
+  period: Period;
+  onPeriod: (period: Period) => void;
   visibility: TopicHistory[];
+  knownTopics: TopicHistory[];
   runningQueryId: number | null;
   runningAll: boolean;
   onRun: (id: number) => void;
   onRunAll: () => void;
 }) {
   const [hoveredWatchId, setHoveredWatchId] = useState<number | null>(null);
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
+  const knownKey = knownTopics.map((item) => `${item.watch.topic}:${item.currentRank ?? ""}`).join("\n");
+  const knownSamples = useMemo(
+    () => knownTopics.map((item) => ({ slug: item.watch.topic, rank: item.currentRank })),
+    [knownKey],
+  );
+  useEffect(() => {
+    if (knownSamples.length === 0) {
+      return;
+    }
+    setSelectedSlugs(resolveTopicSelection(repositoryId, knownSamples));
+  }, [repositoryId, knownSamples]);
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "topic-watches",
     scope: repositoryId,
@@ -944,38 +980,57 @@ function TopicsPanel({
     );
   const languageLabel = language || "Language";
   const scopeQuery = scope === "language" ? "?scope=language" : "";
+  const selected = new Set(selectedSlugs);
+  const visibleSlugs = visibility.map((item) => item.watch.topic);
+  const allChecked = visibleSlugs.length > 0 && visibleSlugs.every((slug) => selected.has(slug));
+
+  function writeSelection(slugs: string[]) {
+    setSelectedSlugs(slugs);
+    writeTopicSelection(repositoryId, slugs);
+  }
 
   return (
     <div className="space-y-4">
+      <div className="inline-flex items-center rounded-lg border bg-muted p-1">
+        {language && (
+          <>
+            {(["all", "language"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => onScope(key)}
+              >
+                {key === "all" ? "All" : languageLabel}
+              </button>
+            ))}
+            <span className="mx-1 w-px self-stretch bg-border" aria-hidden="true" />
+          </>
+        )}
+        <PeriodSelector period={period} onPeriod={onPeriod} embedded />
+      </div>
+      <TopicVisibilityKpis topics={visibility} period={period} />
+      <CombinedTopicRankChart
+        repositoryId={repositoryId}
+        scope={scope}
+        period={period}
+        visibility={visibility}
+        selectedSlugs={selectedSlugs}
+        highlightWatchId={hoveredWatchId}
+      />
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Topics</h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {language && (
-              <div className="inline-flex rounded-lg border bg-muted p-1">
-                {(["all", "language"] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={cn(
-                      "rounded-md px-3 py-1.5 text-sm font-medium",
-                      scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => onScope(key)}
-                  >
-                    {key === "all" ? "All" : languageLabel}
-                  </button>
-                ))}
-              </div>
-            )}
-            <Button
-              className="bg-muted text-foreground"
-              disabled={visibility.length === 0 || searchBusy}
-              onClick={onRunAll}
-            >
-              {searchBusy ? "Running..." : "Run all"}
-            </Button>
-          </div>
+          <Button
+            className="bg-muted text-foreground"
+            disabled={visibility.length === 0 || searchBusy}
+            onClick={onRunAll}
+          >
+            {searchBusy ? "Running..." : "Run all"}
+          </Button>
         </div>
         {visibility.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -984,9 +1039,26 @@ function TopicsPanel({
               : "No topics yet. Add topics to the repository on GitHub."}
           </p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-muted-foreground">
+                <th className="py-2 pr-3">
+                  <input
+                    ref={(node) => {
+                      if (node) {
+                        node.indeterminate = selectedSlugs.length > 0 && visibleSlugs.some((slug) => selected.has(slug)) && !allChecked;
+                      }
+                    }}
+                    type="checkbox"
+                    aria-label="Chart lines"
+                    checked={allChecked}
+                    onChange={() => {
+                      const hidden = selectedSlugs.filter((slug) => !visibleSlugs.includes(slug));
+                      writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs]);
+                    }}
+                  />
+                </th>
                 <QuerySortHeader
                   label="Topic"
                   align="left"
@@ -1020,13 +1092,34 @@ function TopicsPanel({
                     onMouseEnter={() => setHoveredWatchId(item.watch.id)}
                     onMouseLeave={() => setHoveredWatchId(null)}
                   >
+                    <td className="py-3 pr-3">
+                      <input
+                        type="checkbox"
+                        aria-label={`Chart line for ${item.watch.topic}`}
+                        checked={selected.has(item.watch.topic)}
+                        onChange={(event) => {
+                          const next = event.target.checked
+                            ? [...selectedSlugs, item.watch.topic]
+                            : selectedSlugs.filter((slug) => slug !== item.watch.topic);
+                          writeSelection(next);
+                        }}
+                      />
+                    </td>
                     <td className="py-3 pr-4">
-                      <Link
-                        className="text-primary hover:underline"
-                        to={`/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
-                      >
-                        {item.watch.topic}
-                      </Link>
+                      <span className="inline-flex items-center gap-2">
+                        {selected.has(item.watch.topic) && (
+                          <span
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: rankLineColor(visibility.findIndex((row) => row.watch.id === item.watch.id)) }}
+                          />
+                        )}
+                        <Link
+                          className="text-primary hover:underline"
+                          to={`/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
+                        >
+                          {item.watch.topic}
+                        </Link>
+                      </span>
                     </td>
                     <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.watch.resultLimit)}</td>
                     <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
@@ -1055,9 +1148,9 @@ function TopicsPanel({
               })}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
-      <CombinedTopicRankChart repositoryId={repositoryId} scope={scope} visibility={visibility} highlightWatchId={hoveredWatchId} />
     </div>
   );
 }
@@ -1065,50 +1158,108 @@ function TopicsPanel({
 function CombinedTopicRankChart({
   repositoryId,
   scope,
+  period,
   visibility,
+  selectedSlugs,
   highlightWatchId,
 }: {
   repositoryId: number;
   scope: TopicScope;
+  period: Period;
   visibility: TopicHistory[];
+  selectedSlugs: string[];
   highlightWatchId: number | null;
 }) {
+  const [events, setEvents] = useState<GrowthEvent[]>([]);
+  const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+      .then((rows) => {
+        if (!cancelled) {
+          setEvents(Array.isArray(rows) ? rows : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEvents([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repositoryId, period]);
+
+  const drawn = useMemo(
+    () => visibility.filter((item) => selectedSlugs.includes(item.watch.topic)),
+    [visibility, selectedSlugs],
+  );
+
   const option = useMemo(() => {
     const dates = datesFromHistory(
-      visibility.map((item) => item.points),
-      visibility.flatMap((item) => item.missedDates ?? []),
+      drawn.map((item) => item.points),
+      drawn.flatMap((item) => item.missedDates ?? []),
     );
     return rankHistoryOption({
       dates,
       legend: true,
-      series: visibility.map((item) => ({
+      legendToggle: false,
+      period,
+      events,
+      series: drawn.map((item) => ({
         name: item.watch.topic,
         points: item.points,
         limit: item.watch.resultLimit,
         missedDates: item.missedDates,
         highlighted: highlightWatchId === item.watch.id,
         dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
+        color: rankLineColor(visibility.findIndex((row) => row.watch.id === item.watch.id)),
       })),
     });
-  }, [visibility, highlightWatchId]);
+  }, [visibility, drawn, highlightWatchId, events, period]);
 
   const series = useMemo(
-    () => visibility.map((item) => ({ key: String(item.watch.id), name: item.watch.topic })),
-    [visibility],
+    () => drawn.map((item) => ({ key: String(item.watch.id), name: item.watch.topic })),
+    [drawn],
   );
 
-  if (visibility.length === 0) {
-    return null;
+  if (drawn.length === 0) {
+    return (
+      <ChartCard title="Rank History">
+        <p className="text-sm text-muted-foreground">Select topics from the table to display rank history</p>
+      </ChartCard>
+    );
   }
   return (
-    <ChartCard title="Rank History">
-      <PersistentECharts
-        chartId={repoTopicsChartId(repositoryId, scope)}
-        series={series}
-        option={option}
-        style={{ height: 360, width: "100%" }}
-      />
-    </ChartCard>
+    <>
+      <ChartCard title="Rank History">
+        <PersistentECharts
+          chartId={repoTopicsChartId(repositoryId, scope)}
+          series={series}
+          persistSelection={false}
+          option={option}
+          style={{ height: 360, width: "100%" }}
+          onEvents={{
+            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
+              const clicked = markLineEvents(params);
+              if (clicked.length > 0) {
+                setMarkerEvents(clicked);
+              }
+            },
+          }}
+        />
+      </ChartCard>
+      {markerEvents && (
+        <EventDetailsDialog
+          repositoryId={repositoryId}
+          events={markerEvents}
+          onClose={() => setMarkerEvents(null)}
+          onEdit={() => setMarkerEvents(null)}
+          onChanged={() => setMarkerEvents(null)}
+        />
+      )}
+    </>
   );
 }
 
