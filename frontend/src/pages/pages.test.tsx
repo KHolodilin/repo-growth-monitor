@@ -314,6 +314,42 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
   }, 20000);
 
+  it("drops a topic event response that arrives after the period changes", async () => {
+    const user = userEvent.setup();
+    const pending: { resolve: (value: unknown) => void; reject: (error: Error) => void }[] = [];
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return json(traffic);
+      }
+      if (url.includes("topics-visibility")) {
+        return json([topicHistory]);
+      }
+      if (url.includes("growth-events") && !url.includes("settings")) {
+        return new Promise((resolve, reject) => {
+          pending.push({ resolve, reject });
+        });
+      }
+      return json([]);
+    });
+    renderPath("/repositories/13?tab=topics", <RepositoryDetailsPage />);
+    expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
+    await waitFor(() => expect(pending).toHaveLength(1));
+    await user.click(screen.getAllByRole("button", { name: "7d" })[0]);
+    await waitFor(() => expect(pending).toHaveLength(2));
+    pending[0].resolve([]);
+    await user.click(screen.getAllByRole("button", { name: "30d" })[0]);
+    await waitFor(() => expect(pending).toHaveLength(3));
+    pending[1].reject(new Error("late"));
+    await act(async () => {
+      pending[2].resolve({});
+    });
+    expect(screen.getByText("outbox")).toBeInTheDocument();
+  });
+
   it("shows collection failure and load error on repository page", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
