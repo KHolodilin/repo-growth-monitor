@@ -98,7 +98,8 @@ describe("missing traffic", () => {
     );
     expect(await screen.findByText("⚠ Traffic — GitHub data missing for Oct 18 (T-1)")).toBeInTheDocument();
     expect(screen.getByText(/SUCCESS/)).toBeInTheDocument();
-    expect(screen.getByText("✓ Referrers")).toBeInTheDocument();
+    expect(screen.getByText("Referrers")).toBeInTheDocument();
+    expect(screen.queryByText("✓ Referrers")).not.toBeInTheDocument();
   });
 
   it("says the collection never started after the window closed", async () => {

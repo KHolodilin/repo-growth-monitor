@@ -224,15 +224,26 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "GitHub" }));
     await user.click(screen.getByRole("button", { name: "Promotion" }));
     await user.click(screen.getByRole("button", { name: "Discoverability 1/2" }));
-    expect(screen.getByRole("heading", { name: "Repository Health" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Repository Health" })).not.toBeInTheDocument();
     expect(screen.getByText("Description")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Community Standards 1/1" }));
     expect(screen.getByText("README")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
-    expect(screen.getByRole("heading", { name: "About this repository" }).parentElement).toHaveTextContent(
-      repository.description ?? "",
-    );
-    expect(screen.getByText("Collection Status")).toBeInTheDocument();
+    const about = screen.getByRole("heading", { name: "About this repository" });
+    const topicsHeading = screen.getByRole("heading", { name: "Topics" });
+    const overviewHeading = screen.getByRole("heading", { level: 2, name: "Overview" });
+    const collection = screen.getByRole("heading", { name: "Collection Status" });
+    expect(about.compareDocumentPosition(topicsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(topicsHeading.compareDocumentPosition(overviewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(overviewHeading.compareDocumentPosition(collection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(overviewHeading.closest(".grid")).toBe(collection.closest(".grid"));
+    expect(about.parentElement).toHaveTextContent(repository.description ?? "");
+    expect(about.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("kafka")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open repository" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByText("Description").parentElement).toHaveClass("text-emerald-700");
+    expect(screen.getByText("Topics", { selector: "span" }).parentElement).toHaveClass("text-muted-foreground");
+    expect(collection.parentElement?.querySelector(".text-emerald-600")).not.toBeNull();
     await user.click(screen.getByLabelText("Switch repository"));
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "Stats" }));
@@ -351,6 +362,44 @@ describe("pages", () => {
       pending[2].resolve({});
     });
     expect(screen.getByText("outbox")).toBeInTheDocument();
+  });
+
+  it("shows dashes when overview fields and topics were never stored", async () => {
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return json({
+          ...repository,
+          topics: undefined,
+          language: undefined,
+          defaultBranch: undefined,
+          lastCommitAt: undefined,
+          githubUpdatedAt: undefined,
+          githubUrl: undefined,
+        });
+      }
+      if (url.includes("/traffic?")) {
+        return json({
+          ...traffic,
+          lastCollection: {
+            ...traffic.lastCollection,
+            status: "PARTIAL",
+            completedAt: null,
+            jobs: [{ jobType: "MYSTERY", status: "PLANNED" }],
+          },
+        });
+      }
+      return json([]);
+    });
+    renderPath("/repositories/13?tab=overview", <RepositoryDetailsPage />);
+    expect(await screen.findByText("No topics yet.")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByRole("link", { name: "Open repository" })).toHaveAttribute(
+      "href",
+      `https://github.com/${repository.fullName}`,
+    );
+    expect(screen.getByText("MYSTERY")).toBeInTheDocument();
+    expect(screen.queryByText("Collection failed")).not.toBeInTheDocument();
   });
 
   it("shows collection failure and load error on repository page", async () => {

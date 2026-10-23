@@ -108,7 +108,8 @@ describe("portfolio highlights", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("heading", { name: "Repository Health" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Discoverability" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Repository Health" })).not.toBeInTheDocument();
     await waitFor(() => {
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     });

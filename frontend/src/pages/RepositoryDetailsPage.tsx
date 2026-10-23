@@ -1,6 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ExternalLink } from "lucide-react";
+import {
+  Check,
+  Circle,
+  CircleCheck,
+  Clock3,
+  Code2,
+  ExternalLink,
+  Eye,
+  GitBranch,
+  GitFork,
+  Info,
+  LockKeyhole,
+  Package,
+  RefreshCw,
+  Search,
+  Star,
+  Tag,
+  UserRound,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import {
   api,
   type CollectionJob,
@@ -563,6 +583,24 @@ function ContributorsIcon() {
   );
 }
 
+function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
+  return (
+    <h2 className="mb-4 flex items-center gap-2 font-medium">
+      <Icon className="size-5 shrink-0 text-slate-500" aria-hidden="true" />
+      {children}
+    </h2>
+  );
+}
+
+function FieldLabel({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
+  return (
+    <dt className="flex items-center gap-2 text-muted-foreground">
+      <Icon className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+      {children}
+    </dt>
+  );
+}
+
 function Overview({
   repo,
   lastCollection,
@@ -577,46 +615,44 @@ function Overview({
     <div className="space-y-4">
       {about && (
         <Card>
-          <h2 className="mb-4 font-medium">About this repository</h2>
+          <SectionTitle icon={Info}>About this repository</SectionTitle>
           <p className="text-sm font-normal text-muted-foreground">{about}</p>
         </Card>
       )}
-      <div className="grid items-start gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="mb-4 font-medium">Overview</h2>
+      <TopicsCard topics={repo.topics ?? []} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="h-full">
+          <SectionTitle icon={Package}>Overview</SectionTitle>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          <dt className="text-muted-foreground">Owner</dt>
-          <dd>{repo.owner.login}</dd>
-          <dt className="text-muted-foreground">Visibility</dt>
-          <dd>{repo.visibility}</dd>
-          <dt className="text-muted-foreground">Stars</dt>
-          <dd>{formatNumber(repo.stars)}</dd>
-          <dt className="text-muted-foreground">Watchers</dt>
-          <dd>{formatNumber(repo.watchers)}</dd>
-          <dt className="text-muted-foreground">Forks</dt>
-          <dd>{formatNumber(repo.forks)}</dd>
-          <dt className="text-muted-foreground">Contributors</dt>
-          <dd>{formatNumber(repo.contributors)}</dd>
-          <dt className="text-muted-foreground">Language</dt>
-          <dd>{repo.language ?? "—"}</dd>
-          <dt className="text-muted-foreground">Default branch</dt>
-          <dd>{repo.defaultBranch ?? "—"}</dd>
-          <dt className="text-muted-foreground">Last commit</dt>
-          <dd>{formatSyncTime(repo.lastCommitAt) ?? "—"}</dd>
-          <dt className="text-muted-foreground">Last GitHub update</dt>
-          <dd>{formatSyncTime(repo.githubUpdatedAt) ?? "—"}</dd>
-          <dt className="text-muted-foreground">GitHub</dt>
-          <dd>
-            <a className="text-primary hover:underline" href={repo.githubUrl ?? `https://github.com/${repo.fullName}`} target="_blank" rel="noreferrer">
-              Open repository
-            </a>
-          </dd>
-        </dl>
-      </Card>
-      <div className="space-y-4">
+            <FieldLabel icon={UserRound}>Owner</FieldLabel>
+            <dd>{repo.owner.login}</dd>
+            <FieldLabel icon={LockKeyhole}>Visibility</FieldLabel>
+            <dd>{repo.visibility}</dd>
+            <FieldLabel icon={Star}>Stars</FieldLabel>
+            <dd>{formatNumber(repo.stars)}</dd>
+            <FieldLabel icon={Eye}>Watchers</FieldLabel>
+            <dd>{formatNumber(repo.watchers)}</dd>
+            <FieldLabel icon={GitFork}>Forks</FieldLabel>
+            <dd>{formatNumber(repo.forks)}</dd>
+            <FieldLabel icon={UsersRound}>Contributors</FieldLabel>
+            <dd>{formatNumber(repo.contributors)}</dd>
+            <FieldLabel icon={Code2}>Language</FieldLabel>
+            <dd>{repo.language ?? "—"}</dd>
+            <FieldLabel icon={GitBranch}>Default branch</FieldLabel>
+            <dd>{repo.defaultBranch ?? "—"}</dd>
+            <FieldLabel icon={Clock3}>Last commit</FieldLabel>
+            <dd>{formatSyncTime(repo.lastCommitAt) ?? "—"}</dd>
+            <FieldLabel icon={RefreshCw}>Last GitHub update</FieldLabel>
+            <dd>{formatSyncTime(repo.githubUpdatedAt) ?? "—"}</dd>
+            <FieldLabel icon={ExternalLink}>GitHub</FieldLabel>
+            <dd>
+              <a className="text-primary hover:underline" href={repo.githubUrl ?? `https://github.com/${repo.fullName}`} target="_blank" rel="noreferrer">
+                Open repository
+              </a>
+            </dd>
+          </dl>
+        </Card>
         <CollectionStatusCard run={lastCollection} trafficGap={trafficGap} />
-        <TopicsCard topics={repo.topics ?? []} />
-      </div>
       </div>
       {repo.health && <RepositoryHealthSection health={repo.health} />}
     </div>
@@ -626,7 +662,7 @@ function Overview({
 function TopicsCard({ topics }: { topics: string[] }) {
   return (
     <Card>
-      <h2 className="mb-3 font-medium">Topics</h2>
+      <SectionTitle icon={Tag}>Topics</SectionTitle>
       {topics.length === 0 ? (
         <p className="text-sm text-muted-foreground">No topics yet.</p>
       ) : (
@@ -671,23 +707,37 @@ function HealthScoreLink({
 function RepositoryHealthSection({ health }: { health: RepositoryHealth }) {
   return (
     <Card id="repository-health">
-      <h2 className="mb-4 font-medium">Repository Health</h2>
-      <div className="grid items-start gap-8 md:grid-cols-2">
-        <HealthCheckList title="Discoverability" items={health.discoverability} />
-        <HealthCheckList title="Community Standards" items={health.communityStandards} />
+      <div className="grid gap-8 md:grid-cols-2">
+        <HealthCheckList title="Discoverability" icon={Search} items={health.discoverability} />
+        <HealthCheckList title="Community Standards" icon={UsersRound} items={health.communityStandards} />
       </div>
     </Card>
   );
 }
 
-function HealthCheckList({ title, items }: { title: string; items: { label: string; passed: boolean }[] }) {
+function HealthCheckList({
+  title,
+  icon: Icon,
+  items,
+}: {
+  title: string;
+  icon: LucideIcon;
+  items: { label: string; passed: boolean }[];
+}) {
   return (
     <div>
-      <h3 className="mb-3 text-sm font-medium">{title}</h3>
+      <h3 className="mb-3 flex items-center gap-2 text-sm font-medium">
+        <Icon className="size-5 shrink-0 text-slate-500" aria-hidden="true" />
+        {title}
+      </h3>
       <div className="space-y-2 text-sm">
         {items.map((item) => (
-          <div key={item.label} className={item.passed ? "text-emerald-700" : "text-muted-foreground"}>
-            <span className="mr-2">{item.passed ? "✓" : "○"}</span>
+          <div key={item.label} className={cn("flex items-center gap-2", item.passed ? "text-emerald-700" : "text-muted-foreground")}>
+            {item.passed ? (
+              <CircleCheck className="size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <Circle className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+            )}
             <span>{item.label}</span>
           </div>
         ))}
@@ -705,16 +755,16 @@ function CollectionStatusCard({
 }) {
   if (trafficGap?.reason === "COLLECTION_NOT_EXECUTED") {
     return (
-      <Card>
-        <h2 className="mb-4 font-medium">Collection Status</h2>
+      <Card className="h-full">
+        <CollectionTitle />
         <p className="text-sm">⛔ {repositoryGapText(trafficGap)}</p>
       </Card>
     );
   }
   if (!run) {
     return (
-      <Card>
-        <h2 className="mb-4 font-medium">Collection Status</h2>
+      <Card className="h-full">
+        <CollectionTitle />
         <h3 className="font-medium">No collection data yet.</h3>
         <p className="mt-2 text-sm text-muted-foreground">
           Run your first collection to fetch GitHub repository statistics.
@@ -726,8 +776,8 @@ function CollectionStatusCard({
   const failed = run.jobs.find((job) => job.status === "FAILED");
   const failureReason = collectionFailureReason(failed?.errorMessage, failed?.jobType);
   return (
-    <Card>
-      <h2 className="mb-4 font-medium">Collection Status</h2>
+    <Card className="h-full">
+      <CollectionTitle success={run.status === "SUCCESS"} />
       {run.status === "FAILED" && <h3 className="mb-2 font-medium text-red-700">Collection failed</h3>}
       <div className="text-sm">
         {formatBusinessDate(run.businessDate)} · {run.status}
@@ -739,7 +789,7 @@ function CollectionStatusCard({
         <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
       )}
       {failureReason && <p className="mt-2 text-sm">{failureReason}</p>}
-      <div className="mt-4 space-y-2 text-sm">
+      <div className="mt-4 divide-y divide-border text-sm">
         {run.jobs.map((job) => (
           <JobRow key={job.jobType} job={job} businessDate={run.businessDate} trafficGap={trafficGap} />
         ))}
@@ -758,18 +808,30 @@ function JobRow({
   trafficGap?: RepositoryTraffic["trafficGap"];
 }) {
   if (job.status === "FAILED") {
-    return <div className="text-sm text-red-700">⛔ Collection failed for {formatChartAxisDate(businessDate)}.</div>;
+    return <div className="py-2 text-sm text-red-700">⛔ Collection failed for {formatChartAxisDate(businessDate)}.</div>;
   }
   if (job.jobType === "TRAFFIC" && trafficGap?.reason === "GITHUB_DATA_MISSING") {
-    return <div className="text-sm text-amber-700">⚠ {trafficJobWarning(trafficGap)}</div>;
+    return <div className="py-2 text-sm text-amber-700">⚠ {trafficJobWarning(trafficGap)}</div>;
   }
-  const icon = job.status === "SUCCESS" ? "✓" : job.status === "RUNNING" ? "⟳" : "○";
-  const color = job.status === "SUCCESS" ? "text-emerald-700" : job.status === "RUNNING" ? "text-primary" : "text-muted-foreground";
+  const success = job.status === "SUCCESS";
   return (
-    <div className={cn("flex items-center justify-between gap-3", color)}>
-      <span>
-        {icon} {JOB_LABELS[job.jobType] ?? job.jobType}
-      </span>
+    <div className={cn("flex items-center gap-2 py-2", success ? "text-emerald-700" : "text-muted-foreground")}>
+      {success ? (
+        <Check className="size-4 shrink-0" aria-hidden="true" />
+      ) : (
+        <Circle className="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+      )}
+      <span>{JOB_LABELS[job.jobType] ?? job.jobType}</span>
+    </div>
+  );
+}
+
+function CollectionTitle({ success = false }: { success?: boolean }) {
+  return (
+    <div className="mb-4 flex items-center gap-2">
+      <CircleCheck className="size-5 shrink-0 text-slate-500" aria-hidden="true" />
+      <h2 className="font-medium">Collection Status</h2>
+      {success && <CircleCheck className="ml-auto size-8 shrink-0 text-emerald-600" aria-hidden="true" />}
     </div>
   );
 }
