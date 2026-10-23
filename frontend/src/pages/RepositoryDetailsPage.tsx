@@ -437,7 +437,7 @@ export function RepositoryDetailsPage() {
             </button>
           ))}
         </div>
-        {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "growth-events") && (
+        {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "topics" || tab === "growth-events") && (
           <PeriodSelector period={period} onPeriod={setPeriod} />
         )}
       </div>
@@ -466,7 +466,6 @@ export function RepositoryDetailsPage() {
           scope={scope}
           onScope={setScope}
           period={period}
-          onPeriod={setPeriod}
           visibility={topicsVisibility}
           knownTopics={knownTopics}
           runningQueryId={runningQueryId}
@@ -925,7 +924,6 @@ function TopicsPanel({
   scope,
   onScope,
   period,
-  onPeriod,
   visibility,
   knownTopics,
   runningQueryId,
@@ -938,7 +936,6 @@ function TopicsPanel({
   scope: TopicScope;
   onScope: (scope: TopicScope) => void;
   period: Period;
-  onPeriod: (period: Period) => void;
   visibility: TopicHistory[];
   knownTopics: TopicHistory[];
   runningQueryId: number | null;
@@ -991,27 +988,23 @@ function TopicsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex items-center rounded-lg border bg-muted p-1">
-        {language && (
-          <>
-            {(["all", "language"] as const).map((key) => (
-              <button
-                key={key}
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => onScope(key)}
-              >
-                {key === "all" ? "All" : languageLabel}
-              </button>
-            ))}
-            <span className="mx-1 w-px self-stretch bg-border" aria-hidden="true" />
-          </>
-        )}
-        <PeriodSelector period={period} onPeriod={onPeriod} embedded />
-      </div>
+      {language && (
+        <div className="inline-flex items-center rounded-lg border bg-muted p-1">
+          {(["all", "language"] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium",
+                scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => onScope(key)}
+            >
+              {key === "all" ? "All" : languageLabel}
+            </button>
+          ))}
+        </div>
+      )}
       <TopicVisibilityKpis topics={visibility} period={period} />
       <CombinedTopicRankChart
         repositoryId={repositoryId}

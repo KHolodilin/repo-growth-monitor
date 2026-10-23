@@ -276,7 +276,9 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
     expect(screen.getByText("outbox")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "All" }).parentElement).toHaveTextContent("7d");
+    const scopeBar = screen.getByRole("button", { name: "All" }).parentElement;
+    expect(scopeBar).toHaveTextContent("Java");
+    expect(scopeBar).not.toHaveTextContent("7d");
     const outboxLine = screen.getByRole("checkbox", { name: "Chart line for outbox" });
     await user.click(outboxLine);
     await user.click(outboxLine);
@@ -351,6 +353,7 @@ describe("pages", () => {
   });
 
   it("shows collection failure and load error on repository page", async () => {
+    const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/repositories/13")) {
@@ -383,6 +386,10 @@ describe("pages", () => {
     expect(screen.queryByRole("heading", { name: "About this repository" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tooltip", { hidden: true })).not.toBeInTheDocument();
     expect(screen.getByText("No topics yet.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
+    expect(await screen.findByText(/No topics yet. Add topics/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1d" })).toBeInTheDocument();
 
     api.mockRejectedValueOnce(new Error("missing"));
     renderPath("/repositories/13", <RepositoryDetailsPage />);
