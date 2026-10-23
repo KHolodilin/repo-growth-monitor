@@ -276,9 +276,10 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
     expect(screen.getByText("outbox")).toBeInTheDocument();
-    const scopeBar = screen.getByRole("button", { name: "All" }).parentElement;
+    const scopeBar = screen.getByRole("button", { name: "All" }).parentElement as HTMLElement;
     expect(scopeBar).toHaveTextContent("Java");
     expect(scopeBar).not.toHaveTextContent("7d");
+    expect(scopeBar.parentElement?.contains(screen.getAllByRole("button", { name: "7d" })[0])).toBe(true);
     const outboxLine = screen.getByRole("checkbox", { name: "Chart line for outbox" });
     await user.click(outboxLine);
     await user.click(outboxLine);

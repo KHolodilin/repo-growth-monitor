@@ -438,7 +438,26 @@ export function RepositoryDetailsPage() {
           ))}
         </div>
         {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "topics" || tab === "growth-events") && (
-          <PeriodSelector period={period} onPeriod={setPeriod} />
+          <div className="flex items-center gap-2">
+            {tab === "topics" && repo.language && (
+              <div className="inline-flex items-center rounded-lg border bg-muted p-1">
+                {(["all", "language"] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium",
+                      scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => setScope(key)}
+                  >
+                    {key === "all" ? "All" : repo.language}
+                  </button>
+                ))}
+              </div>
+            )}
+            <PeriodSelector period={period} onPeriod={setPeriod} />
+          </div>
         )}
       </div>
       {tab === "overview" && (
@@ -464,7 +483,6 @@ export function RepositoryDetailsPage() {
           repositoryId={repo.id}
           language={repo.language}
           scope={scope}
-          onScope={setScope}
           period={period}
           visibility={topicsVisibility}
           knownTopics={knownTopics}
@@ -922,7 +940,6 @@ function TopicsPanel({
   repositoryId,
   language,
   scope,
-  onScope,
   period,
   visibility,
   knownTopics,
@@ -934,7 +951,6 @@ function TopicsPanel({
   repositoryId: number;
   language?: string;
   scope: TopicScope;
-  onScope: (scope: TopicScope) => void;
   period: Period;
   visibility: TopicHistory[];
   knownTopics: TopicHistory[];
@@ -975,7 +991,6 @@ function TopicsPanel({
     || visibility.some(
       (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
     );
-  const languageLabel = language || "Language";
   const scopeQuery = scope === "language" ? "?scope=language" : "";
   const selected = new Set(selectedSlugs);
   const visibleSlugs = visibility.map((item) => item.watch.topic);
@@ -988,23 +1003,6 @@ function TopicsPanel({
 
   return (
     <div className="space-y-4">
-      {language && (
-        <div className="inline-flex items-center rounded-lg border bg-muted p-1">
-          {(["all", "language"] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium",
-                scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-              )}
-              onClick={() => onScope(key)}
-            >
-              {key === "all" ? "All" : languageLabel}
-            </button>
-          ))}
-        </div>
-      )}
       <TopicVisibilityKpis topics={visibility} period={period} />
       <CombinedTopicRankChart
         repositoryId={repositoryId}
