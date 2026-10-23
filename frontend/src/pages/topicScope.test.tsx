@@ -149,6 +149,28 @@ describe("topics visibility scope cookie", () => {
     expect(readTopicScope(13)).toBe("language");
   });
 
+  it("clears a saved language choice when the repository has no language", async () => {
+    writeTopicScope(13, "language");
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/repositories/13")) {
+        return Promise.resolve({ ...repository, language: null });
+      }
+      if (url.includes("/traffic?")) {
+        return Promise.resolve(traffic);
+      }
+      if (url.includes("topics-visibility")) {
+        return Promise.resolve([topicHistory]);
+      }
+      return Promise.resolve([]);
+    });
+    renderRepo("/repositories/13?tab=topics");
+    expect(await screen.findByText("outbox")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Java" })).not.toBeInTheDocument();
+    await waitFor(() => expect(readTopicScope(13)).toBe("all"));
+    expect(screen.getByTestId("search").textContent).toBe("tab=topics");
+  });
+
   it("falls back to All when the repository has no language", async () => {
     writeTopicScope(13, "language");
     api.mockImplementation((path: string) => {

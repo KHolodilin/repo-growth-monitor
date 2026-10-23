@@ -85,9 +85,7 @@ export function TopicDetailsPage() {
   }
 
   function setScope(next: "all" | "language") {
-    if (repositoryId) {
-      writeTopicScope(Number(repositoryId), next);
-    }
+    writeTopicScope(Number(repositoryId), next);
     setSearchParams(next === "all" ? {} : { scope: next }, { replace: true });
   }
 

@@ -96,7 +96,7 @@ export function RepositoryDetailsPage() {
   const [period, setPeriod] = usePeriod(id);
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
-  const storedScope = id ? readTopicScope(Number(id)) : null;
+  const storedScope = readTopicScope(Number(id));
   const scope: TopicScope = tab === "topics"
     ? resolveVisibleScope(scopeQuery, storedScope, Boolean(repo?.language))
     : "all";
@@ -132,6 +132,7 @@ export function RepositoryDetailsPage() {
   const [runningAll, setRunningAll] = useState(false);
   const [focusHealth, setFocusHealth] = useState(false);
   const scopeIntent = useRef<TopicScope | null>(null);
+  const [scopeChoice, setScopeChoice] = useState(0);
 
   function setTab(next: Tab) {
     if (next === "traffic") {
@@ -139,7 +140,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     if (next === "topics") {
-      const nextScope = resolveVisibleScope(null, id ? readTopicScope(Number(id)) : null, Boolean(repo?.language));
+      const nextScope = resolveVisibleScope(null, readTopicScope(Number(id)), Boolean(repo?.language));
       setSearchParams(nextScope === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
       return;
     }
@@ -148,10 +149,8 @@ export function RepositoryDetailsPage() {
 
   function setScope(next: TopicScope) {
     scopeIntent.current = next;
-    if (id) {
-      writeTopicScope(Number(id), next);
-    }
-    setSearchParams(next === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
+    writeTopicScope(Number(id), next);
+    setScopeChoice((value) => value + 1);
   }
 
   useEffect(() => {
@@ -164,16 +163,16 @@ export function RepositoryDetailsPage() {
     }
     const hasLanguage = Boolean(repo.language);
     if (scopeIntent.current) {
-      const desired: TopicScope = scopeIntent.current === "language" && hasLanguage ? "language" : "all";
-      const shown: TopicScope = scopeQuery === "language" && hasLanguage ? "language" : "all";
+      const desired = scopeIntent.current;
+      writeTopicScope(repo.id, desired);
+      const shown: TopicScope = scopeQuery === "language" ? "language" : "all";
       if (shown !== desired) {
         setSearchParams(
           desired === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" },
           { replace: true },
         );
-        return;
       }
-      scopeIntent.current = null;
+      return;
     }
     if (scopeQuery != null) {
       const next: TopicScope = scopeQuery === "language" && hasLanguage ? "language" : "all";
@@ -189,7 +188,7 @@ export function RepositoryDetailsPage() {
     } else if (stored === "language") {
       writeTopicScope(repo.id, "all");
     }
-  }, [tab, repo, id, scopeQuery, setSearchParams]);
+  }, [tab, repo, id, scopeQuery, setSearchParams, scopeChoice]);
 
   const load = useCallback(async () => {
     if (!id) {
