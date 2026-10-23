@@ -229,10 +229,21 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Community Standards 1/1" }));
     expect(screen.getByText("README")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
-    expect(screen.getByRole("heading", { name: "About this repository" }).parentElement).toHaveTextContent(
-      repository.description ?? "",
-    );
-    expect(screen.getByText("Collection Status")).toBeInTheDocument();
+    const about = screen.getByRole("heading", { name: "About this repository" });
+    const topicsHeading = screen.getByRole("heading", { name: "Topics" });
+    const overviewHeading = screen.getByRole("heading", { level: 2, name: "Overview" });
+    const collection = screen.getByRole("heading", { name: "Collection Status" });
+    expect(about.compareDocumentPosition(topicsHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(topicsHeading.compareDocumentPosition(overviewHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(overviewHeading.compareDocumentPosition(collection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(overviewHeading.closest(".grid")).toBe(collection.closest(".grid"));
+    expect(about.parentElement).toHaveTextContent(repository.description ?? "");
+    expect(about.querySelector("svg")).not.toBeNull();
+    expect(screen.getByText("kafka")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open repository" })).toHaveAttribute("target", "_blank");
+    expect(screen.getByText("Description").parentElement).toHaveClass("text-emerald-700");
+    expect(screen.getByText("Topics", { selector: "span" }).parentElement).toHaveClass("text-muted-foreground");
+    expect(collection.parentElement?.querySelector(".text-emerald-600")).not.toBeNull();
     await user.click(screen.getByLabelText("Switch repository"));
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "Stats" }));
