@@ -15,7 +15,6 @@ import {
   Package,
   RefreshCw,
   Search,
-  ShieldCheck,
   Star,
   Tag,
   UserRound,
@@ -708,7 +707,6 @@ function HealthScoreLink({
 function RepositoryHealthSection({ health }: { health: RepositoryHealth }) {
   return (
     <Card id="repository-health">
-      <SectionTitle icon={ShieldCheck}>Repository Health</SectionTitle>
       <div className="grid gap-8 md:grid-cols-2">
         <HealthCheckList title="Discoverability" icon={Search} items={health.discoverability} />
         <HealthCheckList title="Community Standards" icon={UsersRound} items={health.communityStandards} />

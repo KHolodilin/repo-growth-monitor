@@ -224,7 +224,7 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "GitHub" }));
     await user.click(screen.getByRole("button", { name: "Promotion" }));
     await user.click(screen.getByRole("button", { name: "Discoverability 1/2" }));
-    expect(screen.getByRole("heading", { name: "Repository Health" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Repository Health" })).not.toBeInTheDocument();
     expect(screen.getByText("Description")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Community Standards 1/1" }));
     expect(screen.getByText("README")).toBeInTheDocument();
