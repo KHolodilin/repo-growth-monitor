@@ -254,6 +254,18 @@ public class TopicRunJdbcRepository {
                 .optional();
     }
 
+    public List<LocalDate> snapshotDates(long topicWatchId) {
+        return jdbcClient.sql("""
+                        SELECT business_date FROM topic_run
+                        WHERE topic_watch_id = :topicWatchId
+                          AND snapshot_at IS NOT NULL
+                        ORDER BY business_date
+                        """)
+                .param("topicWatchId", topicWatchId)
+                .query(LocalDate.class)
+                .list();
+    }
+
     public List<LocalDate> missedDates(long topicWatchId) {
         return jdbcClient.sql("""
                         SELECT business_date FROM topic_run

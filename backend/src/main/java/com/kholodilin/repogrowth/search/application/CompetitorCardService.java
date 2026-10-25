@@ -64,9 +64,6 @@ public class CompetitorCardService {
         if (snapshotName == null) {
             throw ApiException.notFound("Repository was not found in this search");
         }
-        String resolvedName = snapshotName;
-        CompetitorProfile profile = profileRepository.find(githubRepositoryId)
-                .orElseGet(() -> fetchAndStore(githubRepositoryId, resolvedName));
         List<CompetitorPoint> points = new ArrayList<>();
         for (LocalDate date : runRepository.snapshotDates(searchQueryId)) {
             SearchResultJdbcRepository.SnapshotValue hit = hits.get(date);
@@ -74,6 +71,12 @@ public class CompetitorCardService {
                     ? new CompetitorPoint(date, null, null)
                     : new CompetitorPoint(date, hit.stars(), hit.forks()));
         }
+        return assemble(githubRepositoryId, snapshotName, points);
+    }
+
+    public CompetitorCard assemble(long githubRepositoryId, String snapshotName, List<CompetitorPoint> points) {
+        CompetitorProfile profile = profileRepository.find(githubRepositoryId)
+                .orElseGet(() -> fetchAndStore(githubRepositoryId, snapshotName));
         RepositoryHealthFacts facts = new RepositoryHealthFacts(
                 profile.homepage(),
                 profile.hasReadme(),

@@ -6,6 +6,7 @@ import { RepositoryDetailsPage } from "./pages/RepositoryDetailsPage";
 import { QueryDetailsPage } from "./pages/QueryDetailsPage";
 import { CompetitorCardPage } from "./pages/CompetitorCardPage";
 import { TopicDetailsPage } from "./pages/TopicDetailsPage";
+import { TopicCompetitorCardPage } from "./pages/TopicCompetitorCardPage";
 import { SearchResultsPage } from "./pages/SearchResultsPage";
 import { TrafficHistoryPage } from "./pages/TrafficHistoryPage";
 
@@ -24,6 +25,10 @@ export default function App() {
           element={<CompetitorCardPage />}
         />
         <Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
+        <Route
+          path="/repositories/:repositoryId/topics/:topic/competitors/:githubRepositoryId"
+          element={<TopicCompetitorCardPage />}
+        />
         <Route path="/search-runs/:id" element={<SearchResultsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

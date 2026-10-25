@@ -1,5 +1,7 @@
 package com.kholodilin.repogrowth.topic.api;
 
+import com.kholodilin.repogrowth.search.application.CompetitorCardService;
+import com.kholodilin.repogrowth.topic.application.TopicCompetitorService;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,9 +17,14 @@ import java.util.List;
 public class TopicVisibilityController {
 
     private final TopicVisibilityService topicVisibilityService;
+    private final TopicCompetitorService topicCompetitorService;
 
-    public TopicVisibilityController(TopicVisibilityService topicVisibilityService) {
+    public TopicVisibilityController(
+            TopicVisibilityService topicVisibilityService,
+            TopicCompetitorService topicCompetitorService
+    ) {
         this.topicVisibilityService = topicVisibilityService;
+        this.topicCompetitorService = topicCompetitorService;
     }
 
     @GetMapping("/repositories/{id}/topics-visibility")
@@ -67,6 +74,16 @@ public class TopicVisibilityController {
             @RequestParam(defaultValue = "all") String scope
     ) {
         return topicVisibilityService.latestResultsByTopic(id, topic, scope);
+    }
+
+    @GetMapping("/repositories/{id}/topics/{topic}/competitors/{githubRepositoryId}")
+    public CompetitorCardService.CompetitorCard competitor(
+            @PathVariable long id,
+            @PathVariable String topic,
+            @PathVariable long githubRepositoryId,
+            @RequestParam(defaultValue = "all") String scope
+    ) {
+        return topicCompetitorService.card(id, topic, scope, githubRepositoryId);
     }
 
     @GetMapping("/topic-runs/{id}/results")
