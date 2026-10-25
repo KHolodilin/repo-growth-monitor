@@ -9,6 +9,7 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { TopicResultsTable } from "../components/TopicResultsTable";
+import { topicCompetitorPath } from "./TopicCompetitorCardPage";
 
 function parseScope(value: string | null): "all" | "language" {
   return value === "language" ? "language" : "all";
@@ -224,7 +225,12 @@ export function TopicDetailsPage() {
         {!results ? (
           <p className="text-sm text-muted-foreground">No topic snapshot yet.</p>
         ) : (
-          <TopicResultsTable rows={results.rows} repositoryId={repo.id} trackedGithubId={repo.githubId} />
+          <TopicResultsTable
+            rows={results.rows}
+            repositoryId={repo.id}
+            trackedGithubId={repo.githubId}
+            nameTo={(row) => topicCompetitorPath(repo.id, history.watch.topic, row.result.githubRepositoryId, scope)}
+          />
         )}
       </Card>
     </div>

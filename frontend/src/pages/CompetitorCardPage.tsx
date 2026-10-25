@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ChartCard } from "../components/ChartDownloadMenu";
-import { PageBreadcrumb } from "../components/PageBreadcrumb";
+import { PageBreadcrumb, type BreadcrumbItem } from "../components/PageBreadcrumb";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { api, type CompetitorCard, type Repository, type SearchHistory } from "../lib/api";
 import { storedCountOption } from "../lib/searchSeriesChart";
@@ -42,6 +42,35 @@ export function CompetitorCardPage() {
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!repo || !history || !card) return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
 
+  return (
+    <CompetitorCardView
+      items={[
+        { label: "Portfolio", to: "/dashboard" },
+        {
+          label: repo.fullName,
+          repoSwitcher: {
+            currentId: repo.id,
+            hrefFor: (id) => `/repositories/${id}?tab=search`,
+          },
+        },
+        { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
+        { label: history.query.query, to: `/repositories/${repo.id}/search-queries/${history.query.id}` },
+      ]}
+      card={card}
+      chartId={`${repositoryId}:competitor:${queryId}:${githubRepositoryId}`}
+    />
+  );
+}
+
+export function CompetitorCardView({
+  items,
+  card,
+  chartId,
+}: {
+  items: BreadcrumbItem[];
+  card: CompetitorCard;
+  chartId: string;
+}) {
   const passed = card.discoverability.filter((item) => item.passed).length;
   const option = storedCountOption({
     dates: card.points.map((point) => point.date),
@@ -54,20 +83,7 @@ export function CompetitorCardPage() {
   return (
     <div className="space-y-6">
       <header>
-        <PageBreadcrumb
-          items={[
-            { label: "Portfolio", to: "/dashboard" },
-            {
-              label: repo.fullName,
-              repoSwitcher: {
-                currentId: repo.id,
-                hrefFor: (id) => `/repositories/${id}?tab=search`,
-              },
-            },
-            { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
-            { label: history.query.query, to: `/repositories/${repo.id}/search-queries/${history.query.id}` },
-          ]}
-        />
+        <PageBreadcrumb items={items} />
         <h1 className="mt-2 break-all text-xl font-semibold">{card.fullName}</h1>
         <a className="mt-1 inline-block text-sm text-primary hover:underline" href={card.htmlUrl} target="_blank" rel="noreferrer">
           Open on GitHub
@@ -106,7 +122,7 @@ export function CompetitorCardPage() {
 
       <ChartCard title="Stars and forks">
         <PersistentECharts
-          chartId={`${repositoryId}:competitor:${queryId}:${githubRepositoryId}`}
+          chartId={chartId}
           series={[
             { key: "Stars", name: "Stars" },
             { key: "Forks", name: "Forks" },

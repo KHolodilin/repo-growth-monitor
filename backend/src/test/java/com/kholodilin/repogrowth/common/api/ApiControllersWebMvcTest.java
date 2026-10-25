@@ -40,6 +40,7 @@ import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.domain.SearchRun;
 import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
 import com.kholodilin.repogrowth.topic.api.TopicVisibilityController;
+import com.kholodilin.repogrowth.topic.application.TopicCompetitorService;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService;
 import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
 import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
@@ -115,6 +116,8 @@ class ApiControllersWebMvcTest {
     GrowthEventService growthEventService;
     @MockitoBean
     TopicVisibilityService topicVisibilityService;
+    @MockitoBean
+    TopicCompetitorService topicCompetitorService;
     @MockitoBean
     TopicWatchSync topicWatchSync;
     @MockitoBean
@@ -213,6 +216,15 @@ class ApiControllersWebMvcTest {
         when(topicVisibilityService.historyByTopic(eq(13L), eq("outbox"), anyString())).thenReturn(history);
         when(topicVisibilityService.latestResultsByTopic(eq(13L), eq("outbox"), anyString())).thenReturn(topicResults);
         when(topicVisibilityService.results(3L)).thenReturn(topicResults);
+        when(topicCompetitorService.card(eq(13L), eq("outbox"), eq("all"), eq(2L))).thenReturn(new CompetitorCardService.CompetitorCard(
+                2L,
+                "big/outbox",
+                "A neighbor worth reading",
+                "https://github.com/big/outbox",
+                List.of("kafka"),
+                List.of(new HealthCheckItem("Repository description exists", true)),
+                List.of(new CompetitorCardService.CompetitorPoint(LocalDate.of(2026, 9, 23), 10, 2))
+        ));
         when(analyticsService.dashboard(anyString())).thenReturn(null);
         when(analyticsService.portfolio(anyString())).thenReturn(null);
         when(analyticsService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
@@ -285,6 +297,9 @@ class ApiControllersWebMvcTest {
         mockMvc.perform(get("/api/v1/topic-watches/7/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/history")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/competitors/2")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("big/outbox"))
+                .andExpect(jsonPath("$.points[0].stars").value(10));
         mockMvc.perform(get("/api/v1/topic-runs/3/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/dashboard")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/portfolio")).andExpect(status().isOk());

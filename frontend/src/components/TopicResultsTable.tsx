@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { type TopicRunResults } from "../lib/api";
 import { cn, formatNumber, formatPositionDelta } from "../lib/utils";
 import { useTableSort } from "../lib/tableSortPrefs";
@@ -14,10 +15,12 @@ export function TopicResultsTable({
   rows,
   repositoryId,
   trackedGithubId,
+  nameTo,
 }: {
   rows: ResultRow[];
   repositoryId: number;
   trackedGithubId?: number;
+  nameTo?: (row: ResultRow) => string;
 }) {
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "topic-results",
@@ -62,14 +65,7 @@ export function TopicResultsTable({
               <tr key={row.result.githubRepositoryId} className={`border-t ${mine ? "bg-blue-50 font-medium" : ""}`}>
                 <td className="whitespace-nowrap px-4 py-2.5 align-top">{row.result.position}</td>
                 <td className="max-w-0 px-4 py-2.5 align-top">
-                  <a
-                    className="break-words [overflow-wrap:anywhere] text-primary hover:underline"
-                    href={row.result.htmlUrl ?? `https://github.com/${row.result.fullName}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {row.result.fullName}
-                  </a>
+                  <RepositoryName row={row} to={nameTo?.(row) ?? null} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.stars)}</td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.forks)}</td>
@@ -81,6 +77,27 @@ export function TopicResultsTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function RepositoryName({ row, to }: { row: ResultRow; to: string | null }) {
+  const className = "break-words [overflow-wrap:anywhere] text-primary hover:underline";
+  if (to) {
+    return (
+      <Link className={className} to={to}>
+        {row.result.fullName}
+      </Link>
+    );
+  }
+  return (
+    <a
+      className={className}
+      href={row.result.htmlUrl ?? `https://github.com/${row.result.fullName}`}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {row.result.fullName}
+    </a>
   );
 }
 

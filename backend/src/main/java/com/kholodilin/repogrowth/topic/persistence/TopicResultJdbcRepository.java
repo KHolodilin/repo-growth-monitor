@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -65,5 +66,34 @@ public class TopicResultJdbcRepository {
                 .param("topicRunId", topicRunId)
                 .query(MAPPER)
                 .list();
+    }
+
+    public List<SnapshotValue> findSnapshots(long topicWatchId) {
+        return jdbcClient.sql("""
+                        SELECT r.business_date, s.github_repository_id, s.full_name, s.stars, s.forks
+                        FROM topic_run r
+                        JOIN topic_result s ON s.topic_run_id = r.id
+                        WHERE r.topic_watch_id = :topicWatchId
+                          AND r.snapshot_at IS NOT NULL
+                        ORDER BY r.business_date, s.position
+                        """)
+                .param("topicWatchId", topicWatchId)
+                .query((rs, rowNum) -> new SnapshotValue(
+                        rs.getObject("business_date", LocalDate.class),
+                        rs.getLong("github_repository_id"),
+                        rs.getString("full_name"),
+                        rs.getInt("stars"),
+                        rs.getInt("forks")
+                ))
+                .list();
+    }
+
+    public record SnapshotValue(
+            LocalDate date,
+            long githubRepositoryId,
+            String fullName,
+            int stars,
+            int forks
+    ) {
     }
 }
