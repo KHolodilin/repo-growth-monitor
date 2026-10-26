@@ -70,7 +70,8 @@ describe("trafficChart", () => {
     expect(sparse.series[0].data).toContain(null);
     expect(sparse.series[1].data).toContain(null);
     expect(sparse.series[2].data).toContain(null);
-    expect(sparse.series[3].markPoint.data[0].name).toBe("Events");
+    expect(sparse.series[3].markPoint).toBeUndefined();
+    expect(sparse.series[3].markLine.data[0].events[0].title).toBeUndefined();
     expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
 

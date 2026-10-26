@@ -70,6 +70,7 @@ export function TopicCompetitorCardPage() {
       ]}
       card={card}
       chartId={`${repositoryId}:topic-competitor:${topicName}:${githubRepositoryId}`}
+      repositoryId={repo.id}
     />
   );
 }

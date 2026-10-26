@@ -59,10 +59,23 @@ describe("missing traffic", () => {
     const icon = screen.getByRole("img", { name: "No GitHub traffic for 18 Oct. Last data Oct 17" });
     expect(icon).toHaveTextContent("!");
     expect(icon.closest("a")).toBeNull();
-    await user.click(screen.getByRole("button", { name: /2 repositories/ }));
+    const badge = screen.getByRole("button", { name: /2 repositories/ });
+    await user.click(badge);
+    expect(badge).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
     expect(screen.getByText("Partial collection: Traffic ✕")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "KHolodilin/other" })).toHaveLength(2);
+    await user.keyboard("a");
+    expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
+    await user.click(screen.getByText("Collection failed for Oct 19."));
+    expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText("Collection failed for Oct 19.")).not.toBeInTheDocument();
+    expect(badge).toHaveAttribute("aria-expanded", "false");
+    await user.click(badge);
+    expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
+    await user.click(document.body);
+    expect(screen.queryByText("Collection failed for Oct 19.")).not.toBeInTheDocument();
   });
 
   it("explains a missing yesterday on the repository page without drawing it as zero", async () => {

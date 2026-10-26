@@ -75,12 +75,14 @@ describe("query neighbor chart", () => {
     await user.click(within(metric).getByRole("button", { name: "Forks" }));
     expect(within(metric).getByRole("button", { name: "Place" })).toHaveAttribute("aria-pressed", "false");
 
-    const axis = screen.getByRole("group", { name: "Chart axis" });
-    expect(within(axis).getByRole("button", { name: "Calendar" })).toHaveAttribute("aria-pressed", "true");
-    await user.click(within(axis).getByRole("button", { name: "Timeline" }));
-    expect(within(axis).getByRole("button", { name: "Timeline" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Calendar" }));
+    expect(screen.getByRole("menuitemradio", { name: "Calendar" })).toHaveAttribute("aria-checked", "true");
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
+    expect(screen.getByRole("button", { name: "Timeline" })).toBeInTheDocument();
     expect(within(metric).getByRole("button", { name: "Forks" })).toHaveAttribute("aria-pressed", "true");
-    await user.click(within(axis).getByRole("button", { name: "Calendar" }));
-    expect(within(axis).getByRole("button", { name: "Calendar" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "Timeline" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Calendar" }));
+    expect(screen.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
   });
 });

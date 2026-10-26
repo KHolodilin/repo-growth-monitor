@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
 import { writeTopicScope } from "../lib/topicScope";
 import { ChartCard } from "../components/ChartDownloadMenu";
-import { PersistentECharts } from "../components/PersistentECharts";
+import { ChartModePlot } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { TopicResultsTable } from "../components/TopicResultsTable";
@@ -108,24 +108,6 @@ export function TopicDetailsPage() {
     }
   }, [repositoryId, repo, searchParams, setSearchParams]);
 
-  const option = useMemo(() => {
-    if (!history) {
-      return null;
-    }
-    const dates = datesFromHistory([history.points], history.missedDates);
-    return rankHistoryOption({
-      dates,
-      series: [
-        {
-          name: history.watch.topic,
-          points: history.points,
-          limit: history.watch.resultLimit,
-          missedDates: history.missedDates,
-        },
-      ],
-    });
-  }, [history]);
-
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -203,22 +185,32 @@ export function TopicDetailsPage() {
         <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
       </div>
 
-      {option && (
-        <ChartCard title="Rank History">
-          {recentMissed.length > 0 && (
-            <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
-              ranking, so these days stay empty.
-            </p>
-          )}
-          <PersistentECharts
-            chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
-            series={[{ key: String(history.watch.id), name: history.watch.topic }]}
-            option={option}
-            style={{ height: 360, width: "100%" }}
-          />
-        </ChartCard>
-      )}
+      <ChartCard title="Rank History" repositoryId={repo.id} period="all" context={`repository:${repo.id}:topic:${history.watch.id}`}>
+        {recentMissed.length > 0 && (
+          <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
+            ranking, so these days stay empty.
+          </p>
+        )}
+        <ChartModePlot
+          chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
+          series={[{ key: String(history.watch.id), name: history.watch.topic }]}
+          style={{ height: 360, width: "100%" }}
+          build={({ axis, events }) => rankHistoryOption({
+            dates: datesFromHistory([history.points], history.missedDates),
+            axis,
+            events,
+            series: [
+              {
+                name: history.watch.topic,
+                points: history.points,
+                limit: history.watch.resultLimit,
+                missedDates: history.missedDates,
+              },
+            ],
+          })}
+        />
+      </ChartCard>
 
       <Card>
         <h2 className="mb-3 font-medium">Current Topic Results</h2>

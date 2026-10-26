@@ -54,10 +54,16 @@ function eventMarkerKind(period?: string) {
   return "text" as const;
 }
 
-export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak = 1, period?: string) {
+export function eventMarkOverlays(
+  dates: string[],
+  events: GrowthEvent[],
+  peak = 1,
+  period?: string,
+  dateOf: (event: GrowthEvent) => string = eventUtcDate,
+) {
   const kind = eventMarkerKind(period);
   const onAxis = new Set(dates);
-  const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
+  const groups = groupEventsByUtcDate(events, dateOf).filter((group) => onAxis.has(group.date));
   const labels = groups.map((group) => {
     const countText = String(group.events.length);
     return {
@@ -173,7 +179,7 @@ export function trafficChartOption(
     1,
     ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.uniqueCloners].filter((value): value is number => value != null)),
   );
-  const { groups, markLine, markPoint } = eventMarkOverlays(dates, events, peak, period);
+  const { groups, markLine } = eventMarkOverlays(dates, events, peak, period);
 
   return {
     tooltip: {
@@ -268,7 +274,6 @@ export function trafficChartOption(
         lineStyle: { opacity: 0, width: 0 },
         tooltip: { show: false },
         markLine,
-        markPoint,
       },
     ],
   };

@@ -237,4 +237,65 @@ describe("searchSeriesChart", () => {
     expect(series[0].data).toEqual([2]);
     expect(series[2].data).toEqual([null]);
   });
+
+  it("keeps a timeline event on its own day without rewriting the event time", () => {
+    const event = {
+      id: 1,
+      repositoryId: 13,
+      eventAt: "2026-09-23T00:00:00Z",
+      category: "RELEASE",
+      type: "RELEASE_PUBLISHED",
+      title: "v1",
+      source: "GITHUB" as const,
+    };
+    const lines = [{
+      name: "acme/app",
+      points: [
+        { date: "2026-09-22", position: 2, stars: 4, forks: 1 },
+        { date: "2026-09-23", position: 1, stars: 5, forks: 1 },
+      ],
+    }];
+    const place = searchMetricOption({
+      metric: "place",
+      axis: "timeline",
+      dates: ["2026-09-22", "2026-09-23"],
+      missedDates: [],
+      limit: 50,
+      lines,
+      events: [event, { ...event, id: 2, eventAt: "2026-01-01T00:00:00Z", title: "Outside" }],
+    });
+    const markers = place.series.find((item) => item.name === "Events") as {
+      markLine: { data: { xAxis: string; events: { title: string; eventAt: string }[] }[] };
+    };
+    expect(markers.markLine.data[0].xAxis).toBe("2");
+    expect(markers.markLine.data[0].events[0].eventAt).toBe("2026-09-23T00:00:00Z");
+    const stars = searchMetricOption({
+      metric: "stars",
+      axis: "timeline",
+      dates: ["2026-09-22", "2026-09-23"],
+      missedDates: [],
+      limit: 50,
+      lines,
+      events: [event],
+    });
+    const tooltip = stars.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
+    const text = tooltip([
+      { axisValue: "2", seriesName: "Events", data: null },
+      { axisValue: "2", seriesName: "acme/app", data: 5 },
+    ]);
+    expect(text).toContain("Day 2");
+    expect(text).toContain("acme/app");
+    expect(text).not.toContain(">Events<");
+    const eventSeries = stars.series.find((item) => item.name === "Events") as { markPoint?: unknown };
+    expect(eventSeries.markPoint).toBeUndefined();
+    const quiet = searchMetricOption({
+      metric: "forks",
+      dates: ["2026-09-23"],
+      missedDates: [],
+      limit: 50,
+      lines,
+      events: [{ ...event, eventAt: "2026-01-01T00:00:00Z" }],
+    });
+    expect(quiet.series.some((item) => item.name === "Events")).toBe(false);
+  });
 });

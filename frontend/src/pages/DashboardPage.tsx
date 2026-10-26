@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { api, type Dashboard, type RankHighlight } from "../lib/api";
+import { api, type Dashboard, type GrowthEvent, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { statsChartOption } from "../lib/statsChart";
+import { asGrowthEvents } from "../lib/growthEvents";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -63,6 +64,8 @@ export function DashboardPage() {
     };
   }, [period]);
 
+  const trackedIds = data?.repositories.map((row) => row.id) ?? [];
+  const portfolioEvents = useTrackedEvents(trackedIds, period);
   const collectingFirst = data?.state === "FIRST_COLLECTION" || Boolean(data?.activeCollection);
   useEffect(() => {
     if (!collectingFirst) {
@@ -152,9 +155,9 @@ export function DashboardPage() {
       {data.state === "FIRST_COLLECTION" ? (
         <CollectingCard rows={data.repositories} />
       ) : tab === "traffic" ? (
-        <TrafficChart traffic={data.traffic} />
+        <TrafficChart traffic={data.traffic} events={portfolioEvents} period={period} />
       ) : (
-        <StatsChart points={data.stats.points} />
+        <StatsChart points={data.stats.points} events={portfolioEvents} period={period} />
       )}
       <PeriodHighlights highlights={data.highlights} />
       <RepositoryTable rows={data.repositories} />
@@ -176,18 +179,41 @@ function DashboardHeader({
   onTab: (tab: "traffic" | "stats") => void;
 }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const problems = (data?.repositories ?? [])
     .map((row) => ({ row, lines: repositoryProblemLines(row) }))
     .filter((item) => item.lines.length > 0);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Portfolio</h1>
         {problems.length > 0 && (
-          <div className="relative">
+          <div ref={rootRef} className="relative">
             <button
               type="button"
               className="text-sm text-amber-700"
+              aria-expanded={open}
               onClick={() => setOpen((current) => !current)}
             >
               ⚠ {repositoryProblemBadge(problems.length)}
@@ -233,6 +259,34 @@ function DashboardHeader({
   );
 }
 
+function useTrackedEvents(repositoryIds: number[], period: string) {
+  const key = repositoryIds.join(",");
+  const [events, setEvents] = useState<GrowthEvent[]>([]);
+  useEffect(() => {
+    const ids = key ? key.split(",").map(Number) : [];
+    if (ids.length === 0) {
+      setEvents([]);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(
+      ids.map((id) =>
+        api<GrowthEvent[]>(`/api/v1/repositories/${id}/growth-events?period=${period}`)
+          .then((rows) => asGrowthEvents(rows))
+          .catch(() => [] as GrowthEvent[]),
+      ),
+    ).then((groups) => {
+      if (!cancelled) {
+        setEvents(groups.flat());
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [key, period]);
+  return events;
+}
+
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
     <Card className="flex h-full flex-col p-3">
@@ -242,11 +296,19 @@ function KpiCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
+function TrafficChart({
+  traffic,
+  events,
+  period,
+}: {
+  traffic: Dashboard["traffic"];
+  events: GrowthEvent[];
+  period: string;
+}) {
   const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
   return (
-    <ChartCard title="Traffic">
+    <ChartCard title="Traffic" events={events} period={period} context="portfolio:traffic">
       <PersistentECharts
         chartId={dashboardTrafficChartId()}
         series={TRAFFIC_SERIES}
@@ -258,10 +320,18 @@ function TrafficChart({ traffic }: { traffic: Dashboard["traffic"] }) {
   );
 }
 
-function StatsChart({ points }: { points: Dashboard["stats"]["points"] }) {
+function StatsChart({
+  points,
+  events,
+  period,
+}: {
+  points: Dashboard["stats"]["points"];
+  events: GrowthEvent[];
+  period: string;
+}) {
   const option = useMemo(() => statsChartOption(points), [points]);
   return (
-    <ChartCard title="Stats">
+    <ChartCard title="Stats" events={events} period={period} context="portfolio:stats">
       {points.length === 0 ? (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           <div className="font-medium text-foreground">No stats for this period.</div>

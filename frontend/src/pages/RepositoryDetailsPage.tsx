@@ -35,6 +35,7 @@ import {
 import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
+import { asGrowthEvents } from "../lib/growthEvents";
 import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -42,10 +43,10 @@ import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
-import { PersistentECharts } from "../components/PersistentECharts";
+import { ChartModePlot } from "../components/PersistentECharts";
 import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
 import { SnapshotCards } from "../components/SnapshotCards";
-import { EventDetailsDialog, GrowthEventsPanel } from "../components/GrowthEventsPanel";
+import { GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
 import { resolveSearchQuerySelection, writeSearchQuerySelection } from "../lib/searchQuerySelection";
@@ -53,8 +54,7 @@ import { SearchVisibilityKpis } from "../components/SearchVisibilityKpis";
 import { TopicVisibilityKpis } from "../components/TopicVisibilityKpis";
 import { resolveTopicSelection, writeTopicSelection } from "../lib/topicSelection";
 import { readTopicScope, resolveVisibleScope, writeTopicScope, type TopicScope } from "../lib/topicScope";
-import { filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
-import { markLineEvents, trafficChartOption } from "../lib/trafficChart";
+import { trafficChartOption } from "../lib/trafficChart";
 import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/querySort";
@@ -917,24 +917,16 @@ function TrafficPanel({
   onShowServicePathsChange: (next: boolean) => void;
 }) {
   const [events, setEvents] = useState<GrowthEvent[]>([]);
-  const [filter, setFilter] = useState<EventFilter>("all");
-  const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
 
   const loadEvents = useCallback(() => {
     api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then(setEvents)
+      .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
 
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
-
-  const visibleEvents = useMemo(() => filterGrowthEvents(events, filter), [events, filter]);
-  const option = useMemo(
-    () => trafficChartOption(traffic.traffic, visibleEvents, period, traffic.trafficGap),
-    [traffic, visibleEvents, period],
-  );
 
   return (
     <div className="space-y-3">
@@ -968,43 +960,12 @@ function TrafficPanel({
           series={traffic.traffic.map((point) => point.uniqueCloners)}
         />
       </div>
-      <ChartCard
-        title="Traffic"
-        controls={
-          <div className="inline-flex rounded-lg border bg-muted p-1">
-            {([
-              ["all", "All"],
-              ["github", "GitHub"],
-              ["promotion", "Promotion"],
-            ] as const).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  filter === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setFilter(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        }
-      >
-        <PersistentECharts
+      <ChartCard title="Traffic" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:traffic`} onEventsChanged={loadEvents}>
+        <ChartModePlot
           chartId={repoTrafficChartId(repositoryId)}
           series={REPO_TRAFFIC_SERIES}
-          option={option}
           style={{ height: 360, width: "100%" }}
-          onEvents={{
-            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
-              const clicked = markLineEvents(params);
-              if (clicked.length > 0) {
-                setMarkerEvents(clicked);
-              }
-            },
-          }}
+          build={({ events: marked }) => trafficChartOption(traffic.traffic, marked, period, traffic.trafficGap)}
         />
       </ChartCard>
       <SnapshotCards
@@ -1016,18 +977,6 @@ function TrafficPanel({
         showServicePaths={showServicePaths}
         onShowServicePathsChange={onShowServicePathsChange}
       />
-      {markerEvents && (
-        <EventDetailsDialog
-          repositoryId={repositoryId}
-          events={markerEvents}
-          onClose={() => setMarkerEvents(null)}
-          onEdit={() => setMarkerEvents(null)}
-          onChanged={() => {
-            setMarkerEvents(null);
-            loadEvents();
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -1264,54 +1213,38 @@ function CombinedTopicRankChart({
   highlightWatchId: number | null;
 }) {
   const [events, setEvents] = useState<GrowthEvent[]>([]);
-  const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
+
+  const loadEvents = useCallback(() => {
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+      .then((rows) => setEvents(asGrowthEvents(rows)))
+      .catch(() => setEvents([]));
+  }, [repositoryId, period]);
 
   useEffect(() => {
-    let cancelled = false;
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => {
-        if (!cancelled) {
-          setEvents(Array.isArray(rows) ? rows : []);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setEvents([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [repositoryId, period]);
+    loadEvents();
+  }, [loadEvents]);
 
   const drawn = useMemo(
     () => visibility.filter((item) => selectedSlugs.includes(item.watch.topic)),
     [visibility, selectedSlugs],
   );
 
-  const option = useMemo(() => {
-    const dates = datesFromHistory(
-      drawn.map((item) => item.points),
-      drawn.flatMap((item) => item.missedDates ?? []),
-    );
-    return rankHistoryOption({
-      dates,
-      legend: true,
-      legendToggle: false,
-      period,
-      events,
-      series: drawn.map((item) => ({
-        name: item.watch.topic,
-        points: item.points,
-        limit: item.watch.resultLimit,
-        missedDates: item.missedDates,
-        highlighted: highlightWatchId === item.watch.id,
-        dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
-        color: rankLineColor(visibility.findIndex((row) => row.watch.id === item.watch.id)),
-      })),
-    });
-  }, [visibility, drawn, highlightWatchId, events, period]);
-
+  const dates = useMemo(
+    () => datesFromHistory(drawn.map((item) => item.points), drawn.flatMap((item) => item.missedDates ?? [])),
+    [drawn],
+  );
+  const rankSeries = useMemo(
+    () => drawn.map((item) => ({
+      name: item.watch.topic,
+      points: item.points,
+      limit: item.watch.resultLimit,
+      missedDates: item.missedDates,
+      highlighted: highlightWatchId === item.watch.id,
+      dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
+      color: rankLineColor(visibility.findIndex((row) => row.watch.id === item.watch.id)),
+    })),
+    [drawn, highlightWatchId, visibility],
+  );
   const series = useMemo(
     () => drawn.map((item) => ({ key: String(item.watch.id), name: item.watch.topic })),
     [drawn],
@@ -1319,40 +1252,29 @@ function CombinedTopicRankChart({
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History">
+      <ChartCard title="Rank History" context={`repository:${repositoryId}:topics`}>
         <p className="text-sm text-muted-foreground">Select topics from the table to display rank history</p>
       </ChartCard>
     );
   }
   return (
-    <>
-      <ChartCard title="Rank History">
-        <PersistentECharts
-          chartId={repoTopicsChartId(repositoryId, scope)}
-          series={series}
-          persistSelection={false}
-          option={option}
-          style={{ height: 360, width: "100%" }}
-          onEvents={{
-            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
-              const clicked = markLineEvents(params);
-              if (clicked.length > 0) {
-                setMarkerEvents(clicked);
-              }
-            },
-          }}
-        />
-      </ChartCard>
-      {markerEvents && (
-        <EventDetailsDialog
-          repositoryId={repositoryId}
-          events={markerEvents}
-          onClose={() => setMarkerEvents(null)}
-          onEdit={() => setMarkerEvents(null)}
-          onChanged={() => setMarkerEvents(null)}
-        />
-      )}
-    </>
+    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:topics`} onEventsChanged={loadEvents}>
+      <ChartModePlot
+        chartId={repoTopicsChartId(repositoryId, scope)}
+        series={series}
+        persistSelection={false}
+        style={{ height: 360, width: "100%" }}
+        build={({ axis, events: marked }) => rankHistoryOption({
+          dates,
+          legend: true,
+          legendToggle: false,
+          period,
+          axis,
+          events: marked,
+          series: rankSeries,
+        })}
+      />
+    </ChartCard>
   );
 }
 
@@ -1642,55 +1564,37 @@ function CombinedRankChart({
   selectedIds: number[];
 }) {
   const [events, setEvents] = useState<GrowthEvent[]>([]);
-  const [markerEvents, setMarkerEvents] = useState<GrowthEvent[] | null>(null);
+
+  const loadEvents = useCallback(() => {
+    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+      .then((rows) => setEvents(asGrowthEvents(rows)))
+      .catch(() => setEvents([]));
+  }, [repositoryId, period]);
 
   useEffect(() => {
-    let cancelled = false;
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => {
-        if (!cancelled) {
-          setEvents(Array.isArray(rows) ? rows : []);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setEvents([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [repositoryId, period]);
+    loadEvents();
+  }, [loadEvents]);
 
   const drawn = useMemo(
     () => visibility.filter((item) => selectedIds.includes(item.query.id)),
     [visibility, selectedIds],
   );
-
-  const option = useMemo(() => {
-    const rows = visibility.filter((item) => selectedIds.includes(item.query.id));
-    const dates = datesFromHistory(
-      rows.map((item) => item.points),
-      rows.flatMap((item) => item.missedDates),
-    );
-    return rankHistoryOption({
-      dates,
-      legend: true,
-      legendToggle: false,
-      period,
-      events,
-      series: rows.map((item) => ({
-        name: item.query.name,
-        points: item.points,
-        limit: item.query.resultLimit,
-        missedDates: item.missedDates,
-        highlighted: highlightQueryId === item.query.id,
-        dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
-        color: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)),
-      })),
-    });
-  }, [visibility, selectedIds, highlightQueryId, events, period]);
-
+  const dates = useMemo(
+    () => datesFromHistory(drawn.map((item) => item.points), drawn.flatMap((item) => item.missedDates)),
+    [drawn],
+  );
+  const rankSeries = useMemo(
+    () => drawn.map((item) => ({
+      name: item.query.name,
+      points: item.points,
+      limit: item.query.resultLimit,
+      missedDates: item.missedDates,
+      highlighted: highlightQueryId === item.query.id,
+      dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
+      color: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)),
+    })),
+    [drawn, highlightQueryId, visibility],
+  );
   const series = useMemo(
     () => drawn.map((item) => ({ key: String(item.query.id), name: item.query.name })),
     [drawn],
@@ -1698,40 +1602,29 @@ function CombinedRankChart({
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History">
+      <ChartCard title="Rank History" context={`repository:${repositoryId}:search`}>
         <p className="text-sm text-muted-foreground">Select search queries from the table to display rank history</p>
       </ChartCard>
     );
   }
   return (
-    <>
-      <ChartCard title="Rank History">
-        <PersistentECharts
-          chartId={repoSearchChartId(repositoryId)}
-          series={series}
-          persistSelection={false}
-          option={option}
-          style={{ height: 360, width: "100%" }}
-          onEvents={{
-            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
-              const clicked = markLineEvents(params);
-              if (clicked.length > 0) {
-                setMarkerEvents(clicked);
-              }
-            },
-          }}
-        />
-      </ChartCard>
-      {markerEvents && (
-        <EventDetailsDialog
-          repositoryId={repositoryId}
-          events={markerEvents}
-          onClose={() => setMarkerEvents(null)}
-          onEdit={() => setMarkerEvents(null)}
-          onChanged={() => setMarkerEvents(null)}
-        />
-      )}
-    </>
+    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:search`} onEventsChanged={loadEvents}>
+      <ChartModePlot
+        chartId={repoSearchChartId(repositoryId)}
+        series={series}
+        persistSelection={false}
+        style={{ height: 360, width: "100%" }}
+        build={({ axis, events: marked }) => rankHistoryOption({
+          dates,
+          legend: true,
+          legendToggle: false,
+          period,
+          axis,
+          events: marked,
+          series: rankSeries,
+        })}
+      />
+    </ChartCard>
   );
 }
 
