@@ -338,17 +338,15 @@ function AxisMenu() {
     <div ref={rootRef} className="group relative">
       <button
         type="button"
-        className="inline-flex h-10 shrink-0 items-center rounded-lg border bg-card p-1 hover:bg-muted"
+        className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border bg-card px-2 text-sm hover:bg-muted"
         aria-label={label}
         aria-describedby={open ? undefined : tipId}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="inline-flex min-h-8 items-center gap-0.5 px-1.5 py-1.5">
-          {axis === "timeline" ? <TimelineAxisIcon /> : <CalendarAxisIcon />}
-          <Chevron />
-        </span>
+        {label}
+        <Chevron />
       </button>
       {!open && <MenuTip id={tipId} text={label} />}
       {open && (

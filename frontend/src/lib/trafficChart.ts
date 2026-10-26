@@ -179,7 +179,7 @@ export function trafficChartOption(
     1,
     ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.uniqueCloners].filter((value): value is number => value != null)),
   );
-  const { groups, markLine, markPoint } = eventMarkOverlays(dates, events, peak, period);
+  const { groups, markLine } = eventMarkOverlays(dates, events, peak, period);
 
   return {
     tooltip: {
@@ -274,7 +274,6 @@ export function trafficChartOption(
         lineStyle: { opacity: 0, width: 0 },
         tooltip: { show: false },
         markLine,
-        markPoint,
       },
     ],
   };
