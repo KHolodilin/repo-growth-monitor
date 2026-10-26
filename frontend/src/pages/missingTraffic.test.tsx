@@ -65,6 +65,10 @@ describe("missing traffic", () => {
     expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
     expect(screen.getByText("Partial collection: Traffic ✕")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "KHolodilin/other" })).toHaveLength(2);
+    await user.keyboard("a");
+    expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
+    await user.click(screen.getByText("Collection failed for Oct 19."));
+    expect(screen.getByText("Collection failed for Oct 19.")).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByText("Collection failed for Oct 19.")).not.toBeInTheDocument();
     expect(badge).toHaveAttribute("aria-expanded", "false");
