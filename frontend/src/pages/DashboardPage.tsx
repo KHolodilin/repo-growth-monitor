@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type Dashboard, type GrowthEvent, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
@@ -179,18 +179,41 @@ function DashboardHeader({
   onTab: (tab: "traffic" | "stats") => void;
 }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const problems = (data?.repositories ?? [])
     .map((row) => ({ row, lines: repositoryProblemLines(row) }))
     .filter((item) => item.lines.length > 0);
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Portfolio</h1>
         {problems.length > 0 && (
-          <div className="relative">
+          <div ref={rootRef} className="relative">
             <button
               type="button"
               className="text-sm text-amber-700"
+              aria-expanded={open}
               onClick={() => setOpen((current) => !current)}
             >
               ⚠ {repositoryProblemBadge(problems.length)}
