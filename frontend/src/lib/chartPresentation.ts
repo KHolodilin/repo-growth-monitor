@@ -154,10 +154,7 @@ function toTimeline(option: ChartOption): ChartOption {
   if (framed.labels.length === 0) {
     return option;
   }
-  const axis = option.xAxis;
-  if (!axis || Array.isArray(axis)) {
-    return option;
-  }
+  const axis = option.xAxis as { data?: unknown; axisLabel?: Record<string, unknown> };
   return {
     ...option,
     tooltip: wrapTooltip(option.tooltip, framed.dayToDate),

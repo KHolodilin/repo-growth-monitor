@@ -151,6 +151,44 @@ describe("rankChart", () => {
     expect(tooltip([{ axisValue: "2" }])).toContain("Day 2");
     expect(tooltip([{ axisValue: "2" }])).toContain("Launch");
     expect(rankHistoryOption({ dates: ["2026-09-23"], axis: "timeline", series: [] }).xAxis.data).toEqual([]);
+
+    const shared = rankHistoryOption({
+      dates: ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"],
+      axis: "timeline",
+      period: "7d",
+      today: "2026-09-24",
+      events: [
+        {
+          id: 2,
+          repositoryId: 13,
+          eventAt: "2026-09-18T12:00:00Z",
+          category: "PROMOTION",
+          type: "LINKEDIN_POST",
+          title: "Old",
+          source: "MANUAL",
+        },
+      ],
+      series: [
+        {
+          name: "long",
+          limit: 50,
+          missedDates: ["2026-09-22"],
+          points: [
+            { date: "2026-09-21", position: 1 },
+            { date: "2026-09-23", position: 2 },
+          ],
+        },
+        {
+          name: "short",
+          limit: 50,
+          points: [{ date: "2026-09-24", position: 3 }],
+        },
+      ],
+    });
+    expect(shared.xAxis.data.length).toBeGreaterThan(1);
+    const longLine = shared.series[0] as { data: (number | null)[] };
+    expect(longLine.data).toContain(null);
+    expect(longLine.data).toContain(1);
   });
 
   it("collects dates and recent misses", () => {

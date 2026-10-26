@@ -35,6 +35,7 @@ import {
 import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
+import { asGrowthEvents } from "../lib/growthEvents";
 import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -919,7 +920,7 @@ function TrafficPanel({
 
   const loadEvents = useCallback(() => {
     api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => setEvents(Array.isArray(rows) ? rows : []))
+      .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
 
@@ -1215,7 +1216,7 @@ function CombinedTopicRankChart({
 
   const loadEvents = useCallback(() => {
     api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => setEvents(Array.isArray(rows) ? rows : []))
+      .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
 
@@ -1566,7 +1567,7 @@ function CombinedRankChart({
 
   const loadEvents = useCallback(() => {
     api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => setEvents(Array.isArray(rows) ? rows : []))
+      .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
 

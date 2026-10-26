@@ -13,6 +13,26 @@ vi.mock("../lib/api", async (importOriginal) => {
 });
 
 describe("portfolio highlights", () => {
+  it("drops portfolio events that resolve after the page is gone", async () => {
+    let release: (rows: unknown) => void = () => undefined;
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("growth-events")) {
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      return Promise.resolve(dashboardReady);
+    });
+    const view = render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("heading", { name: "Repositories" })).toBeInTheDocument();
+    view.unmount();
+    release([]);
+  });
+
   it("links the period lines and colors discoverability", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue({

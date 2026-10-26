@@ -222,12 +222,9 @@ function QueryRankChart({
 }) {
   const { axis, events } = useChartMode();
   const chart = useMemo(
-    () => queryDetailsChart({ history, repo, rows, series, selected, metric, axis, events }),
+    () => queryDetailsChart({ history, repo, rows, series, selected, metric, axis, events })!,
     [history, repo, rows, series, selected, metric, axis, events],
   );
-  if (!chart) {
-    return null;
-  }
   return (
     <PersistentECharts
       chartId={`${repo.id}:query:${history.query.id}`}

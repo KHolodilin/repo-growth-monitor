@@ -69,6 +69,66 @@ describe("chartPresentation", () => {
       xAxis: [],
       series: [{ data: [1] }],
     });
+    const odd = presentChartOption(
+      {
+        tooltip: { formatter: (params: { axisValue?: string }[]) => params[0]?.axisValue },
+        xAxis: { data: ["2026-09-22", "2026-09-23"] },
+        series: [{ name: "Views" }, { name: "Visitors", data: [1, null], markLine: {} }],
+      },
+      { axis: "timeline", events: [event] },
+    );
+    expect(odd.xAxis.data).toEqual(["1", "2"]);
+    expect(odd.tooltip.formatter([{ axisValue: "9" }, null])).toBe("9");
+    expect(odd.tooltip.formatter([{ axisValue: "1", name: "keep" }, null])).toBe("Day 1");
+    expect(odd.tooltip.formatter([{ axisValue: "1", name: "1" }])).toBe("Day 1");
+    const numeric = presentChartOption(
+      {
+        tooltip: { formatter: () => 4 },
+        xAxis: { data: ["2026-09-23"] },
+        series: [{
+          name: "Views",
+          data: [1],
+          markPoint: { data: [{ xAxis: "2026-01-01" }, { xAxis: "2026-09-23" }] },
+        }],
+      },
+      { axis: "timeline", events: [] },
+    );
+    expect(numeric.tooltip.formatter({ axisValue: "1", name: "1" })).toBe(4);
+    expect(numeric.series[0].markPoint.data).toEqual([{ xAxis: "1" }]);
+    const kept = presentChartOption(
+      {
+        grid: { top: "10%" },
+        xAxis: { data: ["2026-09-23"] },
+        series: [{ name: "Views", data: [1] }],
+      },
+      { axis: "calendar", events: [{ ...event, eventAt: "2026-01-01T00:00:00Z" }] },
+    );
+    expect(kept.series).toHaveLength(1);
+    expect(kept.grid.top).toBe("10%");
+    const labeled = presentChartOption(
+      {
+        grid: { top: "10%" },
+        xAxis: { data: ["2026-09-23"] },
+        series: [{ name: "Views", data: [1] }],
+      },
+      { axis: "calendar", events: [event] },
+    );
+    expect(labeled.series).toHaveLength(2);
+    expect(labeled.grid.top).toBe("10%");
+    expect(presentChartOption(
+      { xAxis: { data: [] }, series: [] },
+      { axis: "timeline", events: [event] },
+    ).xAxis.data).toEqual([]);
+    const plain = presentChartOption(
+      { tooltip: { formatter: "plain" }, xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
+      { axis: "timeline", events: [] },
+    );
+    expect(plain.xAxis.data).toEqual(["1"]);
+    expect(plain.tooltip.formatter).toBe("plain");
+    expect(presentChartOption(
+      { xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
+      { axis: "timeline", events: [] },
+    ).tooltip).toBeUndefined();
   });
 
   it("leaves an existing events series and a chart with no stored points", () => {

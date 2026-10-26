@@ -262,7 +262,7 @@ describe("searchSeriesChart", () => {
       missedDates: [],
       limit: 50,
       lines,
-      events: [event],
+      events: [event, { ...event, id: 2, eventAt: "2026-01-01T00:00:00Z", title: "Outside" }],
     });
     const markers = place.series.find((item) => item.name === "Events") as {
       markLine: { data: { xAxis: string; events: { title: string; eventAt: string }[] }[] };
@@ -286,5 +286,14 @@ describe("searchSeriesChart", () => {
     expect(text).toContain("Day 2");
     expect(text).toContain("acme/app");
     expect(text).not.toContain(">Events<");
+    const quiet = searchMetricOption({
+      metric: "forks",
+      dates: ["2026-09-23"],
+      missedDates: [],
+      limit: 50,
+      lines,
+      events: [{ ...event, eventAt: "2026-01-01T00:00:00Z" }],
+    });
+    expect(quiet.series.some((item) => item.name === "Events")).toBe(false);
   });
 });

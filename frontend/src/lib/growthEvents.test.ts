@@ -39,7 +39,7 @@ describe("growthEvents", () => {
     expect(eventUtcDate(event({}))).toBe("2026-09-22");
     expect(eventUtcDate(event({ eventAt: undefined }))).toBe("");
     expect(asGrowthEvents(null)).toEqual([]);
-    expect(asGrowthEvents([{ repositoryId: 1 }])).toEqual([]);
+    expect(asGrowthEvents([null, 1, { repositoryId: 1 }])).toEqual([]);
     expect(asGrowthEvents([event({})])).toHaveLength(1);
   });
 

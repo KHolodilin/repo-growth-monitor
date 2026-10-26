@@ -2,7 +2,11 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { ChartCard, ChartDownloadMenu, ChartExportProvider, useRegisterChartExport } from "./ChartDownloadMenu";
+import { api } from "../lib/api";
+import { PersistentECharts } from "./PersistentECharts";
+import { ChartCard, ChartDownloadMenu, ChartExportProvider, useChartMode, useRegisterChartExport } from "./ChartDownloadMenu";
+
+vi.mock("../lib/api", () => ({ api: vi.fn(() => Promise.resolve([])) }));
 
 function Registrar({ onPng, onCsv }: { onPng: () => void; onCsv: () => void }) {
   useRegisterChartExport({ downloadPng: onPng, downloadCsv: onCsv });
@@ -58,6 +62,11 @@ describe("ChartDownloadMenu", () => {
     await user.click(download);
     await user.click(download);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "All events" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "GitHub events" }));
+    await user.click(screen.getByRole("button", { name: "Calendar" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
 
     view.rerender(<Host showChart={false} />);
     expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
@@ -117,5 +126,77 @@ describe("ChartDownloadMenu", () => {
     await user.click(screen.getByRole("button", { name: "Timeline" }));
     await user.click(screen.getByRole("button", { name: "Timeline" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("uses the default mode outside a card and reloads fetched events", async () => {
+    const user = userEvent.setup();
+    function Outside() {
+      const mode = useChartMode();
+      return (
+        <button type="button" onClick={() => mode.openMarker([])}>
+          outside
+        </button>
+      );
+    }
+    render(<Outside />);
+    await user.click(screen.getByRole("button", { name: "outside" }));
+
+    vi.mocked(api).mockRejectedValueOnce(new Error("down"));
+    const failed = render(
+      <ChartCard title="Traffic" repositoryId={13} onEventsChanged={vi.fn()}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+      </ChartCard>,
+    );
+    expect(await screen.findByRole("button", { name: "All events" })).toBeInTheDocument();
+    failed.unmount();
+
+    let fail: (error: Error) => void = () => undefined;
+    vi.mocked(api).mockImplementation(
+      () => new Promise((_resolve, reject) => {
+        fail = reject;
+      }),
+    );
+    const late = render(
+      <ChartCard title="Traffic" repositoryId={13}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+      </ChartCard>,
+    );
+    late.unmount();
+    fail(new Error("late"));
+
+    let release: (rows: unknown) => void = () => undefined;
+    vi.mocked(api).mockImplementation(
+      () => new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+    const view = render(
+      <ChartCard title="Traffic" repositoryId={13}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        <PersistentECharts
+          chartId="events"
+          series={[{ key: "Views", name: "Views" }]}
+          option={{ xAxis: { data: ["2026-09-22"] }, series: [{ name: "Views", type: "line", data: [1] }] }}
+        />
+      </ChartCard>,
+    );
+    view.unmount();
+    release([]);
+
+    vi.mocked(api).mockResolvedValue([]);
+    render(
+      <ChartCard title="Traffic" repositoryId={13}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        <PersistentECharts
+          chartId="events"
+          series={[{ key: "Views", name: "Views" }]}
+          option={{ xAxis: { data: ["2026-09-22"] }, series: [{ name: "Views", type: "line", data: [1] }] }}
+        />
+      </ChartCard>,
+    );
+    await user.click(await screen.findByRole("button", { name: "mark" }));
+    vi.mocked(api).mockResolvedValueOnce(undefined);
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByRole("button", { name: "All events" })).toBeInTheDocument();
   });
 });

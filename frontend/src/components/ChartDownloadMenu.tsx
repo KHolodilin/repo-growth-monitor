@@ -169,10 +169,7 @@ export function ChartCard({
             onEdit={() => setMarker(null)}
             onChanged={() => {
               setMarker(null);
-              if (eventsProp !== undefined) {
-                onEventsChanged?.();
-                return;
-              }
+              onEventsChanged?.();
               setReloadKey((value) => value + 1);
             }}
           />
@@ -378,10 +375,7 @@ export function ChartDownloadMenu() {
 
   function choose(kind: "png" | "csv") {
     setOpen(false);
-    const actions = registry?.current;
-    if (!actions) {
-      return;
-    }
+    const actions = registry.current as ExportActions;
     if (kind === "png") {
       actions.downloadPng();
       return;
