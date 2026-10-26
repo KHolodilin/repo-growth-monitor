@@ -44,7 +44,7 @@ describe("ChartDownloadMenu", () => {
     expect(screen.getByRole("tooltip", { name: "Download" })).toHaveClass("group-hover:block");
     expect(download).toHaveAttribute("aria-expanded", "false");
     await user.click(download);
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tooltip", { name: "Download" })).not.toBeInTheDocument();
     expect(download).toHaveAttribute("aria-expanded", "true");
     await user.keyboard("a");
     expect(screen.getByRole("menu", { name: "Download format" })).toBeInTheDocument();
@@ -68,15 +68,18 @@ describe("ChartDownloadMenu", () => {
     const onPng = vi.fn();
     const onCsv = vi.fn();
     render(
-      <ChartCard title="Traffic" controls={<button type="button">All</button>}>
+      <ChartCard title="Traffic" controls={<button type="button">Place</button>}>
         <Registrar onPng={onPng} onCsv={onCsv} />
       </ChartCard>,
     );
     const heading = screen.getByRole("heading", { name: "Traffic" });
     const row = heading.parentElement;
     expect(row?.className).toContain("flex");
-    expect(row).toContainElement(screen.getByRole("button", { name: "All" }));
+    expect(row).toContainElement(screen.getByRole("button", { name: "Place" }));
+    expect(row).toContainElement(screen.getByRole("button", { name: "All events" }));
+    expect(row).toContainElement(screen.getByRole("button", { name: "Calendar" }));
     expect(row).toContainElement(screen.getByRole("button", { name: "Download" }));
+    expect(row?.querySelectorAll(".w-px")).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Download" }));
     await user.click(screen.getByRole("menuitem", { name: "PNG" }));
@@ -86,6 +89,33 @@ describe("ChartDownloadMenu", () => {
     await user.click(screen.getByRole("button", { name: "Download" }));
     await user.click(screen.getByRole("menuitem", { name: "CSV" }));
     expect(onCsv).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("filters events and switches the axis from the header menus", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChartCard title="Traffic">
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+      </ChartCard>,
+    );
+    await user.click(screen.getByRole("button", { name: "All events" }));
+    expect(screen.getByRole("menuitemradio", { name: "All events" })).toHaveAttribute("aria-checked", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "All events" }));
+    await user.click(document.body);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "All events" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Events off" }));
+    expect(screen.getByRole("button", { name: "Events off" })).toBeInTheDocument();
+    expect(screen.getByRole("tooltip", { name: "Events off" })).toHaveClass("group-hover:block");
+
+    await user.click(screen.getByRole("button", { name: "Calendar" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
+    expect(screen.getByRole("button", { name: "Timeline" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Timeline" }));
+    await user.click(screen.getByRole("button", { name: "Timeline" }));
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
 });

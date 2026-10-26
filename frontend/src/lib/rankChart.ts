@@ -39,6 +39,38 @@ export function rankTooltipText(point: RankHistoryPoint | undefined, limit: numb
   return `#${point.position}`;
 }
 
+/** Day 1 is each line's first stored point. A later miss stays an empty day. */
+function timelineRank(dates: string[], series: RankHistorySeries[]) {
+  const spans = series.map((item) => {
+    const byDate = new Map(item.points.map((point) => [point.date, point]));
+    const start = dates.findIndex((date) => byDate.has(date));
+    return { item, byDate, span: start < 0 ? [] : dates.slice(start) };
+  });
+  const longest = spans.reduce(
+    (best, item) => (item.span.length > best.span.length ? item : best),
+    { span: [] as string[] },
+  );
+  const axis = Array.from({ length: longest.span.length }, (_, index) => String(index + 1));
+  return {
+    dates: axis,
+    dateToDay: new Map(longest.span.map((date, index) => [date, String(index + 1)])),
+    series: spans.map(({ item, byDate, span }) => ({
+      ...item,
+      points: axis.flatMap((label, index) => {
+        if (index >= span.length) {
+          return [];
+        }
+        const point = byDate.get(span[index]);
+        if (!point) {
+          return [];
+        }
+        return [{ date: label, position: point.position }];
+      }),
+      missedDates: axis.filter((label, index) => index < span.length && (item.missedDates ?? []).includes(span[index])),
+    })),
+  };
+}
+
 export function rankHistoryOption({
   dates,
   series,
@@ -48,6 +80,8 @@ export function rankHistoryOption({
   period,
   today = new Date().toISOString().slice(0, 10),
   formatAxis = formatChartAxisDate,
+  axis = "calendar",
+  markerAt,
 }: {
   dates: string[];
   series: RankHistorySeries[];
@@ -59,16 +93,26 @@ export function rankHistoryOption({
   period?: Period;
   today?: string;
   formatAxis?: (value: string) => string;
+  axis?: "calendar" | "timeline";
+  /** Puts an event on a timeline day. Calendar charts use the event's UTC date. */
+  markerAt?: (event: GrowthEvent) => string;
 }) {
   const windowDates = period ? periodDates(period, today) : null;
   const visibleEvents = windowDates
     ? events.filter((event) => windowDates.includes(eventUtcDate(event)))
     : events;
-  const axisDates = windowDates
-    ?? (visibleEvents.length > 0 ? calendarDates([...dates, ...visibleEvents.map((event) => eventUtcDate(event))]) : dates);
-  const overlays = visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period) : null;
+  const calendarAxis = markerAt
+    ? dates
+    : windowDates
+      ?? (visibleEvents.length > 0 ? calendarDates([...dates, ...visibleEvents.map((event) => eventUtcDate(event))]) : dates);
+  const frame = axis === "timeline" ? timelineRank(calendarAxis, series) : null;
+  const plotSeries = frame?.series ?? series;
+  const axisDates = frame?.dates ?? calendarAxis;
+  const plotAxis = frame ? (value: string) => `Day ${value}` : formatAxis;
+  const locate = frame ? (event: GrowthEvent) => frame.dateToDay.get(eventUtcDate(event)) ?? "" : markerAt;
+  const overlays = visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period, locate) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
-  const lines = series.flatMap((item, index) => {
+  const lines = plotSeries.flatMap((item, index) => {
     const color = item.color ?? rankLineColor(index);
     const byDate = new Map(item.points.map((point) => [point.date, point]));
     const missed = new Set(item.missedDates ?? []);
@@ -131,7 +175,7 @@ export function rankHistoryOption({
           return "";
         }
         const date = params[0].axisValue;
-        const rows = series
+        const rows = plotSeries
           .map((item) => {
             const point = item.points.find((entry) => entry.date === date);
             const missed = item.missedDates?.includes(date) ?? false;
@@ -145,14 +189,14 @@ export function rankHistoryOption({
             : `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.08)">${dayEvents
                 .map((item) => `<div>${item.title}</div>`)
                 .join("")}</div>`;
-        return `<div>${formatAxis(date)}<br/>${rows}${eventRows}</div>`;
+        return `<div>${plotAxis(date)}<br/>${rows}${eventRows}</div>`;
       },
     },
     legend: legend
       ? {
           top: 0,
           type: "scroll",
-          data: series.map((item) => item.name),
+          data: plotSeries.map((item) => item.name),
           ...(legendToggle ? {} : { selectedMode: false }),
         }
       : undefined,
@@ -165,7 +209,7 @@ export function rankHistoryOption({
         hideOverlap: true,
         showMinLabel: true,
         showMaxLabel: true,
-        formatter: (value: string) => formatAxis(String(value)),
+        formatter: (value: string) => plotAxis(String(value)),
       },
     },
     yAxis: {
@@ -203,8 +247,13 @@ export function rankHistoryOption({
  * The pin balloons stay on Traffic, where they sit on the peak above the lines. On this
  * inverted axis they cover the rank dots, so Rank History keeps only the dashed line.
  */
-function rankEventOverlays(dates: string[], events: GrowthEvent[], period?: Period) {
-  const overlays = eventMarkOverlays(dates, events, 1, period);
+function rankEventOverlays(
+  dates: string[],
+  events: GrowthEvent[],
+  period?: Period,
+  dateOf?: (event: GrowthEvent) => string,
+) {
+  const overlays = eventMarkOverlays(dates, events, 1, period, dateOf);
   const label = { ...overlays.markLine.label, position: "start" as const };
   return {
     ...overlays,

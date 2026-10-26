@@ -1,6 +1,6 @@
 import type { GrowthEvent } from "./api";
 
-export type EventFilter = "all" | "github" | "promotion";
+export type EventFilter = "all" | "github" | "promotion" | "off";
 
 export const AUTOMATIC_SETTING_LABELS: { type: string; label: string }[] = [
   { type: "README_SIGNIFICANTLY_CHANGED", label: "README significantly changed" },
@@ -58,10 +58,25 @@ export function eventMarkerLabel(events: GrowthEvent[]) {
 }
 
 export function eventUtcDate(event: GrowthEvent) {
-  return event.eventAt.slice(0, 10);
+  return typeof event.eventAt === "string" ? event.eventAt.slice(0, 10) : "";
+}
+
+export function asGrowthEvents(rows: unknown): GrowthEvent[] {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows.filter((row): row is GrowthEvent => {
+    if (!row || typeof row !== "object") {
+      return false;
+    }
+    return typeof (row as GrowthEvent).eventAt === "string";
+  });
 }
 
 export function filterGrowthEvents(events: GrowthEvent[], filter: EventFilter) {
+  if (filter === "off") {
+    return [];
+  }
   if (filter === "github") {
     return events.filter((event) => event.source === "GITHUB" || event.source === "SYSTEM");
   }
@@ -71,10 +86,13 @@ export function filterGrowthEvents(events: GrowthEvent[], filter: EventFilter) {
   return events;
 }
 
-export function groupEventsByUtcDate(events: GrowthEvent[]) {
+export function groupEventsByUtcDate(
+  events: GrowthEvent[],
+  dateOf: (event: GrowthEvent) => string = eventUtcDate,
+) {
   const groups = new Map<string, GrowthEvent[]>();
   for (const event of events) {
-    const date = eventUtcDate(event);
+    const date = dateOf(event);
     const current = groups.get(date) ?? [];
     current.push(event);
     groups.set(date, current);

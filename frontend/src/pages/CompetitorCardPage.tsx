@@ -58,6 +58,7 @@ export function CompetitorCardPage() {
       ]}
       card={card}
       chartId={`${repositoryId}:competitor:${queryId}:${githubRepositoryId}`}
+      repositoryId={repo.id}
     />
   );
 }
@@ -66,10 +67,12 @@ export function CompetitorCardView({
   items,
   card,
   chartId,
+  repositoryId,
 }: {
   items: BreadcrumbItem[];
   card: CompetitorCard;
   chartId: string;
+  repositoryId?: number;
 }) {
   const passed = card.discoverability.filter((item) => item.passed).length;
   const option = storedCountOption({
@@ -120,7 +123,7 @@ export function CompetitorCardView({
         </ul>
       </section>
 
-      <ChartCard title="Stars and forks">
+      <ChartCard title="Stars and forks" repositoryId={repositoryId} period="all">
         <PersistentECharts
           chartId={chartId}
           series={[

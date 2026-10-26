@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GrowthEvent } from "./api";
 import {
+  asGrowthEvents,
   eventCategoryIcon,
   eventMarkerLabel,
   eventTypeLabel,
@@ -36,6 +37,10 @@ describe("growthEvents", () => {
     expect(sourceBadge("MANUAL")).toBe("MANUAL");
     expect(sourceBadge("GITHUB")).toBe("AUTO");
     expect(eventUtcDate(event({}))).toBe("2026-09-22");
+    expect(eventUtcDate(event({ eventAt: undefined }))).toBe("");
+    expect(asGrowthEvents(null)).toEqual([]);
+    expect(asGrowthEvents([{ repositoryId: 1 }])).toEqual([]);
+    expect(asGrowthEvents([event({})])).toHaveLength(1);
   });
 
   it("filters groups and maps icons", () => {
@@ -47,6 +52,7 @@ describe("growthEvents", () => {
     expect(filterGrowthEvents(items, "all")).toHaveLength(3);
     expect(filterGrowthEvents(items, "github")).toHaveLength(2);
     expect(filterGrowthEvents(items, "promotion")).toHaveLength(1);
+    expect(filterGrowthEvents(items, "off")).toEqual([]);
     expect(groupEventsByUtcDate(items)).toHaveLength(1);
     expect(eventCategoryIcon("DISCOVERABILITY")).toBe("◇");
     expect(eventCategoryIcon("COMMUNITY")).toBe("○");

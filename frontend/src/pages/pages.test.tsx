@@ -223,8 +223,10 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "mark" }));
     api.mockResolvedValueOnce({});
     await user.click(screen.getByRole("button", { name: "Delete" }));
-    await user.click(screen.getByRole("button", { name: "GitHub" }));
-    await user.click(screen.getByRole("button", { name: "Promotion" }));
+    await user.click(screen.getAllByRole("button", { name: "All events" })[0]);
+    await user.click(screen.getByRole("menuitemradio", { name: "GitHub events" }));
+    await user.click(screen.getByRole("button", { name: "GitHub events" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Promotion events" }));
     await user.click(screen.getByRole("button", { name: "Discoverability 1/2" }));
     expect(screen.queryByRole("heading", { name: "Repository Health" })).not.toBeInTheDocument();
     expect(screen.getByText("Description")).toBeInTheDocument();

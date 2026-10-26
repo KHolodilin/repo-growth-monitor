@@ -56,6 +56,8 @@ export function SnapshotHistoryChart({
   return (
     <ChartCard
       title={title}
+      repositoryId={repositoryId}
+      period="all"
       controls={
         <div className="inline-flex rounded-lg border bg-muted p-1">
           <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>

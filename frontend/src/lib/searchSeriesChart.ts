@@ -1,5 +1,7 @@
-import type { SearchSeries } from "./api";
+import type { GrowthEvent, SearchSeries } from "./api";
+import { eventUtcDate } from "./growthEvents";
 import { datesFromHistory, rankHistoryOption } from "./rankChart";
+import { eventMarkOverlays } from "./trafficChart";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
 export type SearchChartMetric = "place" | "stars" | "forks";
@@ -84,8 +86,13 @@ export function timelineFrame(dates: string[], lines: ChartLine[], missedDates: 
   });
   const length = Math.max(0, ...spans.map((item) => item.span.length));
   const axis = Array.from({ length }, (_, index) => String(index + 1));
+  const longestSpan = spans.reduce(
+    (best, item) => (item.span.length > best.length ? item.span : best),
+    [] as string[],
+  );
   return {
     dates: axis,
+    dateToDay: new Map(longestSpan.map((date, index) => [date, String(index + 1)])),
     lines: spans.map(({ line, byDate, span }) => ({
       name: line.name,
       points: axis.flatMap((label, index) => {
@@ -112,6 +119,7 @@ export function searchMetricOption({
   missedDates,
   limit,
   lines,
+  events = [],
 }: {
   metric: SearchChartMetric;
   axis?: SearchChartAxis;
@@ -119,15 +127,19 @@ export function searchMetricOption({
   missedDates: string[];
   limit: number;
   lines: ChartLine[];
+  events?: GrowthEvent[];
 }) {
   const frame = axis === "timeline" ? timelineFrame(dates, lines, missedDates) : null;
   const axisDates = frame?.dates ?? dates;
   const formatAxis = axis === "timeline" ? (value: string) => `Day ${value}` : formatChartAxisDate;
+  const markerAt = frame ? (event: GrowthEvent) => frame.dateToDay.get(eventUtcDate(event)) ?? "" : undefined;
   if (metric === "place") {
     return rankHistoryOption({
       dates: axisDates,
       formatAxis,
       legend: lines.length > 0,
+      events,
+      markerAt,
       series: (frame?.lines ?? lines).map((line) => ({
         name: line.name,
         limit,
@@ -141,6 +153,8 @@ export function searchMetricOption({
   return countHistoryOption({
     dates: axisDates,
     formatAxis,
+    events,
+    markerAt,
     series: plotted.map((line) => ({
       name: line.name,
       data: axisDates.map((date) => line.points.find((point) => point.date === date)?.[field] ?? null),
@@ -159,6 +173,7 @@ export function queryDetailsChart({
   selected,
   metric,
   axis = "calendar",
+  events = [],
 }: {
   history: { points: { date: string; position: number | null }[]; missedDates: string[]; query: { resultLimit: number } } | null;
   repo: { githubId: number; fullName: string } | null;
@@ -167,6 +182,7 @@ export function queryDetailsChart({
   selected: number[];
   metric: SearchChartMetric;
   axis?: SearchChartAxis;
+  events?: GrowthEvent[];
 }) {
   if (!history || !repo) {
     return null;
@@ -199,6 +215,7 @@ export function queryDetailsChart({
       missedDates: history.missedDates,
       limit: history.query.resultLimit,
       lines,
+      events,
     }),
     series: [
       { key: String(repo.githubId), name: repo.fullName },
@@ -227,11 +244,28 @@ function countHistoryOption({
   dates,
   series,
   formatAxis = formatChartAxisDate,
+  events = [],
+  markerAt,
 }: {
   dates: string[];
   series: { name: string; data: (number | null)[] }[];
   formatAxis?: (value: string) => string;
+  events?: GrowthEvent[];
+  markerAt?: (event: GrowthEvent) => string;
 }) {
+  const overlays = events.length > 0 ? eventMarkOverlays(dates, events, 1, undefined, markerAt) : null;
+  const eventSeries = overlays && overlays.groups.length > 0
+    ? [{
+        name: "Events",
+        type: "line" as const,
+        data: dates.map(() => null),
+        showSymbol: false,
+        lineStyle: { opacity: 0, width: 0 },
+        tooltip: { show: false },
+        markLine: overlays.markLine,
+        markPoint: overlays.markPoint,
+      }]
+    : [];
   return {
     tooltip: {
       trigger: "axis" as const,
@@ -241,6 +275,7 @@ function countHistoryOption({
         }
         const date = formatAxis(params[0].axisValue);
         const rows = params
+          .filter((item) => item.seriesName !== "Events")
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             return `<div>${item.seriesName}: ${value}</div>`;
@@ -263,13 +298,16 @@ function countHistoryOption({
       },
     },
     yAxis: { type: "value" as const },
-    series: series.map((item) => ({
-      name: item.name,
-      type: "line" as const,
-      showSymbol: true,
-      symbolSize: 8,
-      connectNulls: false,
-      data: item.data,
-    })),
+    series: [
+      ...series.map((item) => ({
+        name: item.name,
+        type: "line" as const,
+        showSymbol: true,
+        symbolSize: 8,
+        connectNulls: false,
+        data: item.data,
+      })),
+      ...eventSeries,
+    ],
   };
 }

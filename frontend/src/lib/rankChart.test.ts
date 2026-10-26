@@ -115,6 +115,44 @@ describe("rankChart", () => {
     expect(option.series).toHaveLength(3);
   });
 
+  it("starts a timeline at the first stored point and keeps the event on that day", () => {
+    const option = rankHistoryOption({
+      dates: ["2026-09-21", "2026-09-22", "2026-09-23"],
+      axis: "timeline",
+      events: [
+        {
+          id: 1,
+          repositoryId: 13,
+          eventAt: "2026-09-23T12:00:00Z",
+          category: "PROMOTION",
+          type: "LINKEDIN_POST",
+          title: "Launch",
+          source: "MANUAL",
+        },
+      ],
+      series: [
+        {
+          name: "outbox",
+          limit: 50,
+          missedDates: ["2026-09-22"],
+          points: [
+            { date: "2026-09-22", position: null },
+            { date: "2026-09-23", position: 4 },
+          ],
+        },
+      ],
+    });
+    expect(option.xAxis.data).toEqual(["1", "2"]);
+    expect(option.xAxis.axisLabel.formatter("2")).toBe("Day 2");
+    const line = option.series[0] as { data: (number | null)[] };
+    expect(line.data).toEqual([null, 4]);
+    const tooltip = option.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    expect(tooltip([{ axisValue: "1" }])).toContain("Not collected");
+    expect(tooltip([{ axisValue: "2" }])).toContain("Day 2");
+    expect(tooltip([{ axisValue: "2" }])).toContain("Launch");
+    expect(rankHistoryOption({ dates: ["2026-09-23"], axis: "timeline", series: [] }).xAxis.data).toEqual([]);
+  });
+
   it("collects dates and recent misses", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-23T12:00:00Z"));

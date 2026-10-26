@@ -54,10 +54,16 @@ function eventMarkerKind(period?: string) {
   return "text" as const;
 }
 
-export function eventMarkOverlays(dates: string[], events: GrowthEvent[], peak = 1, period?: string) {
+export function eventMarkOverlays(
+  dates: string[],
+  events: GrowthEvent[],
+  peak = 1,
+  period?: string,
+  dateOf: (event: GrowthEvent) => string = eventUtcDate,
+) {
   const kind = eventMarkerKind(period);
   const onAxis = new Set(dates);
-  const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
+  const groups = groupEventsByUtcDate(events, dateOf).filter((group) => onAxis.has(group.date));
   const labels = groups.map((group) => {
     const countText = String(group.events.length);
     return {
