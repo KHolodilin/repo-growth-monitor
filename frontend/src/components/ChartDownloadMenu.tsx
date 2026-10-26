@@ -31,10 +31,10 @@ const ChartExportContext = createContext<ExportRegistry | null>(null);
 const ChartModeContext = createContext<ChartMode | null>(null);
 
 const EVENT_MODES = [
-  ["all", "All", "All events"],
-  ["github", "GitHub", "GitHub events"],
-  ["promotion", "Promotion", "Promotion events"],
-  ["off", "Off", "Events off"],
+  ["all", "All", "All", "All events"],
+  ["github", "GH", "GitHub", "GitHub events"],
+  ["promotion", "Pro", "Promotion", "Promotion events"],
+  ["off", "Off", "Off", "Events off"],
 ] as const;
 
 function createRegistry(): ExportRegistry {
@@ -293,8 +293,8 @@ function EventFilterMenu() {
     <div ref={rootRef} className="group relative">
       <button
         type="button"
-        className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border bg-card px-2 text-sm hover:bg-muted"
-        aria-label={current[2]}
+        className="inline-flex h-10 shrink-0 items-center gap-1 rounded-l-lg rounded-r-none border bg-card px-2 text-sm hover:bg-muted"
+        aria-label={current[3]}
         aria-describedby={open ? undefined : tipId}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -303,10 +303,10 @@ function EventFilterMenu() {
         {current[1]}
         <Chevron />
       </button>
-      {!open && <MenuTip id={tipId} text={current[2]} />}
+      {!open && <MenuTip id={tipId} text={current[3]} />}
       {open && (
         <div role="menu" aria-label="Growth events" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-lg border bg-card py-1 shadow-lg">
-          {EVENT_MODES.map(([key, label, tip]) => (
+          {EVENT_MODES.map(([key, , label, tip]) => (
             <button
               key={key}
               type="button"
@@ -334,18 +334,19 @@ function AxisMenu() {
   const { open, setOpen, rootRef } = useDismissableMenu();
   const tipId = useId();
   const label = axis === "timeline" ? "Timeline" : "Calendar";
+  const short = axis === "timeline" ? "Day" : "Cal";
   return (
-    <div ref={rootRef} className="group relative">
+    <div ref={rootRef} className="group relative -ml-px">
       <button
         type="button"
-        className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border bg-card px-2 text-sm hover:bg-muted"
+        className="inline-flex h-10 shrink-0 items-center gap-1 rounded-l-none rounded-r-lg border bg-card px-2 text-sm hover:bg-muted"
         aria-label={label}
         aria-describedby={open ? undefined : tipId}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        {label}
+        {short}
         <Chevron />
       </button>
       {!open && <MenuTip id={tipId} text={label} />}
@@ -418,9 +419,10 @@ export function ChartDownloadMenu() {
 
   return (
     <>
-      <EventFilterMenu />
-      <span className="w-px self-stretch bg-border" aria-hidden="true" />
-      <AxisMenu />
+      <div className="inline-flex items-stretch">
+        <EventFilterMenu />
+        <AxisMenu />
+      </div>
       <span className="w-px self-stretch bg-border" aria-hidden="true" />
       <div ref={rootRef} className="group relative">
         <button

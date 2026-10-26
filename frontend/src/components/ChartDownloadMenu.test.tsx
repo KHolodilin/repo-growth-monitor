@@ -88,7 +88,7 @@ describe("ChartDownloadMenu", () => {
     expect(row).toContainElement(screen.getByRole("button", { name: "All events" }));
     expect(row).toContainElement(screen.getByRole("button", { name: "Calendar" }));
     expect(row).toContainElement(screen.getByRole("button", { name: "Download" }));
-    expect(row?.querySelectorAll(".w-px")).toHaveLength(2);
+    expect(row?.querySelectorAll(".w-px")).toHaveLength(1);
 
     await user.click(screen.getByRole("button", { name: "Download" }));
     await user.click(screen.getByRole("menuitem", { name: "PNG" }));
@@ -214,11 +214,11 @@ describe("ChartDownloadMenu", () => {
     );
     const traffic = within(screen.getByRole("heading", { name: "Traffic" }).parentElement!.parentElement!);
     const stats = within(screen.getByRole("heading", { name: "Stats" }).parentElement!.parentElement!);
-    expect(traffic.getByRole("button", { name: "Calendar" })).toHaveTextContent("Calendar");
+    expect(traffic.getByRole("button", { name: "Calendar" })).toHaveTextContent("Cal");
     await user.click(traffic.getByRole("button", { name: "Calendar" }));
     await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
-    expect(traffic.getByRole("button", { name: "Timeline" })).toHaveTextContent("Timeline");
-    expect(stats.getByRole("button", { name: "Calendar" })).toHaveTextContent("Calendar");
+    expect(traffic.getByRole("button", { name: "Timeline" })).toHaveTextContent("Day");
+    expect(stats.getByRole("button", { name: "Calendar" })).toHaveTextContent("Cal");
     await user.click(traffic.getByRole("button", { name: "All events" }));
     await user.click(screen.getByRole("menuitemradio", { name: "Events off" }));
     expect(traffic.getByRole("button", { name: "Events off" })).toHaveTextContent("Off");
@@ -237,9 +237,9 @@ describe("ChartDownloadMenu", () => {
     );
     const restoredTraffic = within(screen.getByRole("heading", { name: "Traffic" }).parentElement!.parentElement!);
     const restoredStats = within(screen.getByRole("heading", { name: "Stats" }).parentElement!.parentElement!);
-    expect(restoredTraffic.getByRole("button", { name: "Timeline" })).toHaveTextContent("Timeline");
+    expect(restoredTraffic.getByRole("button", { name: "Timeline" })).toHaveTextContent("Day");
     expect(restoredTraffic.getByRole("button", { name: "Events off" })).toHaveTextContent("Off");
-    expect(restoredStats.getByRole("button", { name: "Calendar" })).toHaveTextContent("Calendar");
+    expect(restoredStats.getByRole("button", { name: "Calendar" })).toHaveTextContent("Cal");
     expect(restoredStats.getByRole("button", { name: "All events" })).toHaveTextContent("All");
   });
 });
