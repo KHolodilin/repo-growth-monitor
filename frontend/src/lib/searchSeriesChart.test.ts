@@ -286,6 +286,8 @@ describe("searchSeriesChart", () => {
     expect(text).toContain("Day 2");
     expect(text).toContain("acme/app");
     expect(text).not.toContain(">Events<");
+    const eventSeries = stars.series.find((item) => item.name === "Events") as { markPoint?: unknown };
+    expect(eventSeries.markPoint).toBeUndefined();
     const quiet = searchMetricOption({
       metric: "forks",
       dates: ["2026-09-23"],

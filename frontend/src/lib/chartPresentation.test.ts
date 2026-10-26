@@ -50,6 +50,7 @@ describe("chartPresentation", () => {
     expect(events.name).toBe("Events");
     expect(events.markLine.data[0].xAxis).toBe("1");
     expect(events.markLine.data[0].events[0].title).toBe("Launch");
+    expect(events.markPoint).toBeUndefined();
     expect(option.grid.top).toBe(64);
     expect(option.tooltip.formatter([{ axisValue: "1", data: 4 }])).toBe("On Day 1: 4");
     const single = presentChartOption(

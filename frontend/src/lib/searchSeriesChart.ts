@@ -263,7 +263,6 @@ function countHistoryOption({
         lineStyle: { opacity: 0, width: 0 },
         tooltip: { show: false },
         markLine: overlays.markLine,
-        markPoint: overlays.markPoint,
       }]
     : [];
   return {

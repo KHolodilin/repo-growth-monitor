@@ -199,4 +199,33 @@ describe("ChartDownloadMenu", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(await screen.findByRole("button", { name: "All events" })).toBeInTheDocument();
   });
+
+  it("keeps the same All and Calendar choice on every chart", async () => {
+    const user = userEvent.setup();
+    const first = render(
+      <>
+        <ChartCard title="Traffic">
+          <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        </ChartCard>
+        <ChartCard title="Stats">
+          <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        </ChartCard>
+      </>,
+    );
+    await user.click(screen.getAllByRole("button", { name: "Calendar" })[0]);
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
+    expect(screen.getAllByRole("button", { name: "Timeline" })).toHaveLength(2);
+    await user.click(screen.getAllByRole("button", { name: "All events" })[0]);
+    await user.click(screen.getByRole("menuitemradio", { name: "Events off" }));
+    expect(screen.getAllByRole("button", { name: "Events off" })).toHaveLength(2);
+    first.unmount();
+
+    render(
+      <ChartCard title="Traffic">
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+      </ChartCard>,
+    );
+    expect(screen.getByRole("button", { name: "Timeline" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Events off" })).toBeInTheDocument();
+  });
 });

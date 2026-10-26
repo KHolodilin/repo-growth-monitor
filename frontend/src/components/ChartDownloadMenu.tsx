@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type GrowthEvent } from "../lib/api";
+import { readChartAxis, readChartEventFilter, subscribeChartMode, writeChartAxis, writeChartEventFilter } from "../lib/chartModePrefs";
 import { asGrowthEvents, filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
 import type { ChartAxis } from "../lib/chartPresentation";
 import { Card } from "./ui";
@@ -111,9 +112,19 @@ export function ChartCard({
 }) {
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const [eventFilter, setEventFilter] = useState<EventFilter>("all");
-  const [axis, setAxis] = useState<ChartAxis>("calendar");
+  const [eventFilter, setEventFilterState] = useState(readChartEventFilter);
+  const [axis, setAxisState] = useState(readChartAxis);
   const [marker, setMarker] = useState<GrowthEvent[] | null>(null);
+  useEffect(() => subscribeChartMode(() => {
+    setEventFilterState(readChartEventFilter());
+    setAxisState(readChartAxis());
+  }), []);
+  const setEventFilter = useCallback((value: EventFilter) => {
+    writeChartEventFilter(value);
+  }, []);
+  const setAxis = useCallback((value: ChartAxis) => {
+    writeChartAxis(value);
+  }, []);
 
   useEffect(() => {
     if (eventsProp !== undefined || repositoryId == null) {
@@ -143,7 +154,7 @@ export function ChartCard({
   }, []);
   const mode = useMemo<ChartMode>(
     () => ({ eventFilter, setEventFilter, axis, setAxis, events, period, openMarker }),
-    [eventFilter, axis, events, period, openMarker],
+    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker],
   );
 
   return (
