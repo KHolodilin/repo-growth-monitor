@@ -41,7 +41,7 @@ export function timelineColumns(dates: string[], columns: (number | null | undef
     labels,
     columns: spans.map((span) => labels.map((_, index) => (index < span.values.length ? span.values[index] : null))),
     dateToDay: new Map(longest.dates.map((date, index) => [date, String(index + 1)])),
-    dayToDate: new Map(labels.map((label, index) => [label, longest.dates[index] ?? ""])),
+    dayToDate: new Map(longest.dates.map((date, index) => [String(index + 1), date])),
   };
 }
 
@@ -147,8 +147,9 @@ function toTimeline(option: ChartOption): ChartOption {
   if (!dates || dates.length === 0 || dates.some((date) => !ISO_DATE.test(date))) {
     return option;
   }
-  const columns = (option.series ?? []).map((series) =>
-    Array.isArray(series.data) ? (series.data as (number | null)[]) : dates.map(() => null),
+  const series = option.series ?? [];
+  const columns = series.map((item) =>
+    Array.isArray(item.data) ? (item.data as (number | null)[]) : dates.map(() => null),
   );
   const framed = timelineColumns(dates, columns);
   if (framed.labels.length === 0) {
@@ -166,11 +167,11 @@ function toTimeline(option: ChartOption): ChartOption {
         formatter: (value: string) => `Day ${value}`,
       },
     },
-    series: (option.series ?? []).map((series, index) => ({
-      ...series,
+    series: series.map((item, index) => ({
+      ...item,
       data: framed.columns[index],
-      markLine: remapMarks(series.markLine, framed.dateToDay),
-      markPoint: remapMarks(series.markPoint, framed.dateToDay),
+      markLine: remapMarks(item.markLine, framed.dateToDay),
+      markPoint: remapMarks(item.markPoint, framed.dateToDay),
     })),
   };
 }

@@ -78,6 +78,7 @@ describe("chartPresentation", () => {
       { axis: "timeline", events: [event] },
     );
     expect(odd.xAxis.data).toEqual(["1", "2"]);
+    expect(odd.tooltip.formatter([])).toBeUndefined();
     expect(odd.tooltip.formatter([{ axisValue: "9" }, null])).toBe("9");
     expect(odd.tooltip.formatter([{ axisValue: "1", name: "keep" }, null])).toBe("Day 1");
     expect(odd.tooltip.formatter([{ axisValue: "1", name: "1" }])).toBe("Day 1");
@@ -119,6 +120,15 @@ describe("chartPresentation", () => {
       { xAxis: { data: [] }, series: [] },
       { axis: "timeline", events: [event] },
     ).xAxis.data).toEqual([]);
+    const onlyEvents = presentChartOption(
+      { xAxis: { data: ["2026-09-23"] } },
+      { axis: "calendar", events: [event] },
+    );
+    expect(onlyEvents.series.map((item) => item.name)).toEqual(["Events"]);
+    expect(presentChartOption(
+      { xAxis: { data: ["2026-09-23"] } },
+      { axis: "timeline", events: [] },
+    ).xAxis.data).toEqual(["2026-09-23"]);
     const plain = presentChartOption(
       { tooltip: { formatter: "plain" }, xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
       { axis: "timeline", events: [] },

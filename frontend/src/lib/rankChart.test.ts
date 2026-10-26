@@ -183,6 +183,11 @@ describe("rankChart", () => {
           limit: 50,
           points: [{ date: "2026-09-24", position: 3 }],
         },
+        {
+          name: "absent",
+          limit: 50,
+          points: [{ date: "2026-01-01", position: 9 }],
+        },
       ],
     });
     expect(shared.xAxis.data.length).toBeGreaterThan(1);

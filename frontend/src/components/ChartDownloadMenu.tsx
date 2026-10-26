@@ -139,9 +139,7 @@ export function ChartCard({
   const source = eventsProp !== undefined ? asGrowthEvents(eventsProp) : loaded;
   const events = useMemo(() => filterGrowthEvents(source, eventFilter), [source, eventFilter]);
   const openMarker = useCallback((items: GrowthEvent[]) => {
-    if (items.length > 0) {
-      setMarker(items);
-    }
+    setMarker(items);
   }, []);
   const mode = useMemo<ChartMode>(
     () => ({ eventFilter, setEventFilter, axis, setAxis, events, period, openMarker }),
@@ -253,7 +251,7 @@ function EventFilterMenu() {
   const { eventFilter, setEventFilter } = useModeControls();
   const { open, setOpen, rootRef } = useDismissableMenu();
   const tipId = useId();
-  const current = EVENT_MODES.find((item) => item[0] === eventFilter) ?? EVENT_MODES[0];
+  const current = EVENT_MODES.find((item) => item[0] === eventFilter)!;
   return (
     <div ref={rootRef} className="group relative">
       <button
