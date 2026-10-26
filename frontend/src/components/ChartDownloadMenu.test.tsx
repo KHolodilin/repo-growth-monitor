@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -200,32 +200,47 @@ describe("ChartDownloadMenu", () => {
     expect(await screen.findByRole("button", { name: "All events" })).toBeInTheDocument();
   });
 
-  it("keeps the same All and Calendar choice on every chart", async () => {
+  it("keeps Calendar or Timeline on the chart that changed", async () => {
     const user = userEvent.setup();
     const first = render(
       <>
-        <ChartCard title="Traffic">
+        <ChartCard title="Traffic" context="portfolio:traffic">
           <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
         </ChartCard>
-        <ChartCard title="Stats">
+        <ChartCard title="Stats" context="portfolio:stats">
           <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
         </ChartCard>
       </>,
     );
-    await user.click(screen.getAllByRole("button", { name: "Calendar" })[0]);
+    const traffic = within(screen.getByRole("heading", { name: "Traffic" }).parentElement!.parentElement!);
+    const stats = within(screen.getByRole("heading", { name: "Stats" }).parentElement!.parentElement!);
+    const trafficAxis = traffic.getByRole("button", { name: "Calendar" });
+    expect(trafficAxis).not.toHaveTextContent("1 2 3");
+    await user.click(trafficAxis);
     await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
-    expect(screen.getAllByRole("button", { name: "Timeline" })).toHaveLength(2);
-    await user.click(screen.getAllByRole("button", { name: "All events" })[0]);
+    expect(traffic.getByRole("button", { name: "Timeline" })).toHaveTextContent("1 2 3");
+    expect(stats.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
+    await user.click(traffic.getByRole("button", { name: "All events" }));
     await user.click(screen.getByRole("menuitemradio", { name: "Events off" }));
-    expect(screen.getAllByRole("button", { name: "Events off" })).toHaveLength(2);
+    expect(traffic.getByRole("button", { name: "Events off" })).toBeInTheDocument();
+    expect(stats.getByRole("button", { name: "All events" })).toBeInTheDocument();
     first.unmount();
 
     render(
-      <ChartCard title="Traffic">
-        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
-      </ChartCard>,
+      <>
+        <ChartCard title="Traffic" context="portfolio:traffic">
+          <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        </ChartCard>
+        <ChartCard title="Stats" context="portfolio:stats">
+          <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        </ChartCard>
+      </>,
     );
-    expect(screen.getByRole("button", { name: "Timeline" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Events off" })).toBeInTheDocument();
+    const restoredTraffic = within(screen.getByRole("heading", { name: "Traffic" }).parentElement!.parentElement!);
+    const restoredStats = within(screen.getByRole("heading", { name: "Stats" }).parentElement!.parentElement!);
+    expect(restoredTraffic.getByRole("button", { name: "Timeline" })).toHaveTextContent("1 2 3");
+    expect(restoredTraffic.getByRole("button", { name: "Events off" })).toBeInTheDocument();
+    expect(restoredStats.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
+    expect(restoredStats.getByRole("button", { name: "All events" })).toBeInTheDocument();
   });
 });

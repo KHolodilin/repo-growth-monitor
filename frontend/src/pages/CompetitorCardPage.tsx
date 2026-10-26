@@ -72,7 +72,7 @@ export function CompetitorCardView({
   items: BreadcrumbItem[];
   card: CompetitorCard;
   chartId: string;
-  repositoryId?: number;
+  repositoryId: number;
 }) {
   const passed = card.discoverability.filter((item) => item.passed).length;
   const option = storedCountOption({
@@ -123,7 +123,7 @@ export function CompetitorCardView({
         </ul>
       </section>
 
-      <ChartCard title="Stars and forks" repositoryId={repositoryId} period="all">
+      <ChartCard title="Stars and forks" repositoryId={repositoryId} period="all" context={`repository:${repositoryId}:competitor`}>
         <PersistentECharts
           chartId={chartId}
           series={[

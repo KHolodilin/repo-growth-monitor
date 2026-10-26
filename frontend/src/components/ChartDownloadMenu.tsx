@@ -100,6 +100,7 @@ export function ChartCard({
   events: eventsProp,
   repositoryId,
   period = "30d",
+  context,
   onEventsChanged,
 }: {
   title: string;
@@ -108,23 +109,40 @@ export function ChartCard({
   events?: GrowthEvent[];
   repositoryId?: number;
   period?: string;
+  /** Where this chart lives. The All and Calendar choice is stored for this place only. */
+  context?: string;
   onEventsChanged?: () => void;
 }) {
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const [eventFilter, setEventFilterState] = useState(readChartEventFilter);
-  const [axis, setAxisState] = useState(readChartAxis);
+  const [eventFilter, setEventFilterState] = useState<EventFilter>(() => (context ? readChartEventFilter(context) : "all"));
+  const [axis, setAxisState] = useState<ChartAxis>(() => (context ? readChartAxis(context) : "calendar"));
   const [marker, setMarker] = useState<GrowthEvent[] | null>(null);
-  useEffect(() => subscribeChartMode(() => {
-    setEventFilterState(readChartEventFilter());
-    setAxisState(readChartAxis());
-  }), []);
+  useEffect(() => {
+    if (!context) {
+      return;
+    }
+    setEventFilterState(readChartEventFilter(context));
+    setAxisState(readChartAxis(context));
+    return subscribeChartMode(context, () => {
+      setEventFilterState(readChartEventFilter(context));
+      setAxisState(readChartAxis(context));
+    });
+  }, [context]);
   const setEventFilter = useCallback((value: EventFilter) => {
-    writeChartEventFilter(value);
-  }, []);
+    if (!context) {
+      setEventFilterState(value);
+      return;
+    }
+    writeChartEventFilter(context, value);
+  }, [context]);
   const setAxis = useCallback((value: ChartAxis) => {
-    writeChartAxis(value);
-  }, []);
+    if (!context) {
+      setAxisState(value);
+      return;
+    }
+    writeChartAxis(context, value);
+  }, [context]);
 
   useEffect(() => {
     if (eventsProp !== undefined || repositoryId == null) {
@@ -246,6 +264,14 @@ function CalendarAxisIcon() {
   );
 }
 
+function TimelineAxisIcon() {
+  return (
+    <span aria-hidden="true" className="font-mono text-[10px] leading-none tracking-widest">
+      1 2 3
+    </span>
+  );
+}
+
 function MenuTip({ id, text }: { id: string; text: string }) {
   return (
     <span
@@ -320,7 +346,7 @@ function AxisMenu() {
         onClick={() => setOpen((value) => !value)}
       >
         <span className="inline-flex min-h-8 items-center gap-0.5 px-1.5 py-1.5">
-          <CalendarAxisIcon />
+          {axis === "timeline" ? <TimelineAxisIcon /> : <CalendarAxisIcon />}
           <Chevron />
         </span>
       </button>
@@ -354,7 +380,7 @@ function AxisMenu() {
             }}
           >
             <span className="w-3" aria-hidden="true">{axis === "timeline" ? "✓" : ""}</span>
-            <span aria-hidden="true" className="font-mono text-[10px] tracking-widest">1  2  3</span>
+            <TimelineAxisIcon />
             Timeline
           </button>
         </div>

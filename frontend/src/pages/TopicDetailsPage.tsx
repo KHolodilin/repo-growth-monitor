@@ -185,7 +185,7 @@ export function TopicDetailsPage() {
         <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
       </div>
 
-      <ChartCard title="Rank History" repositoryId={repo.id} period="all">
+      <ChartCard title="Rank History" repositoryId={repo.id} period="all" context={`repository:${repo.id}:topic:${history.watch.id}`}>
         {recentMissed.length > 0 && (
           <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's

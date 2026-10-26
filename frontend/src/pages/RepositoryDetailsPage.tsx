@@ -960,7 +960,7 @@ function TrafficPanel({
           series={traffic.traffic.map((point) => point.uniqueCloners)}
         />
       </div>
-      <ChartCard title="Traffic" events={events} repositoryId={repositoryId} period={period} onEventsChanged={loadEvents}>
+      <ChartCard title="Traffic" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:traffic`} onEventsChanged={loadEvents}>
         <ChartModePlot
           chartId={repoTrafficChartId(repositoryId)}
           series={REPO_TRAFFIC_SERIES}
@@ -1252,13 +1252,13 @@ function CombinedTopicRankChart({
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History">
+      <ChartCard title="Rank History" context={`repository:${repositoryId}:topics`}>
         <p className="text-sm text-muted-foreground">Select topics from the table to display rank history</p>
       </ChartCard>
     );
   }
   return (
-    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} onEventsChanged={loadEvents}>
+    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:topics`} onEventsChanged={loadEvents}>
       <ChartModePlot
         chartId={repoTopicsChartId(repositoryId, scope)}
         series={series}
@@ -1602,13 +1602,13 @@ function CombinedRankChart({
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History">
+      <ChartCard title="Rank History" context={`repository:${repositoryId}:search`}>
         <p className="text-sm text-muted-foreground">Select search queries from the table to display rank history</p>
       </ChartCard>
     );
   }
   return (
-    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} onEventsChanged={loadEvents}>
+    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:search`} onEventsChanged={loadEvents}>
       <ChartModePlot
         chartId={repoSearchChartId(repositoryId)}
         series={series}

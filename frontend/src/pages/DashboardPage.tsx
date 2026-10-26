@@ -285,7 +285,7 @@ function TrafficChart({
   const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
   return (
-    <ChartCard title="Traffic" events={events} period={period}>
+    <ChartCard title="Traffic" events={events} period={period} context="portfolio:traffic">
       <PersistentECharts
         chartId={dashboardTrafficChartId()}
         series={TRAFFIC_SERIES}
@@ -308,7 +308,7 @@ function StatsChart({
 }) {
   const option = useMemo(() => statsChartOption(points), [points]);
   return (
-    <ChartCard title="Stats" events={events} period={period}>
+    <ChartCard title="Stats" events={events} period={period} context="portfolio:stats">
       {points.length === 0 ? (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           <div className="font-medium text-foreground">No stats for this period.</div>

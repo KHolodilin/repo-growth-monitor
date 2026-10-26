@@ -80,7 +80,7 @@ export function RepositoryStatsPanel({
           );
         })}
       </div>
-      <ChartCard title="Stats" repositoryId={repositoryId} period={period}>
+      <ChartCard title="Stats" repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:stats`}>
         {history.points.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
             <div className="font-medium text-foreground">No stats for this period.</div>

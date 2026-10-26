@@ -58,6 +58,7 @@ export function SnapshotHistoryChart({
       title={title}
       repositoryId={repositoryId}
       period="all"
+      context={`repository:${repositoryId}:${kind}`}
       controls={
         <div className="inline-flex rounded-lg border bg-muted p-1">
           <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>

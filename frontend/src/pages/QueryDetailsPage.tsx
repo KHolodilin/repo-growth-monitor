@@ -143,6 +143,7 @@ export function QueryDetailsPage() {
         title="Rank History"
         repositoryId={repo.id}
         period="all"
+        context={`repository:${repo.id}:query:${history.query.id}`}
         controls={
           <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
             {([
