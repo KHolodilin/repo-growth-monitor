@@ -147,7 +147,21 @@ public record DashboardResponse(
             Integer forks,
             Integer watchers,
             Integer contributors,
+            List<TrafficLeader> starsLeaders,
+            List<TrafficLeader> forksLeaders,
+            List<TrafficLeader> watchersLeaders,
+            List<TrafficLeader> contributorsLeaders,
             int missingRepositories
     ) {
+        public StatsPoint(
+                LocalDate date,
+                Integer stars,
+                Integer forks,
+                Integer watchers,
+                Integer contributors,
+                int missingRepositories
+        ) {
+            this(date, stars, forks, watchers, contributors, List.of(), List.of(), List.of(), List.of(), missingRepositories);
+        }
     }
 }

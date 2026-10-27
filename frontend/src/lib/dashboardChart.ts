@@ -109,7 +109,7 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
         formatter: (value: string) => formatChartAxisDate(String(value)),
       },
     },
-    yAxis: { type: "value" as const, name: "Metric value" },
+    yAxis: { type: "value" as const },
     series: [
       ...metricSeries(traffic, "views", "Views", "#5470c6"),
       ...metricSeries(traffic, "visitors", "Visitors", "#91cc75"),

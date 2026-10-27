@@ -468,6 +468,10 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(week.stats().points().get(1).stars()).isNull();
         assertThat(week.stats().points().get(2).stars()).isEqualTo(106);
         assertThat(week.stats().points().get(2).missingRepositories()).isEqualTo(1);
+        assertThat(week.stats().points().get(2).starsLeaders()).extracting(DashboardResponse.TrafficLeader::fullName)
+                .containsExactly("acme/kafka-starter");
+        assertThat(week.stats().points().get(3).starsLeaders()).extracting(DashboardResponse.TrafficLeader::fullName)
+                .containsExactly("acme/kafka-starter", "acme/spring-outbox");
         assertThat(week.stats().totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(160, 10, 6.7));
         assertThat(week.stats().totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, 0, 0.0));
         assertThat(week.stats().totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, 0, 0.0));

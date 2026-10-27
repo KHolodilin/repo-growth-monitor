@@ -28,7 +28,7 @@ describe("portfolio highlights", () => {
         <DashboardPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("heading", { name: "Repositories" })).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "Repository" })).toBeInTheDocument();
     view.unmount();
     release([]);
   });
@@ -77,7 +77,7 @@ describe("portfolio highlights", () => {
     );
     const dash = screen.getAllByText("—").find((node) => node.closest("td"));
     expect(dash?.className ?? "").not.toMatch(/emerald|amber|red/);
-    expect(screen.getByRole("heading", { name: "Repositories" }).parentElement).not.toHaveTextContent("checks");
+    expect(screen.getByRole("columnheader", { name: "Repository" }).closest("table")).not.toHaveTextContent("checks");
     await user.click(screen.getByRole("link", { name: "12/13" }));
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
   });

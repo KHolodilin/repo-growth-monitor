@@ -53,3 +53,8 @@ Thumbs.db
 
 # Local database dumps
 backups/
+
+.tools/
+
+backend/m2-cache/
+

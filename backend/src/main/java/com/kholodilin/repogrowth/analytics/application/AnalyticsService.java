@@ -699,7 +699,18 @@ public class AnalyticsService {
                 contributors += row.contributors();
                 ids.add(row.repositoryId());
             }
-            points.add(new StatsPoint(day, stars, forks, watchers, contributors, Math.max(0, tracked - ids.size())));
+            points.add(new StatsPoint(
+                    day,
+                    stars,
+                    forks,
+                    watchers,
+                    contributors,
+                    topStatShares(rows, RepositoryStatDay::stars),
+                    topStatShares(rows, RepositoryStatDay::forks),
+                    topStatShares(rows, RepositoryStatDay::watchers),
+                    topStatShares(rows, RepositoryStatDay::contributors),
+                    Math.max(0, tracked - ids.size())
+            ));
         }
         return points;
     }
@@ -752,6 +763,23 @@ public class AnalyticsService {
             }
             shares.add(new TrafficLeader(row.fullName(), value));
         }
+        return rankLeaders(shares);
+    }
+
+    /** Up to three tracked repositories with the largest positive stats share for the day. */
+    static List<TrafficLeader> topStatShares(List<RepositoryStatDay> rows, ToIntFunction<RepositoryStatDay> metric) {
+        List<TrafficLeader> shares = new ArrayList<>();
+        for (RepositoryStatDay row : rows) {
+            long value = metric.applyAsInt(row);
+            if (value <= 0) {
+                continue;
+            }
+            shares.add(new TrafficLeader(row.fullName(), value));
+        }
+        return rankLeaders(shares);
+    }
+
+    private static List<TrafficLeader> rankLeaders(List<TrafficLeader> shares) {
         shares.sort(Comparator.comparingLong(TrafficLeader::value).reversed().thenComparing(TrafficLeader::fullName));
         return List.copyOf(shares.subList(0, Math.min(3, shares.size())));
     }

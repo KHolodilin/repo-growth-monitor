@@ -332,18 +332,12 @@ function StatsChart({
   const option = useMemo(() => statsChartOption(points), [points]);
   return (
     <ChartCard title="Stats" events={events} period={period} context="portfolio:stats">
-      {points.length === 0 ? (
-        <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          <div className="font-medium text-foreground">No stats for this period.</div>
-        </div>
-      ) : (
-        <PersistentECharts
-          chartId={dashboardStatsChartId()}
-          series={STATS_SERIES}
-          option={option}
-          style={{ height: 360, width: "100%" }}
-        />
-      )}
+      <PersistentECharts
+        chartId={dashboardStatsChartId()}
+        series={STATS_SERIES}
+        option={option}
+        style={{ height: 360, width: "100%" }}
+      />
     </ChartCard>
   );
 }
@@ -445,10 +439,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
 
   return (
     <Card className="overflow-hidden p-0">
-      <div className="px-5 pt-5">
-        <h2 className="font-medium">Repositories</h2>
-      </div>
-      <div className="mt-3 overflow-x-auto">
+      <div className="overflow-x-auto pt-3">
         <table className="w-full min-w-[1000px] text-sm">
           <thead className="text-left text-muted-foreground">
             <tr>
