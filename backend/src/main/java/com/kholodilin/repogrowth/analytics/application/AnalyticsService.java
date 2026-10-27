@@ -684,7 +684,7 @@ public class AnalyticsService {
         for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
             List<RepositoryStatDay> rows = byDate.getOrDefault(day, List.of());
             if (rows.isEmpty()) {
-                points.add(new StatsPoint(day, null, null, null, null, List.of(), List.of(), List.of(), List.of(), tracked));
+                points.add(new StatsPoint(day, null, null, null, null, tracked));
                 continue;
             }
             int stars = 0;
