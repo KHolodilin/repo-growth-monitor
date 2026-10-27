@@ -215,6 +215,10 @@ export type StatsHistoryPoint = {
   forks: number | null;
   watchers: number | null;
   contributors: number | null;
+  starsLeaders?: { fullName: string; value: number }[] | null;
+  forksLeaders?: { fullName: string; value: number }[] | null;
+  watchersLeaders?: { fullName: string; value: number }[] | null;
+  contributorsLeaders?: { fullName: string; value: number }[] | null;
   missingRepositories?: number;
 };
 

@@ -168,10 +168,35 @@ class DashboardPartialDataTest {
                 .extracting(StatsPoint::date)
                 .containsExactly(first, hole, partial);
         assertThat(points).extracting(StatsPoint::date).containsExactly(first, hole, partial);
-        assertThat(points.get(0)).isEqualTo(new StatsPoint(first, 150, 3, 5, 0, 0));
+        assertThat(points.get(0).stars()).isEqualTo(150);
+        assertThat(points.get(0).forks()).isEqualTo(3);
+        assertThat(points.get(0).watchers()).isEqualTo(5);
+        assertThat(points.get(0).contributors()).isEqualTo(0);
+        assertThat(points.get(0).missingRepositories()).isZero();
+        assertThat(points.get(0).starsLeaders()).containsExactly(
+                new TrafficLeader("owner/1", 100),
+                new TrafficLeader("owner/2", 50)
+        );
+        assertThat(points.get(0).forksLeaders()).containsExactly(
+                new TrafficLeader("owner/1", 2),
+                new TrafficLeader("owner/2", 1)
+        );
+        assertThat(points.get(0).watchersLeaders()).containsExactly(
+                new TrafficLeader("owner/1", 4),
+                new TrafficLeader("owner/2", 1)
+        );
+        assertThat(points.get(0).contributorsLeaders()).isEmpty();
         assertThat(points.get(1).stars()).isNull();
         assertThat(points.get(1).missingRepositories()).isEqualTo(2);
-        assertThat(points.get(2)).isEqualTo(new StatsPoint(partial, 106, 2, 4, 4, 1));
+        assertThat(points.get(2).stars()).isEqualTo(106);
+        assertThat(points.get(2).missingRepositories()).isEqualTo(1);
+        assertThat(points.get(2).starsLeaders()).containsExactly(new TrafficLeader("owner/1", 106));
+        assertThat(points.get(2).contributorsLeaders()).containsExactly(new TrafficLeader("owner/1", 4));
+        assertThat(AnalyticsService.topStatShares(List.of(), RepositoryStatDay::stars)).isEmpty();
+        assertThat(AnalyticsService.topStatShares(
+                List.of(stat(1, first, 0, 0, 0, 0)),
+                RepositoryStatDay::stars
+        )).isEmpty();
 
         PortfolioStats stats = AnalyticsService.portfolioStats(
                 List.of(stat(1, partial, 106, 2, 4, 4), stat(2, first, 50, 1, 1, 1)),
