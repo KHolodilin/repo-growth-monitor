@@ -18,7 +18,7 @@ body:
     attributes:
       label: Version
       description: Release tag or commit, and whether this is Docker, the mock stack, or a local checkout.
-      placeholder: 0.26.0, docker compose
+      placeholder: 0.27.0, docker compose
     validations:
       required: true
   - type: textarea
