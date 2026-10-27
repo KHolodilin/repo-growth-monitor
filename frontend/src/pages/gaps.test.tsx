@@ -137,7 +137,7 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
   });
 
-  it("shows an empty stats chart when the portfolio has no snapshots in the period", async () => {
+  it("still draws the portfolio stats chart when there are no snapshots in the period", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue({
       ...dashboardReady,
@@ -157,7 +157,8 @@ describe("coverage gaps", () => {
         <DashboardPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("No stats for this period.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Stats" })).toBeInTheDocument();
+    expect(screen.queryByText("No stats for this period.")).not.toBeInTheDocument();
     expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "all" }));
     expect(screen.queryByText("vs prev")).not.toBeInTheDocument();
