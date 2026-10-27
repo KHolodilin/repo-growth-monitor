@@ -50,6 +50,7 @@ describe("statsChart", () => {
       "Stars - —",
     );
     expect(option.xAxis.boundaryGap).toBe(true);
+    expect(option.series.every((item) => item.connectNulls === true)).toBe(true);
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(option.legend).toMatchObject({ top: 0 });
   });
@@ -63,6 +64,7 @@ describe("statsChart", () => {
     expect(formatter([{ axisValue: "2026-09-23", seriesName: "Stars", data: 21 }])).toContain("missing stats data");
     expect(formatter([{ axisValue: "2026-09-24", seriesName: "Stars", data: null }])).not.toContain("missing stats data");
     expect(partial.xAxis.boundaryGap).toBe(false);
+    expect(partial.series.every((item) => item.connectNulls === true)).toBe(true);
     const none = statsChartOption([
       { date: "2026-09-23", stars: 21, forks: 1, watchers: 1, contributors: 1, starsLeaders: [] },
     ]);
@@ -96,4 +98,3 @@ describe("statsChart", () => {
     expect(namedFormatter([{ axisValue: "2026-09-24", seriesName: "Stars", data: 21 }])).toContain("Stars - 21");
   });
 });
-

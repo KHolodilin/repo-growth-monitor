@@ -118,7 +118,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: points.map((point) => point.stars),
       },
       {
@@ -126,7 +126,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: points.map((point) => point.forks),
       },
       {
@@ -134,7 +134,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: points.map((point) => point.watchers),
       },
       {
@@ -142,7 +142,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: points.map((point) => point.contributors),
       },
     ],
