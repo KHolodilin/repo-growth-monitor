@@ -19,6 +19,7 @@ describe("statsChart", () => {
     expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(option.xAxis.boundaryGap).toBe(true);
+    expect(option.series.every((item) => item.connectNulls === true)).toBe(true);
     const partial = statsChartOption([
       { date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7, missingRepositories: 2 },
       { date: "2026-09-24", stars: null, forks: null, watchers: null, contributors: null, missingRepositories: 2 },
