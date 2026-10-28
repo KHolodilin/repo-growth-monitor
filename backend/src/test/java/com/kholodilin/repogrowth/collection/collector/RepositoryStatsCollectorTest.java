@@ -146,6 +146,46 @@ class RepositoryStatsCollectorTest {
     }
 
     @Test
+    void collectClearsBlankAboutAndDropsBlankContributorLogins() {
+        when(repositoryJdbcRepository.findHealth(13L)).thenReturn(Optional.empty());
+        when(gitHubClient.getRepository("acme", "demo")).thenReturn(remoteWithBlankDescription());
+        when(gitHubClient.countContributors("acme", "demo")).thenReturn(1);
+        when(gitHubClient.listContributors("acme", "demo")).thenReturn(List.of(
+                new com.kholodilin.repogrowth.github.model.GitHubContributorItem("  ", "User", null),
+                new com.kholodilin.repogrowth.github.model.GitHubContributorItem("zoe", "User", null)
+        ));
+        when(gitHubClient.latestCommitAt("acme", "demo")).thenReturn(Optional.empty());
+        when(gitHubClient.getCommunityProfile("acme", "demo")).thenReturn(GitHubCommunityProfileResponse.empty());
+        when(gitHubClient.getReadme("acme", "demo")).thenReturn(Optional.empty());
+        when(gitHubClient.fileExists(anyString(), anyString(), anyString())).thenReturn(false);
+        when(gitHubClient.hasIssueTemplates("acme", "demo")).thenReturn(false);
+        when(gitHubClient.latestReleaseAt("acme", "demo")).thenReturn(Optional.empty());
+        when(gitHubClient.getSocialPreview("acme", "demo")).thenReturn(new GitHubSocialPreview(false, null));
+
+        collector.collect(context());
+
+        verify(repositoryJdbcRepository).updateStats(
+                org.mockito.ArgumentMatchers.eq(13L),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(),
+                any(),
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.anyBoolean()
+        );
+        verify(trafficJdbcRepository).replaceContributorLogins(
+                org.mockito.ArgumentMatchers.eq(13L),
+                org.mockito.ArgumentMatchers.eq(LocalDate.of(2026, 9, 23)),
+                org.mockito.ArgumentMatchers.eq(List.of("zoe"))
+        );
+    }
+
+    @Test
     void collectKeepsThePreviousPreviewWhenGitHubFails() {
         when(repositoryJdbcRepository.findHealth(13L)).thenReturn(Optional.of(new RepositoryHealthFacts(
                 "https://example.com", true, true, true, true, true, true, true, true, true, true
@@ -195,6 +235,16 @@ class RepositoryStatsCollectorTest {
     private GitHubRepositoryResponse remoteWithoutDescription() {
         return new GitHubRepositoryResponse(
                 200L, "demo", "acme/demo", null, false, "public", "main", "Java",
+                false, false, 11, 1, 2, 0, "https://github.com/acme/demo",
+                Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"),
+                new GitHubOwnerResponse(1L, "acme", "User", null, null),
+                List.of(), null, null
+        );
+    }
+
+    private GitHubRepositoryResponse remoteWithBlankDescription() {
+        return new GitHubRepositoryResponse(
+                200L, "demo", "acme/demo", "   ", false, "public", "main", "Java",
                 false, false, 11, 1, 2, 0, "https://github.com/acme/demo",
                 Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"),
                 new GitHubOwnerResponse(1L, "acme", "User", null, null),
