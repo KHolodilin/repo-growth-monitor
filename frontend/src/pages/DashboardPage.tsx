@@ -14,7 +14,7 @@ import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSele
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
-import { dashboardStatsChartId, dashboardTrafficChartId, STATS_SERIES, TRAFFIC_SERIES } from "../lib/chartLegend";
+import { dashboardStatsChartId, dashboardTrafficChartId, DASHBOARD_STATS_SERIES, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 
 const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "growth", "discoverability"] as const;
@@ -25,7 +25,7 @@ const PORTFOLIO_STATS = [
   { key: "stars", label: "Stars", color: "#5470c6" },
   { key: "forks", label: "Forks", color: "#91cc75" },
   { key: "watchers", label: "Watchers", color: "#fac858" },
-  { key: "contributors", label: "Contributors", color: "#ee6666" },
+  { key: "contributors", label: "Unique Contributors", color: "#ee6666" },
 ] as const;
 
 export function DashboardPage() {
@@ -126,11 +126,11 @@ export function DashboardPage() {
             series={data.traffic.map((point) => point.visitors)}
           />
           <TrafficKpiCard
-            label="Clones"
-            value={data.summary.clones.value}
-            growthPercent={data.summary.clones.growthPercent}
+            label="Unique Cloners"
+            value={data.summary.uniqueCloners.value}
+            growthPercent={data.summary.uniqueCloners.growthPercent}
             period={period}
-            series={data.traffic.map((point) => point.clones)}
+            series={data.traffic.map((point) => point.uniqueCloners ?? null)}
           />
         </div>
       ) : (
@@ -329,12 +329,15 @@ function StatsChart({
   events: GrowthEvent[];
   period: string;
 }) {
-  const option = useMemo(() => statsChartOption(points), [points]);
+  const option = useMemo(
+    () => statsChartOption(points, { contributorsLabel: "Unique Contributors" }),
+    [points],
+  );
   return (
     <ChartCard title="Stats" events={events} period={period} context="portfolio:stats">
       <PersistentECharts
         chartId={dashboardStatsChartId()}
-        series={STATS_SERIES}
+        series={DASHBOARD_STATS_SERIES}
         option={option}
         style={{ height: 360, width: "100%" }}
       />

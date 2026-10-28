@@ -237,7 +237,7 @@ export function trafficChartOption(
         type: "line",
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: dates.map((date) => byDate.get(date)?.views ?? null),
         markPoint: marker
           ? {
@@ -255,7 +255,7 @@ export function trafficChartOption(
         type: "line",
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: dates.map((date) => byDate.get(date)?.uniqueVisitors ?? null),
       },
       {
@@ -263,7 +263,7 @@ export function trafficChartOption(
         type: "line",
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: dates.map((date) => byDate.get(date)?.uniqueCloners ?? null),
       },
       {

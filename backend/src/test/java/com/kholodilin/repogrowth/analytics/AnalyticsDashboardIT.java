@@ -138,7 +138,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.summary().visitors().value()).isEqualTo(140);
         assertThat(dashboard.summary().visitors().growthPercent()).isEqualTo(100.0);
         assertThat(dashboard.summary().views().value()).isEqualTo(280);
-        assertThat(dashboard.summary().clones().value()).isEqualTo(28);
+        assertThat(dashboard.summary().uniqueCloners().value()).isEqualTo(21);
         assertThat(dashboard.summary().stars().total()).isEqualTo(169);
         assertThat(dashboard.summary().stars().change()).isEqualTo(14);
         assertThat(dashboard.stats().totals().stars().value()).isEqualTo(155);
@@ -457,6 +457,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(2), 106, 4, 2, 0, 4);
         trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 110, 4, 2, 0, 4);
         trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(1), 50, 1, 1, 0, 0);
+        trafficJdbcRepository.replaceContributorLogins(kafka.id(), today.minusDays(1), java.util.List.of("alice", "bob"));
+        trafficJdbcRepository.replaceContributorLogins(outbox.id(), today.minusDays(1), java.util.List.of("bob"));
 
         DashboardResponse week = analyticsService.dashboard("7d");
         assertThat(week.stats().points()).extracting(DashboardResponse.StatsPoint::date).containsExactly(
@@ -475,7 +477,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(week.stats().totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(160, 10, 6.7));
         assertThat(week.stats().totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, 0, 0.0));
         assertThat(week.stats().totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, 0, 0.0));
-        assertThat(week.stats().totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(4, 4, null));
+        assertThat(week.stats().totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(2, null, null));
+        assertThat(week.stats().points().get(3).contributors()).isEqualTo(2);
 
         DashboardResponse day = analyticsService.dashboard("1d");
         assertThat(day.stats().points()).extracting(DashboardResponse.StatsPoint::date).containsExactly(today.minusDays(1));

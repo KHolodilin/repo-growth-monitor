@@ -49,6 +49,7 @@ public abstract class AbstractPostgresTest {
         jdbcClient.sql("DELETE FROM traffic_path_snapshot").update();
         jdbcClient.sql("DELETE FROM traffic_referrer_snapshot").update();
         jdbcClient.sql("DELETE FROM traffic_daily").update();
+        jdbcClient.sql("DELETE FROM repository_daily_contributor_login").update();
         jdbcClient.sql("DELETE FROM repository_daily_stats").update();
         jdbcClient.sql("DELETE FROM repository_health").update();
         jdbcClient.sql("DELETE FROM repository_topics").update();

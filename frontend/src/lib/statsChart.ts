@@ -17,7 +17,7 @@ function leadersFor(point: StatsHistoryPoint | undefined, seriesName: string) {
   if (seriesName === "Watchers") {
     return point.watchersLeaders;
   }
-  if (seriesName === "Contributors") {
+  if (seriesName === "Contributors" || seriesName === "Unique Contributors") {
     return point.contributorsLeaders;
   }
   return undefined;
@@ -56,7 +56,11 @@ function tooltipItems(raw: unknown): TooltipItem[] | null {
   return null;
 }
 
-export function statsChartOption(points: StatsHistoryPoint[]) {
+export function statsChartOption(
+  points: StatsHistoryPoint[],
+  options?: { contributorsLabel?: string },
+) {
+  const contributorsLabel = options?.contributorsLabel ?? "Contributors";
   const byDate = new Map(points.map((point) => [point.date, point]));
   const dates = points.map((point) => point.date);
   return {
@@ -90,7 +94,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
       },
     },
     axisPointer: { show: false },
-    legend: { top: 0, data: ["Stars", "Forks", "Watchers", "Contributors"] },
+    legend: { top: 0, data: ["Stars", "Forks", "Watchers", contributorsLabel] },
     grid: {
       left: 48,
       right: 24,
@@ -138,7 +142,7 @@ export function statsChartOption(points: StatsHistoryPoint[]) {
         data: points.map((point) => point.watchers),
       },
       {
-        name: "Contributors",
+        name: contributorsLabel,
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,

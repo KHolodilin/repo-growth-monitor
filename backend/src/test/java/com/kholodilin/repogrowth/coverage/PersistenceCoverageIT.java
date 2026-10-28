@@ -94,7 +94,7 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
         assertThat(repositoryJdbcRepository.isAccountAccessible(repository.id())).isTrue();
         assertThat(repositoryJdbcRepository.countTracked()).isEqualTo(1);
         repositoryJdbcRepository.updateStats(
-                repository.id(), 11, 2, 3, 1, 4,
+                repository.id(), "updated about", 11, 2, 3, 1, 4,
                 Instant.parse("2026-09-02T00:00:00Z"), Instant.parse("2026-09-02T00:00:00Z"),
                 Instant.parse("2026-09-02T00:00:00Z"), Instant.parse("2026-09-02T00:00:00Z"), false
         );
@@ -220,6 +220,13 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
 
         trafficJdbcRepository.upsertDaily(repository.id(), today, 8, 3, 2, 1);
         trafficJdbcRepository.upsertDailyStats(repository.id(), today, 10, 1, 2, 0, 3);
+        trafficJdbcRepository.replaceContributorLogins(repository.id(), today, java.util.List.of("alice", "bob"));
+        assertThat(trafficJdbcRepository.trackedDailyStats(today, today).getFirst().contributorLogins())
+                .containsExactly("alice", "bob");
+        assertThat(trafficJdbcRepository.latestTrackedDailyStats().getFirst().contributorLogins())
+                .containsExactly("alice", "bob");
+        trafficJdbcRepository.replaceContributorLogins(repository.id(), today, java.util.List.of());
+        assertThat(trafficJdbcRepository.trackedDailyStats(today, today).getFirst().contributorLogins()).isEmpty();
         trafficJdbcRepository.insertReferrers(repository.id(), today, Instant.parse("2026-09-23T00:00:00Z"), "github.com", 4, 2);
         trafficJdbcRepository.insertPath(repository.id(), today, Instant.parse("2026-09-23T00:00:00Z"), "/acme/demo", "demo", 4, 2, false);
         trafficJdbcRepository.insertPath(repository.id(), today, Instant.parse("2026-09-23T00:00:00Z"), "/acme/demo/issues", "issues", 1, 1, true);

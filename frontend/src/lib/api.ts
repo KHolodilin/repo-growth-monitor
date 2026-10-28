@@ -76,7 +76,7 @@ export type Dashboard = {
     repositories: number;
     views: { value: number; growthPercent: number | null };
     visitors: { value: number; growthPercent: number | null };
-    clones: { value: number; growthPercent: number | null };
+    uniqueCloners: { value: number; growthPercent: number | null };
     stars: { total: number; change: number | null };
   };
   traffic: {
@@ -84,6 +84,7 @@ export type Dashboard = {
     views: number | null;
     visitors: number | null;
     clones: number | null;
+    uniqueCloners?: number | null;
     viewsLeaders?: { fullName: string; value: number }[] | null;
     visitorsLeaders?: { fullName: string; value: number }[] | null;
     clonesLeaders?: { fullName: string; value: number }[] | null;

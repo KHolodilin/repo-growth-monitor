@@ -393,7 +393,7 @@ public class AnalyticsService {
                         tracked.size(),
                         metric(current.views(), previous.views(), period),
                         metric(current.uniqueVisitors(), previous.uniqueVisitors(), period),
-                        metric(current.clones(), previous.clones(), period),
+                        metric(current.uniqueCloners(), previous.uniqueCloners(), period),
                         new StarsMetric(starsTotal, starsChange)
                 ),
                 traffic,
@@ -609,17 +609,19 @@ public class AnalyticsService {
         for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
             List<RepositoryDayTotals> rows = byDate.getOrDefault(day, List.of());
             if (rows.isEmpty()) {
-                points.add(new TrafficPoint(day, null, null, null, List.of(), List.of(), List.of(), tracked));
+                points.add(new TrafficPoint(day, null, null, null, null, List.of(), List.of(), List.of(), tracked));
                 continue;
             }
             long views = 0;
             long visitors = 0;
             long clones = 0;
+            long uniqueCloners = 0;
             Set<String> names = new HashSet<>();
             for (RepositoryDayTotals row : rows) {
                 views += row.views();
                 visitors += row.uniqueVisitors();
                 clones += row.clones();
+                uniqueCloners += row.uniqueCloners();
                 names.add(row.fullName());
             }
             int missing = Math.max(0, tracked - names.size());
@@ -628,6 +630,7 @@ public class AnalyticsService {
                     views,
                     visitors,
                     clones,
+                    uniqueCloners,
                     topShares(rows, RepositoryDayTotals::views),
                     topShares(rows, RepositoryDayTotals::uniqueVisitors),
                     topShares(rows, RepositoryDayTotals::clones),
@@ -690,25 +693,24 @@ public class AnalyticsService {
             int stars = 0;
             int forks = 0;
             int watchers = 0;
-            int contributors = 0;
             Set<Long> ids = new HashSet<>();
             for (RepositoryStatDay row : rows) {
                 stars += row.stars();
                 forks += row.forks();
                 watchers += row.watchers();
-                contributors += row.contributors();
                 ids.add(row.repositoryId());
             }
+            Integer uniqueContributors = uniqueContributorCount(rows);
             points.add(new StatsPoint(
                     day,
                     stars,
                     forks,
                     watchers,
-                    contributors,
+                    uniqueContributors,
                     topStatShares(rows, RepositoryStatDay::stars),
                     topStatShares(rows, RepositoryStatDay::forks),
                     topStatShares(rows, RepositoryStatDay::watchers),
-                    topStatShares(rows, RepositoryStatDay::contributors),
+                    topUniqueContributorShares(rows),
                     Math.max(0, tracked - ids.size())
             ));
         }
@@ -717,18 +719,50 @@ public class AnalyticsService {
 
     static PortfolioStats portfolioStats(List<RepositoryStatDay> latest, boolean allTime, List<StatsPoint> points) {
         List<StatsPoint> present = points.stream().filter(point -> point.stars() != null).toList();
+        List<StatsPoint> uniquePresent = points.stream().filter(point -> point.contributors() != null).toList();
         boolean comparable = !allTime && present.size() >= 2;
+        boolean uniqueComparable = !allTime && uniquePresent.size() >= 2;
         StatsPoint first = comparable ? present.getFirst() : null;
         StatsPoint last = comparable ? present.getLast() : null;
+        StatsPoint uniqueFirst = uniqueComparable ? uniquePresent.getFirst() : null;
+        StatsPoint uniqueLast = uniqueComparable ? uniquePresent.getLast() : null;
         return new PortfolioStats(
                 new DashboardResponse.StatsTotals(
                         portfolioLevel(sum(latest, RepositoryStatDay::stars), comparable, pointValue(first == null ? null : first.stars()), pointValue(last == null ? null : last.stars())),
                         portfolioLevel(sum(latest, RepositoryStatDay::forks), comparable, pointValue(first == null ? null : first.forks()), pointValue(last == null ? null : last.forks())),
                         portfolioLevel(sum(latest, RepositoryStatDay::watchers), comparable, pointValue(first == null ? null : first.watchers()), pointValue(last == null ? null : last.watchers())),
-                        portfolioLevel(sum(latest, RepositoryStatDay::contributors), comparable, pointValue(first == null ? null : first.contributors()), pointValue(last == null ? null : last.contributors()))
+                        portfolioLevel(
+                                uniqueContributorCount(latest),
+                                uniqueComparable,
+                                pointValue(uniqueFirst == null ? null : uniqueFirst.contributors()),
+                                pointValue(uniqueLast == null ? null : uniqueLast.contributors())
+                        )
                 ),
                 points
         );
+    }
+
+    static Integer uniqueContributorCount(List<RepositoryStatDay> rows) {
+        boolean anyCollected = false;
+        Set<String> logins = new HashSet<>();
+        for (RepositoryStatDay row : rows) {
+            if (row.contributorLogins() == null) {
+                continue;
+            }
+            anyCollected = true;
+            logins.addAll(row.contributorLogins());
+        }
+        return anyCollected ? logins.size() : null;
+    }
+
+    static List<TrafficLeader> topUniqueContributorShares(List<RepositoryStatDay> rows) {
+        List<RepositoryStatDay> withLogins = rows.stream()
+                .filter(row -> row.contributorLogins() != null)
+                .toList();
+        if (withLogins.isEmpty()) {
+            return List.of();
+        }
+        return topStatShares(withLogins, row -> row.contributorLogins().size());
     }
 
     private static Integer sum(List<RepositoryStatDay> rows, ToIntFunction<RepositoryStatDay> metric) {

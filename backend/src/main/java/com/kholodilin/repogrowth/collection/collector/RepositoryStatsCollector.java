@@ -3,6 +3,7 @@ package com.kholodilin.repogrowth.collection.collector;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
+import com.kholodilin.repogrowth.github.model.GitHubContributorItem;
 import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthEvaluator;
 import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
+import java.util.List;
 
 @Slf4j
 @Component
@@ -56,6 +58,19 @@ public class RepositoryStatsCollector implements Collector {
             log.warn("Contributor count failed repository={} error={}", context.repository().fullName(), ex.getMessage());
         }
         int resolvedContributors = contributors;
+        List<String> contributorLogins = null;
+        try {
+            contributorLogins = gitHubClient.listContributors(owner, name).stream()
+                    .map(GitHubContributorItem::login)
+                    .filter(login -> login != null && !login.isBlank())
+                    .map(String::trim)
+                    .distinct()
+                    .sorted()
+                    .toList();
+        } catch (RuntimeException ex) {
+            log.warn("Contributor list failed repository={} error={}", context.repository().fullName(), ex.getMessage());
+        }
+        List<String> resolvedContributorLogins = contributorLogins;
         Instant lastCommitAt = null;
         try {
             lastCommitAt = gitHubClient.latestCommitAt(owner, name).orElse(null);
@@ -133,10 +148,14 @@ public class RepositoryStatsCollector implements Collector {
                 files.hasPullRequestTemplate(),
                 hasSocialPreview
         );
+        String description = remote.description() == null || remote.description().isBlank()
+                ? null
+                : remote.description().trim();
 
         transactionTemplate.executeWithoutResult(status -> {
             repositoryJdbcRepository.updateStats(
                     context.repository().id(),
+                    description,
                     remote.stargazersCount(),
                     remote.watchers(),
                     remote.forksCount(),
@@ -163,6 +182,13 @@ public class RepositoryStatsCollector implements Collector {
                     remote.openIssuesCount(),
                     resolvedContributors
             );
+            if (resolvedContributorLogins != null) {
+                trafficJdbcRepository.replaceContributorLogins(
+                        context.repository().id(),
+                        context.job().businessDate(),
+                        resolvedContributorLogins
+                );
+            }
         });
     }
 }

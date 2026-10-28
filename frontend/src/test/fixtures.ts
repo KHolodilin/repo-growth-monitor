@@ -155,10 +155,10 @@ export const dashboardReady: Dashboard = {
     repositories: 1,
     views: { value: 10, growthPercent: 12.5 },
     visitors: { value: 4, growthPercent: -2 },
-    clones: { value: 2, growthPercent: null },
+    uniqueCloners: { value: 2, growthPercent: null },
     stars: { total: 21, change: 3 },
   },
-  traffic: [{ date: "2026-09-23", views: 5, visitors: 2, clones: 1 }],
+  traffic: [{ date: "2026-09-23", views: 5, visitors: 2, clones: 1, uniqueCloners: 1 }],
   repositories: [
     {
       id: 13,

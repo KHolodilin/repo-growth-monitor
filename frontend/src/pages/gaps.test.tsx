@@ -73,6 +73,7 @@ describe("coverage gaps", () => {
     api.mockResolvedValue({
       ...dashboardReady,
       summary: { ...dashboardReady.summary, stars: { total: 21, change: 0 } },
+      traffic: [{ date: "2026-09-23", views: 5, visitors: 2, clones: 1 }],
       repositories: [
         dashboardReady.repositories[0],
         { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null },

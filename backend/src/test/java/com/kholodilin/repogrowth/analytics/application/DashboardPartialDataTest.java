@@ -93,8 +93,8 @@ class DashboardPartialDataTest {
     @Test
     void trailingUnpublishedDaysAreDroppedFromTheSeries() {
         List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 26), 100L, 40L, 5L),
-                new TrafficPoint(LocalDate.of(2026, 8, 27), null, null, null),
+                new TrafficPoint(LocalDate.of(2026, 8, 26), 100L, 40L, 5L, 2L),
+                new TrafficPoint(LocalDate.of(2026, 8, 27), null, null, null, null),
                 new TrafficPoint(LocalDate.of(2026, 8, 28), null, null, null)
         );
         List<TrafficPoint> trimmed = AnalyticsService.dropTrailingGaps(traffic, TrafficPoint::views);
@@ -171,7 +171,7 @@ class DashboardPartialDataTest {
         assertThat(points.get(0).stars()).isEqualTo(150);
         assertThat(points.get(0).forks()).isEqualTo(3);
         assertThat(points.get(0).watchers()).isEqualTo(5);
-        assertThat(points.get(0).contributors()).isEqualTo(0);
+        assertThat(points.get(0).contributors()).isNull();
         assertThat(points.get(0).missingRepositories()).isZero();
         assertThat(points.get(0).starsLeaders()).containsExactly(
                 new TrafficLeader("owner/1", 100),
@@ -191,7 +191,7 @@ class DashboardPartialDataTest {
         assertThat(points.get(2).stars()).isEqualTo(106);
         assertThat(points.get(2).missingRepositories()).isEqualTo(1);
         assertThat(points.get(2).starsLeaders()).containsExactly(new TrafficLeader("owner/1", 106));
-        assertThat(points.get(2).contributorsLeaders()).containsExactly(new TrafficLeader("owner/1", 4));
+        assertThat(points.get(2).contributorsLeaders()).isEmpty();
         assertThat(AnalyticsService.topStatShares(List.of(), RepositoryStatDay::stars)).isEmpty();
         assertThat(AnalyticsService.topStatShares(
                 List.of(stat(1, first, 0, 0, 0, 0)),
@@ -206,7 +206,7 @@ class DashboardPartialDataTest {
         assertThat(stats.totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(156,  -44, -29.3));
         assertThat(stats.totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, -1, -33.3));
         assertThat(stats.totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, -1, -20.0));
-        assertThat(stats.totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(5, 4, null));
+        assertThat(stats.totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(null, null, null));
 
         PortfolioStats all = AnalyticsService.portfolioStats(List.of(), true, points);
         assertThat(all.totals().stars().value()).isNull();
@@ -215,6 +215,34 @@ class DashboardPartialDataTest {
 
         assertThat(AnalyticsService.portfolioStats(List.of(stat(1, first, 10, 0, 0, 0)), false, List.of(points.get(0)))
                 .totals().stars().absoluteChange()).isNull();
+    }
+
+    @Test
+    void uniqueContributorsUnionLoginsAcrossRepositoriesAndIgnoreUncollectedDays() {
+        LocalDate day = LocalDate.of(2026, 8, 20);
+        LocalDate next = LocalDate.of(2026, 8, 22);
+        LocalDate today = LocalDate.of(2026, 8, 23);
+        RepositoryStatDay left = new RepositoryStatDay(1, "owner/1", day, 10, 1, 1, 9, List.of("alice", "bob"));
+        RepositoryStatDay right = new RepositoryStatDay(2, "owner/2", day, 5, 1, 1, 9, List.of("bob", "carol"));
+        RepositoryStatDay later = new RepositoryStatDay(1, "owner/1", next, 12, 1, 1, 9, List.of("alice"));
+        List<StatsPoint> points = AnalyticsService.portfolioStatsSeries(
+                day, today, today, 2,
+                Map.of(day, List.of(left, right), next, List.of(later))
+        );
+        assertThat(points.get(0).contributors()).isEqualTo(3);
+        assertThat(points.get(0).contributorsLeaders()).containsExactly(
+                new TrafficLeader("owner/1", 2),
+                new TrafficLeader("owner/2", 2)
+        );
+        assertThat(points.get(1).contributors()).isNull();
+        assertThat(points.get(2).contributors()).isEqualTo(1);
+        PortfolioStats stats = AnalyticsService.portfolioStats(List.of(later, right), false, points);
+        assertThat(stats.totals().contributors().value()).isEqualTo(3);
+        assertThat(stats.totals().contributors().absoluteChange()).isEqualTo(-2);
+        assertThat(AnalyticsService.uniqueContributorCount(List.of(stat(1, day, 1, 0, 0, 1)))).isNull();
+        assertThat(AnalyticsService.uniqueContributorCount(List.of(
+                new RepositoryStatDay(1, "owner/1", day, 1, 0, 0, 0, List.of())
+        ))).isZero();
     }
 
     private static RepositoryStatDay stat(long id, LocalDate date, int stars, int forks, int watchers, int contributors) {

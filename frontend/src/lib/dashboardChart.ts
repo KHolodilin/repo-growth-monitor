@@ -137,7 +137,7 @@ function metricSeries(
       color,
       showSymbol: true,
       symbolSize: 8,
-      connectNulls: false,
+      connectNulls: true,
       data: traffic.map((point) => point[metric] ?? null),
     },
   ];

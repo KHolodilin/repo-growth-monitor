@@ -120,7 +120,7 @@ export function rankHistoryOption({
       {
         name: item.name,
         type: "line",
-        connectNulls: false,
+        connectNulls: true,
         showSymbol: true,
         symbol: "circle",
         symbolSize: item.highlighted ? 8 : 6,
