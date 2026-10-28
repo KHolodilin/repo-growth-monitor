@@ -93,8 +93,8 @@ class DashboardPartialDataTest {
     @Test
     void trailingUnpublishedDaysAreDroppedFromTheSeries() {
         List<TrafficPoint> traffic = List.of(
-                new TrafficPoint(LocalDate.of(2026, 8, 26), 100L, 40L, 5L),
-                new TrafficPoint(LocalDate.of(2026, 8, 27), null, null, null),
+                new TrafficPoint(LocalDate.of(2026, 8, 26), 100L, 40L, 5L, 2L),
+                new TrafficPoint(LocalDate.of(2026, 8, 27), null, null, null, null),
                 new TrafficPoint(LocalDate.of(2026, 8, 28), null, null, null)
         );
         List<TrafficPoint> trimmed = AnalyticsService.dropTrailingGaps(traffic, TrafficPoint::views);

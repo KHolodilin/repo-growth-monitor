@@ -12,7 +12,6 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -242,7 +241,7 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
-    private static List<String> readLogins(boolean collected, Array array) {
+    static List<String> readLogins(boolean collected, Array array) {
         if (!collected) {
             return null;
         }
@@ -251,19 +250,16 @@ public class TrafficJdbcRepository {
         }
         try {
             Object raw = array.getArray();
-            if (raw instanceof String[] values) {
-                return Arrays.asList(values);
+            if (!(raw instanceof Object[] values)) {
+                return List.of();
             }
-            if (raw instanceof Object[] values) {
-                List<String> logins = new ArrayList<>(values.length);
-                for (Object value : values) {
-                    if (value != null) {
-                        logins.add(String.valueOf(value));
-                    }
+            List<String> logins = new ArrayList<>(values.length);
+            for (Object value : values) {
+                if (value != null) {
+                    logins.add(String.valueOf(value));
                 }
-                return logins;
             }
-            return List.of();
+            return logins;
         } catch (Exception ex) {
             return List.of();
         }

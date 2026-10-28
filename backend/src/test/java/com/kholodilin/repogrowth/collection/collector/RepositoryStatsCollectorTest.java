@@ -194,7 +194,7 @@ class RepositoryStatsCollectorTest {
 
     private GitHubRepositoryResponse remoteWithoutDescription() {
         return new GitHubRepositoryResponse(
-                200L, "demo", "acme/demo", "  ", false, "public", "main", "Java",
+                200L, "demo", "acme/demo", null, false, "public", "main", "Java",
                 false, false, 11, 1, 2, 0, "https://github.com/acme/demo",
                 Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"),
                 new GitHubOwnerResponse(1L, "acme", "User", null, null),
