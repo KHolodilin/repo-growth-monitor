@@ -266,6 +266,7 @@ public class RepositoryJdbcRepository {
 
     public void updateStats(
             long id,
+            String description,
             int stars,
             int watchers,
             int forks,
@@ -279,7 +280,8 @@ public class RepositoryJdbcRepository {
     ) {
         jdbcClient.sql("""
                         UPDATE repository
-                        SET stars = :stars,
+                        SET description = :description,
+                            stars = :stars,
                             watchers = :watchers,
                             forks = :forks,
                             open_issues = :openIssues,
@@ -293,6 +295,7 @@ public class RepositoryJdbcRepository {
                         WHERE id = :id
                         """)
                 .param("id", id)
+                .param("description", description)
                 .param("stars", stars)
                 .param("watchers", watchers)
                 .param("forks", forks)

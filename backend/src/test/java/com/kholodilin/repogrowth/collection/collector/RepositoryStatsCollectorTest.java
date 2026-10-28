@@ -71,6 +71,11 @@ class RepositoryStatsCollectorTest {
         when(repositoryJdbcRepository.findHealth(13L)).thenReturn(Optional.empty());
         when(gitHubClient.getRepository("acme", "demo")).thenReturn(remote());
         when(gitHubClient.countContributors("acme", "demo")).thenReturn(4);
+        when(gitHubClient.listContributors("acme", "demo")).thenReturn(List.of(
+                new com.kholodilin.repogrowth.github.model.GitHubContributorItem("alice", "User", null),
+                new com.kholodilin.repogrowth.github.model.GitHubContributorItem(null, "Anonymous", null),
+                new com.kholodilin.repogrowth.github.model.GitHubContributorItem("bob", "User", null)
+        ));
         when(gitHubClient.latestCommitAt("acme", "demo")).thenReturn(Optional.of(Instant.parse("2026-09-01T00:00:00Z")));
         when(gitHubClient.getCommunityProfile("acme", "demo")).thenReturn(GitHubCommunityProfileResponse.empty());
         when(gitHubClient.getReadme("acme", "demo")).thenReturn(Optional.of("# demo\n"));
@@ -85,7 +90,59 @@ class RepositoryStatsCollectorTest {
         verify(repositoryJdbcRepository).upsertHealth(anyLong(), facts.capture());
         assertThat(facts.getValue().hasSocialPreview()).isTrue();
         verify(repositoryJdbcRepository).updateLastReleaseAt(anyLong(), any());
+        verify(repositoryJdbcRepository).updateStats(
+                org.mockito.ArgumentMatchers.eq(13L),
+                org.mockito.ArgumentMatchers.eq("demo"),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(),
+                any(),
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.anyBoolean()
+        );
+        verify(trafficJdbcRepository).replaceContributorLogins(
+                org.mockito.ArgumentMatchers.eq(13L),
+                org.mockito.ArgumentMatchers.eq(LocalDate.of(2026, 9, 23)),
+                org.mockito.ArgumentMatchers.eq(List.of("alice", "bob"))
+        );
         verify(topicWatchSync).sync(13L);
+    }
+
+    @Test
+    void collectClearsAnEmptyAboutAndSkipsLoginsWhenTheListFails() {
+        when(repositoryJdbcRepository.findHealth(13L)).thenReturn(Optional.empty());
+        when(gitHubClient.getRepository("acme", "demo")).thenReturn(remoteWithoutDescription());
+        when(gitHubClient.countContributors("acme", "demo")).thenReturn(1);
+        when(gitHubClient.listContributors(anyString(), anyString())).thenThrow(new IllegalStateException("list"));
+        when(gitHubClient.latestCommitAt("acme", "demo")).thenReturn(Optional.empty());
+        when(gitHubClient.getCommunityProfile("acme", "demo")).thenReturn(GitHubCommunityProfileResponse.empty());
+        when(gitHubClient.getReadme("acme", "demo")).thenReturn(Optional.empty());
+        when(gitHubClient.fileExists(anyString(), anyString(), anyString())).thenReturn(false);
+        when(gitHubClient.hasIssueTemplates("acme", "demo")).thenReturn(false);
+        when(gitHubClient.latestReleaseAt("acme", "demo")).thenReturn(Optional.empty());
+        when(gitHubClient.getSocialPreview("acme", "demo")).thenReturn(new GitHubSocialPreview(false, null));
+
+        collector.collect(context());
+
+        verify(repositoryJdbcRepository).updateStats(
+                org.mockito.ArgumentMatchers.eq(13L),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(),
+                any(),
+                any(),
+                any(),
+                org.mockito.ArgumentMatchers.anyBoolean()
+        );
+        verify(trafficJdbcRepository, never()).replaceContributorLogins(anyLong(), any(), any());
     }
 
     @Test
@@ -95,6 +152,7 @@ class RepositoryStatsCollectorTest {
         )));
         when(gitHubClient.getRepository("acme", "demo")).thenReturn(remote());
         when(gitHubClient.countContributors(anyString(), anyString())).thenThrow(new IllegalStateException("contributors"));
+        when(gitHubClient.listContributors(anyString(), anyString())).thenThrow(new IllegalStateException("list"));
         when(gitHubClient.latestCommitAt(anyString(), anyString())).thenThrow(new IllegalStateException("commit"));
         when(gitHubClient.getCommunityProfile(anyString(), anyString())).thenThrow(new IllegalStateException("profile"));
         when(gitHubClient.getReadme(anyString(), anyString())).thenThrow(new IllegalStateException("readme"));
@@ -131,6 +189,16 @@ class RepositoryStatsCollectorTest {
                 Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"),
                 new GitHubOwnerResponse(1L, "acme", "User", null, null),
                 List.of("kafka"), " https://example.com ", new GitHubLicenseResponse("mit", "MIT", "MIT")
+        );
+    }
+
+    private GitHubRepositoryResponse remoteWithoutDescription() {
+        return new GitHubRepositoryResponse(
+                200L, "demo", "acme/demo", "  ", false, "public", "main", "Java",
+                false, false, 11, 1, 2, 0, "https://github.com/acme/demo",
+                Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-09-01T00:00:00Z"),
+                new GitHubOwnerResponse(1L, "acme", "User", null, null),
+                List.of(), null, null
         );
     }
 }

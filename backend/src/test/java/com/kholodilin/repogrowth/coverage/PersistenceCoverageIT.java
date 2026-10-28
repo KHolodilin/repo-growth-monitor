@@ -94,7 +94,7 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
         assertThat(repositoryJdbcRepository.isAccountAccessible(repository.id())).isTrue();
         assertThat(repositoryJdbcRepository.countTracked()).isEqualTo(1);
         repositoryJdbcRepository.updateStats(
-                repository.id(), 11, 2, 3, 1, 4,
+                repository.id(), "updated about", 11, 2, 3, 1, 4,
                 Instant.parse("2026-09-02T00:00:00Z"), Instant.parse("2026-09-02T00:00:00Z"),
                 Instant.parse("2026-09-02T00:00:00Z"), Instant.parse("2026-09-02T00:00:00Z"), false
         );

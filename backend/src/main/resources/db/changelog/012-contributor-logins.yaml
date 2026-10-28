@@ -1,0 +1,19 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-contributor-logins
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE repository_daily_stats
+                  ADD COLUMN contributor_logins_collected BOOLEAN NOT NULL DEFAULT FALSE;
+
+              CREATE TABLE repository_daily_contributor_login (
+                  repository_id BIGINT NOT NULL REFERENCES repository (id) ON DELETE CASCADE,
+                  stat_date DATE NOT NULL,
+                  login TEXT NOT NULL,
+                  PRIMARY KEY (repository_id, stat_date, login)
+              );
+
+              CREATE INDEX idx_daily_contributor_login_date
+                  ON repository_daily_contributor_login (stat_date, repository_id);

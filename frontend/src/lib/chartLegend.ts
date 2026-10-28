@@ -37,6 +37,13 @@ export const STATS_SERIES = [
   { key: "Contributors", name: "Contributors" },
 ] as const;
 
+export const DASHBOARD_STATS_SERIES = [
+  { key: "Stars", name: "Stars" },
+  { key: "Forks", name: "Forks" },
+  { key: "Watchers", name: "Watchers" },
+  { key: "Unique Contributors", name: "Unique Contributors" },
+] as const;
+
 export function repoStatsChartId(repoId: number | string) {
   return `${repoId}:stats`;
 }

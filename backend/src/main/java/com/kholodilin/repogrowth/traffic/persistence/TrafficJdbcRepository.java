@@ -7,9 +7,12 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Array;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -103,6 +106,34 @@ public class TrafficJdbcRepository {
                 .update();
     }
 
+    public void replaceContributorLogins(long repositoryId, LocalDate date, List<String> logins) {
+        jdbcClient.sql("""
+                        DELETE FROM repository_daily_contributor_login
+                        WHERE repository_id = :repositoryId AND stat_date = :statDate
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("statDate", date)
+                .update();
+        for (String login : logins) {
+            jdbcClient.sql("""
+                            INSERT INTO repository_daily_contributor_login (repository_id, stat_date, login)
+                            VALUES (:repositoryId, :statDate, :login)
+                            """)
+                    .param("repositoryId", repositoryId)
+                    .param("statDate", date)
+                    .param("login", login)
+                    .update();
+        }
+        jdbcClient.sql("""
+                        UPDATE repository_daily_stats
+                        SET contributor_logins_collected = TRUE
+                        WHERE repository_id = :repositoryId AND stat_date = :statDate
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("statDate", date)
+                .update();
+    }
+
     public List<RepositoryDailyStats> dailyStatsHistory(long repositoryId, LocalDate fromInclusive) {
         if (fromInclusive == null) {
             return jdbcClient.sql("""
@@ -148,7 +179,13 @@ public class TrafficJdbcRepository {
                                s.stars,
                                s.watchers,
                                s.forks,
-                               s.contributors
+                               s.contributors,
+                               s.contributor_logins_collected,
+                               (
+                                   SELECT COALESCE(array_agg(c.login ORDER BY c.login), ARRAY[]::text[])
+                                   FROM repository_daily_contributor_login c
+                                   WHERE c.repository_id = s.repository_id AND c.stat_date = s.stat_date
+                               ) AS contributor_logins
                         FROM repository_daily_stats s
                         JOIN repository r ON r.id = s.repository_id
                         WHERE r.tracking_enabled = TRUE
@@ -165,7 +202,8 @@ public class TrafficJdbcRepository {
                         rs.getInt("stars"),
                         rs.getInt("forks"),
                         rs.getInt("watchers"),
-                        rs.getInt("contributors")
+                        rs.getInt("contributors"),
+                        readLogins(rs.getBoolean("contributor_logins_collected"), rs.getArray("contributor_logins"))
                 ))
                 .list();
     }
@@ -179,7 +217,13 @@ public class TrafficJdbcRepository {
                                s.stars,
                                s.watchers,
                                s.forks,
-                               s.contributors
+                               s.contributors,
+                               s.contributor_logins_collected,
+                               (
+                                   SELECT COALESCE(array_agg(c.login ORDER BY c.login), ARRAY[]::text[])
+                                   FROM repository_daily_contributor_login c
+                                   WHERE c.repository_id = s.repository_id AND c.stat_date = s.stat_date
+                               ) AS contributor_logins
                         FROM repository_daily_stats s
                         JOIN repository r ON r.id = s.repository_id
                         WHERE r.tracking_enabled = TRUE
@@ -192,9 +236,37 @@ public class TrafficJdbcRepository {
                         rs.getInt("stars"),
                         rs.getInt("forks"),
                         rs.getInt("watchers"),
-                        rs.getInt("contributors")
+                        rs.getInt("contributors"),
+                        readLogins(rs.getBoolean("contributor_logins_collected"), rs.getArray("contributor_logins"))
                 ))
                 .list();
+    }
+
+    private static List<String> readLogins(boolean collected, Array array) {
+        if (!collected) {
+            return null;
+        }
+        if (array == null) {
+            return List.of();
+        }
+        try {
+            Object raw = array.getArray();
+            if (raw instanceof String[] values) {
+                return Arrays.asList(values);
+            }
+            if (raw instanceof Object[] values) {
+                List<String> logins = new ArrayList<>(values.length);
+                for (Object value : values) {
+                    if (value != null) {
+                        logins.add(String.valueOf(value));
+                    }
+                }
+                return logins;
+            }
+            return List.of();
+        } catch (Exception ex) {
+            return List.of();
+        }
     }
 
     public Optional<LocalDate> earliestDailyStatsDate(long repositoryId) {
@@ -543,7 +615,8 @@ public class TrafficJdbcRepository {
                                r.full_name,
                                t.views,
                                t.unique_visitors,
-                               t.clones
+                               t.clones,
+                               t.unique_cloners
                         FROM traffic_daily t
                         JOIN repository r ON r.id = t.repository_id
                         WHERE r.tracking_enabled = TRUE
@@ -558,7 +631,8 @@ public class TrafficJdbcRepository {
                         rs.getString("full_name"),
                         rs.getLong("views"),
                         rs.getLong("unique_visitors"),
-                        rs.getLong("clones")
+                        rs.getLong("clones"),
+                        rs.getLong("unique_cloners")
                 ))
                 .list();
     }
@@ -797,8 +871,20 @@ public class TrafficJdbcRepository {
             int stars,
             int forks,
             int watchers,
-            int contributors
+            int contributors,
+            List<String> contributorLogins
     ) {
+        public RepositoryStatDay(
+                long repositoryId,
+                String fullName,
+                LocalDate date,
+                int stars,
+                int forks,
+                int watchers,
+                int contributors
+        ) {
+            this(repositoryId, fullName, date, stars, forks, watchers, contributors, null);
+        }
     }
 
     public record DailyTotals(LocalDate date, long views, long uniqueVisitors, long clones) {
@@ -815,8 +901,18 @@ public class TrafficJdbcRepository {
             String fullName,
             long views,
             long uniqueVisitors,
-            long clones
+            long clones,
+            long uniqueCloners
     ) {
+        public RepositoryDayTotals(
+                LocalDate date,
+                String fullName,
+                long views,
+                long uniqueVisitors,
+                long clones
+        ) {
+            this(date, fullName, views, uniqueVisitors, clones, 0);
+        }
     }
 
     public record ReferrerRow(String referrer, int views, int uniqueVisitors) {

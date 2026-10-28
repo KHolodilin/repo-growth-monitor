@@ -42,7 +42,7 @@ public record DashboardResponse(
             int repositories,
             MetricValue views,
             MetricValue visitors,
-            MetricValue clones,
+            MetricValue uniqueCloners,
             StarsMetric stars
     ) {
     }
@@ -64,13 +64,18 @@ public record DashboardResponse(
             Long views,
             Long visitors,
             Long clones,
+            Long uniqueCloners,
             List<TrafficLeader> viewsLeaders,
             List<TrafficLeader> visitorsLeaders,
             List<TrafficLeader> clonesLeaders,
             int missingRepositories
     ) {
         public TrafficPoint(LocalDate date, Long views, Long visitors, Long clones) {
-            this(date, views, visitors, clones, List.of(), List.of(), List.of(), 0);
+            this(date, views, visitors, clones, null, List.of(), List.of(), List.of(), 0);
+        }
+
+        public TrafficPoint(LocalDate date, Long views, Long visitors, Long clones, Long uniqueCloners) {
+            this(date, views, visitors, clones, uniqueCloners, List.of(), List.of(), List.of(), 0);
         }
     }
 

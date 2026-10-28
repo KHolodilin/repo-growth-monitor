@@ -303,7 +303,7 @@ function countHistoryOption({
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
-        connectNulls: false,
+        connectNulls: true,
         data: item.data,
       })),
       ...eventSeries,

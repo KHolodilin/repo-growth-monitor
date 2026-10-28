@@ -62,7 +62,7 @@ export function snapshotChartOption({
       type: "line",
       showSymbol: true,
       symbolSize: 8,
-      connectNulls: false,
+      connectNulls: true,
       itemStyle: { color: referrerLineColor(name, index) },
       lineStyle: { color: referrerLineColor(name, index) },
       data: dates.map((_, dateIndex) => {

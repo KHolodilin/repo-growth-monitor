@@ -155,7 +155,7 @@ describe("searchSeriesChart", () => {
       [10, null],
       [1, null],
     ]);
-    expect(option.series.every((item) => item.connectNulls === false)).toBe(true);
+    expect(option.series.every((item) => item.connectNulls === true)).toBe(true);
   });
 
   it("starts each repository at day 1 and keeps a later gap empty", () => {
