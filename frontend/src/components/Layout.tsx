@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ApiError, type Dashboard } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
-import { canMutate, mutationBlockedReason } from "../lib/auth";
+import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
@@ -193,15 +193,32 @@ export function Layout() {
   );
 }
 
-function AuthChrome({
-  me,
-  loading,
-  onLogout,
-}: {
-  me: { authenticated: boolean; displayName: string | null; loginUrl: string };
-  loading: boolean;
-  onLogout: () => void;
-}) {
+function AuthChrome({ me, loading, onLogout }: { me: Me; loading: boolean; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   if (loading) {
     return <span className="text-muted-foreground">…</span>;
   }
@@ -212,13 +229,47 @@ function AuthChrome({
       </a>
     );
   }
+
+  const identity = me.displayName?.trim() || me.userId || "Account";
+  const initial = identity.charAt(0).toUpperCase();
+
   return (
-    <span className="flex items-center gap-3">
-      <span className="text-foreground">{me.displayName}</span>
-      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onLogout}>
-        Sign out
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground hover:bg-muted/80"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Account menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {initial}
       </button>
-    </span>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-md border bg-card text-sm shadow-md"
+        >
+          <div className="border-b px-3 py-2.5">
+            <div className="font-medium text-foreground">{identity}</div>
+            {me.userId && me.userId !== identity && (
+              <div className="mt-0.5 text-xs text-muted-foreground">{me.userId}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => {
+              setOpen(false);
+              onLogout();
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

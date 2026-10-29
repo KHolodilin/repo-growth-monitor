@@ -24,8 +24,17 @@ vi.mock("../lib/auth", async (importOriginal) => {
   return { ...actual, loadMe, signOut };
 });
 
+const adminMe = {
+  ...anonymousMe,
+  authenticated: true,
+  userId: "1",
+  displayName: "Mock Admin",
+  roles: ["USER", "ADMIN"],
+  actions: ["MUTATE"],
+};
+
 describe("Layout auth chrome", () => {
-  it("hides Collect for guests and shows Sign out for admins", async () => {
+  it("hides Collect for guests and keeps the account name inside the menu", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue(dashboardReady);
     loadMe.mockResolvedValue(anonymousMe);
@@ -43,15 +52,9 @@ describe("Layout auth chrome", () => {
     expect(await screen.findByRole("link", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByText(/Sign in as an admin/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Collect/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Account menu" })).not.toBeInTheDocument();
 
-    loadMe.mockResolvedValue({
-      ...anonymousMe,
-      authenticated: true,
-      userId: "1",
-      displayName: "Mock Admin",
-      roles: ["USER", "ADMIN"],
-      actions: ["MUTATE"],
-    });
+    loadMe.mockResolvedValue(adminMe);
     render(
       <MemoryRouter>
         <AuthProvider>
@@ -63,10 +66,15 @@ describe("Layout auth chrome", () => {
         </AuthProvider>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Mock Admin")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Account menu" })).toBeInTheDocument();
+    expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Collect/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByText("Mock Admin")).toBeInTheDocument();
     signOut.mockResolvedValue(undefined);
-    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
     await waitFor(() => expect(signOut).toHaveBeenCalled());
   });
 
@@ -78,14 +86,7 @@ describe("Layout auth chrome", () => {
       }
       return Promise.resolve(dashboardReady);
     });
-    loadMe.mockResolvedValue({
-      ...anonymousMe,
-      authenticated: true,
-      userId: "1",
-      displayName: "Mock Admin",
-      roles: ["USER", "ADMIN"],
-      actions: ["MUTATE"],
-    });
+    loadMe.mockResolvedValue(adminMe);
     render(
       <MemoryRouter>
         <AuthProvider>
@@ -97,8 +98,30 @@ describe("Layout auth chrome", () => {
         </AuthProvider>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Mock Admin")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Account menu" })).toBeInTheDocument();
+    expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Collect/ }));
     expect(await screen.findByText(/Session expired/)).toBeInTheDocument();
+  });
+
+  it("closes the account menu on Escape", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue(dashboardReady);
+    loadMe.mockResolvedValue(adminMe);
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<p>home</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByText("Mock Admin")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
   });
 });
