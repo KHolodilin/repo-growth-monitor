@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { api, type Dashboard } from "../lib/api";
+import { api, ApiError, type Dashboard } from "../lib/api";
+import { useAuth } from "../lib/AuthContext";
+import { canMutate, mutationBlockedReason } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
@@ -10,6 +12,7 @@ import { Button } from "./ui";
 
 export function Layout() {
   const location = useLocation();
+  const { me, loading: authLoading, logout } = useAuth();
   const dashboardActive = location.pathname === "/" || location.pathname === "/dashboard";
   const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
@@ -21,6 +24,8 @@ export function Layout() {
   const syncLabel = formatSyncTime(sync) ?? "—";
   const progress = headerProgress({ repositoryId, rows: rows ?? [], watching });
   const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
+  const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
+  const allowMutations = canMutate(me) && !authLoading;
 
   const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
@@ -69,6 +74,10 @@ export function Layout() {
   }, [live, refreshStatus]);
 
   async function collectNow() {
+    if (!allowMutations) {
+      setError(mutateBlocked ?? "Sign in as an admin to collect.");
+      return;
+    }
     setCollecting(true);
     setWatching(true);
     setError(null);
@@ -93,7 +102,11 @@ export function Layout() {
       }
     } catch (err) {
       setWatching(false);
-      setError(err instanceof Error ? err.message : "Collect failed");
+      if (err instanceof ApiError && err.status === 401) {
+        setError("Session expired. Sign in again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Collect failed");
+      }
     } finally {
       setCollecting(false);
     }
@@ -122,7 +135,13 @@ export function Layout() {
           <nav className="flex items-center gap-6 text-sm">
             <Button
               className="py-1.5"
-              disabled={collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0)}
+              title={mutateBlocked ?? undefined}
+              disabled={
+                !allowMutations ||
+                collecting ||
+                collectionBlocked(access) ||
+                (repositoryId == null && rows != null && rows.length === 0)
+              }
               onClick={() => void collectNow()}
             >
               {label}
@@ -142,6 +161,7 @@ export function Layout() {
               <RepositoriesIcon className="h-6 w-6" />
               Repositories
             </NavLink>
+            <AuthChrome me={me} loading={authLoading} onLogout={() => void logout()} />
           </nav>
         </div>
       </header>
@@ -155,8 +175,13 @@ export function Layout() {
           <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{tokenBanner(access)}</p>
         </div>
       )}
+      {!authLoading && mutateBlocked && (
+        <div className="border-b bg-slate-50 text-slate-800">
+          <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{mutateBlocked}</p>
+        </div>
+      )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-        <Outlet />
+        <Outlet context={{ allowMutations, mutateBlocked }} />
       </main>
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-1 px-6 py-4 text-xs text-muted-foreground">
@@ -170,6 +195,35 @@ export function Layout() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function AuthChrome({
+  me,
+  loading,
+  onLogout,
+}: {
+  me: { authenticated: boolean; displayName: string | null; loginUrl: string };
+  loading: boolean;
+  onLogout: () => void;
+}) {
+  if (loading) {
+    return <span className="text-muted-foreground">…</span>;
+  }
+  if (!me.authenticated) {
+    return (
+      <a href={me.loginUrl} className="font-medium text-primary hover:underline">
+        Sign in
+      </a>
+    );
+  }
+  return (
+    <span className="flex items-center gap-3">
+      <span className="text-foreground">{me.displayName}</span>
+      <button type="button" className="text-muted-foreground hover:text-foreground" onClick={onLogout}>
+        Sign out
+      </button>
+    </span>
   );
 }
 

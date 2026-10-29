@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
 import { recentMissedDates } from "../lib/rankChart";
 import { queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
@@ -12,6 +13,7 @@ import { SearchResultsTable } from "../components/SearchResultsTable";
 
 export function QueryDetailsPage() {
   const { repositoryId, queryId } = useParams();
+  const { allowMutations, blocked } = useMutationAccess();
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SearchHistory | null>(null);
   const [results, setResults] = useState<SearchRunResults | null>(null);
@@ -64,7 +66,7 @@ export function QueryDetailsPage() {
   }, [searchBusy, repositoryId, queryId]);
 
   async function runNow() {
-    if (!queryId || running || searchBusy) {
+    if (!allowMutations || !queryId || running || searchBusy) {
       return;
     }
     setRunning(true);
@@ -126,7 +128,12 @@ export function QueryDetailsPage() {
             {history.enrichmentStatus ? ` · Enrichment: ${history.enrichmentStatus}` : ""}
           </p>
         </div>
-        <Button className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end" disabled={busy} onClick={() => void runNow()}>
+        <Button
+          className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
+          disabled={busy || !allowMutations}
+          title={blocked ?? undefined}
+          onClick={() => void runNow()}
+        >
           {busy ? "Running..." : "Run now"}
         </Button>
       </header>

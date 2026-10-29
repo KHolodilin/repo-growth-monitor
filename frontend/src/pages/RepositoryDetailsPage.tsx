@@ -34,6 +34,7 @@ import {
 } from "../lib/api";
 import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { asGrowthEvents } from "../lib/growthEvents";
 import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
@@ -90,6 +91,7 @@ function parseTab(tabParam: string | null): Tab {
 export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { allowMutations, blocked: mutateBlocked } = useMutationAccess();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
   const scopeQuery = searchParams.get("scope");
@@ -275,7 +277,7 @@ export function RepositoryDetailsPage() {
   }, [runActive, searchActive, topicsActive, load]);
 
   async function createQuery() {
-    if (!id) {
+    if (!allowMutations || !id) {
       return;
     }
     const query = normalizeSearchQuery(queryText);
@@ -300,7 +302,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runQuery(queryId: number) {
-    if (runningQueryId != null || runningAll || searchActive) {
+    if (!allowMutations || runningQueryId != null || runningAll || searchActive) {
       return;
     }
     setRunningQueryId(queryId);
@@ -313,7 +315,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runAllQueries() {
-    if (!id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
+    if (!allowMutations || !id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
       return;
     }
     setRunningAll(true);
@@ -328,7 +330,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runTopicWatch(watchId: number) {
-    if (runningQueryId != null || runningAll || topicsActive) {
+    if (!allowMutations || runningQueryId != null || runningAll || topicsActive) {
       return;
     }
     setRunningQueryId(watchId);
@@ -341,7 +343,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runAllTopics() {
-    if (!id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
+    if (!allowMutations || !id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
       return;
     }
     setRunningAll(true);
@@ -356,7 +358,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function deleteQuery(queryId: number) {
-    if (!id) {
+    if (!allowMutations || !id) {
       return;
     }
     try {
@@ -548,6 +550,8 @@ export function RepositoryDetailsPage() {
           knownTopics={knownTopics}
           runningQueryId={runningQueryId}
           runningAll={runningAll}
+          allowMutations={allowMutations}
+          mutateBlocked={mutateBlocked}
           onRun={runTopicWatch}
           onRunAll={() => void runAllTopics()}
         />
@@ -565,6 +569,8 @@ export function RepositoryDetailsPage() {
           queryError={queryError}
           runningQueryId={runningQueryId}
           runningAll={runningAll}
+          allowMutations={allowMutations}
+          mutateBlocked={mutateBlocked}
           onCreate={() => void createQuery()}
           onRun={runQuery}
           onRunAll={() => void runAllQueries()}
@@ -996,6 +1002,8 @@ function TopicsPanel({
   knownTopics,
   runningQueryId,
   runningAll,
+  allowMutations = true,
+  mutateBlocked = null,
   onRun,
   onRunAll,
 }: {
@@ -1007,6 +1015,8 @@ function TopicsPanel({
   knownTopics: TopicHistory[];
   runningQueryId: number | null;
   runningAll: boolean;
+  allowMutations?: boolean;
+  mutateBlocked?: string | null;
   onRun: (id: number) => void;
   onRunAll: () => void;
 }) {
@@ -1068,7 +1078,8 @@ function TopicsPanel({
           <h2 className="font-medium">Topics</h2>
           <Button
             className="bg-muted text-foreground"
-            disabled={visibility.length === 0 || searchBusy}
+            disabled={visibility.length === 0 || searchBusy || !allowMutations}
+            title={mutateBlocked ?? undefined}
             onClick={onRunAll}
           >
             {searchBusy ? "Running..." : "Run all"}
@@ -1178,7 +1189,8 @@ function TopicsPanel({
                       <div className="flex justify-end">
                         <Button
                           className="bg-muted text-foreground"
-                          disabled={running || searchBusy}
+                          disabled={running || searchBusy || !allowMutations}
+                          title={mutateBlocked ?? undefined}
                           onClick={() => onRun(item.watch.id)}
                         >
                           {running || runningAll ? "Running..." : "Run"}
@@ -1287,6 +1299,8 @@ function SearchPanel({
   queryError,
   runningQueryId,
   runningAll,
+  allowMutations = true,
+  mutateBlocked = null,
   onCreate,
   onRun,
   onRunAll,
@@ -1300,6 +1314,8 @@ function SearchPanel({
   queryError: string | null;
   runningQueryId: number | null;
   runningAll: boolean;
+  allowMutations?: boolean;
+  mutateBlocked?: string | null;
   onCreate: () => void;
   onRun: (id: number) => void;
   onRunAll: () => void;
@@ -1385,12 +1401,13 @@ function SearchPanel({
               value={queryText}
               onChange={(event) => setQueryText(event.target.value)}
             />
-            <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
+            <Button disabled={!queryText.trim() || duplicate || !allowMutations} title={mutateBlocked ?? undefined} onClick={onCreate}>
               Add query
             </Button>
             <Button
               className="ml-auto shrink-0 bg-muted text-foreground"
-              disabled={visibility.length === 0 || searchBusy}
+              disabled={visibility.length === 0 || searchBusy || !allowMutations}
+              title={mutateBlocked ?? undefined}
               onClick={onRunAll}
             >
               {searchBusy ? "Running..." : "Run all"}
@@ -1496,14 +1513,16 @@ function SearchPanel({
                     <div className="flex justify-end gap-2">
                       <Button
                         className="bg-muted text-foreground"
-                        disabled={running || searchBusy}
+                        disabled={running || searchBusy || !allowMutations}
+                        title={mutateBlocked ?? undefined}
                         onClick={() => onRun(item.query.id)}
                       >
                         {running || runningAll ? "Running..." : "Run"}
                       </Button>
                       <Button
                         className="bg-muted text-red-700"
-                        disabled={running}
+                        disabled={running || !allowMutations}
+                        title={mutateBlocked ?? undefined}
                         onClick={() => onDelete(item.query.id)}
                       >
                         Delete

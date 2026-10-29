@@ -9,6 +9,7 @@ import {
   loadGitHubAccess,
   type GitHubAccess,
 } from "../lib/githubAccess";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { activityClass, formatActivityPresentation } from "../lib/utils";
 
 const SEARCH_KEY = "rgm.repositories.search";
@@ -18,6 +19,7 @@ type TrackingFilter = "all" | "tracked" | "untracked" | "no-access";
 type VisibilityFilter = "all" | "public" | "private" | "internal";
 
 export function RepositoriesPage() {
+  const { allowMutations, blocked: mutateBlocked } = useMutationAccess();
   const [repos, setRepos] = useState<Repository[]>([]);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +76,10 @@ export function RepositoriesPage() {
   const showEnable = !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
 
   async function toggle(repo: Repository) {
+    if (!allowMutations) {
+      setError(mutateBlocked ?? "Admin role required");
+      return;
+    }
     if (repo.trackingEnabled && !window.confirm("Stop tracking this repository? Collection stops. Stored data stays.")) {
       return;
     }
@@ -89,6 +95,10 @@ export function RepositoriesPage() {
   }
 
   async function applyShown(enabled: boolean) {
+    if (!allowMutations) {
+      setError(mutateBlocked ?? "Admin role required");
+      return;
+    }
     const targets = enabled ? enableTargets : disableTargets;
     if (!enabled && !window.confirm("Turn tracking off for the shown repositories? Collection stops. Stored data stays.")) {
       return;
@@ -121,12 +131,22 @@ export function RepositoriesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {showEnable && (
-            <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(true)}>
+            <Button
+              className="bg-card text-foreground hover:bg-muted"
+              title={mutateBlocked ?? undefined}
+              disabled={!allowMutations}
+              onClick={() => void applyShown(true)}
+            >
               Start tracking ({enableTargets.length})
             </Button>
           )}
           {disableTargets.length > 0 && (
-            <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(false)}>
+            <Button
+              className="bg-card text-foreground hover:bg-muted"
+              title={mutateBlocked ?? undefined}
+              disabled={!allowMutations}
+              onClick={() => void applyShown(false)}
+            >
               Stop tracking ({disableTargets.length})
             </Button>
           )}
@@ -198,7 +218,8 @@ export function RepositoriesPage() {
                     type="checkbox"
                     className="mt-1"
                     checked={repo.trackingEnabled}
-                    disabled={repo.accessible === false && !repo.trackingEnabled}
+                    disabled={!allowMutations || (repo.accessible === false && !repo.trackingEnabled)}
+                    title={mutateBlocked ?? undefined}
                     onChange={() => void toggle(repo)}
                   />
                   <div className="min-w-0">

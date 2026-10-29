@@ -1,0 +1,13 @@
+users:
+  - username: user
+    password: user
+    displayName: Mock User
+    enabled: true
+  - username: admin
+    password: admin
+    displayName: Mock Admin
+    enabled: true
+  - username: blocked
+    password: blocked
+    displayName: Mock Blocked
+    enabled: false

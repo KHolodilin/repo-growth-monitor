@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
 import { writeTopicScope } from "../lib/topicScope";
@@ -18,6 +19,7 @@ function parseScope(value: string | null): "all" | "language" {
 export function TopicDetailsPage() {
   const { repositoryId, topic } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { allowMutations, blocked } = useMutationAccess();
   const scope = parseScope(searchParams.get("scope"));
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<TopicHistory | null>(null);
@@ -71,7 +73,7 @@ export function TopicDetailsPage() {
   }, [searchBusy, repositoryId, topicName, scope]);
 
   async function runNow() {
-    if (!history || running || searchBusy) {
+    if (!allowMutations || !history || running || searchBusy) {
       return;
     }
     setRunning(true);
@@ -155,7 +157,12 @@ export function TopicDetailsPage() {
             {history.searchStatus ? ` · Search: ${history.searchStatus}` : ""}
           </p>
         </div>
-        <Button className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end" disabled={busy} onClick={() => void runNow()}>
+        <Button
+          className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
+          disabled={busy || !allowMutations}
+          title={blocked ?? undefined}
+          onClick={() => void runNow()}
+        >
           {busy ? "Running..." : "Run now"}
         </Button>
       </header>
