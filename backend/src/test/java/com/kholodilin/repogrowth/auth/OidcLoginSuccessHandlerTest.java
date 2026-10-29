@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
@@ -84,6 +85,28 @@ class OidcLoginSuccessHandlerTest {
         assertThat(principal.userId()).isEqualTo(7L);
         assertThat(principal.getName()).isEqualTo("Ada");
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void fallsBackToPreferredUsernameAndPassesThroughNonOidc() throws Exception {
+        AuthProperties properties = new AuthProperties("zitadel", false, null, null,
+                new AuthProperties.Oidc("https://idp.example", "c", "s", null, null), null);
+        OidcLoginSuccessHandler handler = new OidcLoginSuccessHandler(
+                users, AuthProvider.ZITADEL, properties, Clock.systemUTC());
+        AppUser stored = new AppUser(
+                4L, "https://idp.example", "sub-4", "pref", true,
+                Instant.now(), Instant.now(), Instant.now(), List.of(AppRole.USER));
+        when(users.ensureOnLogin(eq("https://idp.example"), eq("sub-4"), eq("pref"))).thenReturn(stored);
+        OidcUser oidcUser = oidcUser("sub-4", "https://idp.example", null, "pref", null);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response,
+                new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "oidc"));
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+        SecurityContextHolder.clearContext();
+
+        MockHttpServletResponse passthrough = new MockHttpServletResponse();
+        Authentication plain = UsernamePasswordAuthenticationToken.authenticated("x", null, List.of());
+        handler.onAuthenticationSuccess(new MockHttpServletRequest("GET", "/"), passthrough, plain);
     }
 
     @Test

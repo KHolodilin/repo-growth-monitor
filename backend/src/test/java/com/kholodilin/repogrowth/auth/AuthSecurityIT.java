@@ -113,6 +113,22 @@ class AuthSecurityIT extends AbstractPostgresTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void loginPageAndAuthenticatedMe() throws Exception {
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk());
+        AppUser admin = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "admin").orElseThrow();
+        mockMvc.perform(get("/api/v1/me").with(asPrincipal(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.actions[0]").value("MUTATE"));
+        AppUser user = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "user").orElseThrow();
+        mockMvc.perform(get("/api/v1/me").with(asPrincipal(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.actions").isEmpty());
+    }
+
     private static RequestPostProcessor asPrincipal(AppUser user) {
         AppUserPrincipal principal = new AppUserPrincipal(user.id(), user.displayName());
         return authentication(UsernamePasswordAuthenticationToken.authenticated(
