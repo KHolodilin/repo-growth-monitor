@@ -34,7 +34,7 @@ export function GrowthEventsPanel({
   onChanged: () => void;
   onOpenEvents?: (events: GrowthEvent[]) => void;
 }) {
-  const { allowMutations, blocked } = useMutationAccess();
+  const { allowMutations } = useMutationAccess();
   const [viewAll, setViewAll] = useState(false);
   const [form, setForm] = useState<GrowthEvent | "new" | null>(null);
   const [selected, setSelected] = useState<GrowthEvent[] | null>(null);
@@ -57,9 +57,11 @@ export function GrowthEventsPanel({
               View all →
             </button>
           )}
-          <Button type="button" disabled={!allowMutations} title={blocked ?? undefined} onClick={() => setForm("new")}>
-            + Add event
-          </Button>
+          {allowMutations && (
+            <Button type="button" onClick={() => setForm("new")}>
+              + Add event
+            </Button>
+          )}
         </div>
       </div>
       {recent.length === 0 ? (
@@ -221,6 +223,7 @@ export function EventDetailsDialog({
   onChanged: () => void;
   today?: string;
 }) {
+  const { allowMutations } = useMutationAccess();
   const eventDate = events[0] ? eventUtcDate(events[0]) : "";
   const [comparison, setComparison] = useState<EventWindowComparison | null>(null);
 
@@ -292,7 +295,7 @@ export function EventDetailsDialog({
                   Open link
                 </a>
               )}
-              {event.source === "MANUAL" && (
+              {event.source === "MANUAL" && allowMutations && (
                 <div className="flex gap-3 pt-1">
                   <button type="button" className="text-xs font-medium text-primary" onClick={() => onEdit(event)}>
                     Edit
