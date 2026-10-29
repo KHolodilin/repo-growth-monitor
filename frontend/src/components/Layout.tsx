@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { api, type Dashboard } from "../lib/api";
+import { api, ApiError, type Dashboard } from "../lib/api";
+import { useAuth } from "../lib/AuthContext";
+import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
@@ -10,6 +12,7 @@ import { Button } from "./ui";
 
 export function Layout() {
   const location = useLocation();
+  const { me, loading: authLoading, logout } = useAuth();
   const dashboardActive = location.pathname === "/" || location.pathname === "/dashboard";
   const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
@@ -21,6 +24,8 @@ export function Layout() {
   const syncLabel = formatSyncTime(sync) ?? "—";
   const progress = headerProgress({ repositoryId, rows: rows ?? [], watching });
   const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
+  const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
+  const allowMutations = canMutate(me) && !authLoading;
 
   const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
@@ -69,6 +74,10 @@ export function Layout() {
   }, [live, refreshStatus]);
 
   async function collectNow() {
+    if (!allowMutations) {
+      setError(mutateBlocked ?? "Sign in as an admin to collect.");
+      return;
+    }
     setCollecting(true);
     setWatching(true);
     setError(null);
@@ -93,7 +102,11 @@ export function Layout() {
       }
     } catch (err) {
       setWatching(false);
-      setError(err instanceof Error ? err.message : "Collect failed");
+      if (err instanceof ApiError && err.status === 401) {
+        setError("Session expired. Sign in again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Collect failed");
+      }
     } finally {
       setCollecting(false);
     }
@@ -120,13 +133,19 @@ export function Layout() {
             )}
           </div>
           <nav className="flex items-center gap-6 text-sm">
-            <Button
-              className="py-1.5"
-              disabled={collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0)}
-              onClick={() => void collectNow()}
-            >
-              {label}
-            </Button>
+            {allowMutations && (
+              <Button
+                className="py-1.5"
+                disabled={
+                  collecting ||
+                  collectionBlocked(access) ||
+                  (repositoryId == null && rows != null && rows.length === 0)
+                }
+                onClick={() => void collectNow()}
+              >
+                {label}
+              </Button>
+            )}
             <NavLink
               to="/"
               end
@@ -142,6 +161,7 @@ export function Layout() {
               <RepositoriesIcon className="h-6 w-6" />
               Repositories
             </NavLink>
+            <AuthChrome me={me} loading={authLoading} onLogout={() => void logout()} />
           </nav>
         </div>
       </header>
@@ -156,7 +176,7 @@ export function Layout() {
         </div>
       )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-        <Outlet />
+        <Outlet context={{ allowMutations, mutateBlocked }} />
       </main>
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-1 px-6 py-4 text-xs text-muted-foreground">
@@ -169,6 +189,86 @@ export function Layout() {
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
       </footer>
+    </div>
+  );
+}
+
+function AuthChrome({ me, loading, onLogout }: { me: Me; loading: boolean; onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    function onPointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  if (loading) {
+    return <span className="text-muted-foreground">…</span>;
+  }
+  if (!me.authenticated) {
+    return (
+      <a href={me.loginUrl} className="font-medium text-primary hover:underline">
+        Sign in
+      </a>
+    );
+  }
+
+  const identity = me.displayName?.trim() || me.userId || "Account";
+  const initial = identity.charAt(0).toUpperCase();
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground hover:bg-muted/80"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="Account menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        {initial}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-md border bg-card text-sm shadow-md"
+        >
+          <div className="border-b px-3 py-2.5">
+            <div className="font-medium text-foreground">{identity}</div>
+            {me.userId && me.userId !== identity && (
+              <div className="mt-0.5 text-xs text-muted-foreground">{me.userId}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={() => {
+              setOpen(false);
+              onLogout();
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }

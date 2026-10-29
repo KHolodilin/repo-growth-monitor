@@ -43,6 +43,8 @@ services:
       COLLECTION_PLANNER_FROM: "00:00"
       COLLECTION_PLANNER_TO: "23:59"
       COLLECTION_PLANNER_INTERVAL: 1m
+      AUTH_PROVIDER: mock
+      AUTH_PRODUCTION: "false"
     depends_on:
       postgres:
         condition: service_healthy

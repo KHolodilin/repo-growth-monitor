@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
-import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
-import { datesFromHistory, rankHistoryOption, recentMissedDates } from "../lib/rankChart";
+import { useMutationAccess } from "../lib/mutationAccess";
+import { formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { writeTopicScope } from "../lib/topicScope";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { ChartModePlot } from "../components/PersistentECharts";
@@ -18,6 +19,7 @@ function parseScope(value: string | null): "all" | "language" {
 export function TopicDetailsPage() {
   const { repositoryId, topic } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { allowMutations } = useMutationAccess();
   const scope = parseScope(searchParams.get("scope"));
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<TopicHistory | null>(null);
@@ -71,7 +73,7 @@ export function TopicDetailsPage() {
   }, [searchBusy, repositoryId, topicName, scope]);
 
   async function runNow() {
-    if (!history || running || searchBusy) {
+    if (!allowMutations || !history || running || searchBusy) {
       return;
     }
     setRunning(true);
@@ -121,7 +123,6 @@ export function TopicDetailsPage() {
   }
 
   const busy = running || searchBusy;
-  const recentMissed = recentMissedDates(history.missedDates);
   const languageLabel = repo.language || "Language";
   const topicUrl =
     scope === "language" && repo.language
@@ -155,9 +156,15 @@ export function TopicDetailsPage() {
             {history.searchStatus ? ` · Search: ${history.searchStatus}` : ""}
           </p>
         </div>
-        <Button className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end" disabled={busy} onClick={() => void runNow()}>
-          {busy ? "Running..." : "Run now"}
-        </Button>
+        {allowMutations && (
+          <Button
+            className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
+            disabled={busy}
+            onClick={() => void runNow()}
+          >
+            {busy ? "Running..." : "Run now"}
+          </Button>
+        )}
       </header>
 
       {repo.language && (
@@ -186,12 +193,6 @@ export function TopicDetailsPage() {
       </div>
 
       <ChartCard title="Rank History" repositoryId={repo.id} period="all" context={`repository:${repo.id}:topic:${history.watch.id}`}>
-        {recentMissed.length > 0 && (
-          <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
-            ranking, so these days stay empty.
-          </p>
-        )}
         <ChartModePlot
           chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
           series={[{ key: String(history.watch.id), name: history.watch.topic }]}

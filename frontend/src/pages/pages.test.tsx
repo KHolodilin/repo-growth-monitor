@@ -488,14 +488,14 @@ describe("pages", () => {
     });
     const topicView = renderPath("/repositories/13/topics/outbox", <TopicDetailsPage />);
     expect(await screen.findByRole("heading", { name: "outbox" })).toBeInTheDocument();
-    expect(screen.getByText(/Not collected on/)).toBeInTheDocument();
+    expect(screen.queryByText(/Not collected on/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Java" }));
     await user.click(screen.getByRole("button", { name: "Run now" }));
     topicView.unmount();
 
     const queryView = renderPath("/repositories/13/search-queries/5", <QueryDetailsPage />);
     expect(await screen.findByText(/transactional outbox/)).toBeInTheDocument();
-    expect(screen.getByText(/Not collected on/)).toBeInTheDocument();
+    expect(screen.queryByText(/Not collected on/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Run now" }));
     queryView.unmount();
 

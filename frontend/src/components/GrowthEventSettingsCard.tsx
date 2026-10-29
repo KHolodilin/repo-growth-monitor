@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, type GrowthEventSetting } from "../lib/api";
 import { AUTOMATIC_SETTING_LABELS } from "../lib/growthEvents";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { Card } from "./ui";
 
 export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number }) {
+  const { allowMutations, blocked } = useMutationAccess();
   const [settings, setSettings] = useState<GrowthEventSetting[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +30,10 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
   const byType = new Map(settings.map((item) => [item.eventType, item]));
 
   async function toggle(eventType: string, enabled: boolean) {
+    if (!allowMutations) {
+      setError(blocked ?? "Admin role required");
+      return;
+    }
     setError(null);
     const previous = settings;
     setSettings((current) =>
@@ -60,7 +66,8 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
               <input
                 type="checkbox"
                 checked={setting?.enabled ?? false}
-                disabled={!setting}
+                disabled={!setting || !allowMutations}
+                title={blocked ?? undefined}
                 onChange={(change) => void toggle(item.type, change.target.checked)}
               />
               <span>{item.label}</span>

@@ -12,9 +12,29 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+      timeout: ${AUTH_SESSION_IDLE:8h}
 
 app:
   timezone: UTC
+
+auth:
+  provider: ${AUTH_PROVIDER:}
+  production: ${AUTH_PRODUCTION:false}
+  session-idle: ${AUTH_SESSION_IDLE:8h}
+  session-absolute: ${AUTH_SESSION_ABSOLUTE:24h}
+  oidc:
+    issuer-uri: ${AUTH_OIDC_ISSUER_URI:}
+    client-id: ${AUTH_OIDC_CLIENT_ID:}
+    client-secret: ${AUTH_OIDC_CLIENT_SECRET:}
+    redirect-uri: ${AUTH_OIDC_REDIRECT_URI:}
+    scope: ${AUTH_OIDC_SCOPE:openid profile email}
+  mock:
+    users-location: ${AUTH_MOCK_USERS_LOCATION:classpath:auth/mock-users.yml}
 
 github:
   token: ${GITHUB_TOKEN:}
@@ -87,5 +107,7 @@ logging:
 springdoc:
   api-docs:
     path: /v3/api-docs
+    enabled: ${SPRINGDOC_API_DOCS_ENABLED:true}
   swagger-ui:
     path: /swagger-ui.html
+    enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}

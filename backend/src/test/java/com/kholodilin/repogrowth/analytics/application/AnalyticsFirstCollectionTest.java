@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.analytics.application;
 
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.DashboardState;
+import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -71,6 +72,8 @@ class AnalyticsFirstCollectionTest {
         when(jobs.findByRunIds(any())).thenReturn(List.of(job));
         when(health.discoverabilityScore(repository)).thenReturn(new RepositoryHealthService.DiscoverabilityScore(4, 13));
         when(activity.classify(anyBoolean(), nullable(Instant.class))).thenReturn(ActivityStatus.ACTIVE);
+        CurrentUserAccess access = mock(CurrentUserAccess.class);
+        when(access.canSeePrivateRepositories()).thenReturn(true);
         AnalyticsService service = new AnalyticsService(
                 repositoryService,
                 traffic,
@@ -81,7 +84,8 @@ class AnalyticsFirstCollectionTest {
                 health,
                 mock(PortfolioHighlightsService.class),
                 mock(PlanningWindow.class),
-                Clock.fixed(now, ZoneOffset.UTC)
+                Clock.fixed(now, ZoneOffset.UTC),
+                access
         );
 
         var response = service.dashboard("30d");

@@ -30,6 +30,8 @@ public abstract class AbstractPostgresTest {
         registry.add("search.workers", () -> "0");
         registry.add("app.timezone", () -> "UTC");
         registry.add("spring.task.scheduling.enabled", () -> "false");
+        registry.add("auth.provider", () -> "mock");
+        registry.add("auth.production", () -> "false");
     }
 
     protected void wipeRepositoryData(JdbcClient jdbcClient) {
