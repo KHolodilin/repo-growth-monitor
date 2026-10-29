@@ -1378,46 +1378,48 @@ function SearchPanel({
         selectedIds={selectedIds}
       />
       <Card>
-        <div className="mb-3 flex items-baseline gap-3">
-          <h2 className="font-medium">Search Queries</h2>
-          <a
-            className="text-sm font-normal text-primary underline"
-            href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Search syntax tips
-          </a>
-        </div>
-        <div className="mb-4">
-          <div className="flex gap-2">
-            <input
-              className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
-              placeholder="transactional outbox language:java"
-              value={queryText}
-              onChange={(event) => setQueryText(event.target.value)}
-            />
-            {allowMutations && (
-              <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
-                Add query
-              </Button>
-            )}
-            {allowMutations && (
-              <Button
-                className="ml-auto shrink-0 bg-muted text-foreground"
-                disabled={visibility.length === 0 || searchBusy}
-                onClick={onRunAll}
+        {allowMutations ? (
+          <>
+            <div className="mb-3 flex items-baseline gap-3">
+              <h2 className="font-medium">Search Queries</h2>
+              <a
+                className="text-sm font-normal text-primary underline"
+                href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
+                target="_blank"
+                rel="noreferrer"
               >
-                {searchBusy ? "Running..." : "Run all"}
-              </Button>
-            )}
-          </div>
-          {(queryError || duplicate) && (
-            <p className="mt-2 text-sm text-red-700">
-              {queryError ?? "This search query is already tracked for the repository"}
-            </p>
-          )}
-        </div>
+                Search syntax tips
+              </a>
+            </div>
+            <div className="mb-4">
+              <div className="flex gap-2">
+                <input
+                  className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+                  placeholder="transactional outbox language:java"
+                  value={queryText}
+                  onChange={(event) => setQueryText(event.target.value)}
+                />
+                <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
+                  Add query
+                </Button>
+                <Button
+                  className="ml-auto shrink-0 bg-muted text-foreground"
+                  disabled={visibility.length === 0 || searchBusy}
+                  onClick={onRunAll}
+                >
+                  {searchBusy ? "Running..." : "Run all"}
+                </Button>
+              </div>
+              {(queryError || duplicate) && (
+                <p className="mt-2 text-sm text-red-700">
+                  {queryError ?? "This search query is already tracked for the repository"}
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          <h2 className="mb-3 font-medium">Search Queries</h2>
+        )}
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
