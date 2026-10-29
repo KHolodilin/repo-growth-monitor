@@ -91,7 +91,7 @@ function parseTab(tabParam: string | null): Tab {
 export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { allowMutations, blocked: mutateBlocked } = useMutationAccess();
+  const { allowMutations } = useMutationAccess();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
   const scopeQuery = searchParams.get("scope");
@@ -551,7 +551,6 @@ export function RepositoryDetailsPage() {
           runningQueryId={runningQueryId}
           runningAll={runningAll}
           allowMutations={allowMutations}
-          mutateBlocked={mutateBlocked}
           onRun={runTopicWatch}
           onRunAll={() => void runAllTopics()}
         />
@@ -570,7 +569,6 @@ export function RepositoryDetailsPage() {
           runningQueryId={runningQueryId}
           runningAll={runningAll}
           allowMutations={allowMutations}
-          mutateBlocked={mutateBlocked}
           onCreate={() => void createQuery()}
           onRun={runQuery}
           onRunAll={() => void runAllQueries()}
@@ -1003,7 +1001,6 @@ function TopicsPanel({
   runningQueryId,
   runningAll,
   allowMutations = true,
-  mutateBlocked = null,
   onRun,
   onRunAll,
 }: {
@@ -1016,7 +1013,6 @@ function TopicsPanel({
   runningQueryId: number | null;
   runningAll: boolean;
   allowMutations?: boolean;
-  mutateBlocked?: string | null;
   onRun: (id: number) => void;
   onRunAll: () => void;
 }) {
@@ -1076,14 +1072,15 @@ function TopicsPanel({
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Topics</h2>
-          <Button
-            className="bg-muted text-foreground"
-            disabled={visibility.length === 0 || searchBusy || !allowMutations}
-            title={mutateBlocked ?? undefined}
-            onClick={onRunAll}
-          >
-            {searchBusy ? "Running..." : "Run all"}
-          </Button>
+          {allowMutations && (
+            <Button
+              className="bg-muted text-foreground"
+              disabled={visibility.length === 0 || searchBusy}
+              onClick={onRunAll}
+            >
+              {searchBusy ? "Running..." : "Run all"}
+            </Button>
+          )}
         </div>
         {visibility.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -1186,16 +1183,17 @@ function TopicsPanel({
                       {formatSyncTime(item.lastChecked) ?? "—"}
                     </td>
                     <td className="py-3 pl-3">
-                      <div className="flex justify-end">
-                        <Button
-                          className="bg-muted text-foreground"
-                          disabled={running || searchBusy || !allowMutations}
-                          title={mutateBlocked ?? undefined}
-                          onClick={() => onRun(item.watch.id)}
-                        >
-                          {running || runningAll ? "Running..." : "Run"}
-                        </Button>
-                      </div>
+                      {allowMutations && (
+                        <div className="flex justify-end">
+                          <Button
+                            className="bg-muted text-foreground"
+                            disabled={running || searchBusy}
+                            onClick={() => onRun(item.watch.id)}
+                          >
+                            {running || runningAll ? "Running..." : "Run"}
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1300,7 +1298,6 @@ function SearchPanel({
   runningQueryId,
   runningAll,
   allowMutations = true,
-  mutateBlocked = null,
   onCreate,
   onRun,
   onRunAll,
@@ -1315,7 +1312,6 @@ function SearchPanel({
   runningQueryId: number | null;
   runningAll: boolean;
   allowMutations?: boolean;
-  mutateBlocked?: string | null;
   onCreate: () => void;
   onRun: (id: number) => void;
   onRunAll: () => void;
@@ -1401,17 +1397,20 @@ function SearchPanel({
               value={queryText}
               onChange={(event) => setQueryText(event.target.value)}
             />
-            <Button disabled={!queryText.trim() || duplicate || !allowMutations} title={mutateBlocked ?? undefined} onClick={onCreate}>
-              Add query
-            </Button>
-            <Button
-              className="ml-auto shrink-0 bg-muted text-foreground"
-              disabled={visibility.length === 0 || searchBusy || !allowMutations}
-              title={mutateBlocked ?? undefined}
-              onClick={onRunAll}
-            >
-              {searchBusy ? "Running..." : "Run all"}
-            </Button>
+            {allowMutations && (
+              <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
+                Add query
+              </Button>
+            )}
+            {allowMutations && (
+              <Button
+                className="ml-auto shrink-0 bg-muted text-foreground"
+                disabled={visibility.length === 0 || searchBusy}
+                onClick={onRunAll}
+              >
+                {searchBusy ? "Running..." : "Run all"}
+              </Button>
+            )}
           </div>
           {(queryError || duplicate) && (
             <p className="mt-2 text-sm text-red-700">
@@ -1510,24 +1509,24 @@ function SearchPanel({
                     {formatSyncTime(item.lastChecked) ?? "—"}
                   </td>
                   <td className="py-3 pl-3">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        className="bg-muted text-foreground"
-                        disabled={running || searchBusy || !allowMutations}
-                        title={mutateBlocked ?? undefined}
-                        onClick={() => onRun(item.query.id)}
-                      >
-                        {running || runningAll ? "Running..." : "Run"}
-                      </Button>
-                      <Button
-                        className="bg-muted text-red-700"
-                        disabled={running || !allowMutations}
-                        title={mutateBlocked ?? undefined}
-                        onClick={() => onDelete(item.query.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
+                    {allowMutations && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          className="bg-muted text-foreground"
+                          disabled={running || searchBusy}
+                          onClick={() => onRun(item.query.id)}
+                        >
+                          {running || runningAll ? "Running..." : "Run"}
+                        </Button>
+                        <Button
+                          className="bg-muted text-red-700"
+                          disabled={running}
+                          onClick={() => onDelete(item.query.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

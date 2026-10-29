@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
 import { useMutationAccess } from "../lib/mutationAccess";
-import { formatChartAxisDate, formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
-import { recentMissedDates } from "../lib/rankChart";
+import { formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
 import { queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
 import { ChartCard, useChartMode } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -13,7 +12,7 @@ import { SearchResultsTable } from "../components/SearchResultsTable";
 
 export function QueryDetailsPage() {
   const { repositoryId, queryId } = useParams();
-  const { allowMutations, blocked } = useMutationAccess();
+  const { allowMutations } = useMutationAccess();
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SearchHistory | null>(null);
   const [results, setResults] = useState<SearchRunResults | null>(null);
@@ -93,7 +92,6 @@ export function QueryDetailsPage() {
   }
 
   const busy = running || searchBusy;
-  const recentMissed = recentMissedDates(history.missedDates);
 
   return (
     <div className="space-y-6">
@@ -128,14 +126,15 @@ export function QueryDetailsPage() {
             {history.enrichmentStatus ? ` · Enrichment: ${history.enrichmentStatus}` : ""}
           </p>
         </div>
-        <Button
-          className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
-          disabled={busy || !allowMutations}
-          title={blocked ?? undefined}
-          onClick={() => void runNow()}
-        >
-          {busy ? "Running..." : "Run now"}
-        </Button>
+        {allowMutations && (
+          <Button
+            className="justify-self-start sm:col-start-2 sm:row-start-1 sm:justify-self-end"
+            disabled={busy}
+            onClick={() => void runNow()}
+          >
+            {busy ? "Running..." : "Run now"}
+          </Button>
+        )}
       </header>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -174,12 +173,6 @@ export function QueryDetailsPage() {
           </div>
         }
       >
-        {recentMissed.length > 0 && (
-          <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            Not collected on {recentMissed.map(formatChartAxisDate).join(", ")}. GitHub Search only returns today's
-            ranking, so these days stay empty.
-          </p>
-        )}
         <QueryRankChart
           history={history}
           repo={repo}
