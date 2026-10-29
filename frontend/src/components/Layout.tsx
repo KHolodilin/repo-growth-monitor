@@ -133,19 +133,19 @@ export function Layout() {
             )}
           </div>
           <nav className="flex items-center gap-6 text-sm">
-            <Button
-              className="py-1.5"
-              title={mutateBlocked ?? undefined}
-              disabled={
-                !allowMutations ||
-                collecting ||
-                collectionBlocked(access) ||
-                (repositoryId == null && rows != null && rows.length === 0)
-              }
-              onClick={() => void collectNow()}
-            >
-              {label}
-            </Button>
+            {allowMutations && (
+              <Button
+                className="py-1.5"
+                disabled={
+                  collecting ||
+                  collectionBlocked(access) ||
+                  (repositoryId == null && rows != null && rows.length === 0)
+                }
+                onClick={() => void collectNow()}
+              >
+                {label}
+              </Button>
+            )}
             <NavLink
               to="/"
               end
@@ -173,11 +173,6 @@ export function Layout() {
       {tokenBanner(access) && (
         <div className="border-b bg-amber-50 text-amber-950">
           <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{tokenBanner(access)}</p>
-        </div>
-      )}
-      {!authLoading && mutateBlocked && (
-        <div className="border-b bg-slate-50 text-slate-800">
-          <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{mutateBlocked}</p>
         </div>
       )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../lib/AuthContext";
@@ -18,7 +18,16 @@ vi.mock("../lib/auth", async (importOriginal) => {
   return { ...actual, loadMe };
 });
 
-const tracked = { ...repository, accessible: true, trafficPermissionMissing: false };
+const tracked = { ...repository, accessible: true, trafficPermissionMissing: false, visibility: "PUBLIC" };
+const privateRepo = {
+  ...repository,
+  id: 8,
+  name: "secret",
+  fullName: "KHolodilin/secret",
+  visibility: "PRIVATE",
+  trackingEnabled: true,
+  accessible: true,
+};
 
 describe("repositories auth gating", () => {
   beforeEach(() => {
@@ -28,12 +37,12 @@ describe("repositories auth gating", () => {
     loadMe.mockResolvedValue(anonymousMe);
   });
 
-  it("blocks tracking changes for guests", async () => {
+  it("hides private repositories and tracking controls for guests", async () => {
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
         return { tokenState: "OK", rateLimitReset: null };
       }
-      return [tracked];
+      return [tracked, privateRepo];
     });
     render(
       <MemoryRouter>
@@ -43,12 +52,9 @@ describe("repositories auth gating", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
-    const row = screen.getByText(tracked.fullName).closest("label");
-    const checkbox = within(row as HTMLElement).getByRole("checkbox");
-    expect(checkbox).toBeDisabled();
-    fireEvent.click(checkbox);
-    expect(await screen.findByText(/Sign in as an admin|Admin role required/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Stop tracking/ }));
-    expect(screen.getByText(/Sign in as an admin|Admin role required/)).toBeInTheDocument();
+    expect(screen.queryByText(privateRepo.fullName)).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Refresh from GitHub/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Stop tracking/ })).not.toBeInTheDocument();
   });
 });

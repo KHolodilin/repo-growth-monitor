@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -25,7 +25,7 @@ vi.mock("../lib/auth", async (importOriginal) => {
 });
 
 describe("Layout auth chrome", () => {
-  it("shows Sign in for guests and Sign out for admins", async () => {
+  it("hides Collect for guests and shows Sign out for admins", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue(dashboardReady);
     loadMe.mockResolvedValue(anonymousMe);
@@ -41,11 +41,8 @@ describe("Layout auth chrome", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole("link", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.getByText(/Sign in as an admin/)).toBeInTheDocument();
-    const collect = screen.getByRole("button", { name: /Collect/ });
-    expect(collect).toBeDisabled();
-    fireEvent.click(collect);
-    expect(await screen.findByText(/Sign in as an admin/)).toBeInTheDocument();
+    expect(screen.queryByText(/Sign in as an admin/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Collect/ })).not.toBeInTheDocument();
 
     loadMe.mockResolvedValue({
       ...anonymousMe,
@@ -55,7 +52,6 @@ describe("Layout auth chrome", () => {
       roles: ["USER", "ADMIN"],
       actions: ["MUTATE"],
     });
-    // remount with admin session
     render(
       <MemoryRouter>
         <AuthProvider>
@@ -68,6 +64,7 @@ describe("Layout auth chrome", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("Mock Admin")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Collect/ })).toBeInTheDocument();
     signOut.mockResolvedValue(undefined);
     await user.click(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => expect(signOut).toHaveBeenCalled());
