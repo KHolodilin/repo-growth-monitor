@@ -46,4 +46,17 @@ class UsersCliTest {
         )));
         assertThat(new UsersCli(users).run(new String[]{"users", "list"})).isZero();
     }
+
+    @Test
+    void revokeAdminAndTruncatesLongFields() {
+        when(users.revokeAdmin(2L)).thenReturn(new AppUser(
+                2L, "https://very-long-issuer.example/path", "sub-with-a-very-long-value-xxxxxxxx",
+                null, true, Instant.now(), Instant.now(), Instant.now(), List.of(AppRole.USER)));
+        assertThat(new UsersCli(users).run(new String[]{"users", "revoke-admin", "--user-id", "2"})).isZero();
+
+        when(users.list()).thenReturn(List.of(new AppUser(
+                3L, "issuer", "short", "Name that is definitely longer than twenty four",
+                true, null, Instant.now(), Instant.now(), List.of(AppRole.USER))));
+        assertThat(new UsersCli(users).run(new String[]{"users", "list"})).isZero();
+    }
 }

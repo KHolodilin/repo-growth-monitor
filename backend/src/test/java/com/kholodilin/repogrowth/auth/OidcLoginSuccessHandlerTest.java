@@ -88,6 +88,29 @@ class OidcLoginSuccessHandlerTest {
     }
 
     @Test
+    void fallsBackToEmailAndConfiguredIssuer() throws Exception {
+        AuthProperties properties = new AuthProperties("zitadel", false, null, null,
+                new AuthProperties.Oidc("https://configured.example", "c", "s", null, null), null);
+        OidcLoginSuccessHandler handler = new OidcLoginSuccessHandler(
+                users, AuthProvider.ZITADEL, properties, Clock.systemUTC());
+        AppUser stored = new AppUser(
+                5L, "https://configured.example", "sub-5", "mail@ex.com", true,
+                Instant.now(), Instant.now(), Instant.now(), List.of(AppRole.USER));
+        when(users.ensureOnLogin(eq("https://configured.example"), eq("sub-5"), eq("mail@ex.com"))).thenReturn(stored);
+        Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("sub", "sub-5");
+        claims.put("email", "mail@ex.com");
+        Instant now = Instant.now();
+        OidcIdToken token = new OidcIdToken("t", now, now.plusSeconds(60), claims);
+        OidcUser oidcUser = new DefaultOidcUser(List.of(new OidcUserAuthority(token)), token);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response,
+                new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "oidc"));
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
     void fallsBackToPreferredUsernameAndPassesThroughNonOidc() throws Exception {
         AuthProperties properties = new AuthProperties("zitadel", false, null, null,
                 new AuthProperties.Oidc("https://idp.example", "c", "s", null, null), null);
@@ -129,6 +152,51 @@ class OidcLoginSuccessHandlerTest {
 
         assertThat(response.getRedirectedUrl()).contains("error=disabled");
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void fallsBackToSubjectAndRegistrationIdWithoutSessionOnDisable() throws Exception {
+        AuthProperties properties = new AuthProperties("zitadel", false, null, null,
+                new AuthProperties.Oidc("  ", "c", "s", null, null), null);
+        OidcLoginSuccessHandler handler = new OidcLoginSuccessHandler(
+                users, AuthProvider.ZITADEL, properties, Clock.systemUTC());
+        AppUser disabled = new AppUser(
+                8L, "oidc", "only-sub", "only-sub", false,
+                null, Instant.now(), Instant.now(), List.of(AppRole.USER));
+        when(users.ensureOnLogin(eq("oidc"), eq("only-sub"), eq("only-sub"))).thenReturn(disabled);
+        Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("sub", "only-sub");
+        Instant now = Instant.now();
+        OidcIdToken token = new OidcIdToken("t", now, now.plusSeconds(60), claims);
+        OidcUser oidcUser = new DefaultOidcUser(List.of(new OidcUserAuthority(token)), token);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response,
+                new OAuth2AuthenticationToken(oidcUser, oidcUser.getAuthorities(), "oidc"));
+        assertThat(response.getRedirectedUrl()).contains("error=disabled");
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void fallsBackToProviderLabelWhenNotOAuth2Token() throws Exception {
+        AuthProperties properties = new AuthProperties("keycloak", false, null, null,
+                new AuthProperties.Oidc(null, "c", "s", null, null), null);
+        OidcLoginSuccessHandler handler = new OidcLoginSuccessHandler(
+                users, AuthProvider.KEYCLOAK, properties, Clock.systemUTC());
+        AppUser stored = new AppUser(
+                6L, "keycloak", "sub-6", "sub-6", true,
+                Instant.now(), Instant.now(), Instant.now(), List.of(AppRole.USER));
+        when(users.ensureOnLogin(eq("keycloak"), eq("sub-6"), eq("sub-6"))).thenReturn(stored);
+        Map<String, Object> claims = new java.util.HashMap<>();
+        claims.put("sub", "sub-6");
+        Instant now = Instant.now();
+        OidcIdToken token = new OidcIdToken("t", now, now.plusSeconds(60), claims);
+        OidcUser oidcUser = new DefaultOidcUser(List.of(new OidcUserAuthority(token)), token);
+        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
+                oidcUser, null, oidcUser.getAuthorities());
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        handler.onAuthenticationSuccess(new MockHttpServletRequest(), response, authentication);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+        SecurityContextHolder.clearContext();
     }
 
     private static OidcUser oidcUser(String sub, String issuer, String name, String preferred, String email) {

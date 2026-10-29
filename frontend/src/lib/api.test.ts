@@ -37,18 +37,45 @@ describe("api", () => {
     await expect(api("/api/v1/x")).resolves.toBeUndefined();
   });
 
-  it("maps 401 and 403 to ApiError", async () => {
+  it("maps 401 and 403 to ApiError and sends CSRF", async () => {
+    document.cookie = "XSRF-TOKEN=tok%2Fval";
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      json: async () => ({ message: "Authentication required" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api("/api/v1/x", { method: "POST", body: "{}" })).rejects.toEqual(
+      expect.objectContaining({ status: 401 }) as ApiError,
+    );
+    expect(fetchMock.mock.calls[0][1].headers.get("X-XSRF-TOKEN")).toBe("tok/val");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: "Forbidden",
+        json: async () => ({ message: "" }),
+      }),
+    );
+    await expect(api("/api/v1/x", { method: "PUT" })).rejects.toEqual(
+      expect.objectContaining({ status: 403, message: "Admin role required" }) as ApiError,
+    );
+
+    document.cookie = "OTHER=1";
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValueOnce({
         ok: false,
         status: 401,
         statusText: "Unauthorized",
-        json: async () => ({ message: "Authentication required" }),
+        json: async () => ({ message: "" }),
       }),
     );
-    await expect(api("/api/v1/x", { method: "POST" })).rejects.toEqual(
-      expect.objectContaining({ status: 401 }) as ApiError,
+    await expect(api("/api/v1/x", { method: "PATCH" })).rejects.toEqual(
+      expect.objectContaining({ status: 401, message: "Sign in required" }) as ApiError,
     );
   });
 

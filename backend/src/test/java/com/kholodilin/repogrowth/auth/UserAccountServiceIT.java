@@ -71,4 +71,15 @@ class UserAccountServiceIT extends AbstractPostgresTest {
         AppUser again = users.ensureOnLogin("https://idp.example", "sub-1", "Alice Updated");
         assertThat(again.id()).isEqualTo(created.id());
     }
+
+    @Test
+    void blankDisplayNameFallsBackToSubAndCanMutate() {
+        AppUser created = users.ensureOnLogin("https://idp.example", "sub-blank", "  ");
+        assertThat(created.displayName()).isEqualTo("sub-blank");
+        assertThat(users.canMutate(created)).isFalse();
+        users.grantAdmin(created.id());
+        AppUser admin = users.findById(created.id()).orElseThrow();
+        assertThat(users.canMutate(admin)).isTrue();
+        assertThat(users.canMutate(null)).isFalse();
+    }
 }
