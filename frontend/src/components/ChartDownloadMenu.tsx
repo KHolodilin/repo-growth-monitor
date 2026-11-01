@@ -331,12 +331,9 @@ function MobileEventStrip({
   onOpen: (items: GrowthEvent[]) => void;
 }) {
   const axis = dates.length > 0 ? dates : [...new Set(events.map(eventUtcDate))].sort();
-  if (axis.length === 0) {
-    return null;
-  }
   const onAxis = new Set(axis);
   const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
-  if (groups.length === 0) {
+  if (axis.length === 0 || groups.length === 0) {
     return null;
   }
   const first = axis[0];
@@ -380,12 +377,9 @@ function MobileChartMenu() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!registry) {
-      return;
-    }
-    const sync = () => setReady(registry.current !== null);
+    const sync = () => setReady(registry?.current != null);
     sync();
-    return registry.subscribe(sync);
+    return registry?.subscribe(sync);
   }, [registry]);
 
   return (

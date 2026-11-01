@@ -171,5 +171,11 @@ describe("chartPresentation", () => {
         { axis: "calendar", events: [event], mobile: true },
       ).series,
     ).toHaveLength(1);
+    expect(
+      presentChartOption(
+        { xAxis: { data: ["2026-09-23"] } },
+        { axis: "calendar", events: [event], mobile: true },
+      ).series,
+    ).toEqual([]);
   });
 });

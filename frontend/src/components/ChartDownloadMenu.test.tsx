@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -314,5 +314,61 @@ describe("ChartDownloadMenu", () => {
     await user.click(screen.getByRole("checkbox", { name: "Events" }));
     await user.click(screen.getByRole("button", { name: /2 events on 2026-09-23/ }));
     expect(await screen.findByText("Launch")).toBeInTheDocument();
+  });
+
+  it("keeps the selected mobile series and hides markers off the axis", async () => {
+    const user = userEvent.setup();
+    stubMobile(true);
+    const series = [
+      { key: "Views", name: "Views" },
+      { key: "Visitors", name: "Visitors" },
+    ] as const;
+    const view = render(
+      <ChartCard title="Traffic" events={[growthEvent]} mobileSeries={series}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        <PersistentECharts
+          chartId="mobile-off-axis"
+          series={series}
+          option={{
+            xAxis: { data: ["2026-09-22"] },
+            series: [
+              { name: "Views", type: "line", data: [1] },
+              { name: "Visitors", type: "line", data: [0] },
+            ],
+          }}
+        />
+      </ChartCard>,
+    );
+    expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Visitors" }));
+    expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /events on/ })).not.toBeInTheDocument());
+
+    view.rerender(
+      <ChartCard title="Traffic" events={[growthEvent]} mobileSeries={series}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+        <PersistentECharts
+          chartId="mobile-one-day"
+          series={series}
+          option={{
+            xAxis: { data: ["2026-09-23"] },
+            series: [
+              { name: "Views", type: "line", data: [2] },
+              { name: "Visitors", type: "line", data: [1] },
+            ],
+          }}
+        />
+      </ChartCard>,
+    );
+    expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("button", { name: /1 event on 2026-09-23/ })).toBeInTheDocument();
+
+    view.rerender(
+      <ChartCard title="Traffic" events={[growthEvent]}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+      </ChartCard>,
+    );
+    expect(screen.queryByRole("button", { name: "Chart menu" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
   });
 });
