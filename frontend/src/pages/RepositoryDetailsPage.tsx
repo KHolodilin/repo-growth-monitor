@@ -964,7 +964,15 @@ function TrafficPanel({
           series={traffic.traffic.map((point) => point.uniqueCloners)}
         />
       </div>
-      <ChartCard title="Traffic" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:traffic`} onEventsChanged={loadEvents}>
+      <ChartCard
+        title="Traffic"
+        events={events}
+        repositoryId={repositoryId}
+        period={period}
+        context={`repository:${repositoryId}:traffic`}
+        onEventsChanged={loadEvents}
+        mobileSeries={REPO_TRAFFIC_SERIES}
+      >
         <ChartModePlot
           chartId={repoTrafficChartId(repositoryId)}
           series={REPO_TRAFFIC_SERIES}

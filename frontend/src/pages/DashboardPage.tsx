@@ -308,7 +308,13 @@ function TrafficChart({
   const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
   return (
-    <ChartCard title="Traffic" events={events} period={period} context="portfolio:traffic">
+    <ChartCard
+      title="Traffic"
+      events={events}
+      period={period}
+      context="portfolio:traffic"
+      mobileSeries={TRAFFIC_SERIES}
+    >
       <PersistentECharts
         chartId={dashboardTrafficChartId()}
         series={TRAFFIC_SERIES}

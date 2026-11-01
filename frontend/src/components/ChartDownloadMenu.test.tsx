@@ -1,10 +1,31 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
 import { PersistentECharts } from "./PersistentECharts";
 import { ChartCard, ChartDownloadMenu, ChartExportProvider, useChartMode, useRegisterChartExport } from "./ChartDownloadMenu";
+
+const growthEvent = {
+  id: 1,
+  repositoryId: 13,
+  eventAt: "2026-09-23T12:00:00Z",
+  category: "PROMOTION" as const,
+  type: "LINKEDIN_POST" as const,
+  title: "Launch",
+  source: "MANUAL" as const,
+};
+
+function stubMobile(matches: boolean) {
+  const listeners = new Set<() => void>();
+  const media = {
+    matches,
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+  };
+  vi.stubGlobal("matchMedia", vi.fn(() => media));
+  return media;
+}
 
 vi.mock("../lib/api", () => ({ api: vi.fn(() => Promise.resolve([])) }));
 
@@ -30,6 +51,10 @@ function Host({ showChart }: { showChart: boolean }) {
 }
 
 describe("ChartDownloadMenu", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("stays hidden until a chart registers export", async () => {
     const user = userEvent.setup();
     const view = render(<ChartDownloadMenu />);
@@ -241,5 +266,53 @@ describe("ChartDownloadMenu", () => {
     expect(restoredTraffic.getByRole("button", { name: "Events off" })).toHaveTextContent("Off");
     expect(restoredStats.getByRole("button", { name: "Calendar" })).toHaveTextContent("Cal");
     expect(restoredStats.getByRole("button", { name: "All events" })).toHaveTextContent("All");
+  });
+
+  it("uses the mobile ChartCard shell with one series and an events strip", async () => {
+    const user = userEvent.setup();
+    stubMobile(true);
+    const onPng = vi.fn();
+    const onCsv = vi.fn();
+    render(
+      <ChartCard
+        title="Traffic"
+        events={[growthEvent, { ...growthEvent, id: 2, title: "Second" }]}
+        mobileSeries={[
+          { key: "Views", name: "Views" },
+          { key: "Visitors", name: "Visitors" },
+          { key: "Clones", name: "Clones" },
+        ]}
+      >
+        <Registrar onPng={onPng} onCsv={onCsv} />
+      </ChartCard>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "All events" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("checkbox", { name: "Events" })).toBeChecked();
+    expect(screen.getByRole("button", { name: /2 events on 2026-09-23/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Visitors" }));
+    expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
+
+    await user.click(screen.getByRole("button", { name: "Chart menu" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
+    await user.click(screen.getByRole("button", { name: "Chart menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "PNG" }));
+    expect(onPng).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Chart menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "CSV" }));
+    expect(onCsv).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole("button", { name: "Chart menu" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Calendar" }));
+
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
+    expect(screen.queryByRole("button", { name: /events on/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
+    await user.click(screen.getByRole("button", { name: /2 events on 2026-09-23/ }));
+    expect(await screen.findByText("Launch")).toBeInTheDocument();
   });
 });

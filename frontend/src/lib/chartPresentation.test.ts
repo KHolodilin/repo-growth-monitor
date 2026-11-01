@@ -153,4 +153,23 @@ describe("chartPresentation", () => {
     expect(presentChartOption(option, { axis: "calendar", events: [event] }).series).toHaveLength(2);
     expect(presentChartOption(option, { axis: "timeline", events: [] })).toBe(option);
   });
+
+  it("drops event markLines on mobile so the ChartCard strip owns markers", () => {
+    const option = {
+      xAxis: { data: ["2026-09-23"] },
+      series: [
+        { name: "Views", data: [1], markLine: { data: [{ xAxis: "2026-09-23" }] } },
+        { name: "Events", data: [null], markLine: { data: [{ xAxis: "2026-09-23" }] } },
+      ],
+    };
+    const mobile = presentChartOption(option, { axis: "calendar", events: [event], mobile: true });
+    expect(mobile.series.map((item) => item.name)).toEqual(["Views"]);
+    expect(mobile.series[0].markLine).toBeUndefined();
+    expect(
+      presentChartOption(
+        { xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
+        { axis: "calendar", events: [event], mobile: true },
+      ).series,
+    ).toHaveLength(1);
+  });
 });

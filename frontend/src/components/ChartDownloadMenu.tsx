@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type GrowthEvent } from "../lib/api";
 import { readChartAxis, readChartEventFilter, subscribeChartMode, writeChartAxis, writeChartEventFilter } from "../lib/chartModePrefs";
-import { asGrowthEvents, filterGrowthEvents, type EventFilter } from "../lib/growthEvents";
+import { asGrowthEvents, eventUtcDate, filterGrowthEvents, groupEventsByUtcDate, type EventFilter } from "../lib/growthEvents";
 import type { ChartAxis } from "../lib/chartPresentation";
+import { useIsMobileChart } from "../lib/useMediaQuery";
 import { Card } from "./ui";
 import { EventDetailsDialog } from "./GrowthEventsPanel";
 
@@ -17,6 +18,8 @@ type ExportRegistry = {
   publish: (next: ExportActions | null) => void;
 };
 
+type MobileSeriesOption = { key: string; name: string };
+
 type ChartMode = {
   eventFilter: EventFilter;
   setEventFilter: (filter: EventFilter) => void;
@@ -25,6 +28,10 @@ type ChartMode = {
   events: GrowthEvent[];
   period?: string;
   openMarker: (events: GrowthEvent[]) => void;
+  mobile: boolean;
+  mobileSeriesName: string | null;
+  axisDates: string[];
+  setAxisDates: (dates: string[]) => void;
 };
 
 const ChartExportContext = createContext<ExportRegistry | null>(null);
@@ -72,6 +79,10 @@ export function useChartMode() {
     events: mode?.events ?? [],
     period: mode?.period,
     openMarker: mode?.openMarker ?? (() => undefined),
+    mobile: mode?.mobile ?? false,
+    mobileSeriesName: mode?.mobileSeriesName ?? null,
+    axisDates: mode?.axisDates ?? [],
+    setAxisDates: mode?.setAxisDates ?? (() => undefined),
   };
 }
 
@@ -102,6 +113,7 @@ export function ChartCard({
   period = "30d",
   context,
   onEventsChanged,
+  mobileSeries,
 }: {
   title: string;
   controls?: ReactNode;
@@ -112,12 +124,32 @@ export function ChartCard({
   /** Where this chart lives. The All and Calendar choice is stored for this place only. */
   context?: string;
   onEventsChanged?: () => void;
+  /** When set, mobile (&lt;768px) shows a one-series ChartCard shell for these names. */
+  mobileSeries?: readonly MobileSeriesOption[];
 }) {
+  const mobile = useIsMobileChart();
+  const mobileShell = mobile && mobileSeries != null && mobileSeries.length > 0;
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const [eventFilter, setEventFilterState] = useState<EventFilter>(() => (context ? readChartEventFilter(context) : "all"));
   const [axis, setAxisState] = useState<ChartAxis>(() => (context ? readChartAxis(context) : "calendar"));
   const [marker, setMarker] = useState<GrowthEvent[] | null>(null);
+  const [mobileSeriesName, setMobileSeriesName] = useState<string | null>(() => mobileSeries?.[0]?.name ?? null);
+  const [axisDates, setAxisDatesState] = useState<string[]>([]);
+  const setAxisDates = useCallback((dates: string[]) => {
+    setAxisDatesState((prev) =>
+      prev.length === dates.length && prev.every((date, index) => date === dates[index]) ? prev : dates,
+    );
+  }, []);
+  useEffect(() => {
+    if (!mobileSeries?.length) {
+      setMobileSeriesName(null);
+      return;
+    }
+    setMobileSeriesName((current) =>
+      current && mobileSeries.some((item) => item.name === current) ? current : mobileSeries[0].name,
+    );
+  }, [mobileSeries]);
   useEffect(() => {
     if (!context) {
       return;
@@ -171,22 +203,57 @@ export function ChartCard({
     setMarker(items);
   }, []);
   const mode = useMemo<ChartMode>(
-    () => ({ eventFilter, setEventFilter, axis, setAxis, events, period, openMarker }),
-    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker],
+    () => ({
+      eventFilter,
+      setEventFilter,
+      axis,
+      setAxis,
+      events,
+      period,
+      openMarker,
+      mobile: mobileShell,
+      mobileSeriesName: mobileShell ? mobileSeriesName : null,
+      axisDates,
+      setAxisDates,
+    }),
+    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker, mobileShell, mobileSeriesName, axisDates],
   );
 
   return (
     <ChartExportProvider>
       <ChartModeContext.Provider value={mode}>
         <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-medium">{title}</h2>
-            <div className="flex flex-nowrap items-center justify-end gap-2">
-              {controls}
-              <ChartDownloadMenu />
+          {mobileShell ? (
+            <div className="mb-3 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-medium">{title}</h2>
+                <MobileChartMenu />
+              </div>
+              {mobileSeries && (
+                <SeriesSegment
+                  options={mobileSeries}
+                  value={mobileSeriesName ?? mobileSeries[0].name}
+                  onChange={setMobileSeriesName}
+                />
+              )}
+              <EventsToggle
+                on={eventFilter !== "off"}
+                onChange={(next) => setEventFilter(next ? "all" : "off")}
+              />
             </div>
-          </div>
+          ) : (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-medium">{title}</h2>
+              <div className="flex flex-nowrap items-center justify-end gap-2">
+                {controls}
+                <ChartDownloadMenu />
+              </div>
+            </div>
+          )}
           {children}
+          {mobileShell && eventFilter !== "off" && events.length > 0 && (
+            <MobileEventStrip events={events} dates={axisDates} onOpen={openMarker} />
+          )}
         </Card>
         {marker && marker.length > 0 && (
           <EventDetailsDialog
@@ -203,6 +270,196 @@ export function ChartCard({
         )}
       </ChartModeContext.Provider>
     </ChartExportProvider>
+  );
+}
+
+function SeriesSegment({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly MobileSeriesOption[];
+  value: string;
+  onChange: (name: string) => void;
+}) {
+  return (
+    <div role="tablist" aria-label="Chart series" className="flex gap-1 overflow-x-auto">
+      {options.map((item) => {
+        const active = item.name === value;
+        return (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={
+              active
+                ? "shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
+                : "shrink-0 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            }
+            onClick={() => onChange(item.name)}
+          >
+            {item.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function EventsToggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+      <input
+        type="checkbox"
+        className="h-4 w-4 rounded border"
+        checked={on}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      Events
+    </label>
+  );
+}
+
+function MobileEventStrip({
+  events,
+  dates,
+  onOpen,
+}: {
+  events: GrowthEvent[];
+  dates: string[];
+  onOpen: (items: GrowthEvent[]) => void;
+}) {
+  const axis = dates.length > 0 ? dates : [...new Set(events.map(eventUtcDate))].sort();
+  if (axis.length === 0) {
+    return null;
+  }
+  const onAxis = new Set(axis);
+  const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
+  if (groups.length === 0) {
+    return null;
+  }
+  const first = axis[0];
+  const last = axis[axis.length - 1];
+  const span = Math.max(1, axis.length - 1);
+  return (
+    <div className="relative mt-2 h-11 border-t pt-1" aria-label="Growth events">
+      {groups.map((group) => {
+        const index = axis.indexOf(group.date);
+        const left = axis.length === 1 ? 50 : (index / span) * 100;
+        return (
+          <button
+            key={group.date}
+            type="button"
+            className="absolute top-0 flex h-11 w-11 -translate-x-1/2 items-center justify-center"
+            style={{ left: `${left}%` }}
+            aria-label={`${group.events.length} event${group.events.length === 1 ? "" : "s"} on ${group.date}`}
+            onClick={() => onOpen(group.events)}
+          >
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground">
+              {group.events.length > 1 ? (
+                group.events.length
+              ) : (
+                <span className="block h-2.5 w-2.5 rounded-full bg-primary-foreground" aria-hidden="true" />
+              )}
+            </span>
+          </button>
+        );
+      })}
+      <span className="sr-only">
+        {first} to {last}
+      </span>
+    </div>
+  );
+}
+
+function MobileChartMenu() {
+  const registry = useContext(ChartExportContext);
+  const { axis, setAxis } = useModeControls();
+  const { open, setOpen, rootRef } = useDismissableMenu();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!registry) {
+      return;
+    }
+    const sync = () => setReady(registry.current !== null);
+    sync();
+    return registry.subscribe(sync);
+  }, [registry]);
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-lg leading-none hover:bg-muted"
+        aria-label="Chart menu"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div role="menu" aria-label="Chart menu" className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-lg border bg-card py-1 shadow-lg">
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-label="Calendar"
+            aria-checked={axis === "calendar"}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
+            onClick={() => {
+              setAxis("calendar");
+              setOpen(false);
+            }}
+          >
+            <span className="w-3" aria-hidden="true">{axis === "calendar" ? "✓" : ""}</span>
+            Calendar
+          </button>
+          <button
+            type="button"
+            role="menuitemradio"
+            aria-label="Timeline"
+            aria-checked={axis === "timeline"}
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted"
+            onClick={() => {
+              setAxis("timeline");
+              setOpen(false);
+            }}
+          >
+            <span className="w-3" aria-hidden="true">{axis === "timeline" ? "✓" : ""}</span>
+            Timeline
+          </button>
+          {ready && registry && (
+            <>
+              <div className="my-1 border-t" />
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+                onClick={() => {
+                  setOpen(false);
+                  registry.current?.downloadPng();
+                }}
+              >
+                PNG
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+                onClick={() => {
+                  setOpen(false);
+                  registry.current?.downloadCsv();
+                }}
+              >
+                CSV
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
