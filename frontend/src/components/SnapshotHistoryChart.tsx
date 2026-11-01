@@ -8,6 +8,7 @@ import {
   type SnapshotMetric,
 } from "../lib/snapshotChartPrefs";
 import { OTHER_KEY, defaultTopKeys } from "../lib/snapshotHistory";
+import { useIsMobileChart } from "../lib/useMediaQuery";
 import { cn } from "../lib/utils";
 import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
@@ -25,6 +26,7 @@ export function SnapshotHistoryChart({
   history: SnapshotHistory;
 }) {
   const repositoryId = history.repositoryId;
+  const mobile = useIsMobileChart();
   const [metric, setMetric] = useState<SnapshotMetric>("VISITORS");
   const [selected, setSelected] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -49,9 +51,23 @@ export function SnapshotHistoryChart({
     [history, metric, selected],
   );
   const legend = [...selected, OTHER_KEY];
+  const mobileSeries = useMemo(
+    () => [...selected, OTHER_KEY].map((name) => ({ key: name, name })),
+    [selected],
+  );
   const moreCount = Math.max(0, history.rows.length - selected.length);
   const enoughHistory = history.dates.length >= 2;
   const showIcons = kind === "referrers";
+  const metricControls = (
+    <div className="inline-flex rounded-lg border bg-muted p-1">
+      <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>
+        Visitors
+      </MetricButton>
+      <MetricButton active={metric === "VIEWS"} onClick={() => persist("VIEWS", selected)}>
+        Views
+      </MetricButton>
+    </div>
+  );
 
   return (
     <ChartCard
@@ -59,16 +75,9 @@ export function SnapshotHistoryChart({
       repositoryId={repositoryId}
       period="all"
       context={`repository:${repositoryId}:${kind}`}
-      controls={
-        <div className="inline-flex rounded-lg border bg-muted p-1">
-          <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>
-            Visitors
-          </MetricButton>
-          <MetricButton active={metric === "VIEWS"} onClick={() => persist("VIEWS", selected)}>
-            Views
-          </MetricButton>
-        </div>
-      }
+      controls={metricControls}
+      mobileControls={metricControls}
+      mobileSeries={mobileSeries}
     >
       {!enoughHistory && (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
@@ -78,15 +87,17 @@ export function SnapshotHistoryChart({
       )}
       {enoughHistory && (
         <>
-          <div className="mb-3 flex flex-wrap gap-3 text-sm">
-            {legend.map((name, index) => (
-              <span key={name} className="inline-flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: referrerLineColor(name, index) }} />
-                {(showIcons || name === OTHER_KEY) && <ReferrerSourceIcon source={name} />}
-                {name}
-              </span>
-            ))}
-          </div>
+          {!mobile && (
+            <div className="mb-3 flex flex-wrap gap-3 text-sm">
+              {legend.map((name, index) => (
+                <span key={name} className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: referrerLineColor(name, index) }} />
+                  {(showIcons || name === OTHER_KEY) && <ReferrerSourceIcon source={name} />}
+                  {name}
+                </span>
+              ))}
+            </div>
+          )}
           <PersistentECharts
             chartId={`${repositoryId}:snapshot-${kind}`}
             series={legend.map((name) => ({ key: name, name }))}

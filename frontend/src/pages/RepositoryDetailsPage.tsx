@@ -1270,13 +1270,21 @@ function CombinedTopicRankChart({
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History" context={`repository:${repositoryId}:topics`}>
+      <ChartCard title="Rank History" context={`repository:${repositoryId}:topics`} mobileSeries={[]}>
         <p className="text-sm text-muted-foreground">Select topics from the table to display rank history</p>
       </ChartCard>
     );
   }
   return (
-    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:topics`} onEventsChanged={loadEvents}>
+    <ChartCard
+      title="Rank History"
+      events={events}
+      repositoryId={repositoryId}
+      period={period}
+      context={`repository:${repositoryId}:topics`}
+      onEventsChanged={loadEvents}
+      mobileSeries={series}
+    >
       <ChartModePlot
         chartId={repoTopicsChartId(repositoryId, scope)}
         series={series}
@@ -1630,13 +1638,21 @@ function CombinedRankChart({
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History" context={`repository:${repositoryId}:search`}>
+      <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
         <p className="text-sm text-muted-foreground">Select search queries from the table to display rank history</p>
       </ChartCard>
     );
   }
   return (
-    <ChartCard title="Rank History" events={events} repositoryId={repositoryId} period={period} context={`repository:${repositoryId}:search`} onEventsChanged={loadEvents}>
+    <ChartCard
+      title="Rank History"
+      events={events}
+      repositoryId={repositoryId}
+      period={period}
+      context={`repository:${repositoryId}:search`}
+      onEventsChanged={loadEvents}
+      mobileSeries={series}
+    >
       <ChartModePlot
         chartId={repoSearchChartId(repositoryId)}
         series={series}

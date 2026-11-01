@@ -340,7 +340,13 @@ function StatsChart({
     [points],
   );
   return (
-    <ChartCard title="Stats" events={events} period={period} context="portfolio:stats">
+    <ChartCard
+      title="Stats"
+      events={events}
+      period={period}
+      context="portfolio:stats"
+      mobileSeries={DASHBOARD_STATS_SERIES}
+    >
       <PersistentECharts
         chartId={dashboardStatsChartId()}
         series={DASHBOARD_STATS_SERIES}

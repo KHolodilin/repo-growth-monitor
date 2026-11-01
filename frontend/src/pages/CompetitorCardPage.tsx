@@ -6,6 +6,11 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { api, type CompetitorCard, type Repository, type SearchHistory } from "../lib/api";
 import { storedCountOption } from "../lib/searchSeriesChart";
 
+const COMPETITOR_SERIES = [
+  { key: "Stars", name: "Stars" },
+  { key: "Forks", name: "Forks" },
+] as const;
+
 export function CompetitorCardPage() {
   const params = useParams();
   const repositoryId = Number(params.repositoryId);
@@ -123,16 +128,14 @@ export function CompetitorCardView({
         </ul>
       </section>
 
-      <ChartCard title="Stars and forks" repositoryId={repositoryId} period="all" context={`repository:${repositoryId}:competitor`}>
-        <PersistentECharts
-          chartId={chartId}
-          series={[
-            { key: "Stars", name: "Stars" },
-            { key: "Forks", name: "Forks" },
-          ]}
-          option={option}
-          style={{ height: 320 }}
-        />
+      <ChartCard
+        title="Stars and forks"
+        repositoryId={repositoryId}
+        period="all"
+        context={`repository:${repositoryId}:competitor`}
+        mobileSeries={COMPETITOR_SERIES}
+      >
+        <PersistentECharts chartId={chartId} series={COMPETITOR_SERIES} option={option} style={{ height: 320 }} />
       </ChartCard>
     </div>
   );
