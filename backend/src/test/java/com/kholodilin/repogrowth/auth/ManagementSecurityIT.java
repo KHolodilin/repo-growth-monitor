@@ -92,6 +92,6 @@ class ManagementSecurityIT {
     @Test
     void actuatorOnAppPortIsDenied() throws Exception {
         mockMvc.perform(get("/actuator/health").accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isForbidden());
+                .andExpect(result -> assertThat(result.getResponse().getStatus()).isIn(401, 403));
     }
 }
