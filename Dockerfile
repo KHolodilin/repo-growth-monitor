@@ -15,8 +15,12 @@ RUN mvn -q -DskipTests package
 
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
-RUN addgroup -S app && adduser -S app -G app
+RUN addgroup -S app && adduser -S app -G app \
+  && mkdir -p /var/log/app \
+  && chown -R app:app /var/log/app
 COPY --from=backend /build/target/repo-growth-monitor-*.jar app.jar
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh && chown app:app /app/docker-entrypoint.sh
 USER app
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+EXPOSE 8080 8081
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

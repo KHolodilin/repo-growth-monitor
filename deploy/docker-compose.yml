@@ -1,5 +1,11 @@
 name: repo-growth-monitor
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:18.6
@@ -8,39 +14,115 @@ services:
       POSTGRES_DB: repogrowth
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER:-repogrowth}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-${POSTGRES_PASSWORD}}
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+      - ./postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/01-runtime-role.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d repogrowth"]
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-  repo-growth-monitor:
-    image: ghcr.io/kholodilin/repo-growth-monitor:0.29.0
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
+  migrate:
+    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.29.0}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
-      GITHUB_API_BASE_URL: https://api.github.com
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/repogrowth
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      LIQUIBASE_USER: postgres
+      LIQUIBASE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_LIQUIBASE_ENABLED: "true"
+      SPRING_PROFILES_ACTIVE: migrate
+      POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER:-repogrowth}
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-mock}
+      AUTH_PRODUCTION: "false"
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    logging: *default-logging
+
+  backend:
+    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.29.0}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/repogrowth
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_RUNTIME_USER:-repogrowth}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-${POSTGRES_PASSWORD}}
+      SPRING_LIQUIBASE_ENABLED: "false"
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-json-logs}
+      LOG_FILE: /var/log/app/app.log
+      SERVER_SHUTDOWN: graceful
+      MANAGEMENT_PORT: "8081"
+      MANAGEMENT_USER: ${MANAGEMENT_USER:-actuator}
+      MANAGEMENT_PASSWORD: ${MANAGEMENT_PASSWORD:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_API_BASE_URL: https://api.github.com
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      APP_BASE_URL: ${APP_BASE_URL:-}
+      SITE_DOMAIN: ${SITE_DOMAIN:-}
       COLLECTION_PLANNER_FROM: ${COLLECTION_PLANNER_FROM:-06:00}
       COLLECTION_PLANNER_TO: ${COLLECTION_PLANNER_TO:-18:00}
       AUTH_PROVIDER: ${AUTH_PROVIDER}
       AUTH_PRODUCTION: ${AUTH_PRODUCTION:-true}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       AUTH_OIDC_ISSUER_URI: ${AUTH_OIDC_ISSUER_URI:-}
       AUTH_OIDC_CLIENT_ID: ${AUTH_OIDC_CLIENT_ID:-}
       AUTH_OIDC_CLIENT_SECRET: ${AUTH_OIDC_CLIENT_SECRET:-}
       AUTH_OIDC_REDIRECT_URI: ${AUTH_OIDC_REDIRECT_URI:-}
       SPRINGDOC_API_DOCS_ENABLED: ${SPRINGDOC_API_DOCS_ENABLED:-false}
       SPRINGDOC_SWAGGER_UI_ENABLED: ${SPRINGDOC_SWAGGER_UI_ENABLED:-false}
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - app_logs:/var/log/app
+    logging: *default-logging
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
 volumes:
   pgdata:
+  app_logs:
+  caddy_data:
+  caddy_config:
+  caddy_logs:

@@ -116,10 +116,23 @@ The token is never stored in PostgreSQL and never returned by the API. Do not co
 
 ## Local development
 
-### Production-like stack (build from source)
+### VPS / Caddy deploy pack (recommended)
 
-Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is not the
-downloadable release: `docker compose up -d --build` builds `Dockerfile` on the machine.
+See [`deploy/README.md`](deploy/README.md). Without a domain:
+
+```bash
+cd deploy
+cp .env.example .env
+# set GITHUB_TOKEN, POSTGRES_PASSWORD, POSTGRES_RUNTIME_PASSWORD
+docker compose -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.build.yml up -d --build
+```
+
+Open **http://localhost/** (Caddy). App port `8080` is not published; Actuator is `127.0.0.1:8081`.
+
+### Production-like stack (build from source, host :8080)
+
+Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is the
+contributor quick path (not the Caddy pack): `docker compose up -d --build` builds `Dockerfile` on the machine.
 Release 0.29.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.29.0`.
 
 The image is three stages:

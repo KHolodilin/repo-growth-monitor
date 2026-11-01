@@ -1,0 +1,29 @@
+# HTTP-only overlay (no public domain / no ACME).
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# App: http://localhost/  (Caddy :80)
+# Actuator: http://127.0.0.1:8081/actuator/health
+# Postgres: 127.0.0.1:5432
+
+services:
+  backend:
+    environment:
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-mock}
+      AUTH_PRODUCTION: ${AUTH_PRODUCTION:-false}
+      AUTH_COOKIE_SECURE: "false"
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost}
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      SPRINGDOC_API_DOCS_ENABLED: ${SPRINGDOC_API_DOCS_ENABLED:-true}
+      SPRINGDOC_SWAGGER_UI_ENABLED: ${SPRINGDOC_SWAGGER_UI_ENABLED:-true}
+
+  caddy:
+    ports:
+      - "80:80"
+    environment:
+      SITE_DOMAIN: localhost
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy

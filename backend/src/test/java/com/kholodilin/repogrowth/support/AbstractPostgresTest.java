@@ -32,6 +32,7 @@ public abstract class AbstractPostgresTest {
         registry.add("spring.task.scheduling.enabled", () -> "false");
         registry.add("auth.provider", () -> "mock");
         registry.add("auth.production", () -> "false");
+        registry.add("management.server.port", () -> "-1");
     }
 
     protected void wipeRepositoryData(JdbcClient jdbcClient) {
