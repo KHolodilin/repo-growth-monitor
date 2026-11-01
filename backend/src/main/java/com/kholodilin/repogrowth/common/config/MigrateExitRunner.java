@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.common.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.SpringApplication;
@@ -25,6 +26,7 @@ public class MigrateExitRunner implements ApplicationRunner {
     private final ConfigurableApplicationContext context;
     private final IntConsumer exit;
 
+    @Autowired
     public MigrateExitRunner(ConfigurableApplicationContext context) {
         this(context, System::exit);
     }
