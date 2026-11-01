@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir -p dist-release
           VERSION="${{ steps.version.outputs.version }}"
-          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.29.0|ghcr.io/kholodilin/repo-growth-monitor:${VERSION}|g" \
+          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.30.0|ghcr.io/kholodilin/repo-growth-monitor:${VERSION}|g" \
             deploy/docker-compose.yml > dist-release/docker-compose.yml
           cp deploy/docker-compose.local.yml dist-release/docker-compose.local.yml
           cp deploy/Caddyfile dist-release/Caddyfile
