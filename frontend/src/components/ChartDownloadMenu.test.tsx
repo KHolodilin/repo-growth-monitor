@@ -364,6 +364,13 @@ describe("ChartDownloadMenu", () => {
     expect(await screen.findByRole("button", { name: /1 event on 2026-09-23/ })).toBeInTheDocument();
 
     view.rerender(
+      <ChartCard title="Traffic" events={[growthEvent]} mobileSeries={[{ key: "Views", name: "Views" }]}>
+        <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
+      </ChartCard>,
+    );
+    expect(await screen.findByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
+
+    view.rerender(
       <ChartCard title="Traffic" events={[growthEvent]}>
         <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
       </ChartCard>,

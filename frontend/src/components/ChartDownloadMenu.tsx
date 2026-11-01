@@ -146,9 +146,12 @@ export function ChartCard({
       setMobileSeriesName(null);
       return;
     }
-    setMobileSeriesName((current) =>
-      current && mobileSeries.some((item) => item.name === current) ? current : mobileSeries[0].name,
-    );
+    setMobileSeriesName((current) => {
+      if (current != null && mobileSeries.some((item) => item.name === current)) {
+        return current;
+      }
+      return mobileSeries[0].name;
+    });
   }, [mobileSeries]);
   useEffect(() => {
     if (!context) {
@@ -229,12 +232,8 @@ export function ChartCard({
                 <h2 className="font-medium">{title}</h2>
                 <MobileChartMenu />
               </div>
-              {mobileSeries && (
-                <SeriesSegment
-                  options={mobileSeries}
-                  value={mobileSeriesName ?? mobileSeries[0].name}
-                  onChange={setMobileSeriesName}
-                />
+              {mobileSeries && mobileSeriesName && (
+                <SeriesSegment options={mobileSeries} value={mobileSeriesName} onChange={setMobileSeriesName} />
               )}
               <EventsToggle
                 on={eventFilter !== "off"}
