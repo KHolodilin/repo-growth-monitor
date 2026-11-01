@@ -192,7 +192,13 @@ export function TopicDetailsPage() {
         <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
       </div>
 
-      <ChartCard title="Rank History" repositoryId={repo.id} period="all" context={`repository:${repo.id}:topic:${history.watch.id}`}>
+      <ChartCard
+        title="Rank History"
+        repositoryId={repo.id}
+        period="all"
+        context={`repository:${repo.id}:topic:${history.watch.id}`}
+        mobileSeries={[{ key: String(history.watch.id), name: history.watch.topic }]}
+      >
         <ChartModePlot
           chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
           series={[{ key: String(history.watch.id), name: history.watch.topic }]}

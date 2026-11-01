@@ -107,6 +107,7 @@ export function useRegisterChartExport(actions: ExportActions) {
 export function ChartCard({
   title,
   controls,
+  mobileControls,
   children,
   events: eventsProp,
   repositoryId,
@@ -117,6 +118,8 @@ export function ChartCard({
 }: {
   title: string;
   controls?: ReactNode;
+  /** Extra mobile-only controls (metric switch) under the title row. */
+  mobileControls?: ReactNode;
   children: ReactNode;
   events?: GrowthEvent[];
   repositoryId?: number;
@@ -124,11 +127,11 @@ export function ChartCard({
   /** Where this chart lives. The All and Calendar choice is stored for this place only. */
   context?: string;
   onEventsChanged?: () => void;
-  /** When set, mobile (&lt;768px) shows a one-series ChartCard shell for these names. */
+  /** When set (even empty), mobile (&lt;768px) uses the one-series ChartCard shell. */
   mobileSeries?: readonly MobileSeriesOption[];
 }) {
   const mobile = useIsMobileChart();
-  const mobileShell = mobile && mobileSeries != null && mobileSeries.length > 0;
+  const mobileShell = mobile && mobileSeries != null;
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
   const [eventFilter, setEventFilterState] = useState<EventFilter>(() => (context ? readChartEventFilter(context) : "all"));
@@ -232,7 +235,8 @@ export function ChartCard({
                 <h2 className="font-medium">{title}</h2>
                 <MobileChartMenu />
               </div>
-              {mobileSeries && mobileSeriesName && (
+              {mobileControls}
+              {mobileSeries && mobileSeries.length > 1 && mobileSeriesName && (
                 <SeriesSegment options={mobileSeries} value={mobileSeriesName} onChange={setMobileSeriesName} />
               )}
               <EventsToggle

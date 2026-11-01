@@ -368,7 +368,18 @@ describe("ChartDownloadMenu", () => {
         <Registrar onPng={vi.fn()} onCsv={vi.fn()} />
       </ChartCard>,
     );
-    expect(await screen.findByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Chart series" })).not.toBeInTheDocument();
+
+    view.rerender(
+      <ChartCard title="Rank History" mobileSeries={[]} mobileControls={<button type="button">Place</button>}>
+        <p>Select topics from the table to display rank history</p>
+      </ChartCard>,
+    );
+    expect(screen.getByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Place" })).toBeInTheDocument();
+    expect(screen.getByText("Select topics from the table to display rank history")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Chart series" })).not.toBeInTheDocument();
 
     view.rerender(
       <ChartCard title="Traffic" events={[growthEvent]}>

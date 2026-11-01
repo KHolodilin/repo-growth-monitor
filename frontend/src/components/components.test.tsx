@@ -473,6 +473,28 @@ describe("components", () => {
     expect(screen.getByText("No snapshots for this period.")).toBeInTheDocument();
   });
 
+  it("uses the mobile ChartCard shell for snapshot history", async () => {
+    const user = userEvent.setup();
+    const media = {
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal("matchMedia", vi.fn(() => media));
+    render(
+      <MemoryRouter>
+        <SnapshotHistoryChart title="Referrer Traffic (by day)" kind="referrers" history={snapshotHistory} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Chart series" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Visitors" }));
+    await user.click(screen.getByRole("button", { name: "Views" }));
+    await user.click(screen.getByRole("button", { name: /more sources|Select sources/ }));
+    expect(screen.getAllByText("Select sources").length).toBeGreaterThan(1);
+    vi.unstubAllGlobals();
+  });
+
   it("shows one before and after table for the day's events", async () => {
     api.mockImplementation((url: string) => {
       const path = String(url);

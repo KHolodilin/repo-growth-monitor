@@ -79,6 +79,20 @@ export function QueryDetailsPage() {
     }
   }
 
+  const chartSeries = useMemo(() => {
+    if (!repo || !history) {
+      return [] as { key: string; name: string }[];
+    }
+    return queryDetailsChart({
+      history,
+      repo,
+      rows: results?.rows ?? null,
+      series,
+      selected,
+      metric,
+    })!.series;
+  }, [history, repo, results, series, selected, metric]);
+
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -92,6 +106,28 @@ export function QueryDetailsPage() {
   }
 
   const busy = running || searchBusy;
+  const metricControls = (
+    <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
+      {([
+        ["place", "Place"],
+        ["stars", "Stars"],
+        ["forks", "Forks"],
+      ] as const).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          className={cn(
+            "rounded-md px-3 py-1.5 text-sm font-medium",
+            metric === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+          )}
+          aria-pressed={metric === key}
+          onClick={() => setMetric(key)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -150,28 +186,9 @@ export function QueryDetailsPage() {
         repositoryId={repo.id}
         period="all"
         context={`repository:${repo.id}:query:${history.query.id}`}
-        controls={
-          <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
-            {([
-              ["place", "Place"],
-              ["stars", "Stars"],
-              ["forks", "Forks"],
-            ] as const).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  metric === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-                )}
-                aria-pressed={metric === key}
-                onClick={() => setMetric(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        }
+        controls={metricControls}
+        mobileControls={metricControls}
+        mobileSeries={chartSeries}
       >
         <QueryRankChart
           history={history}
