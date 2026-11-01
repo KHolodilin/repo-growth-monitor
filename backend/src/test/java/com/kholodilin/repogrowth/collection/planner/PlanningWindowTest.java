@@ -21,7 +21,7 @@ class PlanningWindowTest {
                 Duration.ofMinutes(5),
                 new CollectionProperties.Planner(true, LocalTime.of(10, 0), LocalTime.of(18, 0), Duration.ofMinutes(10), Duration.ofHours(3))
         );
-        AppProperties app = new AppProperties("UTC");
+        AppProperties app = new AppProperties("UTC", null, null);
         Clock inside = Clock.fixed(Instant.parse("2026-08-27T12:00:00Z"), ZoneOffset.UTC);
         assertThat(new PlanningWindow(properties, inside, app).isOpen()).isTrue();
         Clock after = Clock.fixed(Instant.parse("2026-08-27T21:00:00Z"), ZoneOffset.UTC);
@@ -29,7 +29,7 @@ class PlanningWindowTest {
         Clock atEnd = Clock.fixed(Instant.parse("2026-08-27T18:00:00Z"), ZoneOffset.UTC);
         assertThat(new PlanningWindow(properties, atEnd, app).isOpen()).isFalse();
 
-        PlanningWindow window = new PlanningWindow(properties, inside, new AppProperties("Europe/Moscow"));
+        PlanningWindow window = new PlanningWindow(properties, inside, new AppProperties("Europe/Moscow", null, null));
         assertThat(window.from()).isEqualTo(LocalTime.of(10, 0));
         assertThat(window.to()).isEqualTo(LocalTime.of(18, 0));
         assertThat(window.zoneId().getId()).isEqualTo("Europe/Moscow");

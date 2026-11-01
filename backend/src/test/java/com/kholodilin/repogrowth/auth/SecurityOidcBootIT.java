@@ -45,6 +45,7 @@ class SecurityOidcBootIT {
         registry.add("auth.oidc.client-secret", () -> "secret");
         registry.add("springdoc.api-docs.enabled", () -> "false");
         registry.add("springdoc.swagger-ui.enabled", () -> "false");
+        registry.add("management.server.port", () -> "-1");
     }
 
     @Autowired

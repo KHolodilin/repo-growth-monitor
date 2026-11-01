@@ -7,20 +7,29 @@ spring:
     password: postgres
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+    enabled: ${SPRING_LIQUIBASE_ENABLED:true}
+    user: ${LIQUIBASE_USER:${spring.datasource.username}}
+    password: ${LIQUIBASE_PASSWORD:${spring.datasource.password}}
   jackson:
     default-property-inclusion: non_null
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
 
 server:
   port: 8080
+  forward-headers-strategy: framework
   servlet:
     session:
       cookie:
         http-only: true
         same-site: lax
+        secure: ${AUTH_COOKIE_SECURE:false}
       timeout: ${AUTH_SESSION_IDLE:8h}
 
 app:
   timezone: UTC
+  base-url: ${APP_BASE_URL:}
+  site-domain: ${SITE_DOMAIN:}
 
 auth:
   provider: ${AUTH_PROVIDER:}
@@ -84,20 +93,42 @@ traffic:
     - wiki
 
 management:
+  server:
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
         include: health,info,prometheus,metrics
+      base-path: /actuator
   endpoint:
     health:
       show-details: when_authorized
+      probes:
+        enabled: true
+      group:
+        liveness:
+          include: ping
+        readiness:
+          include: readinessState,db
     prometheus:
       enabled: true
+    env:
+      enabled: false
+    configprops:
+      enabled: false
+    heapdump:
+      enabled: false
+    threaddump:
+      enabled: false
+    logfile:
+      enabled: false
   metrics:
     tags:
       application: ${spring.application.name}
 
 logging:
+  file:
+    name: ${LOG_FILE:}
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level traceId=%X{traceId} repositoryId=%X{repositoryId} collectionRunId=%X{collectionRunId} collectionJobId=%X{collectionJobId} searchRunId=%X{searchRunId} %logger{36} - %msg%n"
   level:

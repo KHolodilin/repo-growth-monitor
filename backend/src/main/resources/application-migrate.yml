@@ -1,0 +1,27 @@
+spring:
+  main:
+    web-application-type: none
+  task:
+    scheduling:
+      enabled: false
+  liquibase:
+    enabled: true
+    user: ${LIQUIBASE_USER:${SPRING_DATASOURCE_USERNAME:postgres}}
+    password: ${LIQUIBASE_PASSWORD:${SPRING_DATASOURCE_PASSWORD:postgres}}
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
+      - org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration
+      - org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration
+
+collection:
+  workers: 0
+  planner:
+    enabled: false
+
+search:
+  workers: 0
+
+management:
+  server:
+    port: -1

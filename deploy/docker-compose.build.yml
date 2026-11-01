@@ -1,0 +1,16 @@
+# Build the app image locally instead of pulling GHCR.
+# Usage (no domain / HTTP):
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml -f docker-compose.build.yml up -d --build
+
+services:
+  migrate:
+    image: repo-growth-monitor:local
+    build:
+      context: ..
+      dockerfile: Dockerfile
+
+  backend:
+    image: repo-growth-monitor:local
+    build:
+      context: ..
+      dockerfile: Dockerfile

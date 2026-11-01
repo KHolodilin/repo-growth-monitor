@@ -38,44 +38,48 @@ jobs:
       - name: Prepare Release assets
         run: |
           mkdir -p dist-release
-          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.29.0|ghcr.io/kholodilin/repo-growth-monitor:${{ steps.version.outputs.version }}|" \
+          VERSION="${{ steps.version.outputs.version }}"
+          sed "s|ghcr.io/kholodilin/repo-growth-monitor:0.29.0|ghcr.io/kholodilin/repo-growth-monitor:${VERSION}|g" \
             deploy/docker-compose.yml > dist-release/docker-compose.yml
+          cp deploy/docker-compose.local.yml dist-release/docker-compose.local.yml
+          cp deploy/Caddyfile dist-release/Caddyfile
+          cp deploy/Caddyfile.local dist-release/Caddyfile.local
           cp deploy/.env.example dist-release/env.example
+          cp deploy/README.md dist-release/README.md
+          mkdir -p dist-release/postgres dist-release/sql
+          cp deploy/postgres/init-runtime-role.sh dist-release/postgres/
+          cp deploy/sql/runtime-grants.md dist-release/sql/
+          (cd dist-release && tar -czf ../deploy-pack.tgz .)
+          mv deploy-pack.tgz dist-release/
 
       - uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
           files: |
+            dist-release/deploy-pack.tgz
             dist-release/docker-compose.yml
+            dist-release/docker-compose.local.yml
             dist-release/env.example
+            dist-release/Caddyfile.local
+            dist-release/README.md
           body: |
-            Download the compose file and start. Java, Node, and a git clone are not required.
+            Download the deploy pack. Java, Node, and a git clone are not required.
 
-            PowerShell:
-
-            ```powershell
-            Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml -OutFile docker-compose.yml
-            Invoke-WebRequest -Uri https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example -OutFile env.example
-            Copy-Item env.example .env
-            # set GITHUB_TOKEN and POSTGRES_PASSWORD
-            docker compose up -d
-            ```
-
-            bash:
+            Without a domain (HTTP on port 80):
 
             ```bash
-            curl -fsSL -o docker-compose.yml https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/docker-compose.yml
-            curl -fsSL -o env.example https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/env.example
+            curl -fsSL -o deploy-pack.tgz https://github.com/KHolodilin/repo-growth-monitor/releases/latest/download/deploy-pack.tgz
+            mkdir -p repo-growth-monitor && tar -xzf deploy-pack.tgz -C repo-growth-monitor
+            cd repo-growth-monitor
             cp env.example .env
-            # set GITHUB_TOKEN and POSTGRES_PASSWORD
-            docker compose up -d
+            # set GITHUB_TOKEN, POSTGRES_PASSWORD, POSTGRES_RUNTIME_PASSWORD
+            docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
             ```
 
-            Open http://localhost:8080
+            Open http://localhost/ (or http://&lt;vps-ip&gt;/).
 
-            1. Open **Repositories** and enable tracking.
-            2. Click **Collect now**, or wait for the planner window (`06:00–18:00` UTC by default).
-            3. View the **Dashboard** and repository details.
+            Actuator stays on the host loopback only: http://127.0.0.1:8081/actuator/health
 
-            The first start creates an empty database. Stop with `docker compose down`. Data stays in the `pgdata` volume.
-            Upgrade by replacing `docker-compose.yml` with the file from a newer Release and running `docker compose up -d` again.
+            See README.md in the pack for HTTPS/domain, CLI, and SSH tunnel examples.
+
+            Upgrade: replace the pack files from a newer Release and run `docker compose … up -d` again. Postgres data stays in the volume.
