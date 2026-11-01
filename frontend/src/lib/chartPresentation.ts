@@ -57,6 +57,16 @@ function hasEvents(option: ChartOption) {
   return (option.series ?? []).some((series) => series.name === "Events");
 }
 
+/** Mobile ChartCard uses an HTML event strip instead of markLine labels on the plot. */
+function stripEventMarks(option: ChartOption): ChartOption {
+  return {
+    ...option,
+    series: (option.series ?? [])
+      .filter((item) => item.name !== "Events")
+      .map((item) => ({ ...item, markLine: undefined })),
+  };
+}
+
 function remapMarks<T extends { data?: MarkItem[] }>(mark: T | undefined, dateToDay: Map<string, string>) {
   if (!mark || !Array.isArray(mark.data)) {
     return mark;
@@ -176,12 +186,17 @@ function toTimeline(option: ChartOption): ChartOption {
 }
 
 /** Calendar dates stay as they are. Timeline and event markers are applied on top of a finished option. */
-export function presentChartOption<T>(option: T, mode: { axis: ChartAxis; events: GrowthEvent[]; period?: string }): T {
+export function presentChartOption<T>(
+  option: T,
+  mode: { axis: ChartAxis; events: GrowthEvent[]; period?: string; mobile?: boolean },
+): T {
   if (!option || typeof option !== "object") {
     return option;
   }
   let next = option as ChartOption;
-  if (mode.events.length > 0 && !hasEvents(next)) {
+  if (mode.mobile) {
+    next = stripEventMarks(next);
+  } else if (mode.events.length > 0 && !hasEvents(next)) {
     next = withEvents(next, mode.events, mode.period);
   }
   if (mode.axis === "timeline") {

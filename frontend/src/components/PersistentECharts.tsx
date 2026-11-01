@@ -30,7 +30,7 @@ export function ChartModePlot({
   return <PersistentECharts {...rest} option={option} />;
 }
 
-export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, ...rest }: Props) {
+export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, style, ...rest }: Props) {
   const chartRef = useRef<ReactECharts>(null);
   const mode = useChartMode();
   const [stored, setStored] = useState<Record<string, boolean> | null>(() => readChartSelection(chartId));
@@ -42,28 +42,59 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
   const selectedByName = useMemo(() => {
     const selected: Record<string, boolean> = {};
     for (const item of series) {
+      if (mode.mobile && mode.mobileSeriesName) {
+        selected[item.name] = item.name === mode.mobileSeriesName;
+        continue;
+      }
       selected[item.name] = !persistSelection || !(stored && Object.prototype.hasOwnProperty.call(stored, item.key))
         ? true
         : stored[item.key];
     }
+    if (mode.mobile) {
+      selected.Events = false;
+    }
     return selected;
-  }, [series, stored, persistSelection]);
+  }, [series, stored, persistSelection, mode.mobile, mode.mobileSeriesName]);
 
   const mergedOption = useMemo(() => {
-    const legend = (option as { legend?: unknown }).legend;
+    const base = option as { legend?: unknown; grid?: Record<string, unknown> };
+    const legend = base.legend;
     if (!legend || typeof legend !== "object" || Array.isArray(legend)) {
-      return option;
+      return mode.mobile
+        ? { ...option, legend: { show: false, selected: selectedByName } }
+        : option;
     }
     return {
       ...option,
-      legend: { ...legend, selected: selectedByName },
+      legend: mode.mobile
+        ? { ...legend, show: false, selected: selectedByName }
+        : { ...legend, selected: selectedByName },
     };
-  }, [option, selectedByName]);
+  }, [option, selectedByName, mode.mobile]);
 
   const presented = useMemo(
-    () => presentChartOption(mergedOption, { axis: mode.axis, events: mode.events, period: mode.period }),
-    [mergedOption, mode.axis, mode.events, mode.period],
+    () =>
+      presentChartOption(mergedOption, {
+        axis: mode.axis,
+        events: mode.events,
+        period: mode.period,
+        mobile: mode.mobile,
+      }),
+    [mergedOption, mode.axis, mode.events, mode.period, mode.mobile],
   );
+
+  useEffect(() => {
+    const axis = (presented as { xAxis?: { data?: unknown } | unknown[] }).xAxis;
+    if (!axis || Array.isArray(axis) || !Array.isArray(axis.data)) {
+      mode.setAxisDates([]);
+      return;
+    }
+    mode.setAxisDates(axis.data.map((value) => String(value)));
+  }, [presented, mode.setAxisDates]);
+
+  const plotStyle = mode.mobile
+    ? { ...(typeof style === "object" && style ? style : {}), height: 220, width: "100%" }
+    : style;
 
   function onLegendSelectChanged(params: { selected?: Record<string, boolean> }) {
     const byName = params.selected ?? {};
@@ -85,9 +116,10 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     <ReactECharts
       option={presented}
       notMerge
+      style={plotStyle}
       onEvents={{
         ...onEvents,
-        ...(persistSelection ? { legendselectchanged: onLegendSelectChanged } : {}),
+        ...(persistSelection && !mode.mobile ? { legendselectchanged: onLegendSelectChanged } : {}),
         click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
           const clicked = markLineEvents(params);
           if (clicked.length > 0) {
