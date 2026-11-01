@@ -127,8 +127,6 @@ management:
       application: ${spring.application.name}
 
 logging:
-  file:
-    name: ${LOG_FILE:}
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level traceId=%X{traceId} repositoryId=%X{repositoryId} collectionRunId=%X{collectionRunId} collectionJobId=%X{collectionJobId} searchRunId=%X{searchRunId} %logger{36} - %msg%n"
   level:
