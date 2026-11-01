@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Sign in — Repo Growth Monitor</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    main { max-width: 24rem; margin: 4rem auto; padding: 1.5rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 0.75rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; }
+    label { display: block; font-size: 0.875rem; margin: 0.75rem 0 0.25rem; }
+    input { width: 100%; box-sizing: border-box; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.5rem; }
+    button, .btn { display: inline-block; margin-top: 1rem; padding: 0.5rem 1rem; border: 0; border-radius: 0.5rem; background: #0f172a; color: #fff; text-decoration: none; cursor: pointer; }
+    .error { color: #b91c1c; font-size: 0.875rem; margin-bottom: 0.75rem; }
+    .hint { color: #64748b; font-size: 0.8rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Sign in</h1>
+  <p class="error" th:if="${error}" th:text="${error == 'disabled'} ? 'Account disabled' : 'Sign-in failed'"></p>
+  <form th:if="${mock}" method="post" action="/login">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" required/>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required/>
+    <button type="submit">Sign in</button>
+    <p class="hint">Mock users: user/user, admin/admin (ADMIN after sync), blocked/blocked.</p>
+  </form>
+  <div th:unless="${mock}">
+    <a class="btn" th:href="${oidcLoginUrl}">Continue with identity provider</a>
+  </div>
+</main>
+</body>
+</html>

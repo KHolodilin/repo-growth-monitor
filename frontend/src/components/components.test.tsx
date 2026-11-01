@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { dashboardReady, growthEvent, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
 import { GrowthEventSettingsCard } from "./GrowthEventSettingsCard";
 import { EventDetailsDialog, GrowthEventsPanel } from "./GrowthEventsPanel";
-import { DashboardIcon, LogoMark, RepositoriesIcon, SettingsIcon } from "./icons";
+import { DashboardIcon, LogoMark, RepositoriesIcon, SettingsIcon, SignInIcon } from "./icons";
 import { Layout } from "./Layout";
 import { PageBreadcrumb } from "./PageBreadcrumb";
 import { PeriodSelector } from "./PeriodSelector";
@@ -39,6 +39,7 @@ describe("components", () => {
         <DashboardIcon />
         <RepositoriesIcon />
         <SettingsIcon />
+        <SignInIcon />
         <PeriodSelector period="30d" onPeriod={onPeriod} />
         <ServicePathBadge />
         <ServicePathToggle checked={false} onChange={vi.fn()} />

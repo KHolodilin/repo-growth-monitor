@@ -1,0 +1,38 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-app-users
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE app_users (
+                  id BIGSERIAL PRIMARY KEY,
+                  oidc_issuer TEXT NOT NULL,
+                  oidc_sub TEXT NOT NULL,
+                  display_name TEXT NOT NULL,
+                  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                  last_login_at TIMESTAMPTZ,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE UNIQUE INDEX uq_app_users_issuer_sub
+                  ON app_users (oidc_issuer, oidc_sub);
+
+              CREATE TABLE user_roles (
+                  id BIGSERIAL PRIMARY KEY,
+                  user_id BIGINT NOT NULL,
+                  role TEXT NOT NULL,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+              );
+
+              CREATE UNIQUE INDEX uq_user_roles_user_role
+                  ON user_roles (user_id, role);
+
+              CREATE INDEX idx_user_roles_user_id
+                  ON user_roles (user_id);
+
+              -- Diagnostic only (no FK on user_roles.user_id by design):
+              -- SELECT ur.* FROM user_roles ur
+              -- LEFT JOIN app_users u ON u.id = ur.user_id
+              -- WHERE u.id IS NULL;

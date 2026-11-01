@@ -25,12 +25,14 @@ import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
+import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.repository.domain.RepositoryVisibility;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
@@ -83,6 +85,7 @@ public class AnalyticsService {
     private final PortfolioHighlightsService highlightsService;
     private final PlanningWindow planningWindow;
     private final Clock clock;
+    private final CurrentUserAccess currentUserAccess;
 
     public AnalyticsService(
             RepositoryService repositoryService,
@@ -94,7 +97,8 @@ public class AnalyticsService {
             RepositoryHealthService healthService,
             PortfolioHighlightsService highlightsService,
             PlanningWindow planningWindow,
-            Clock clock
+            Clock clock,
+            CurrentUserAccess currentUserAccess
     ) {
         this.repositoryService = repositoryService;
         this.trafficJdbcRepository = trafficJdbcRepository;
@@ -106,6 +110,7 @@ public class AnalyticsService {
         this.highlightsService = highlightsService;
         this.planningWindow = planningWindow;
         this.clock = clock;
+        this.currentUserAccess = currentUserAccess;
     }
 
     public DashboardResponse dashboard(String periodParam) {
@@ -115,7 +120,7 @@ public class AnalyticsService {
                 today,
                 trafficJdbcRepository.earliestTrackedTrafficDate().orElse(null)
         );
-        List<Repository> tracked = repositoryService.tracked();
+        List<Repository> tracked = visibleTracked(repositoryService.tracked());
         if (tracked.isEmpty()) {
             return empty(period, DashboardState.NO_REPOSITORIES, 0, 0);
         }
@@ -127,8 +132,7 @@ public class AnalyticsService {
 
     public PortfolioSnapshot portfolio(String period) {
         LocalDate from = fromDate(period);
-        List<Repository> tracked = repositoryService.tracked();
-        TrafficTotals totals = trafficJdbcRepository.portfolioTotals(from);
+        List<Repository> tracked = visibleTracked(repositoryService.tracked());
         long stars = tracked.stream().mapToLong(Repository::stars).sum();
         List<RepositoryMetrics> rows = tracked.stream().map(repository -> {
             TrafficTotals repoTotals = trafficJdbcRepository.totals(repository.id(), from);
@@ -141,19 +145,25 @@ public class AnalyticsService {
                     repository.stars()
             );
         }).toList();
+        long views = rows.stream().mapToLong(RepositoryMetrics::views).sum();
+        long visitors = rows.stream().mapToLong(RepositoryMetrics::visitors).sum();
+        long clones = rows.stream().mapToLong(RepositoryMetrics::clones).sum();
+        long uniqueCloners = tracked.stream()
+                .mapToLong(repository -> trafficJdbcRepository.totals(repository.id(), from).uniqueCloners())
+                .sum();
         return new PortfolioSnapshot(
                 tracked.size(),
-                totals.views(),
-                totals.uniqueVisitors(),
-                totals.clones(),
-                totals.uniqueCloners(),
+                views,
+                visitors,
+                clones,
+                uniqueCloners,
                 stars,
                 rows
         );
     }
 
     public RepositoryTrafficSnapshot traffic(long repositoryId, String periodParam, boolean includeServicePaths) {
-        Repository repository = repositoryService.get(repositoryId);
+        Repository repository = requireVisible(repositoryService.get(repositoryId));
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
         DashboardPeriod period = periodForRepository(repositoryId, periodParam);
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
@@ -193,7 +203,7 @@ public class AnalyticsService {
      * window minus the first. All-time, and a window with fewer than two points, has no change.
      */
     public RepositoryStatsHistory statsHistory(long repositoryId, String periodParam) {
-        repositoryService.get(repositoryId);
+        requireVisible(repositoryService.get(repositoryId));
         DashboardPeriod period = periodForStats(repositoryId, periodParam);
         List<TrafficJdbcRepository.RepositoryDailyStats> history =
                 trafficJdbcRepository.dailyStatsHistory(repositoryId, period.allTime() ? null : period.from());
@@ -250,7 +260,7 @@ public class AnalyticsService {
             Integer daysParam,
             boolean includeServicePaths
     ) {
-        repositoryService.get(repositoryId);
+        requireVisible(repositoryService.get(repositoryId));
         SnapshotKind kind = snapshotKind(kindParam);
         int days = historyDays(daysParam);
         LocalDate to = LocalDate.now(clock);
@@ -318,6 +328,35 @@ public class AnalyticsService {
         return DashboardPeriod.of(periodParam, today, earliest);
     }
 
+    private List<Repository> visibleTracked(List<Repository> tracked) {
+        if (currentUserAccess.canSeePrivateRepositories()) {
+            return tracked;
+        }
+        return tracked.stream().filter(repository -> RepositoryVisibility.isPublic(repository.visibility())).toList();
+    }
+
+    private Repository requireVisible(Repository repository) {
+        if (currentUserAccess.canSeePrivateRepositories() || RepositoryVisibility.isPublic(repository.visibility())) {
+            return repository;
+        }
+        throw ApiException.notFound("Repository not found");
+    }
+
+    private TrafficTotals sumVisibleTotals(LocalDate fromInclusive, LocalDate toInclusive, Set<Long> repositoryIds) {
+        long views = 0;
+        long uniqueVisitors = 0;
+        long clones = 0;
+        long uniqueCloners = 0;
+        for (Long repositoryId : repositoryIds) {
+            TrafficTotals totals = trafficJdbcRepository.totalsInRange(repositoryId, fromInclusive, toInclusive);
+            views += totals.views();
+            uniqueVisitors += totals.uniqueVisitors();
+            clones += totals.clones();
+            uniqueCloners += totals.uniqueCloners();
+        }
+        return new TrafficTotals(views, uniqueVisitors, clones, uniqueCloners);
+    }
+
     private DashboardPeriod periodForRepository(long repositoryId, String periodParam) {
         LocalDate today = LocalDate.now(clock);
         String normalized = DashboardPeriod.normalize(periodParam);
@@ -355,16 +394,24 @@ public class AnalyticsService {
     }
 
     private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
-        TrafficTotals current = trafficJdbcRepository.portfolioTotalsInRange(period.from(), period.to());
+        Set<Long> visibleIds = tracked.stream().map(Repository::id).collect(Collectors.toSet());
+        boolean fullPortfolio = currentUserAccess.canSeePrivateRepositories();
+        TrafficTotals current = fullPortfolio
+                ? trafficJdbcRepository.portfolioTotalsInRange(period.from(), period.to())
+                : sumVisibleTotals(period.from(), period.to(), visibleIds);
         TrafficTotals previous = period.allTime()
                 ? new TrafficTotals(0, 0, 0, 0)
-                : trafficJdbcRepository.portfolioTotalsInRange(period.previousFrom(), period.previousTo());
+                : fullPortfolio
+                ? trafficJdbcRepository.portfolioTotalsInRange(period.previousFrom(), period.previousTo())
+                : sumVisibleTotals(period.previousFrom(), period.previousTo(), visibleIds);
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
         Long starsChange = period.allTime() ? null : trafficJdbcRepository.starsChangeSince(period.from());
         List<TrafficPoint> traffic = series(period, tracked.size());
         Map<Long, TrafficNotice> notices = trafficNotices(period, tracked);
         Map<Long, Long> previousVisitors = previousVisitorsByRepo(period);
-        List<CollectionRun> latestRuns = runRepository.latestPerTrackedRepository();
+        List<CollectionRun> latestRuns = runRepository.latestPerTrackedRepository().stream()
+                .filter(run -> visibleIds.contains(run.repositoryId()))
+                .toList();
         Map<Long, CollectionRun> runByRepo = latestRuns.stream()
                 .collect(Collectors.toMap(CollectionRun::repositoryId, run -> run, (left, right) -> left));
         Map<Long, List<CollectionJob>> jobsByRun = jobRepository.findByRunIds(
@@ -375,6 +422,7 @@ public class AnalyticsService {
         Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
         List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
                 .stream()
+                .filter(row -> visibleIds.contains(row.repositoryId()))
                 .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability, signals, notices))
                 .toList();
         int partialCount = (int) latestRuns.stream()

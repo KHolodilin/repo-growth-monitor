@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.common.api;
 
 import com.kholodilin.repogrowth.analytics.api.AnalyticsController;
 import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
+import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -46,10 +47,12 @@ import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
 import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import com.kholodilin.repogrowth.topic.domain.TopicRun;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
+import com.kholodilin.repogrowth.support.WebMvcTestSecurityConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -87,6 +90,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SystemStatusController.class,
         SpaController.class
 })
+@Import(WebMvcTestSecurityConfig.class)
 class ApiControllersWebMvcTest {
 
     @Autowired
@@ -128,6 +132,8 @@ class ApiControllersWebMvcTest {
     GitHubProperties gitHubProperties;
     @MockitoBean
     GitHubClient gitHubClient;
+    @MockitoBean
+    CurrentUserAccess currentUserAccess;
 
     private Repository repository;
     private SearchQuery query;
@@ -144,7 +150,9 @@ class ApiControllersWebMvcTest {
         query = new SearchQuery(5L, 13L, "outbox", "outbox language:java", true, 50, now, now);
         watch = new TopicWatch(7L, 13L, "outbox", null, "stars", "desc", true, 50, now, now);
         GitHubOwner owner = new GitHubOwner(1L, 1L, "acme", OwnerType.USER, null, "https://github.com/acme", now, now);
+        when(currentUserAccess.canSeePrivateRepositories()).thenReturn(true);
         when(repositoryService.list(false)).thenReturn(List.of(repository));
+        when(repositoryService.list(true)).thenReturn(List.of(repository));
         when(repositoryService.get(13L)).thenReturn(repository);
         when(repositoryService.setTracking(13L, true)).thenReturn(repository);
         when(repositoryService.owner(1L)).thenReturn(owner);

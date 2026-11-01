@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RepoSwitcher } from "../components/RepoSwitcher";
 import { GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
+import { AuthProvider } from "../lib/AuthContext";
+import { anonymousMe } from "../lib/auth";
 import {
   growthEvent,
   repository,
@@ -22,10 +24,14 @@ import { SearchResultsPage } from "./SearchResultsPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
 import { TrafficHistoryPage } from "./TrafficHistoryPage";
 
-const { api } = vi.hoisted(() => ({ api: vi.fn() }));
+const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
 vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
   return { ...actual, api };
+});
+vi.mock("../lib/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/auth")>();
+  return { ...actual, loadMe };
 });
 
 function renderAt(path: string, ui: ReactNode) {
@@ -46,6 +52,15 @@ function renderAt(path: string, ui: ReactNode) {
 describe("extra coverage", () => {
   beforeEach(() => {
     api.mockReset();
+    loadMe.mockReset();
+    loadMe.mockResolvedValue({
+      ...anonymousMe,
+      authenticated: true,
+      userId: "1",
+      displayName: "Mock Admin",
+      roles: ["USER", "ADMIN"],
+      actions: ["MUTATE"],
+    });
     document.cookie = "topics_visibility_scope_13=; path=/; max-age=0";
     document.cookie = "topics_visibility_scope_8=; path=/; max-age=0";
   });
@@ -423,5 +438,17 @@ describe("extra coverage", () => {
       await user.click(screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]);
     }
     details.unmount();
+  });
+
+  it("hides + Add event for guests", async () => {
+    loadMe.mockResolvedValue(anonymousMe);
+    render(
+      <AuthProvider>
+        <GrowthEventsPanel repositoryId={13} events={[growthEvent]} onChanged={vi.fn()} />
+      </AuthProvider>,
+    );
+    expect(await screen.findByText("Recent Growth Events")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Add event" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 });

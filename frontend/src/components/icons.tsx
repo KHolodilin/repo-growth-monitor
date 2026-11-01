@@ -47,3 +47,18 @@ export function SettingsIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+export function SignInIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="8.4" stroke="currentColor" strokeWidth="1.7" />
+      <circle cx="12" cy="9.4" r="2.35" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="M7.4 17.2c1.15-2.05 2.85-3.1 4.6-3.1s3.45 1.05 4.6 3.1"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

@@ -1,0 +1,19 @@
+spring:
+  main:
+    web-application-type: none
+  task:
+    scheduling:
+      enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
+      - org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration
+      - org.springframework.boot.security.oauth2.client.autoconfigure.servlet.OAuth2ClientWebSecurityAutoConfiguration
+
+collection:
+  workers: 0
+  planner:
+    enabled: false
+
+search:
+  workers: 0

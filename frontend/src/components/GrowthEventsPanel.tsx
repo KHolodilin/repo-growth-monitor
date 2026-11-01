@@ -17,6 +17,7 @@ import {
   sourceBadge,
   toDateTimeLocal,
 } from "../lib/growthEvents";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { formatChartAxisDate, formatNumber } from "../lib/utils";
 import { Button, Card } from "./ui";
 
@@ -33,6 +34,7 @@ export function GrowthEventsPanel({
   onChanged: () => void;
   onOpenEvents?: (events: GrowthEvent[]) => void;
 }) {
+  const { allowMutations } = useMutationAccess();
   const [viewAll, setViewAll] = useState(false);
   const [form, setForm] = useState<GrowthEvent | "new" | null>(null);
   const [selected, setSelected] = useState<GrowthEvent[] | null>(null);
@@ -55,9 +57,11 @@ export function GrowthEventsPanel({
               View all →
             </button>
           )}
-          <Button type="button" onClick={() => setForm("new")}>
-            + Add event
-          </Button>
+          {allowMutations && (
+            <Button type="button" onClick={() => setForm("new")}>
+              + Add event
+            </Button>
+          )}
         </div>
       </div>
       {recent.length === 0 ? (
@@ -65,7 +69,13 @@ export function GrowthEventsPanel({
           No growth events in this period. Markers appear after collection or when you add a promotion event.
         </p>
       ) : (
-        <EventRows events={recent} onOpen={openDetails} onEdit={setForm} onChanged={onChanged} />
+        <EventRows
+          events={recent}
+          allowMutations={allowMutations}
+          onOpen={openDetails}
+          onEdit={setForm}
+          onChanged={onChanged}
+        />
       )}
       <p className="mt-3 text-xs text-muted-foreground">
         Events mark observed repository changes in the selected period. They do not imply that a change caused traffic.
@@ -80,7 +90,13 @@ export function GrowthEventsPanel({
               </Button>
             </div>
             <div className="max-h-[60vh] overflow-auto">
-              <EventRows events={events} onOpen={openDetails} onEdit={setForm} onChanged={onChanged} />
+              <EventRows
+                events={events}
+                allowMutations={allowMutations}
+                onOpen={openDetails}
+                onEdit={setForm}
+                onChanged={onChanged}
+              />
             </div>
           </Card>
         </div>
@@ -114,11 +130,13 @@ export function GrowthEventsPanel({
 
 function EventRows({
   events,
+  allowMutations = true,
   onOpen,
   onEdit,
   onChanged,
 }: {
   events: GrowthEvent[];
+  allowMutations?: boolean;
   onOpen: (events: GrowthEvent[]) => void;
   onEdit: (event: GrowthEvent) => void;
   onChanged: () => void;
@@ -138,7 +156,7 @@ function EventRows({
             <div className="mt-0.5 font-medium">{event.title}</div>
             <div className="text-xs text-muted-foreground">{eventTypeLabel(event.type)}</div>
           </button>
-          {event.source === "MANUAL" && (
+          {event.source === "MANUAL" && allowMutations && (
             <div className="flex shrink-0 gap-2">
               <button type="button" className="text-xs font-medium text-primary" onClick={() => onEdit(event)}>
                 Edit
@@ -205,6 +223,7 @@ export function EventDetailsDialog({
   onChanged: () => void;
   today?: string;
 }) {
+  const { allowMutations } = useMutationAccess();
   const eventDate = events[0] ? eventUtcDate(events[0]) : "";
   const [comparison, setComparison] = useState<EventWindowComparison | null>(null);
 
@@ -276,7 +295,7 @@ export function EventDetailsDialog({
                   Open link
                 </a>
               )}
-              {event.source === "MANUAL" && (
+              {event.source === "MANUAL" && allowMutations && (
                 <div className="flex gap-3 pt-1">
                   <button type="button" className="text-xs font-medium text-primary" onClick={() => onEdit(event)}>
                     Edit

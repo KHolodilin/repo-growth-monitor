@@ -9,6 +9,7 @@ import {
   loadGitHubAccess,
   type GitHubAccess,
 } from "../lib/githubAccess";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { activityClass, formatActivityPresentation } from "../lib/utils";
 
 const SEARCH_KEY = "rgm.repositories.search";
@@ -18,6 +19,7 @@ type TrackingFilter = "all" | "tracked" | "untracked" | "no-access";
 type VisibilityFilter = "all" | "public" | "private" | "internal";
 
 export function RepositoriesPage() {
+  const { allowMutations, blocked: mutateBlocked } = useMutationAccess();
   const [repos, setRepos] = useState<Repository[]>([]);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,25 +57,37 @@ export function RepositoriesPage() {
     void load(false);
   }, []);
 
-  const trackedCount = repos.filter((repo) => repo.trackingEnabled).length;
+  const listed = useMemo(
+    () => (allowMutations ? repos : repos.filter((repo) => repo.visibility === "PUBLIC")),
+    [allowMutations, repos],
+  );
+  const trackedCount = listed.filter((repo) => repo.trackingEnabled).length;
   const tracking: TrackingFilter = trackingChoice ?? (trackedCount > 0 ? "tracked" : "all");
-  const showVisibility = !sameVisibility(repos);
-  const showInternal = repos.some((repo) => repo.visibility === "INTERNAL");
-  const showNoAccess = access?.tokenState !== "REJECTED" && repos.some((repo) => repo.accessible === false);
-  const visibility = resolveVisibility(repos, visibilityStored, showVisibility);
+  const showVisibility = allowMutations && !sameVisibility(listed);
+  const showInternal = allowMutations && listed.some((repo) => repo.visibility === "INTERNAL");
+  const showNoAccess = access?.tokenState !== "REJECTED" && listed.some((repo) => repo.accessible === false);
+  const visibility = allowMutations
+    ? resolveVisibility(listed, visibilityStored, showVisibility)
+    : "public";
 
   const visible = useMemo(
-    () => repos.filter((repo) => matches(repo, search, tracking, visibility, showVisibility)),
-    [repos, search, tracking, visibility, showVisibility],
+    () => listed.filter((repo) => matches(repo, search, tracking, visibility, showVisibility)),
+    [listed, search, tracking, visibility, showVisibility],
   );
-  const privateHidden = searched(repos, search).filter(
-    (repo) => matchesTracking(repo, tracking) && repo.visibility === "PRIVATE" && visibility === "public",
-  ).length;
+  const privateHidden = allowMutations
+    ? searched(listed, search).filter(
+        (repo) => matchesTracking(repo, tracking) && repo.visibility === "PRIVATE" && visibility === "public",
+      ).length
+    : 0;
   const enableTargets = visible.filter((repo) => !repo.trackingEnabled && repo.accessible !== false);
   const disableTargets = visible.filter((repo) => repo.trackingEnabled);
-  const showEnable = !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
+  const showEnable = allowMutations && !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
 
   async function toggle(repo: Repository) {
+    if (!allowMutations) {
+      setError(mutateBlocked ?? "Admin role required");
+      return;
+    }
     if (repo.trackingEnabled && !window.confirm("Stop tracking this repository? Collection stops. Stored data stays.")) {
       return;
     }
@@ -89,6 +103,10 @@ export function RepositoriesPage() {
   }
 
   async function applyShown(enabled: boolean) {
+    if (!allowMutations) {
+      setError(mutateBlocked ?? "Admin role required");
+      return;
+    }
     const targets = enabled ? enableTargets : disableTargets;
     if (!enabled && !window.confirm("Turn tracking off for the shown repositories? Collection stops. Stored data stays.")) {
       return;
@@ -125,14 +143,16 @@ export function RepositoriesPage() {
               Start tracking ({enableTargets.length})
             </Button>
           )}
-          {disableTargets.length > 0 && (
+          {allowMutations && disableTargets.length > 0 && (
             <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(false)}>
               Stop tracking ({disableTargets.length})
             </Button>
           )}
-          <Button disabled={loading || collectionBlocked(access)} onClick={() => void load(true)}>
-            Refresh from GitHub
-          </Button>
+          {allowMutations && (
+            <Button disabled={loading || collectionBlocked(access)} onClick={() => void load(true)}>
+              Refresh from GitHub
+            </Button>
+          )}
         </div>
       </div>
       {error && <p className="text-red-600">{error}</p>}
@@ -140,7 +160,7 @@ export function RepositoriesPage() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm font-medium">
-              Tracking {trackedCount} of {repos.length}
+              Tracking {trackedCount} of {listed.length}
             </p>
             <input
               aria-label="Search repositories"
@@ -194,13 +214,15 @@ export function RepositoriesPage() {
             {visible.map((repo) => (
               <label key={repo.id} className="flex items-center justify-between gap-4 rounded-lg border px-3 py-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={repo.trackingEnabled}
-                    disabled={repo.accessible === false && !repo.trackingEnabled}
-                    onChange={() => void toggle(repo)}
-                  />
+                  {allowMutations && (
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={repo.trackingEnabled}
+                      disabled={repo.accessible === false && !repo.trackingEnabled}
+                      onChange={() => void toggle(repo)}
+                    />
+                  )}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link className="break-words [overflow-wrap:anywhere] font-medium text-primary hover:underline" to={`/repositories/${repo.id}`}>
@@ -228,8 +250,12 @@ export function RepositoriesPage() {
                 </div>
               </label>
             ))}
-            {repos.length === 0 && !loading && (
-              <p className="text-sm text-muted-foreground">No repositories yet. Configure GITHUB_TOKEN and refresh.</p>
+            {listed.length === 0 && !loading && (
+              <p className="text-sm text-muted-foreground">
+                {allowMutations
+                  ? "No repositories yet. Configure GITHUB_TOKEN and refresh."
+                  : "No public repositories to show."}
+              </p>
             )}
           </div>
         </div>

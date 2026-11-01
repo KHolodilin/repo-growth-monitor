@@ -34,6 +34,7 @@ import {
 } from "../lib/api";
 import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { asGrowthEvents } from "../lib/growthEvents";
 import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
@@ -90,6 +91,7 @@ function parseTab(tabParam: string | null): Tab {
 export function RepositoryDetailsPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { allowMutations } = useMutationAccess();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
   const scopeQuery = searchParams.get("scope");
@@ -275,7 +277,7 @@ export function RepositoryDetailsPage() {
   }, [runActive, searchActive, topicsActive, load]);
 
   async function createQuery() {
-    if (!id) {
+    if (!allowMutations || !id) {
       return;
     }
     const query = normalizeSearchQuery(queryText);
@@ -300,7 +302,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runQuery(queryId: number) {
-    if (runningQueryId != null || runningAll || searchActive) {
+    if (!allowMutations || runningQueryId != null || runningAll || searchActive) {
       return;
     }
     setRunningQueryId(queryId);
@@ -313,7 +315,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runAllQueries() {
-    if (!id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
+    if (!allowMutations || !id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
       return;
     }
     setRunningAll(true);
@@ -328,7 +330,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runTopicWatch(watchId: number) {
-    if (runningQueryId != null || runningAll || topicsActive) {
+    if (!allowMutations || runningQueryId != null || runningAll || topicsActive) {
       return;
     }
     setRunningQueryId(watchId);
@@ -341,7 +343,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function runAllTopics() {
-    if (!id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
+    if (!allowMutations || !id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
       return;
     }
     setRunningAll(true);
@@ -356,7 +358,7 @@ export function RepositoryDetailsPage() {
   }
 
   async function deleteQuery(queryId: number) {
-    if (!id) {
+    if (!allowMutations || !id) {
       return;
     }
     try {
@@ -548,6 +550,7 @@ export function RepositoryDetailsPage() {
           knownTopics={knownTopics}
           runningQueryId={runningQueryId}
           runningAll={runningAll}
+          allowMutations={allowMutations}
           onRun={runTopicWatch}
           onRunAll={() => void runAllTopics()}
         />
@@ -565,6 +568,7 @@ export function RepositoryDetailsPage() {
           queryError={queryError}
           runningQueryId={runningQueryId}
           runningAll={runningAll}
+          allowMutations={allowMutations}
           onCreate={() => void createQuery()}
           onRun={runQuery}
           onRunAll={() => void runAllQueries()}
@@ -996,6 +1000,7 @@ function TopicsPanel({
   knownTopics,
   runningQueryId,
   runningAll,
+  allowMutations = true,
   onRun,
   onRunAll,
 }: {
@@ -1007,6 +1012,7 @@ function TopicsPanel({
   knownTopics: TopicHistory[];
   runningQueryId: number | null;
   runningAll: boolean;
+  allowMutations?: boolean;
   onRun: (id: number) => void;
   onRunAll: () => void;
 }) {
@@ -1066,13 +1072,15 @@ function TopicsPanel({
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Topics</h2>
-          <Button
-            className="bg-muted text-foreground"
-            disabled={visibility.length === 0 || searchBusy}
-            onClick={onRunAll}
-          >
-            {searchBusy ? "Running..." : "Run all"}
-          </Button>
+          {allowMutations && (
+            <Button
+              className="bg-muted text-foreground"
+              disabled={visibility.length === 0 || searchBusy}
+              onClick={onRunAll}
+            >
+              {searchBusy ? "Running..." : "Run all"}
+            </Button>
+          )}
         </div>
         {visibility.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -1175,15 +1183,17 @@ function TopicsPanel({
                       {formatSyncTime(item.lastChecked) ?? "—"}
                     </td>
                     <td className="py-3 pl-3">
-                      <div className="flex justify-end">
-                        <Button
-                          className="bg-muted text-foreground"
-                          disabled={running || searchBusy}
-                          onClick={() => onRun(item.watch.id)}
-                        >
-                          {running || runningAll ? "Running..." : "Run"}
-                        </Button>
-                      </div>
+                      {allowMutations && (
+                        <div className="flex justify-end">
+                          <Button
+                            className="bg-muted text-foreground"
+                            disabled={running || searchBusy}
+                            onClick={() => onRun(item.watch.id)}
+                          >
+                            {running || runningAll ? "Running..." : "Run"}
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1287,6 +1297,7 @@ function SearchPanel({
   queryError,
   runningQueryId,
   runningAll,
+  allowMutations = true,
   onCreate,
   onRun,
   onRunAll,
@@ -1300,6 +1311,7 @@ function SearchPanel({
   queryError: string | null;
   runningQueryId: number | null;
   runningAll: boolean;
+  allowMutations?: boolean;
   onCreate: () => void;
   onRun: (id: number) => void;
   onRunAll: () => void;
@@ -1366,42 +1378,48 @@ function SearchPanel({
         selectedIds={selectedIds}
       />
       <Card>
-        <div className="mb-3 flex items-baseline gap-3">
-          <h2 className="font-medium">Search Queries</h2>
-          <a
-            className="text-sm font-normal text-primary underline"
-            href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Search syntax tips
-          </a>
-        </div>
-        <div className="mb-4">
-          <div className="flex gap-2">
-            <input
-              className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
-              placeholder="transactional outbox language:java"
-              value={queryText}
-              onChange={(event) => setQueryText(event.target.value)}
-            />
-            <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
-              Add query
-            </Button>
-            <Button
-              className="ml-auto shrink-0 bg-muted text-foreground"
-              disabled={visibility.length === 0 || searchBusy}
-              onClick={onRunAll}
-            >
-              {searchBusy ? "Running..." : "Run all"}
-            </Button>
-          </div>
-          {(queryError || duplicate) && (
-            <p className="mt-2 text-sm text-red-700">
-              {queryError ?? "This search query is already tracked for the repository"}
-            </p>
-          )}
-        </div>
+        {allowMutations ? (
+          <>
+            <div className="mb-3 flex items-baseline gap-3">
+              <h2 className="font-medium">Search Queries</h2>
+              <a
+                className="text-sm font-normal text-primary underline"
+                href="https://docs.github.com/en/search-github/searching-on-github/searching-for-repositories"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Search syntax tips
+              </a>
+            </div>
+            <div className="mb-4">
+              <div className="flex gap-2">
+                <input
+                  className="min-w-0 flex-1 rounded-md border px-3 py-2 text-sm"
+                  placeholder="transactional outbox language:java"
+                  value={queryText}
+                  onChange={(event) => setQueryText(event.target.value)}
+                />
+                <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
+                  Add query
+                </Button>
+                <Button
+                  className="ml-auto shrink-0 bg-muted text-foreground"
+                  disabled={visibility.length === 0 || searchBusy}
+                  onClick={onRunAll}
+                >
+                  {searchBusy ? "Running..." : "Run all"}
+                </Button>
+              </div>
+              {(queryError || duplicate) && (
+                <p className="mt-2 text-sm text-red-700">
+                  {queryError ?? "This search query is already tracked for the repository"}
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          <h2 className="mb-3 font-medium">Search Queries</h2>
+        )}
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -1493,22 +1511,24 @@ function SearchPanel({
                     {formatSyncTime(item.lastChecked) ?? "—"}
                   </td>
                   <td className="py-3 pl-3">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        className="bg-muted text-foreground"
-                        disabled={running || searchBusy}
-                        onClick={() => onRun(item.query.id)}
-                      >
-                        {running || runningAll ? "Running..." : "Run"}
-                      </Button>
-                      <Button
-                        className="bg-muted text-red-700"
-                        disabled={running}
-                        onClick={() => onDelete(item.query.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
+                    {allowMutations && (
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          className="bg-muted text-foreground"
+                          disabled={running || searchBusy}
+                          onClick={() => onRun(item.query.id)}
+                        >
+                          {running || runningAll ? "Running..." : "Run"}
+                        </Button>
+                        <Button
+                          className="bg-muted text-red-700"
+                          disabled={running}
+                          onClick={() => onDelete(item.query.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               );

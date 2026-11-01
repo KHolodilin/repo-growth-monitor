@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.analytics.application;
 
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.Highlights;
+import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -143,6 +144,8 @@ class AnalyticsTrafficNoticeTest {
         when(highlights.build(any(), any())).thenReturn(Highlights.none());
         ActivityClassifier activity = mock(ActivityClassifier.class);
         when(activity.classify(anyBoolean(), nullable(Instant.class))).thenReturn(ActivityStatus.ACTIVE);
+        CurrentUserAccess access = mock(CurrentUserAccess.class);
+        when(access.canSeePrivateRepositories()).thenReturn(true);
         AnalyticsService service = new AnalyticsService(
                 repositories,
                 traffic,
@@ -153,7 +156,8 @@ class AnalyticsTrafficNoticeTest {
                 health,
                 highlights,
                 window,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                access
         );
 
         var dashboard = service.dashboard("7d");
@@ -174,6 +178,8 @@ class AnalyticsTrafficNoticeTest {
             CollectionJobJdbcRepository jobs,
             PlanningWindow window
     ) {
+        CurrentUserAccess access = mock(CurrentUserAccess.class);
+        when(access.canSeePrivateRepositories()).thenReturn(true);
         return new AnalyticsService(
                 repositories,
                 traffic,
@@ -184,7 +190,8 @@ class AnalyticsTrafficNoticeTest {
                 mock(RepositoryHealthService.class),
                 mock(PortfolioHighlightsService.class),
                 window,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                access
         );
     }
 

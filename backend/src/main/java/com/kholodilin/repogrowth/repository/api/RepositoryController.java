@@ -1,9 +1,12 @@
 package com.kholodilin.repogrowth.repository.api;
 
+import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.Repository;
+import com.kholodilin.repogrowth.repository.domain.RepositoryVisibility;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import jakarta.validation.Valid;
@@ -25,24 +28,30 @@ public class RepositoryController {
     private final RepositoryService repositoryService;
     private final RepositoryHealthService repositoryHealthService;
     private final ActivityClassifier activityClassifier;
+    private final CurrentUserAccess currentUserAccess;
 
     public RepositoryController(
             RepositoryService repositoryService,
             RepositoryHealthService repositoryHealthService,
-            ActivityClassifier activityClassifier
+            ActivityClassifier activityClassifier,
+            CurrentUserAccess currentUserAccess
     ) {
         this.repositoryService = repositoryService;
         this.repositoryHealthService = repositoryHealthService;
         this.activityClassifier = activityClassifier;
+        this.currentUserAccess = currentUserAccess;
     }
 
     @GetMapping
     public List<RepositoryResponse> list(@RequestParam(defaultValue = "false") boolean refresh) {
-        List<Repository> repositories = repositoryService.list(refresh);
+        boolean seePrivate = currentUserAccess.canSeePrivateRepositories();
+        // Guests cannot trigger a GitHub refresh; they only read the stored public list.
+        List<Repository> repositories = repositoryService.list(seePrivate && refresh);
         Map<Long, RepositorySignals> signals = repositoryService.signalsFor(
                 repositories.stream().map(Repository::id).toList()
         );
         return repositories.stream()
+                .filter(repository -> seePrivate || RepositoryVisibility.isPublic(repository.visibility()))
                 .map(repository -> toResponse(repository, signals.get(repository.id())))
                 .toList();
     }
@@ -50,7 +59,15 @@ public class RepositoryController {
     @GetMapping("/{id}")
     public RepositoryResponse get(@PathVariable long id) {
         Repository repository = repositoryService.get(id);
+        requireVisible(repository);
         return toResponse(repository, repositoryService.signalsFor(List.of(id)).get(id));
+    }
+
+    private void requireVisible(Repository repository) {
+        if (currentUserAccess.canSeePrivateRepositories() || RepositoryVisibility.isPublic(repository.visibility())) {
+            return;
+        }
+        throw ApiException.notFound("Repository not found");
     }
 
     @PostMapping("/{id}/tracking")
