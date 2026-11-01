@@ -40,7 +40,7 @@ describe("components", () => {
         <RepositoriesIcon />
         <SettingsIcon />
         <SignInIcon />
-        <PeriodSelector period="30d" onPeriod={onPeriod} />
+        <PeriodSelector period="30d" onPeriod={onPeriod} scrollable />
         <ServicePathBadge />
         <ServicePathToggle checked={false} onChange={vi.fn()} />
         <PageBreadcrumb items={[{ label: "Home", to: "/" }, { label: "Now" }]} />

@@ -119,7 +119,7 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <NavLink
               to="/"
@@ -155,19 +155,19 @@ export function Layout() {
       </header>
       {progress && (
         <div className="border-b bg-card">
-          <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{progress}</p>
+          <p className="mx-auto max-w-6xl px-4 py-2 text-sm md:px-6">{progress}</p>
         </div>
       )}
       {tokenBanner(access) && (
         <div className="border-b bg-amber-50 text-amber-950">
-          <p className="mx-auto max-w-6xl px-6 py-2 text-sm">{tokenBanner(access)}</p>
+          <p className="mx-auto max-w-6xl px-4 py-2 text-sm md:px-6">{tokenBanner(access)}</p>
         </div>
       )}
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6 md:py-8">
         <Outlet context={{ allowMutations, mutateBlocked }} />
       </main>
       <footer className="mt-auto border-t bg-card">
-        <div className="mx-auto max-w-6xl space-y-1 px-6 py-4 text-xs text-muted-foreground">
+        <div className="mx-auto max-w-6xl space-y-1 px-4 py-4 text-xs text-muted-foreground md:px-6">
           <div>
             <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
             paths show the latest GitHub snapshot; History has the change between snapshots.

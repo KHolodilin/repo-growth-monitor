@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { readCookie, readJsonCookie, writeCookie, writeJsonCookie } from "../lib/cookies";
 
@@ -77,17 +77,29 @@ export function PeriodSelector({
   period,
   onPeriod,
   embedded = false,
+  scrollable = false,
 }: {
   period: Period;
   onPeriod: (period: Period) => void;
   embedded?: boolean;
+  /** Keep chips on one row; parent may provide overflow-x-auto. */
+  scrollable?: boolean;
 }) {
+  const activeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!scrollable) {
+      return;
+    }
+    activeRef.current?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  }, [period, scrollable]);
+
   const buttons = PERIODS.map((item) => (
     <button
       key={item}
+      ref={period === item ? activeRef : undefined}
       type="button"
       className={cn(
-        "rounded-md px-3 py-1.5 text-sm font-medium",
+        "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium",
         period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
       )}
       onClick={() => onPeriod(item)}
@@ -98,5 +110,14 @@ export function PeriodSelector({
   if (embedded) {
     return buttons;
   }
-  return <div className="inline-flex rounded-lg border bg-muted p-1">{buttons}</div>;
+  return (
+    <div
+      className={cn(
+        "inline-flex max-w-full rounded-lg border bg-muted p-1",
+        scrollable && "flex-nowrap overflow-x-auto",
+      )}
+    >
+      {buttons}
+    </div>
+  );
 }
