@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { dashboardReady, repository, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { Layout } from "../components/Layout";
@@ -23,6 +23,10 @@ vi.mock("../lib/api", async (importOriginal) => {
 });
 
 describe("coverage gaps", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     api.mockReset();
     document.cookie = "topics_visibility_scope_13=; path=/; max-age=0";
@@ -97,6 +101,46 @@ describe("coverage gaps", () => {
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
     expect(screen.getAllByText("11").length).toBeGreaterThan(0);
     await user.click(screen.getByText("KHolodilin/other"));
+    expect(await screen.findByText("opened")).toBeInTheDocument();
+  });
+
+  it("shows portfolio repository cards on a phone viewport", async () => {
+    const user = userEvent.setup();
+    const media = {
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    vi.stubGlobal("matchMedia", vi.fn(() => media));
+    api.mockResolvedValue({
+      ...dashboardReady,
+      repositories: [
+        {
+          ...dashboardReady.repositories[0],
+          fullName: "KHolodilin/spring-transactional-outbox-kafka",
+        },
+        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null },
+      ],
+    });
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/repositories/:id" element={<p>opened</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText("Sort repositories by")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole("columnheader", { name: "Repository" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("link", { name: "KHolodilin/spring-transactional-outbox-kafka" })).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Sort repositories by"), "views");
+    await user.click(screen.getByRole("button", { name: "Sort descending" }));
+    expect(screen.getByRole("button", { name: "Sort ascending" })).toBeInTheDocument();
+    const otherCard = screen.getByRole("link", { name: "KHolodilin/other" }).closest("li");
+    expect(otherCard).toBeTruthy();
+    await user.click(otherCard!.querySelector("dt")!);
     expect(await screen.findByText("opened")).toBeInTheDocument();
   });
 

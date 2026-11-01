@@ -16,10 +16,21 @@ import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { dashboardStatsChartId, dashboardTrafficChartId, DASHBOARD_STATS_SERIES, TRAFFIC_SERIES } from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
+import { useIsMobileChart } from "../lib/useMediaQuery";
 
 const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "growth", "discoverability"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
+
+const SORT_LABELS: Record<SortKey, string> = {
+  visitors: "Visitors",
+  views: "Views",
+  clones: "Clones",
+  stars: "Stars",
+  forks: "Forks",
+  growth: "Growth",
+  discoverability: "Disc.",
+};
 
 const PORTFOLIO_STATS = [
   { key: "stars", label: "Stars", color: "#5470c6" },
@@ -436,6 +447,7 @@ function RankLink({ move }: { move: RankHighlight }) {
 }
 
 function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
+  const mobile = useIsMobileChart();
   const [tokenState, setTokenState] = useState<TokenState | null>(null);
   const needsAccess = rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
   useEffect(() => {
@@ -458,12 +470,15 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
     keys: SORT_KEYS,
     initial: { key: "visitors", dir: "desc" },
   });
+  const activeSortKey = (SORT_KEYS as readonly string[]).includes(sortKey as string)
+    ? (sortKey as SortKey)
+    : "visitors";
 
   const sorted = useMemo(() => {
     const copy = [...rows];
     copy.sort((left, right) => {
-      const leftValue = sortValue(left, sortKey);
-      const rightValue = sortValue(right, sortKey);
+      const leftValue = sortValue(left, activeSortKey);
+      const rightValue = sortValue(right, activeSortKey);
       if (leftValue === null && rightValue === null) {
         return 0;
       }
@@ -476,7 +491,55 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
       return sortDir === "desc" ? rightValue - leftValue : leftValue - rightValue;
     });
     return copy;
-  }, [rows, sortKey, sortDir]);
+  }, [rows, activeSortKey, sortDir]);
+
+  if (mobile) {
+    return (
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+            <span className="shrink-0 text-muted-foreground">Sort</span>
+            <select
+              className="min-w-0 flex-1 rounded-md border bg-card px-3 py-2"
+              aria-label="Sort repositories by"
+              value={activeSortKey}
+              onChange={(event) => {
+                const next = event.target.value as SortKey;
+                if (next !== activeSortKey) {
+                  toggle(next);
+                }
+              }}
+            >
+              {SORT_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="rounded-md border bg-card px-3 py-2 text-sm font-medium"
+            aria-label={sortDir === "desc" ? "Sort descending" : "Sort ascending"}
+            onClick={() => toggle(activeSortKey)}
+          >
+            {sortDir === "desc" ? "↓" : "↑"}
+          </button>
+        </div>
+        <ul className="space-y-3">
+          {sorted.map((row) => (
+            <li key={row.id}>
+              <RepositoryCard
+                row={row}
+                tokenState={tokenState}
+                onOpen={() => navigate(`/repositories/${row.id}`)}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
 
   return (
     <Card className="overflow-hidden p-0">
@@ -485,13 +548,13 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
-              <SortHeader label="Visitors" active={sortKey === "visitors"} dir={sortDir} onClick={() => toggle("visitors")} />
-              <SortHeader label="Views" active={sortKey === "views"} dir={sortDir} onClick={() => toggle("views")} />
-              <SortHeader label="Clones" active={sortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
-              <SortHeader label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
-              <SortHeader label="Forks" active={sortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
-              <SortHeader label="Growth" active={sortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
-              <SortHeader label="Disc." active={sortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
+              <SortHeader label="Visitors" active={activeSortKey === "visitors"} dir={sortDir} onClick={() => toggle("visitors")} />
+              <SortHeader label="Views" active={activeSortKey === "views"} dir={sortDir} onClick={() => toggle("views")} />
+              <SortHeader label="Clones" active={activeSortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
+              <SortHeader label="Stars" active={activeSortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
+              <SortHeader label="Forks" active={activeSortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
+              <SortHeader label="Growth" active={activeSortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
+              <SortHeader label="Disc." active={activeSortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
               <th className="px-5 py-2 font-medium">Activity</th>
             </tr>
           </thead>
@@ -544,6 +607,68 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
           </tbody>
         </table>
       </div>
+    </Card>
+  );
+}
+
+function RepositoryCard({
+  row,
+  tokenState,
+  onOpen,
+}: {
+  row: Dashboard["repositories"][number];
+  tokenState: TokenState | null;
+  onOpen: () => void;
+}) {
+  const growth = formatGrowth(row.growthPercent);
+  const problems = repositoryProblemLines(row).join(" ");
+  const metrics: { label: string; value: ReactNode }[] = [
+    { label: "Visitors", value: formatNumber(row.visitors) },
+    { label: "Views", value: formatNumber(row.views) },
+    { label: "Clones", value: formatNumber(row.clones) },
+    { label: "Stars", value: formatNumber(row.stars) },
+    { label: "Forks", value: formatNumber(row.forks) },
+    {
+      label: "Growth",
+      value: <span className={cn("font-medium", growthClass(growth?.direction))}>{growth?.label ?? "—"}</span>,
+    },
+    { label: "Disc.", value: <DiscoverabilityCell row={row} /> },
+    {
+      label: "Activity",
+      value: <span className={activityClass(row.activityStatus)}>{formatActivityPresentation(row.activityStatus, row.activityAt)}</span>,
+    },
+  ];
+  return (
+    <Card className="cursor-pointer p-4 hover:bg-muted/40" onClick={onOpen}>
+      <div className="flex items-start gap-2">
+        {problems ? (
+          <span role="img" className="mt-0.5 shrink-0 text-amber-700" title={problems} aria-label={problems}>
+            !
+          </span>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <Link
+            className="break-words text-base font-medium text-primary [overflow-wrap:anywhere] hover:underline"
+            to={`/repositories/${row.id}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {row.fullName}
+          </Link>
+          <RepositoryAccessNote
+            accessible={row.accessible}
+            trafficPermissionMissing={row.trafficPermissionMissing}
+            tokenState={tokenState}
+          />
+        </div>
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+        {metrics.map((metric) => (
+          <div key={metric.label} className="min-w-0">
+            <dt className="text-muted-foreground">{metric.label}</dt>
+            <dd className="mt-0.5 break-words tabular-nums [overflow-wrap:anywhere]">{metric.value}</dd>
+          </div>
+        ))}
+      </dl>
     </Card>
   );
 }
