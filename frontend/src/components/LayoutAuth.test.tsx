@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -33,8 +33,17 @@ const adminMe = {
   actions: ["MUTATE"],
 };
 
+const registeredMe = {
+  ...anonymousMe,
+  authenticated: true,
+  userId: "2",
+  displayName: "Mock User",
+  roles: ["USER"],
+  actions: [],
+};
+
 describe("Layout auth chrome", () => {
-  it("hides Collect for guests and keeps the account name inside the menu", async () => {
+  it("keeps only the account menu in the header and roles the menu items", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue(dashboardReady);
     loadMe.mockResolvedValue(anonymousMe);
@@ -49,10 +58,38 @@ describe("Layout auth chrome", () => {
         </AuthProvider>
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("link", { name: "Sign in" })).toBeInTheDocument();
-    expect(screen.queryByText(/Sign in as an admin/)).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Account menu" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Dashboard" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Repositories" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Collect/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Account menu" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Sign in" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Repositories" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Collect/ })).not.toBeInTheDocument();
+    cleanup();
+
+    loadMe.mockResolvedValue(registeredMe);
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<p>home</p>} />
+              <Route path="/repositories" element={<p>repos</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByText("Mock User")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Repositories" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Sign out" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Collect/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Sign in" })).not.toBeInTheDocument();
+    cleanup();
 
     loadMe.mockResolvedValue(adminMe);
     render(
@@ -68,11 +105,12 @@ describe("Layout auth chrome", () => {
     );
     expect(await screen.findByRole("button", { name: "Account menu" })).toBeInTheDocument();
     expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Collect/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Collect/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByText("Mock Admin")).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Repositories" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Collect/ })).toBeInTheDocument();
     signOut.mockResolvedValue(undefined);
     await user.click(screen.getByRole("menuitem", { name: "Sign out" }));
     await waitFor(() => expect(signOut).toHaveBeenCalled());
@@ -99,8 +137,8 @@ describe("Layout auth chrome", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole("button", { name: "Account menu" })).toBeInTheDocument();
-    expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Collect/ }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: /Collect/ }));
     expect(await screen.findByText(/Session expired/)).toBeInTheDocument();
   });
 
@@ -123,5 +161,51 @@ describe("Layout auth chrome", () => {
     expect(screen.getByText("Mock Admin")).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
+  });
+
+  it("closes the guest menu after Sign in and when clicking outside", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue(dashboardReady);
+    loadMe.mockResolvedValue(anonymousMe);
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<p>home</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Sign in" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Sign in" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Sign in" })).toBeInTheDocument();
+    await user.click(screen.getByText("home"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("shows the account id under a different display name", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue(dashboardReady);
+    loadMe.mockResolvedValue(adminMe);
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<p>home</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByText("Mock Admin")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
   });
 });

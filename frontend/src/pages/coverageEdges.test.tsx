@@ -247,7 +247,8 @@ describe("remaining coverage edges", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByText("Repositories")).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Repositories" })).toBeInTheDocument();
     render(
       <MemoryRouter initialEntries={["/repositories"]}>
         <Routes>

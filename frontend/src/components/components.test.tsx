@@ -72,11 +72,13 @@ describe("components", () => {
     expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
     expect(screen.getByText(/About data/)).toBeInTheDocument();
     expect(screen.queryByText(/Last updated/)).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect 1 repository" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
     );
-    await user.click(screen.getByRole("link", { name: "Repositories" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Repositories" }));
     expect(screen.getByText("repos")).toBeInTheDocument();
     ready.unmount();
 
@@ -103,12 +105,20 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect 1 repository" }));
-    expect(screen.getByRole("button", { name: "Collect 1 repository" })).toBeDisabled();
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(screen.getByText("Collected 0 of 1")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeDisabled();
     hold = false;
     waiters.forEach((resolve) => resolve({}));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Collect 1 repository" })).toBeEnabled());
+    await waitFor(async () => {
+      const menu = screen.queryByRole("menu");
+      if (!menu) {
+        await user.click(screen.getByRole("button", { name: "Account menu" }));
+      }
+      expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeEnabled();
+    });
     pending.unmount();
 
     api.mockImplementation((path: string) => {
@@ -126,7 +136,8 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect 1 repository" }));
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(await screen.findByText("busy")).toBeInTheDocument();
     failed.unmount();
 
@@ -145,7 +156,8 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("button", { name: "Select repositories first" })).toBeDisabled();
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
     expect(screen.getByText("Last sync: —")).toBeInTheDocument();
     empty.unmount();
 
@@ -164,7 +176,8 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect 1 repository" }));
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(await screen.findByText("Collect failed")).toBeInTheDocument();
     plain.unmount();
 
@@ -218,7 +231,8 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect this repository" }));
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
     );
@@ -241,7 +255,8 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect 2 repositories" }));
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" }),
     );
@@ -300,7 +315,8 @@ describe("components", () => {
         "Collecting KHolodilin/spring-transactional-outbox-kafka: Traffic done, Referrers failed: rate limit",
       ),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Collect this repository" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
     expect(timers.length).toBeGreaterThan(0);
     const fireTimers = async () => {
@@ -351,11 +367,13 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await user.click(await screen.findByRole("button", { name: "Collect repositories" }));
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect repositories" }));
     await waitFor(() => expect(calls).toBeGreaterThan(1));
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
     release({ lastSyncAt: "2026-09-23T06:00:00Z", repositories: [] });
-    expect(await screen.findByRole("button", { name: "Select repositories first" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(await screen.findByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
   });
 
   it("maps referrer icons and colors", () => {
