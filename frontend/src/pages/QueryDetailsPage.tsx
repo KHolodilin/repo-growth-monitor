@@ -83,15 +83,14 @@ export function QueryDetailsPage() {
     if (!repo || !history) {
       return [] as { key: string; name: string }[];
     }
-    const chart = queryDetailsChart({
+    return queryDetailsChart({
       history,
       repo,
       rows: results?.rows ?? null,
       series,
       selected,
       metric,
-    });
-    return chart?.series ?? [{ key: String(repo.githubId), name: repo.fullName }];
+    })!.series;
   }, [history, repo, results, series, selected, metric]);
 
   if (error) {
