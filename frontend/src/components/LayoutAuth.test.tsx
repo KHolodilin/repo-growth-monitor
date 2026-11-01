@@ -162,4 +162,50 @@ describe("Layout auth chrome", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByText("Mock Admin")).not.toBeInTheDocument();
   });
+
+  it("closes the guest menu after Sign in and when clicking outside", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue(dashboardReady);
+    loadMe.mockResolvedValue(anonymousMe);
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<p>home</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Sign in" })).toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Sign in" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Sign in" })).toBeInTheDocument();
+    await user.click(screen.getByText("home"));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("shows the account id under a different display name", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue(dashboardReady);
+    loadMe.mockResolvedValue(adminMe);
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<p>home</p>} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    expect(screen.getByText("Mock Admin")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+  });
 });

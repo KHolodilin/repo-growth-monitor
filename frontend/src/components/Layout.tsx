@@ -76,9 +76,6 @@ export function Layout() {
       setError(mutateBlocked ?? "Sign in as an admin to collect.");
       return;
     }
-    if (collecting) {
-      return;
-    }
     setCollecting(true);
     setWatching(true);
     setError(null);
@@ -278,9 +275,6 @@ function AuthChrome({
                   className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   disabled={collect.disabled}
                   onClick={() => {
-                    if (collect.disabled) {
-                      return;
-                    }
                     setOpen(false);
                     collect.onCollect();
                   }}
