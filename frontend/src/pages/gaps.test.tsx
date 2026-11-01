@@ -64,7 +64,8 @@ describe("coverage gaps", () => {
     expect(await screen.findByRole("heading", { name: "Collecting" })).toBeInTheDocument();
     expect(screen.getByText("Last sync: —")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "all" }));
-    await user.click(await screen.findByRole("button", { name: "Collect 2 repositories" }));
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     expect(await screen.findByText("busy")).toBeInTheDocument();
   });
 

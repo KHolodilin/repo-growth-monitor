@@ -166,8 +166,9 @@ describe("repository filters", () => {
     expect(await screen.findByText(TOKEN_MISSING)).toBeInTheDocument();
     expect(screen.getByText("No GitHub token")).toBeInTheDocument();
     expect(document.title).toBe("Repo Growth Monitor — no token");
-    expect(screen.getByRole("button", { name: "Collect 1 repository" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Collect 1 repository" }));
+    fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
     missing.unmount();
 

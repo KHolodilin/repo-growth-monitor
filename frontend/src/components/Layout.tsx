@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api, ApiError, type Dashboard } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
-import { cn, formatSyncTime } from "../lib/utils";
-import { DashboardIcon, LogoMark, RepositoriesIcon, SignInIcon } from "./icons";
-import { Button } from "./ui";
+import { formatSyncTime } from "../lib/utils";
+import { LogoMark, SignInIcon } from "./icons";
 
 export function Layout() {
   const location = useLocation();
   const { me, loading: authLoading, logout } = useAuth();
-  const dashboardActive = location.pathname === "/" || location.pathname === "/dashboard";
   const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
   const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
@@ -78,6 +76,9 @@ export function Layout() {
       setError(mutateBlocked ?? "Sign in as an admin to collect.");
       return;
     }
+    if (collecting) {
+      return;
+    }
     setCollecting(true);
     setWatching(true);
     setError(null);
@@ -113,56 +114,46 @@ export function Layout() {
   }
 
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
+  const collectDisabled =
+    collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0);
   const noToken = access?.tokenState === "MISSING";
   document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3.5">
-          <div className="flex items-center gap-3">
-            <NavLink to="/" className="flex items-center gap-2.5 text-slate-900" aria-label="Repo Growth Monitor">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3.5">
+          <div className="flex min-w-0 items-center gap-3">
+            <NavLink
+              to="/"
+              className="flex min-w-0 items-center gap-2.5 text-slate-900"
+              aria-label="Repo Growth Monitor"
+            >
               <LogoMark className="h-8 w-8 shrink-0 object-contain" />
-              <span className="flex items-baseline gap-1 text-[15px] leading-none tracking-tight">
-                <span className="font-bold">Repo Growth</span>
-                <span className="font-normal">Monitor</span>
+              <span className="truncate whitespace-nowrap text-[15px] leading-none tracking-tight">
+                <span className="font-bold">Repo Growth</span> <span className="font-normal">Monitor</span>
               </span>
             </NavLink>
             {noToken && (
-              <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-950">No GitHub token</span>
+              <span className="hidden rounded-md bg-amber-100 px-2 py-1 text-xs font-medium text-amber-950 sm:inline">
+                No GitHub token
+              </span>
             )}
           </div>
-          <nav className="flex items-center gap-6 text-sm">
-            {allowMutations && (
-              <Button
-                className="py-1.5"
-                disabled={
-                  collecting ||
-                  collectionBlocked(access) ||
-                  (repositoryId == null && rows != null && rows.length === 0)
-                }
-                onClick={() => void collectNow()}
-              >
-                {label}
-              </Button>
-            )}
-            <NavLink
-              to="/"
-              end
-              className={cn(
-                "flex items-center gap-2",
-                dashboardActive ? "font-medium text-primary" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <DashboardIcon className="h-6 w-6" />
-              Dashboard
-            </NavLink>
-            <NavLink to="/repositories" className={navClass}>
-              <RepositoriesIcon className="h-6 w-6" />
-              Repositories
-            </NavLink>
-            <AuthChrome me={me} loading={authLoading} onLogout={() => void logout()} />
-          </nav>
+          <AuthChrome
+            me={me}
+            loading={authLoading}
+            onLogout={() => void logout()}
+            collect={
+              allowMutations
+                ? {
+                    label,
+                    disabled: collectDisabled,
+                    onCollect: () => void collectNow(),
+                  }
+                : null
+            }
+          />
         </div>
       </header>
       {progress && (
@@ -193,7 +184,23 @@ export function Layout() {
   );
 }
 
-function AuthChrome({ me, loading, onLogout }: { me: Me; loading: boolean; onLogout: () => void }) {
+type CollectMenuAction = {
+  label: string;
+  disabled: boolean;
+  onCollect: () => void;
+};
+
+function AuthChrome({
+  me,
+  loading,
+  onLogout,
+  collect,
+}: {
+  me: Me;
+  loading: boolean;
+  onLogout: () => void;
+  collect: CollectMenuAction | null;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -222,52 +229,87 @@ function AuthChrome({ me, loading, onLogout }: { me: Me; loading: boolean; onLog
   if (loading) {
     return <span className="text-muted-foreground">…</span>;
   }
-  if (!me.authenticated) {
-    return (
-      <a href={me.loginUrl} className="flex items-center gap-2 font-medium text-primary hover:underline">
-        <SignInIcon className="h-6 w-6" />
-        Sign in
-      </a>
-    );
-  }
 
+  const authenticated = me.authenticated;
   const identity = me.displayName?.trim() || me.userId || "Account";
   const initial = identity.charAt(0).toUpperCase();
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="relative shrink-0" ref={rootRef}>
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground hover:bg-muted/80"
+        className={
+          authenticated
+            ? "flex h-8 w-8 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground hover:bg-muted/80"
+            : "flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+        }
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label="Account menu"
         onClick={() => setOpen((value) => !value)}
       >
-        {initial}
+        {authenticated ? initial : <SignInIcon className="h-6 w-6" />}
       </button>
       {open && (
         <div
           role="menu"
           className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-md border bg-card text-sm shadow-md"
         >
-          <div className="border-b px-3 py-2.5">
-            <div className="font-medium text-foreground">{identity}</div>
-            {me.userId && me.userId !== identity && (
-              <div className="mt-0.5 text-xs text-muted-foreground">{me.userId}</div>
-            )}
-          </div>
-          <button
-            type="button"
-            role="menuitem"
-            className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
-            onClick={() => {
-              setOpen(false);
-              onLogout();
-            }}
-          >
-            Sign out
-          </button>
+          {authenticated ? (
+            <>
+              <div className="border-b px-3 py-2.5">
+                <div className="font-medium text-foreground">{identity}</div>
+                {me.userId && me.userId !== identity && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">{me.userId}</div>
+                )}
+              </div>
+              <Link
+                to="/repositories"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setOpen(false)}
+              >
+                Repositories
+              </Link>
+              {collect && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={collect.disabled}
+                  onClick={() => {
+                    if (collect.disabled) {
+                      return;
+                    }
+                    setOpen(false);
+                    collect.onCollect();
+                  }}
+                >
+                  {collect.label}
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => {
+                  setOpen(false);
+                  onLogout();
+                }}
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <a
+              href={me.loginUrl}
+              role="menuitem"
+              className="block w-full px-3 py-2 text-left font-medium text-primary hover:bg-muted"
+              onClick={() => setOpen(false)}
+            >
+              Sign in
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -280,11 +322,4 @@ function repositoryIdFromPath(pathname: string): number | null {
     return null;
   }
   return Number(match[1]);
-}
-
-function navClass({ isActive }: { isActive: boolean }) {
-  return cn(
-    "flex items-center gap-2",
-    isActive ? "font-medium text-primary" : "text-muted-foreground hover:text-foreground",
-  );
 }
