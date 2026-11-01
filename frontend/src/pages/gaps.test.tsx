@@ -118,8 +118,18 @@ describe("coverage gaps", () => {
         {
           ...dashboardReady.repositories[0],
           fullName: "KHolodilin/spring-transactional-outbox-kafka",
+          collectionStatus: "PARTIAL",
+          jobs: [{ jobType: "TRAFFIC", status: "FAILED", errorMessage: "rate limit" }],
         },
-        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null },
+        {
+          ...dashboardReady.repositories[0],
+          id: 8,
+          fullName: "KHolodilin/other",
+          visitors: 1,
+          growthPercent: null,
+          collectionStatus: "SUCCESS",
+          jobs: [],
+        },
       ],
     });
     render(
@@ -138,6 +148,7 @@ describe("coverage gaps", () => {
     await user.selectOptions(screen.getByLabelText("Sort repositories by"), "views");
     await user.click(screen.getByRole("button", { name: "Sort descending" }));
     expect(screen.getByRole("button", { name: "Sort ascending" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: /Partial collection/i }).length).toBeGreaterThan(0);
     const otherCard = screen.getByRole("link", { name: "KHolodilin/other" }).closest("li");
     expect(otherCard).toBeTruthy();
     await user.click(otherCard!.querySelector("dt")!);

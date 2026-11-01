@@ -470,9 +470,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
     keys: SORT_KEYS,
     initial: { key: "visitors", dir: "desc" },
   });
-  const activeSortKey = (SORT_KEYS as readonly string[]).includes(sortKey as string)
-    ? (sortKey as SortKey)
-    : "visitors";
+  const activeSortKey = sortKey as SortKey;
 
   const sorted = useMemo(() => {
     const copy = [...rows];
@@ -503,12 +501,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               className="min-w-0 flex-1 rounded-md border bg-card px-3 py-2"
               aria-label="Sort repositories by"
               value={activeSortKey}
-              onChange={(event) => {
-                const next = event.target.value as SortKey;
-                if (next !== activeSortKey) {
-                  toggle(next);
-                }
-              }}
+              onChange={(event) => toggle(event.target.value as SortKey)}
             >
               {SORT_KEYS.map((key) => (
                 <option key={key} value={key}>
@@ -650,7 +643,6 @@ function RepositoryCard({
           <Link
             className="break-words text-base font-medium text-primary [overflow-wrap:anywhere] hover:underline"
             to={`/repositories/${row.id}`}
-            onClick={(event) => event.stopPropagation()}
           >
             {row.fullName}
           </Link>
