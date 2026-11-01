@@ -120,10 +120,13 @@ describe("coverage gaps", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole("heading", { name: "Traffic" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Traffic" }).parentElement).toBe(
+    expect(screen.getByRole("group", { name: "Portfolio analytics" })).toContainElement(
+      screen.getByRole("button", { name: "Traffic" }),
+    );
+    expect(screen.getByLabelText("Portfolio period")).toContainElement(screen.getByRole("button", { name: "30d" }));
+    expect(screen.getByRole("button", { name: "Traffic" }).parentElement).not.toBe(
       screen.getByRole("button", { name: "30d" }).parentElement,
     );
-    expect(screen.getByRole("button", { name: "Stats" }).nextElementSibling).toHaveClass("w-px");
     expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();

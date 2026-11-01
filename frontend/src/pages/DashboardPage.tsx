@@ -109,7 +109,7 @@ export function DashboardPage() {
     <div className="space-y-4">
       <DashboardHeader data={data} period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />
       {tab === "traffic" ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
           <KpiCard label="Repositories" value={data.summary.repositories} />
           <TrafficKpiCard
             label="Views"
@@ -134,7 +134,7 @@ export function DashboardPage() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
           {PORTFOLIO_STATS.map((card) => {
             const total = data.stats.totals[card.key];
             return (
@@ -175,8 +175,8 @@ function DashboardHeader({
   data?: Dashboard;
   period: Period;
   onPeriod: (period: Period) => void;
-  tab: "traffic" | "stats";
-  onTab: (tab: "traffic" | "stats") => void;
+  tab?: "traffic" | "stats";
+  onTab?: (tab: "traffic" | "stats") => void;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -205,7 +205,7 @@ function DashboardHeader({
     };
   }, [open]);
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">Portfolio</h1>
         {problems.length > 0 && (
@@ -219,7 +219,7 @@ function DashboardHeader({
               ⚠ {repositoryProblemBadge(problems.length)}
             </button>
             {open && (
-              <div className="absolute left-0 z-10 mt-2 w-80 rounded-md border bg-card p-3 text-left shadow-lg">
+              <div className="absolute left-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border bg-card p-3 text-left shadow-lg">
                 {problems.map(({ row, lines }) => (
                   <div key={row.id} className="py-1 text-sm">
                     <Link className="text-primary hover:underline" to={`/repositories/${row.id}`}>
@@ -235,25 +235,30 @@ function DashboardHeader({
           </div>
         )}
       </div>
-      <div className="inline-flex max-w-full flex-wrap rounded-lg border bg-muted p-1">
-        {([
-          ["traffic", "Traffic"],
-          ["stats", "Stats"],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium",
-              tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => onTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-        <span className="mx-1 my-1 w-px shrink-0 self-stretch bg-border" aria-hidden="true" />
-        <PeriodSelector embedded period={period} onPeriod={onPeriod} />
+      {tab != null && onTab != null && (
+        <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Portfolio analytics">
+          {([
+            ["traffic", "Traffic"],
+            ["stats", "Stats"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium",
+                tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+              )}
+              onClick={() => onTab(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="overflow-x-auto" aria-label="Portfolio period">
+        <div className="inline-flex min-w-min flex-nowrap rounded-lg border bg-muted p-1">
+          <PeriodSelector embedded scrollable period={period} onPeriod={onPeriod} />
+        </div>
       </div>
     </div>
   );
@@ -364,47 +369,68 @@ function PeriodHighlights({ highlights }: { highlights: Dashboard["highlights"] 
   const visitors = highlights?.visitors;
   const growth = visitors ? formatGrowth(visitors.growthPercent) : null;
   return (
-    <div className="space-y-2 text-sm">
-      <HighlightLine label="Rank">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <HighlightCard label="Rank">
         {rise && <RankLink move={rise} />}
         {drop && <RankLink move={drop} />}
-        {!rise && !drop && <span className="text-muted-foreground">No rank changes</span>}
-      </HighlightLine>
-      <HighlightLine label="Events">
+        {!rise && !drop && <span className="text-sm text-muted-foreground">No rank changes</span>}
+      </HighlightCard>
+      <HighlightCard label="Events">
         {events ? (
-          <Link className="text-primary hover:underline" to={`/repositories/${events.repositoryId}?tab=growth-events`}>
-            {events.count} {events.count === 1 ? "promotion event" : "promotion events"} · {events.repositoryNames.join(", ")}
+          <Link
+            className="block text-primary hover:underline"
+            to={`/repositories/${events.repositoryId}?tab=growth-events`}
+            aria-label={`${events.count} ${events.count === 1 ? "promotion event" : "promotion events"} · ${events.repositoryNames.join(", ")}`}
+          >
+            <div className="text-base font-semibold text-foreground">
+              {events.count} {events.count === 1 ? "promotion event" : "promotion events"}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{events.repositoryNames.join(", ")}</div>
           </Link>
         ) : (
-          <span className="text-muted-foreground">No promotion events</span>
+          <span className="text-sm text-muted-foreground">No promotion events</span>
         )}
-      </HighlightLine>
-      <HighlightLine label="Visitors">
+      </HighlightCard>
+      <HighlightCard label="Visitors">
         {visitors && growth ? (
-          <Link className="hover:underline" to={`/repositories/${visitors.repositoryId}`}>
-            {visitors.fullName} <span className={growthClass(growth.direction)}>{growth.label}</span>
+          <Link
+            className="block hover:underline"
+            to={`/repositories/${visitors.repositoryId}`}
+            aria-label={`${visitors.fullName} ${growth.label}`}
+          >
+            <div className={cn("text-base font-semibold", growthClass(growth.direction))}>{growth.label}</div>
+            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{visitors.fullName}</div>
           </Link>
         ) : (
-          <span className="text-muted-foreground">No visitor growth</span>
+          <span className="text-sm text-muted-foreground">No visitor growth</span>
         )}
-      </HighlightLine>
+      </HighlightCard>
     </div>
   );
 }
 
-function HighlightLine({ label, children }: { label: string; children: ReactNode }) {
+function HighlightCard({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3">
-      <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
-      <div className="flex flex-col gap-1">{children}</div>
-    </div>
+    <Card className="flex h-full flex-col gap-2 p-3">
+      <div className="text-sm text-muted-foreground">{label}</div>
+      <div className="flex flex-col gap-2">{children}</div>
+    </Card>
   );
 }
 
 function RankLink({ move }: { move: RankHighlight }) {
   return (
-    <Link className="text-primary hover:underline" to={`/repositories/${move.repositoryId}?tab=search`}>
-      {move.fullName} · {move.queryName} {move.fromRank} → {move.toRank}
+    <Link
+      className="block text-primary hover:underline"
+      to={`/repositories/${move.repositoryId}?tab=search`}
+      aria-label={`${move.fullName} · ${move.queryName} ${move.fromRank} → ${move.toRank}`}
+    >
+      <div className="text-base font-semibold text-foreground">
+        {move.fromRank} → {move.toRank}
+      </div>
+      <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+        {move.fullName} · {move.queryName}
+      </div>
     </Link>
   );
 }

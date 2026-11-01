@@ -37,8 +37,8 @@ export function TrafficKpiCard({
   const sparklineValues = preserveGaps ? (series ?? []) : (series ?? []).filter((point): point is number => point != null);
   const hasSparkline = sparklineValues.some((point) => point != null);
   return (
-    <Card className={cn("flex h-full flex-col p-3", className)}>
-      <div className="text-sm text-muted-foreground">
+    <Card className={cn("flex h-full min-w-0 flex-col p-3", className)}>
+      <div className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
         {label}
         {note && <div className="text-xs">{note}</div>}
       </div>
