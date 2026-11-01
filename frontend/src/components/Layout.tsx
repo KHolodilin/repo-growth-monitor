@@ -7,7 +7,7 @@ import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
 import { cn, formatSyncTime } from "../lib/utils";
-import { DashboardIcon, LogoMark, RepositoriesIcon } from "./icons";
+import { DashboardIcon, LogoMark, RepositoriesIcon, SignInIcon } from "./icons";
 import { Button } from "./ui";
 
 export function Layout() {
@@ -224,7 +224,8 @@ function AuthChrome({ me, loading, onLogout }: { me: Me; loading: boolean; onLog
   }
   if (!me.authenticated) {
     return (
-      <a href={me.loginUrl} className="font-medium text-primary hover:underline">
+      <a href={me.loginUrl} className="flex items-center gap-2 font-medium text-primary hover:underline">
+        <SignInIcon className="h-6 w-6" />
         Sign in
       </a>
     );
