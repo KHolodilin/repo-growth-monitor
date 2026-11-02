@@ -256,7 +256,7 @@ export function ChartCard({
               </div>
             </div>
           )}
-          {children}
+          <div className={mobileShell ? "-mx-4" : undefined}>{children}</div>
           {mobileShell && eventFilter !== "off" && events.length > 0 && (
             <MobileEventStrip events={events} dates={axisDates} onOpen={openMarker} />
           )}

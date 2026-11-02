@@ -65,6 +65,7 @@ describe("PersistentECharts mobile shell", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.getByTestId("echart").parentElement).toHaveClass("-mx-4");
     expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("checkbox", { name: "Events" })).not.toBeChecked();
     await user.click(screen.getByRole("checkbox", { name: "Events" }));
@@ -94,6 +95,17 @@ describe("PersistentECharts mobile shell", () => {
       </ChartCard>,
     );
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.getByTestId("echart").parentElement).toHaveClass("-mx-4");
+  });
+
+  it("keeps desktop plot insets", () => {
+    stubMobile(false);
+    render(
+      <ChartCard title="Traffic" mobileSeries={[{ key: "Views", name: "Views" }]}>
+        <PersistentECharts chartId="desktop-insets" series={[]} option={{ series: [] }} />
+      </ChartCard>,
+    );
+    expect(screen.getByTestId("echart").parentElement).not.toHaveClass("-mx-4");
   });
 
   it("clears axis dates when the chart has no category axis", async () => {
@@ -109,6 +121,7 @@ describe("PersistentECharts mobile shell", () => {
       </ChartCard>,
     );
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.getByTestId("echart").parentElement).toHaveClass("-mx-4");
     expect(screen.queryByLabelText("Growth events")).not.toBeInTheDocument();
   });
 });
