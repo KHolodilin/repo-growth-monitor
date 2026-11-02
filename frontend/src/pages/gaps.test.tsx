@@ -178,7 +178,9 @@ describe("coverage gaps", () => {
     const controls = screen.getByTestId("portfolio-controls");
     expect(controls.className).toContain("flex-col");
     expect(controls.className).toContain("md:flex-row");
-    expect(controls.className).toContain("md:justify-between");
+    expect(controls.className).toContain("gap-3");
+    expect(controls.className).toContain("md:gap-4");
+    expect(controls.className).not.toContain("justify-between");
     expect(controls).toContainElement(screen.getByRole("group", { name: "Portfolio analytics" }));
     expect(controls).toContainElement(screen.getByLabelText("Portfolio period"));
     expect(screen.getByRole("group", { name: "Portfolio analytics" })).toContainElement(
@@ -188,7 +190,8 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("button", { name: "Traffic" }).parentElement).not.toBe(
       screen.getByRole("button", { name: "7d" }).parentElement,
     );
-    expect(screen.getByLabelText("Portfolio period").className).toContain("md:ml-auto");
+    expect(screen.getByLabelText("Portfolio period")).toHaveClass("overflow-x-auto");
+    expect(screen.getByLabelText("Portfolio period").className).not.toContain("ml-auto");
     expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
