@@ -250,7 +250,7 @@ function DashboardHeader({
         className={cn(
           "flex gap-3",
           tab != null && onTab != null
-            ? "flex-col md:flex-row md:items-center md:justify-between"
+            ? "flex-col md:flex-row md:items-center md:gap-4"
             : null,
         )}
         data-testid="portfolio-controls"
@@ -276,7 +276,7 @@ function DashboardHeader({
           </div>
         )}
         <div
-          className={cn("overflow-x-auto", tab != null && onTab != null && "md:ml-auto")}
+          className="overflow-x-auto"
           aria-label="Portfolio period"
         >
           <div className="inline-flex min-w-min flex-nowrap rounded-lg border bg-muted p-1">
