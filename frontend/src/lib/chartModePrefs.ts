@@ -25,7 +25,7 @@ function choiceOf(value: unknown): ChartModeChoice | null {
     return null;
   }
   return {
-    eventFilter: isEventFilter(record.eventFilter) ? record.eventFilter : "all",
+    eventFilter: isEventFilter(record.eventFilter) ? record.eventFilter : "off",
     axis: isAxis(record.axis) ? record.axis : "calendar",
   };
 }
@@ -58,7 +58,7 @@ function publish(context: string) {
 
 function writeChoice(context: string, patch: Partial<ChartModeChoice>) {
   const stored = readMap();
-  const current = stored[context] ?? { eventFilter: "all", axis: "calendar" };
+  const current = stored[context] ?? { eventFilter: "off", axis: "calendar" };
   stored[context] = { ...current, ...patch };
   writeJsonCookie(CHART_MODE_COOKIE, stored);
   publish(context);
@@ -74,7 +74,7 @@ export function subscribeChartMode(context: string, listener: () => void) {
 }
 
 export function readChartEventFilter(context: string): EventFilter {
-  return readMap()[context]?.eventFilter ?? "all";
+  return readMap()[context]?.eventFilter ?? "off";
 }
 
 export function readChartAxis(context: string): ChartAxis {

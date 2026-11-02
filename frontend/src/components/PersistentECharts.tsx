@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import ReactECharts from "echarts-for-react";
 import type { GrowthEvent } from "../lib/api";
-import { readChartSelection, writeChartSelection } from "../lib/chartLegend";
+import { defaultChartSelection, readChartSelection, writeChartSelection } from "../lib/chartLegend";
 import { chartCsv, chartExportBase, downloadChartCsv, downloadChartPng } from "../lib/chartExport";
 import { presentChartOption, type ChartAxis } from "../lib/chartPresentation";
 import { markLineEvents } from "../lib/trafficChart";
@@ -40,15 +40,22 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
   }, [chartId]);
 
   const selectedByName = useMemo(() => {
+    const defaults = defaultChartSelection(series.map((item) => item.key));
     const selected: Record<string, boolean> = {};
     for (const item of series) {
       if (mode.mobile && mode.mobileSeriesName) {
         selected[item.name] = item.name === mode.mobileSeriesName;
         continue;
       }
-      selected[item.name] = !persistSelection || !(stored && Object.prototype.hasOwnProperty.call(stored, item.key))
-        ? true
-        : stored[item.key];
+      if (!persistSelection) {
+        selected[item.name] = true;
+        continue;
+      }
+      if (!stored) {
+        selected[item.name] = defaults[item.key];
+        continue;
+      }
+      selected[item.name] = Object.prototype.hasOwnProperty.call(stored, item.key) ? stored[item.key] : true;
     }
     if (mode.mobile) {
       selected.Events = false;

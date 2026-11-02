@@ -110,14 +110,38 @@ export function pruneChartSelection(chartId: string, remainingKeys: string[]) {
   writeChartSelection(chartId, next);
 }
 
+/** Prefer Visitors / Unique Visitors when no legend cookie is stored. */
+export function defaultChartSelection(keys: string[]): Record<string, boolean> {
+  const visitors = keys.find((key) => key === "Visitors" || key === "Unique Visitors");
+  const selected: Record<string, boolean> = {};
+  for (const key of keys) {
+    selected[key] = visitors ? key === visitors : true;
+  }
+  return selected;
+}
+
 export function resolveChartSelection(
   chartId: string,
   keys: string[],
 ): Record<string, boolean> {
   const stored = readChartSelection(chartId);
+  if (!stored) {
+    return defaultChartSelection(keys);
+  }
   const selected: Record<string, boolean> = {};
   for (const key of keys) {
-    selected[key] = stored && Object.prototype.hasOwnProperty.call(stored, key) ? stored[key] : true;
+    selected[key] = Object.prototype.hasOwnProperty.call(stored, key) ? stored[key] : true;
   }
   return selected;
+}
+
+export function isVisitorsSeriesName(name: string): boolean {
+  return name === "Visitors" || name === "Unique Visitors";
+}
+
+export function defaultMobileSeriesName(options: readonly { name: string }[]): string | null {
+  if (options.length === 0) {
+    return null;
+  }
+  return options.find((item) => isVisitorsSeriesName(item.name))?.name ?? options[0].name;
 }

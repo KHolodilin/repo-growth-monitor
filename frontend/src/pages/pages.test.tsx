@@ -215,7 +215,7 @@ describe("pages", () => {
     expect(screen.queryByText("1 / 2")).not.toBeInTheDocument();
     expect(screen.getByText("↑ 25%")).toBeInTheDocument();
     expect(screen.getByText("↓ 50%")).toBeInTheDocument();
-    expect(screen.getAllByText("vs prev 30d")).toHaveLength(3);
+    expect(screen.getAllByText("vs prev 7d")).toHaveLength(3);
     await user.click(screen.getByLabelText("Switch repository"));
     expect(await screen.findByPlaceholderText("Search repositories")).toBeInTheDocument();
     expect(await screen.findByText("other")).toBeInTheDocument();
@@ -227,7 +227,7 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "mark" }));
     api.mockResolvedValueOnce({});
     await user.click(screen.getByRole("button", { name: "Delete" }));
-    await user.click(screen.getAllByRole("button", { name: "All events" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "Events off" })[0]);
     await user.click(screen.getByRole("menuitemradio", { name: "GitHub events" }));
     await user.click(screen.getByRole("button", { name: "GitHub events" }));
     await user.click(screen.getByRole("menuitemradio", { name: "Promotion events" }));
@@ -360,10 +360,10 @@ describe("pages", () => {
     renderPath("/repositories/13?tab=topics", <RepositoryDetailsPage />);
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
     await waitFor(() => expect(pending).toHaveLength(1));
-    await user.click(screen.getAllByRole("button", { name: "7d" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "30d" })[0]);
     await waitFor(() => expect(pending).toHaveLength(2));
     pending[0].resolve([]);
-    await user.click(screen.getAllByRole("button", { name: "30d" })[0]);
+    await user.click(screen.getAllByRole("button", { name: "7d" })[0]);
     await waitFor(() => expect(pending).toHaveLength(3));
     pending[1].reject(new Error("late"));
     await act(async () => {

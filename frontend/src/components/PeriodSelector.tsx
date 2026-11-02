@@ -7,7 +7,7 @@ export type Period = (typeof PERIODS)[number];
 
 const PERIOD_COOKIE = "rgm-period";
 const REPO_PERIODS_COOKIE = "rgm-period-repos";
-const DEFAULT_PERIOD: Period = "30d";
+const DEFAULT_PERIOD: Period = "7d";
 
 function isPeriod(value: string): value is Period {
   return (PERIODS as readonly string[]).includes(value);

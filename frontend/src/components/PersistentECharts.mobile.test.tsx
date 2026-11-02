@@ -65,11 +65,14 @@ describe("PersistentECharts mobile shell", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("checkbox", { name: "Events" })).not.toBeChecked();
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /1 event on 2026-09-23/ })).toBeInTheDocument(),
     );
-    await user.click(screen.getByRole("tab", { name: "Visitors" }));
-    expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("tab", { name: "Views" }));
+    expect(screen.getByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
     await user.click(screen.getByRole("button", { name: /1 event on 2026-09-23/ }));
     expect(await screen.findByText("Solo")).toBeInTheDocument();
   });

@@ -10,30 +10,30 @@ import {
 
 describe("chartModePrefs", () => {
   it("stores the choice on the chart that changed", () => {
-    expect(readChartEventFilter("portfolio:traffic")).toBe("all");
+    expect(readChartEventFilter("portfolio:traffic")).toBe("off");
     expect(readChartAxis("portfolio:traffic")).toBe("calendar");
     const seen: string[] = [];
     const stop = subscribeChartMode("portfolio:traffic", () => {
       seen.push(`${readChartEventFilter("portfolio:traffic")}:${readChartAxis("portfolio:traffic")}`);
     });
     writeChartAxis("repository:13:stats", "timeline");
-    writeChartEventFilter("portfolio:traffic", "off");
+    writeChartEventFilter("portfolio:traffic", "all");
     writeChartAxis("portfolio:traffic", "timeline");
     expect(readChartAxis("repository:13:stats")).toBe("timeline");
-    expect(readChartEventFilter("repository:13:stats")).toBe("all");
-    expect(readChartEventFilter("portfolio:traffic")).toBe("off");
+    expect(readChartEventFilter("repository:13:stats")).toBe("off");
+    expect(readChartEventFilter("portfolio:traffic")).toBe("all");
     expect(readChartAxis("portfolio:traffic")).toBe("timeline");
     expect(document.cookie).toContain(CHART_MODE_COOKIE);
-    expect(seen).toEqual(["off:calendar", "off:timeline"]);
+    expect(seen).toEqual(["all:calendar", "all:timeline"]);
     const stopAgain = subscribeChartMode("portfolio:traffic", () => {
       seen.push("again");
     });
     writeChartEventFilter("portfolio:traffic", "github");
-    expect(seen).toEqual(["off:calendar", "off:timeline", "github:timeline", "again"]);
+    expect(seen).toEqual(["all:calendar", "all:timeline", "github:timeline", "again"]);
     stop();
     stopAgain();
     writeChartEventFilter("portfolio:traffic", "promotion");
-    expect(seen).toEqual(["off:calendar", "off:timeline", "github:timeline", "again"]);
+    expect(seen).toEqual(["all:calendar", "all:timeline", "github:timeline", "again"]);
   });
 
   it("ignores a cookie that is not a chart mode", () => {
@@ -44,13 +44,13 @@ describe("chartModePrefs", () => {
       "repository:13:stats": { axis: "timeline" },
       "repository:8:traffic": [],
     }))}; path=/`;
-    expect(readChartEventFilter("portfolio:traffic")).toBe("all");
+    expect(readChartEventFilter("portfolio:traffic")).toBe("off");
     expect(readChartAxis("portfolio:traffic")).toBe("calendar");
     expect(readChartAxis("repository:13:stats")).toBe("timeline");
     expect(readChartAxis("repository:8:traffic")).toBe("calendar");
     for (const raw of [null, "text", 1, []]) {
       document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(JSON.stringify(raw))}; path=/`;
-      expect(readChartEventFilter("portfolio:traffic")).toBe("all");
+      expect(readChartEventFilter("portfolio:traffic")).toBe("off");
     }
     document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(JSON.stringify({
       "repository:1:stats": { eventFilter: "promotion" },
