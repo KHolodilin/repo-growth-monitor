@@ -133,7 +133,7 @@ Open **http://localhost/** (Caddy). App port `8080` is not published; Actuator i
 
 Uses a Fine-grained PAT and a separate Postgres volume `pgdata_18`. This is the
 contributor quick path (not the Caddy pack): `docker compose up -d --build` builds `Dockerfile` on the machine.
-Release 0.31.0 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.31.0`.
+Release 0.31.1 publishes the same image as `ghcr.io/kholodilin/repo-growth-monitor:0.31.1`.
 
 The image is three stages:
 
