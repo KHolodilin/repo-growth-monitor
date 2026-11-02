@@ -201,6 +201,16 @@ describe("pages", () => {
       "https://github.com/KHolodilin/spring-transactional-outbox-kafka/graphs/traffic",
     );
     expect(screen.getByRole("link", { name: "GitHub Traffic" }).parentElement).toHaveClass("ml-auto");
+    // The complete compact strip is mobile-hidden, while desktop keeps the flex layout.
+    const metaStrip = screen.getByRole("link", { name: "GitHub Traffic" }).parentElement?.parentElement;
+    expect(metaStrip).toHaveClass("hidden", "md:flex", "flex-wrap", "border-b");
+    expect(metaStrip).not.toHaveClass("flex");
+    expect(metaStrip).toHaveTextContent(`${repository.stars} stars`);
+    expect(metaStrip).toHaveTextContent(`${repository.forks} forks`);
+    expect(metaStrip).toHaveTextContent(`${repository.watchers} watchers`);
+    expect(metaStrip).toHaveTextContent(`${repository.contributors} contributors`);
+    expect(metaStrip).toContainElement(screen.getByRole("button", { name: "Discoverability 1/2" }));
+    expect(metaStrip).toContainElement(screen.getByRole("button", { name: "Community Standards 1/1" }));
     const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
     expect(crumb).toHaveTextContent("Portfolio");
     expect(crumb).toHaveTextContent(repository.fullName);
