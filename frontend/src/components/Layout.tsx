@@ -25,13 +25,7 @@ export function Layout() {
   const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
   const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
   const allowMutations = canMutate(me) && !authLoading;
-  const briefState = live
-    ? "Collecting…"
-    : access?.planner
-      ? access.planner.open
-        ? "Auto-collect window open"
-        : "Outside auto-collect window"
-      : null;
+  const briefState = collectionBriefState(live, access?.planner);
 
   const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
@@ -335,6 +329,19 @@ function AuthChrome({
       )}
     </div>
   );
+}
+
+function collectionBriefState(
+  live: boolean,
+  planner: GitHubAccess["planner"] | null | undefined,
+): string | null {
+  if (live) {
+    return "Collecting…";
+  }
+  if (!planner) {
+    return null;
+  }
+  return planner.open ? "Auto-collect window open" : "Outside auto-collect window";
 }
 
 function repositoryIdFromPath(pathname: string): number | null {

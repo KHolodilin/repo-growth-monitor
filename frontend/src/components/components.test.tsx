@@ -111,6 +111,7 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(screen.getByText("Collected 0 of 1")).toBeInTheDocument();
+    expect(screen.getByText(/Collecting/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeDisabled();
     hold = false;

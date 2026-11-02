@@ -155,7 +155,7 @@ describe("first-run portfolio", () => {
       }
       return Promise.resolve(dashboardReady);
     });
-    render(
+    const closed = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -172,5 +172,25 @@ describe("first-run portfolio", () => {
     expect(line.closest("footer")).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Portfolio" }).parentElement).not.toContainElement(line);
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "About data" }));
+    expect(screen.queryByText(/It has not started yet today/)).not.toBeInTheDocument();
+    closed.unmount();
+
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/system/status")) {
+        return Promise.resolve(status("OK", true));
+      }
+      return Promise.resolve(dashboardReady);
+    });
+    render(
+      <MemoryRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<DashboardPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/Auto-collect window open/)).toBeInTheDocument();
   });
 });
