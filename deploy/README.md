@@ -21,7 +21,7 @@ Mock sign-in: `admin` / `admin` (after mock user sync).
 Pull a released image instead of building:
 
 ```bash
-# APP_IMAGE=ghcr.io/kholodilin/repo-growth-monitor:0.30.1 in .env
+# APP_IMAGE=ghcr.io/kholodilin/repo-growth-monitor:0.31.0 in .env
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 ```
 
