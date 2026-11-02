@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   Check,
   Circle,
@@ -38,6 +38,7 @@ import { useMutationAccess } from "../lib/mutationAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { asGrowthEvents } from "../lib/growthEvents";
 import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
+import type { RunAllMenuAction } from "../components/Layout";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
@@ -90,6 +91,9 @@ function parseTab(tabParam: string | null): Tab {
 
 export function RepositoryDetailsPage() {
   const { id } = useParams();
+  const location = useLocation();
+  const outlet = useOutletContext<{ setRunAll?: Dispatch<SetStateAction<RunAllMenuAction | null>> } | null>();
+  const setRunAll = outlet?.setRunAll;
   const [searchParams, setSearchParams] = useSearchParams();
   const { allowMutations } = useMutationAccess();
   const tabParam = searchParams.get("tab");
@@ -314,7 +318,7 @@ export function RepositoryDetailsPage() {
     }
   }
 
-  async function runAllQueries() {
+  const runAllQueries = useCallback(async () => {
     if (!allowMutations || !id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
       return;
     }
@@ -327,7 +331,7 @@ export function RepositoryDetailsPage() {
     } finally {
       setRunningAll(false);
     }
-  }
+  }, [allowMutations, id, runningQueryId, runningAll, searchActive, visibility.length, load]);
 
   async function runTopicWatch(watchId: number) {
     if (!allowMutations || runningQueryId != null || runningAll || topicsActive) {
@@ -342,7 +346,7 @@ export function RepositoryDetailsPage() {
     }
   }
 
-  async function runAllTopics() {
+  const runAllTopics = useCallback(async () => {
     if (!allowMutations || !id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
       return;
     }
@@ -355,7 +359,24 @@ export function RepositoryDetailsPage() {
     } finally {
       setRunningAll(false);
     }
-  }
+  }, [allowMutations, id, runningQueryId, runningAll, topicsActive, topicsVisibility.length, scope, load]);
+
+  useEffect(() => {
+    if (!setRunAll) return;
+    if (!allowMutations || loading || error || String(repo?.id) !== id || (tab !== "search" && tab !== "topics")) {
+      setRunAll(null);
+      return;
+    }
+    const busy = runningAll || runningQueryId != null || (tab === "search" ? searchActive : topicsActive);
+    setRunAll({
+      locationKey: location.key,
+      label: busy ? "Running..." : "Run all",
+      disabled: busy || (tab === "search" ? visibility.length : topicsVisibility.length) === 0,
+      onRun: () => void (tab === "search" ? runAllQueries() : runAllTopics()),
+    });
+    return () => setRunAll(null);
+  }, [setRunAll, allowMutations, loading, error, repo?.id, id, tab, location.key, runningAll, runningQueryId,
+    searchActive, topicsActive, visibility.length, topicsVisibility.length, runAllQueries, runAllTopics]);
 
   async function deleteQuery(queryId: number) {
     if (!allowMutations || !id) {
@@ -552,7 +573,6 @@ export function RepositoryDetailsPage() {
           runningAll={runningAll}
           allowMutations={allowMutations}
           onRun={runTopicWatch}
-          onRunAll={() => void runAllTopics()}
         />
       )}
       {tab === "search" && (
@@ -571,7 +591,6 @@ export function RepositoryDetailsPage() {
           allowMutations={allowMutations}
           onCreate={() => void createQuery()}
           onRun={runQuery}
-          onRunAll={() => void runAllQueries()}
           onDelete={(queryId) => void deleteQuery(queryId)}
         />
       )}
@@ -1010,7 +1029,6 @@ function TopicsPanel({
   runningAll,
   allowMutations = true,
   onRun,
-  onRunAll,
 }: {
   repositoryId: number;
   language?: string;
@@ -1022,7 +1040,6 @@ function TopicsPanel({
   runningAll: boolean;
   allowMutations?: boolean;
   onRun: (id: number) => void;
-  onRunAll: () => void;
 }) {
   const [hoveredWatchId, setHoveredWatchId] = useState<number | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -1080,15 +1097,7 @@ function TopicsPanel({
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Topics</h2>
-          {allowMutations && (
-            <Button
-              className="bg-muted text-foreground"
-              disabled={visibility.length === 0 || searchBusy}
-              onClick={onRunAll}
-            >
-              {searchBusy ? "Running..." : "Run all"}
-            </Button>
-          )}
+
         </div>
         {visibility.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -1316,7 +1325,6 @@ function SearchPanel({
   allowMutations = true,
   onCreate,
   onRun,
-  onRunAll,
   onDelete,
 }: {
   repositoryId: number;
@@ -1330,7 +1338,6 @@ function SearchPanel({
   allowMutations?: boolean;
   onCreate: () => void;
   onRun: (id: number) => void;
-  onRunAll: () => void;
   onDelete: (id: number) => void;
 }) {
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
@@ -1418,13 +1425,7 @@ function SearchPanel({
                 <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
                   Add query
                 </Button>
-                <Button
-                  className="ml-auto shrink-0 bg-muted text-foreground"
-                  disabled={visibility.length === 0 || searchBusy}
-                  onClick={onRunAll}
-                >
-                  {searchBusy ? "Running..." : "Run all"}
-                </Button>
+
               </div>
               {(queryError || duplicate) && (
                 <p className="mt-2 text-sm text-red-700">

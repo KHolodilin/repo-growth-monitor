@@ -1,5 +1,6 @@
+import { Layout } from "../components/Layout";
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,7 +40,7 @@ function renderAt(path: string, ui: ReactNode) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/repositories" element={ui} />
-        <Route path="/repositories/:id" element={ui} />
+        <Route element={<Layout />}><Route path="/repositories/:id" element={ui} /></Route>
         <Route path="/repositories/:id/traffic/history" element={ui} />
         <Route path="/repositories/:repositoryId/search-queries/:queryId" element={ui} />
         <Route path="/repositories/:repositoryId/topics/:topic" element={ui} />
@@ -232,7 +233,7 @@ describe("extra coverage", () => {
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(await screen.findByText("stats down")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
-    expect(screen.getByText(/successful/)).toBeInTheDocument();
+    expect(within(screen.getByRole("main")).getByText(/successful/)).toBeInTheDocument();
     details.unmount();
 
     const searchErrors = renderAt("/repositories/13?tab=search", <RepositoryDetailsPage />);
@@ -243,7 +244,9 @@ describe("extra coverage", () => {
 
     const topicErrors = renderAt("/repositories/13?tab=topics", <RepositoryDetailsPage />);
     expect(await screen.findByText("outbox")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Run all" }));
+    expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     expect(await screen.findByText("topics failed")).toBeInTheDocument();
     topicErrors.unmount();
 

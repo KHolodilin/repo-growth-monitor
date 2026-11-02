@@ -42,7 +42,7 @@ function renderPath(path: string, ui: ReactNode) {
         <Route path="/" element={<div>home</div>} />
         <Route path="/dashboard" element={<div>home</div>} />
         <Route path="/repositories" element={ui} />
-        <Route path="/repositories/:id" element={ui} />
+        <Route element={<Layout />}><Route path="/repositories/:id" element={ui} /></Route>
         <Route path="/repositories/:id/traffic/history" element={ui} />
         <Route path="/repositories/:repositoryId/search-queries/:queryId" element={ui} />
         <Route path="/repositories/:repositoryId/topics/:topic" element={ui} />
@@ -300,7 +300,9 @@ describe("pages", () => {
     await user.type(screen.getByPlaceholderText(/transactional outbox/), "new query language:java");
     await user.click(screen.getByRole("button", { name: "Add query" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);
-    await user.click(screen.getByRole("button", { name: "Run all" }));
+    expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
@@ -338,7 +340,9 @@ describe("pages", () => {
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "All" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);
-    await user.click(screen.getByRole("button", { name: "Run all" }));
+    expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await user.click(screen.getByRole("button", { name: "Growth Events" }));
     expect(await screen.findByText("Recent Growth Events")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "+ Add event" }));
