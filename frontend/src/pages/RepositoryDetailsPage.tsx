@@ -419,7 +419,7 @@ export function RepositoryDetailsPage() {
           trafficPermissionMissing={repo.trafficPermissionMissing}
           tokenState={tokenState}
         />
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3 text-sm text-muted-foreground">
+        <div className="mt-3 hidden flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3 text-sm text-muted-foreground md:flex">
           <span className="inline-flex items-center gap-1">
             <StarIcon />
             {formatNumber(repo.stars)} stars
