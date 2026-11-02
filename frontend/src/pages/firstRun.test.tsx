@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { Layout } from "../components/Layout";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -147,6 +148,7 @@ describe("first-run portfolio", () => {
   });
 
   it("explains the auto-collect window in the footer", async () => {
+    const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
         return Promise.resolve(status("OK", false));
@@ -162,6 +164,10 @@ describe("first-run portfolio", () => {
         </Routes>
       </MemoryRouter>,
     );
+    expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
+    expect(screen.getByText(/Outside auto-collect window/)).toBeInTheDocument();
+    expect(screen.queryByText(/It has not started yet today/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "About data" }));
     const line = await screen.findByText(/It has not started yet today/);
     expect(line.closest("footer")).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Portfolio" }).parentElement).not.toContainElement(line);
