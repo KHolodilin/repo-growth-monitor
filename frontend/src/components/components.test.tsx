@@ -70,7 +70,10 @@ describe("components", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
-    expect(screen.getByText(/About data/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
+    expect(screen.queryByText(/collected once per day/i)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "About data" }));
+    expect(screen.getByText(/collected once per day/i)).toBeInTheDocument();
     expect(screen.queryByText(/Last updated/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
@@ -108,6 +111,7 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(screen.getByText("Collected 0 of 1")).toBeInTheDocument();
+    expect(screen.getByText(/Collecting/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeDisabled();
     hold = false;
@@ -158,7 +162,7 @@ describe("components", () => {
     );
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
-    expect(screen.getByText("Last sync: —")).toBeInTheDocument();
+    expect(screen.getByText("No successful sync yet")).toBeInTheDocument();
     empty.unmount();
 
     api.mockImplementation((path: string) => {
@@ -204,7 +208,7 @@ describe("components", () => {
         <Layout />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Last sync: —")).toBeInTheDocument();
+    expect(await screen.findByText("No successful sync yet")).toBeInTheDocument();
   });
 
   it("collects one repository from its page and every repository from the list", async () => {

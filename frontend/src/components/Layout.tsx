@@ -19,11 +19,13 @@ export function Layout() {
   const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
-  const syncLabel = formatSyncTime(sync) ?? "—";
+  const syncTime = formatSyncTime(sync);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const progress = headerProgress({ repositoryId, rows: rows ?? [], watching });
   const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
   const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
   const allowMutations = canMutate(me) && !authLoading;
+  const briefState = collectionBriefState(live, access?.planner);
 
   const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
@@ -167,13 +169,32 @@ export function Layout() {
         <Outlet context={{ allowMutations, mutateBlocked }} />
       </main>
       <footer className="mt-auto border-t bg-card">
-        <div className="mx-auto max-w-6xl space-y-1 px-4 py-4 text-xs text-muted-foreground md:px-6">
-          <div>
-            <span className="font-medium text-foreground">About data.</span> Data is collected once per day. Referrers and
-            paths show the latest GitHub snapshot; History has the change between snapshots.
+        <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p>
+              <span className="font-medium text-foreground">
+                {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
+              </span>
+              {briefState ? <span> · {briefState}</span> : null}
+            </p>
+            <button
+              type="button"
+              className="font-medium text-primary hover:underline"
+              aria-expanded={aboutOpen}
+              onClick={() => setAboutOpen((value) => !value)}
+            >
+              About data
+            </button>
           </div>
-          {access?.planner && <div>{headerSchedule(access.planner)}</div>}
-          <div>Last sync: {syncLabel}</div>
+          {aboutOpen && (
+            <div className="space-y-1">
+              <p>
+                Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
+                between snapshots.
+              </p>
+              {access?.planner ? <p>{headerSchedule(access.planner)}</p> : null}
+            </div>
+          )}
           {error && <div className="text-sm text-red-600">{error}</div>}
         </div>
       </footer>
@@ -308,6 +329,19 @@ function AuthChrome({
       )}
     </div>
   );
+}
+
+function collectionBriefState(
+  live: boolean,
+  planner: GitHubAccess["planner"] | null | undefined,
+): string | null {
+  if (live) {
+    return "Collecting…";
+  }
+  if (!planner) {
+    return null;
+  }
+  return planner.open ? "Auto-collect window open" : "Outside auto-collect window";
 }
 
 function repositoryIdFromPath(pathname: string): number | null {
