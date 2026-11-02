@@ -9,8 +9,16 @@ import { headerSchedule } from "../lib/setupChecklist";
 import { formatSyncTime } from "../lib/utils";
 import { LogoMark, SignInIcon } from "./icons";
 
+export type RunAllMenuAction = {
+  locationKey: string;
+  label: string;
+  disabled: boolean;
+  onRun: () => void;
+};
+
 export function Layout() {
   const location = useLocation();
+  const [runAll, setRunAll] = useState<RunAllMenuAction | null>(null);
   const { me, loading: authLoading, logout } = useAuth();
   const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
@@ -143,6 +151,7 @@ export function Layout() {
             me={me}
             loading={authLoading}
             onLogout={() => void logout()}
+            runAll={allowMutations && runAll?.locationKey === location.key ? runAll : null}
             collect={
               allowMutations
                 ? {
@@ -166,7 +175,7 @@ export function Layout() {
         </div>
       )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6 md:py-8">
-        <Outlet context={{ allowMutations, mutateBlocked }} />
+        <Outlet context={{ allowMutations, mutateBlocked, setRunAll }} />
       </main>
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
@@ -213,11 +222,13 @@ function AuthChrome({
   loading,
   onLogout,
   collect,
+  runAll,
 }: {
   me: Me;
   loading: boolean;
   onLogout: () => void;
   collect: CollectMenuAction | null;
+  runAll: RunAllMenuAction | null;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -301,6 +312,20 @@ function AuthChrome({
                   }}
                 >
                   {collect.label}
+                </button>
+              )}
+              {runAll && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={runAll.disabled}
+                  onClick={() => {
+                    setOpen(false);
+                    runAll.onRun();
+                  }}
+                >
+                  {runAll.label}
                 </button>
               )}
               <button
