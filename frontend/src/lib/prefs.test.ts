@@ -4,6 +4,8 @@ import { usePeriod, writeStoredPeriod, writeStoredRepoPeriod } from "../componen
 import { writeCookie, writeJsonCookie } from "./cookies";
 import {
   dashboardTrafficChartId,
+  defaultChartSelection,
+  defaultMobileSeriesName,
   pruneChartSelection,
   readChartSelection,
   repoSearchChartId,
@@ -25,6 +27,24 @@ describe("chart and table prefs", () => {
     expect(repoTopicsChartId(13, "all")).toBe("13:topics:all");
     expect(repoStatsChartId(13)).toBe("13:stats");
     expect(readChartSelection("13:traffic")).toBeNull();
+    expect(defaultChartSelection(["Views", "Visitors", "Clones"])).toEqual({
+      Views: false,
+      Visitors: true,
+      Clones: false,
+    });
+    expect(defaultChartSelection(["Stars", "Forks"])).toEqual({ Stars: true, Forks: true });
+    expect(defaultChartSelection(["Unique Visitors", "Views"])).toEqual({
+      "Unique Visitors": true,
+      Views: false,
+    });
+    expect(defaultMobileSeriesName([])).toBeNull();
+    expect(defaultMobileSeriesName([{ name: "Views" }, { name: "Visitors" }])).toBe("Visitors");
+    expect(defaultMobileSeriesName([{ name: "Stars" }, { name: "Forks" }])).toBe("Stars");
+    expect(resolveChartSelection("13:traffic", ["Views", "Visitors", "Clones"])).toEqual({
+      Views: false,
+      Visitors: true,
+      Clones: false,
+    });
     writeChartSelection("13:traffic", {});
     expect(readChartSelection("13:traffic")).toBeNull();
     writeChartSelection("13:traffic", { Views: false, skip: true });
@@ -34,6 +54,10 @@ describe("chart and table prefs", () => {
     expect(readChartSelection("13:traffic")).toEqual({ Views: false });
     document.cookie = "rgm-chart-legend=not-json; path=/";
     expect(readChartSelection("13:traffic")).toBeNull();
+    expect(resolveChartSelection("13:traffic", ["Views", "Visitors"])).toEqual({
+      Views: false,
+      Visitors: true,
+    });
     writeChartSelection("bad", { Views: true });
     document.cookie = `rgm-chart-legend=${encodeURIComponent(JSON.stringify(["x"]))}; path=/`;
     expect(readChartSelection("bad")).toBeNull();
@@ -97,9 +121,9 @@ describe("chart and table prefs", () => {
     writeJsonCookie("rgm-period-repos", true);
     renderHook(() => usePeriod("3"));
     const first = renderHook(() => usePeriod());
-    expect(first.result.current[0]).toBe("30d");
-    act(() => first.result.current[1]("7d"));
     expect(first.result.current[0]).toBe("7d");
+    act(() => first.result.current[1]("30d"));
+    expect(first.result.current[0]).toBe("30d");
     first.unmount();
 
     writeStoredPeriod("1y");

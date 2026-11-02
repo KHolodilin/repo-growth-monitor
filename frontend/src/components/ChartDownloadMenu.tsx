@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type GrowthEvent } from "../lib/api";
 import { readChartAxis, readChartEventFilter, subscribeChartMode, writeChartAxis, writeChartEventFilter } from "../lib/chartModePrefs";
+import { defaultMobileSeriesName } from "../lib/chartLegend";
 import { asGrowthEvents, eventUtcDate, filterGrowthEvents, groupEventsByUtcDate, type EventFilter } from "../lib/growthEvents";
 import type { ChartAxis } from "../lib/chartPresentation";
 import { useIsMobileChart } from "../lib/useMediaQuery";
@@ -74,7 +75,7 @@ export function ChartExportProvider({ children }: { children: ReactNode }) {
 export function useChartMode() {
   const mode = useContext(ChartModeContext);
   return {
-    eventFilter: mode?.eventFilter ?? ("all" as const),
+    eventFilter: mode?.eventFilter ?? ("off" as const),
     axis: mode?.axis ?? ("calendar" as const),
     events: mode?.events ?? [],
     period: mode?.period,
@@ -111,7 +112,7 @@ export function ChartCard({
   children,
   events: eventsProp,
   repositoryId,
-  period = "30d",
+  period = "7d",
   context,
   onEventsChanged,
   mobileSeries,
@@ -134,10 +135,12 @@ export function ChartCard({
   const mobileShell = mobile && mobileSeries != null;
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const [eventFilter, setEventFilterState] = useState<EventFilter>(() => (context ? readChartEventFilter(context) : "all"));
+  const [eventFilter, setEventFilterState] = useState<EventFilter>(() => (context ? readChartEventFilter(context) : "off"));
   const [axis, setAxisState] = useState<ChartAxis>(() => (context ? readChartAxis(context) : "calendar"));
   const [marker, setMarker] = useState<GrowthEvent[] | null>(null);
-  const [mobileSeriesName, setMobileSeriesName] = useState<string | null>(() => mobileSeries?.[0]?.name ?? null);
+  const [mobileSeriesName, setMobileSeriesName] = useState<string | null>(() =>
+    mobileSeries ? defaultMobileSeriesName(mobileSeries) : null,
+  );
   const [axisDates, setAxisDatesState] = useState<string[]>([]);
   const setAxisDates = useCallback((dates: string[]) => {
     setAxisDatesState((prev) =>
@@ -153,7 +156,7 @@ export function ChartCard({
       if (current != null && mobileSeries.some((item) => item.name === current)) {
         return current;
       }
-      return mobileSeries[0].name;
+      return defaultMobileSeriesName(mobileSeries);
     });
   }, [mobileSeries]);
   useEffect(() => {
@@ -489,7 +492,7 @@ function useDismissableMenu() {
 
 function useModeControls() {
   const mode = useContext(ChartModeContext);
-  const [eventFilter, setEventFilter] = useState<EventFilter>("all");
+  const [eventFilter, setEventFilter] = useState<EventFilter>("off");
   const [axis, setAxis] = useState<ChartAxis>("calendar");
   return {
     eventFilter: mode?.eventFilter ?? eventFilter,

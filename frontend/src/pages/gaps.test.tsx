@@ -178,9 +178,9 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("group", { name: "Portfolio analytics" })).toContainElement(
       screen.getByRole("button", { name: "Traffic" }),
     );
-    expect(screen.getByLabelText("Portfolio period")).toContainElement(screen.getByRole("button", { name: "30d" }));
+    expect(screen.getByLabelText("Portfolio period")).toContainElement(screen.getByRole("button", { name: "7d" }));
     expect(screen.getByRole("button", { name: "Traffic" }).parentElement).not.toBe(
-      screen.getByRole("button", { name: "30d" }).parentElement,
+      screen.getByRole("button", { name: "7d" }).parentElement,
     );
     expect(screen.queryByText("Sum of repository counts")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Stats" }));
@@ -191,7 +191,7 @@ describe("coverage gaps", () => {
     const stars = screen.getAllByText("Stars").find((element) => element.tagName === "DIV");
     expect(stars?.parentElement?.textContent).toContain("—");
     expect(stars?.parentElement?.textContent).not.toContain("vs prev");
-    await user.click(screen.getByRole("button", { name: "7d" }));
+    await user.click(screen.getByRole("button", { name: "30d" }));
     expect(screen.getByRole("heading", { name: "Stats" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Traffic" }));
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
