@@ -246,29 +246,42 @@ function DashboardHeader({
           </div>
         )}
       </div>
-      {tab != null && onTab != null && (
-        <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Portfolio analytics">
-          {([
-            ["traffic", "Traffic"],
-            ["stats", "Stats"],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium",
-                tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-              )}
-              onClick={() => onTab(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="overflow-x-auto" aria-label="Portfolio period">
-        <div className="inline-flex min-w-min flex-nowrap rounded-lg border bg-muted p-1">
-          <PeriodSelector embedded scrollable period={period} onPeriod={onPeriod} />
+      <div
+        className={cn(
+          "flex gap-3",
+          tab != null && onTab != null
+            ? "flex-col md:flex-row md:items-center md:justify-between"
+            : null,
+        )}
+        data-testid="portfolio-controls"
+      >
+        {tab != null && onTab != null && (
+          <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Portfolio analytics">
+            {([
+              ["traffic", "Traffic"],
+              ["stats", "Stats"],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm font-medium",
+                  tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                )}
+                onClick={() => onTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div
+          className={cn("overflow-x-auto", tab != null && onTab != null && "md:ml-auto")}
+          aria-label="Portfolio period"
+        >
+          <div className="inline-flex min-w-min flex-nowrap rounded-lg border bg-muted p-1">
+            <PeriodSelector embedded scrollable period={period} onPeriod={onPeriod} />
+          </div>
         </div>
       </div>
     </div>
