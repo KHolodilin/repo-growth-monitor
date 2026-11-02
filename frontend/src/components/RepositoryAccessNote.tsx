@@ -1,3 +1,4 @@
+import { useAuth } from "../lib/AuthContext";
 import { NO_ACCESS, TRAFFIC_PERMISSION, type TokenState } from "../lib/githubAccess";
 
 export function RepositoryAccessNote({
@@ -9,6 +10,10 @@ export function RepositoryAccessNote({
   trafficPermissionMissing?: boolean;
   tokenState?: TokenState | null;
 }) {
+  const { me, loading } = useAuth();
+  if (loading || !me.authenticated) {
+    return null;
+  }
   const known = tokenState === "OK" || tokenState === "RATE_LIMITED";
   const lost = accessible === false && known;
   const traffic = trafficPermissionMissing === true && known;

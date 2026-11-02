@@ -33,7 +33,8 @@ export function Layout() {
   const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
   const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
   const allowMutations = canMutate(me) && !authLoading;
-  const briefState = collectionBriefState(live, access?.planner);
+  const showOperationalStatus = !authLoading && me.authenticated;
+  const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
@@ -123,7 +124,8 @@ export function Layout() {
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
   const collectDisabled =
     collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0);
-  const noToken = access?.tokenState === "MISSING";
+  const noToken = showOperationalStatus && access?.tokenState === "MISSING";
+  const accessBanner = showOperationalStatus ? tokenBanner(access) : null;
   document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
 
   return (
@@ -164,14 +166,14 @@ export function Layout() {
           />
         </div>
       </header>
-      {progress && (
+      {showOperationalStatus && progress && (
         <div className="border-b bg-card">
           <p className="mx-auto max-w-6xl px-4 py-2 text-sm md:px-6">{progress}</p>
         </div>
       )}
-      {tokenBanner(access) && (
+      {accessBanner && (
         <div className="border-b bg-amber-50 text-amber-950">
-          <p className="mx-auto max-w-6xl px-4 py-2 text-sm md:px-6">{tokenBanner(access)}</p>
+          <p className="mx-auto max-w-6xl px-4 py-2 text-sm md:px-6">{accessBanner}</p>
         </div>
       )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6 md:py-8">
@@ -201,10 +203,10 @@ export function Layout() {
                 Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
                 between snapshots.
               </p>
-              {access?.planner ? <p>{headerSchedule(access.planner)}</p> : null}
+              {showOperationalStatus && access?.planner ? <p>{headerSchedule(access.planner)}</p> : null}
             </div>
           )}
-          {error && <div className="text-sm text-red-600">{error}</div>}
+          {showOperationalStatus && error && <div className="text-sm text-red-600">{error}</div>}
         </div>
       </footer>
     </div>
