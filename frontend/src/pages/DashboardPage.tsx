@@ -250,7 +250,7 @@ function DashboardHeader({
         className={cn(
           "flex gap-3",
           tab != null && onTab != null
-            ? "flex-col md:flex-row md:items-center md:gap-4"
+            ? "flex-col md:flex-row md:items-center md:justify-end md:gap-2"
             : null,
         )}
         data-testid="portfolio-controls"
