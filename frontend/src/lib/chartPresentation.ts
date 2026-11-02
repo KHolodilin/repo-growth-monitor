@@ -17,7 +17,7 @@ type ChartOption = {
   xAxis?: { data?: unknown; axisLabel?: Record<string, unknown> } | unknown[];
   series?: Series[];
   tooltip?: { formatter?: (params: unknown) => unknown };
-  grid?: { top?: unknown };
+  grid?: Record<string, unknown>;
 };
 
 /** Day 1 is each series' first stored value. The axis is as long as the longest span. */
@@ -196,6 +196,8 @@ export function presentChartOption<T>(
   let next = option as ChartOption;
   if (mode.mobile) {
     next = stripEventMarks(next);
+    // Reserve space for labels dynamically instead of the desktop legend and gutters.
+    next = { ...next, grid: { ...next.grid, left: 4, right: 4, top: 12, bottom: 8, containLabel: true } };
   } else if (mode.events.length > 0 && !hasEvents(next)) {
     next = withEvents(next, mode.events, mode.period);
   }

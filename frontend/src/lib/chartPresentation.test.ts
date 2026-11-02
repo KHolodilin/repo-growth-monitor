@@ -179,3 +179,32 @@ describe("chartPresentation", () => {
     ).toEqual([]);
   });
 });
+
+describe("mobile plot spacing", () => {
+  const desktopGrid = { left: 48, right: 72, top: 64, bottom: 40, containLabel: false };
+
+  it.each(["calendar", "timeline"] as const)("fits labels inside a tight grid in %s mode", (axis) => {
+    const option = {
+      grid: desktopGrid,
+      xAxis: { data: ["2026-09-23", "2026-09-24"] },
+      yAxis: [{ type: "value" }, { type: "value", position: "right" }],
+      series: [{ name: "Views", data: [100000, 200000] }],
+    };
+    const result = presentChartOption(option, { axis, events: [event], mobile: true });
+    expect(result.grid).toEqual({ left: 4, right: 4, top: 12, bottom: 8, containLabel: true });
+    expect(result.yAxis).toBe(option.yAxis);
+    expect(option.grid).toBe(desktopGrid);
+    expect(option.grid.top).toBe(64);
+  });
+
+  it("keeps desktop gutters with mobile disabled or omitted", () => {
+    const option = { grid: desktopGrid, series: [] };
+    expect(presentChartOption(option, { axis: "calendar", events: [], mobile: false })).toBe(option);
+    expect(presentChartOption(option, { axis: "calendar", events: [] })).toBe(option);
+  });
+
+  it("contains axis labels even without a source grid or data", () => {
+    const result = presentChartOption<Record<string, unknown>>({}, { axis: "calendar", events: [], mobile: true });
+    expect(result.grid).toEqual({ left: 4, right: 4, top: 12, bottom: 8, containLabel: true });
+  });
+});
