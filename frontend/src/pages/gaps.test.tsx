@@ -179,7 +179,8 @@ describe("coverage gaps", () => {
     expect(controls.className).toContain("flex-col");
     expect(controls.className).toContain("md:flex-row");
     expect(controls.className).toContain("gap-3");
-    expect(controls.className).toContain("md:gap-4");
+    expect(controls.className).toContain("md:gap-2");
+    expect(controls.className).toContain("md:justify-end");
     expect(controls.className).not.toContain("justify-between");
     expect(controls).toContainElement(screen.getByRole("group", { name: "Portfolio analytics" }));
     expect(controls).toContainElement(screen.getByLabelText("Portfolio period"));
