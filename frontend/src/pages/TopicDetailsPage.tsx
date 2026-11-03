@@ -5,6 +5,7 @@ import { useMutationAccess } from "../lib/mutationAccess";
 import { formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { writeTopicScope } from "../lib/topicScope";
+import { ComparisonSeries } from "../components/ComparisonSeries";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { ChartModePlot } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -142,9 +143,9 @@ export function TopicDetailsPage() {
       : `https://github.com/topics/${encodeURIComponent(history.watch.topic)}?o=desc&s=stars`;
 
   const selectedSeries = competitors.filter(item => selected.includes(item.githubRepositoryId));
-  const rankSeries = [{ name: history.watch.topic, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
+  const rankSeries = [{ name: repo.fullName, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
     ...selectedSeries.map(item => ({ name: item.fullName, points: item.points, limit: history.watch.resultLimit }))];
-  const chartSeries = [{ key: String(history.watch.id), name: history.watch.topic }, ...selectedSeries.map(item => ({ key: `competitor:${item.githubRepositoryId}`, name: item.fullName }))];
+  const chartSeries = [{ key: String(history.watch.id), name: repo.fullName }, ...selectedSeries.map(item => ({ key: `competitor:${item.githubRepositoryId}`, name: item.fullName }))];
   const unavailable = selected.filter(id => !competitors.some(item => item.githubRepositoryId === id && item.points.length > 0));
   return (
     <div className="space-y-6">
@@ -214,9 +215,10 @@ export function TopicDetailsPage() {
         repositoryId={repo.id}
         period="all"
         context={`repository:${repo.id}:topic:${history.watch.id}`}
-        mobileSeries={chartSeries}
+        mobileSeries={[]}
       >
         {unavailable.length > 0 && <p role="status" className="mb-2 text-sm text-muted-foreground">No rank history for one or more selected competitors.</p>}
+        <ComparisonSeries series={chartSeries} />
         <ChartModePlot
           chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
           series={chartSeries}
