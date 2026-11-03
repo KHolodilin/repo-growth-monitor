@@ -7,6 +7,7 @@ import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
 import { formatSyncTime } from "../lib/utils";
+import { RouteScroll } from "./RouteScroll";
 import { LogoMark, SignInIcon } from "./icons";
 
 export type RunAllMenuAction = {
@@ -177,6 +178,7 @@ export function Layout() {
         </div>
       )}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6 md:py-8">
+        <RouteScroll />
         <Outlet context={{ allowMutations, mutateBlocked, setRunAll }} />
       </main>
       <footer className="mt-auto border-t bg-card">

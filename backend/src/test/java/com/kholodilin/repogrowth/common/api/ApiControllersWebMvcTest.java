@@ -305,6 +305,9 @@ class ApiControllersWebMvcTest {
         mockMvc.perform(get("/api/v1/topic-watches/7/results")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/history")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/results")).andExpect(status().isOk());
+        when(topicCompetitorService.series(13L, "outbox", "language")).thenReturn(List.of(new TopicCompetitorService.RankSeries(2L, "big/outbox", List.of(new TopicCompetitorService.RankPoint(LocalDate.of(2026, 9, 23), 1)))));
+        mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/series?scope=language")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].points[0].position").value(1));
         mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/competitors/2")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("big/outbox"))
                 .andExpect(jsonPath("$.points[0].stars").value(10));

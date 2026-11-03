@@ -1,4 +1,6 @@
-import { Fragment } from "react";
+import { useIsMobileChart } from "../lib/useMediaQuery";
+import { ChartSelection } from "./ResultCards";
+import { Fragment, useState } from "react";
 import type { SnapshotHistory, SnapshotHistoryCell } from "../lib/api";
 import { cellValue, formatSnapshotDelta } from "../lib/snapshotHistory";
 import type { SnapshotChartKind, SnapshotMetric } from "../lib/snapshotChartPrefs";
@@ -12,10 +14,17 @@ const FIRST_COLUMN_WIDTH = "w-56";
 export function SnapshotHistoryTable({
   kind,
   history,
+  selected = [], onToggle,
 }: {
   kind: SnapshotChartKind;
   history: SnapshotHistory;
+  selected?: string[];
+  onToggle?: (key: string) => void;
 }) {
+  const mobile = useIsMobileChart();
+  const [date, setDate] = useState(history.dates.at(-1));
+  const currentDate = date && history.dates.includes(date) ? date : history.dates.at(-1);
+  const dateIndex = history.dates.indexOf(currentDate!);
   const firstColumn = kind === "referrers" ? "Source" : "Path";
   const showIcons = kind === "referrers";
   const dates = [...history.dates].reverse();
@@ -40,7 +49,25 @@ export function SnapshotHistoryTable({
           Values as reported by GitHub, with the change from the previous snapshot
         </span>
       </div>
-      <div className="max-h-[70vh] overflow-auto">
+      {mobile ? <div className="space-y-3">
+        <div className="flex items-end gap-2">
+          <button type="button" aria-label="Previous snapshot" className="min-h-11 rounded border px-3" disabled={dateIndex <= 0} onClick={() => setDate(history.dates[dateIndex - 1])}>←</button>
+          <label className="min-w-0 flex-1 text-xs text-muted-foreground">Snapshot date<select className="mt-1 block min-h-11 w-full min-w-0 rounded border bg-card px-2 text-sm text-foreground" value={currentDate} onChange={event => setDate(event.target.value)}>{dates.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+          <button type="button" aria-label="Next snapshot" className="min-h-11 rounded border px-3" disabled={dateIndex >= history.dates.length - 1} onClick={() => setDate(history.dates[dateIndex + 1])}>→</button>
+        </div>
+        {history.rows.map(row => {
+          const cell = row.cells.find(item => item.date === currentDate);
+          return <article key={row.key} className="min-w-0 rounded-lg border p-3">
+            <div className="flex items-start gap-2">{showIcons && <ReferrerSourceIcon source={row.key} />}<div className="min-w-0 [overflow-wrap:anywhere]">{wrapPath(row.key)}{row.title && <p className="mt-1 text-xs text-muted-foreground">{row.title}</p>}</div></div>
+            <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">{(["VISITORS", "VIEWS"] as const).map(metric => {
+              const value = cell ? cellValue(cell, metric) : null;
+              const delta = cell ? formatSnapshotDelta(cell, metric) : null;
+              return <div key={metric}><dt className="text-xs text-muted-foreground">{metric === "VISITORS" ? "Visitors" : "Views"}</dt><dd>{value === null ? "—" : formatNumber(value)} {delta && <span className={cn("text-xs", growthClass(delta.direction))}>{delta.label}</span>}</dd></div>;
+            })}</dl>
+            {onToggle && <ChartSelection name={row.key} checked={selected.includes(row.key)} onChange={() => onToggle(row.key)} />}
+          </article>;
+        })}
+      </div> : <div className="max-h-[70vh] overflow-auto">
         <table className="min-w-full border-separate border-spacing-0 text-sm">
           <thead>
             <tr>
@@ -95,7 +122,7 @@ export function SnapshotHistoryTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
     </Card>
   );
 }

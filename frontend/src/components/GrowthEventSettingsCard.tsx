@@ -51,6 +51,16 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
     }
   }
 
+  if (!allowMutations) {
+    return <Card>
+      <h2 className="mb-2 font-medium">Automatic events</h2>
+      <p className="text-sm text-muted-foreground">Read-only configuration. An administrator can change settings and add promotion events.</p>
+      {error ? <p role="alert" className="mt-2 text-sm text-red-700">{error}</p> : <details className="mt-3 text-sm">
+        <summary className="cursor-pointer py-2">Current configuration ({settings.filter(item => item.enabled).length} enabled)</summary>
+        <dl className="mt-2 space-y-2">{AUTOMATIC_SETTING_LABELS.map(item => <div key={item.type} className="flex justify-between gap-3"><dt>{item.label}</dt><dd>{byType.has(item.type) ? byType.get(item.type)!.enabled ? "Enabled" : "Disabled" : "Not available"}</dd></div>)}</dl>
+      </details>}
+    </Card>;
+  }
   return (
     <Card>
       <h2 className="mb-3 font-medium">Automatic events</h2>

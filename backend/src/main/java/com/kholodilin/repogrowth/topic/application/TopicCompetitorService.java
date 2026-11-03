@@ -35,6 +35,21 @@ public class TopicCompetitorService {
         this.competitorCardService = competitorCardService;
     }
 
+    /** Authorization and scope resolution are shared with the topic detail history. */
+    public List<RankSeries> series(long repositoryId, String topic, String scope) {
+        long watchId = topicVisibilityService.historyByTopic(repositoryId, topic, scope).watch().id();
+        Map<Long, List<SnapshotValue>> grouped = new LinkedHashMap<>();
+        for (SnapshotValue row : resultRepository.findSnapshots(watchId)) {
+            grouped.computeIfAbsent(row.githubRepositoryId(), ignored -> new ArrayList<>()).add(row);
+        }
+        return grouped.entrySet().stream().map(entry -> new RankSeries(entry.getKey(),
+                entry.getValue().getLast().fullName(), entry.getValue().stream()
+                .map(row -> new RankPoint(row.date(), row.position())).toList())).toList();
+    }
+
+    public record RankPoint(LocalDate date, int position) { }
+    public record RankSeries(long githubRepositoryId, String fullName, List<RankPoint> points) { }
+
     public CompetitorCard card(long repositoryId, String topic, String scope, long githubRepositoryId) {
         long topicWatchId = topicVisibilityService.historyByTopic(repositoryId, topic, scope).watch().id();
         Map<LocalDate, SnapshotValue> hits = new LinkedHashMap<>();

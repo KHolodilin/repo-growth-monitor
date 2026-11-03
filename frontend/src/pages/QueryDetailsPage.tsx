@@ -45,6 +45,7 @@ export function QueryDetailsPage() {
   }
 
   useEffect(() => {
+    setSelected([]);
     load().catch((err: Error) => setError(err.message));
   }, [repositoryId, queryId]);
 
@@ -190,6 +191,7 @@ export function QueryDetailsPage() {
         mobileControls={metricControls}
         mobileSeries={chartSeries}
       >
+        {selected.some(id => !series.some(item => item.githubRepositoryId === id && item.points.length > 0)) && <p role="status" className="mb-2 text-sm text-muted-foreground">No history for one or more selected competitors.</p>}
         <QueryRankChart
           history={history}
           repo={repo}

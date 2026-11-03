@@ -1,3 +1,5 @@
+import { useIsMobileChart } from "../lib/useMediaQuery";
+import { ChartSelection, ResultCards } from "./ResultCards";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { type TopicRunResults } from "../lib/api";
@@ -16,12 +18,17 @@ export function TopicResultsTable({
   repositoryId,
   trackedGithubId,
   nameTo,
+  selectedIds = [],
+  onToggle,
 }: {
   rows: ResultRow[];
   repositoryId: number;
   trackedGithubId?: number;
+  selectedIds?: number[];
+  onToggle?: (id: number) => void;
   nameTo?: (row: ResultRow) => string;
 }) {
+  const mobile = useIsMobileChart();
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "topic-results",
     scope: repositoryId,
@@ -45,11 +52,19 @@ export function TopicResultsTable({
     return copy;
   }, [rows, sortKey, sortDir]);
 
+  if (mobile) return <ResultCards fields={SORT_KEYS} sortKey={sortKey} sortDir={sortDir} toggle={key => toggle(key as SortKey)} rows={sorted.map(row => {
+    const mine = trackedGithubId != null && row.result.githubRepositoryId === trackedGithubId;
+    return { id: row.result.githubRepositoryId, position: row.result.position, tracked: mine,
+      name: <RepositoryName row={row} to={nameTo?.(row) ?? null} />,
+      metrics: [{ label: "Stars", value: formatNumber(row.result.stars) }, { label: "Forks", value: formatNumber(row.result.forks) }, { label: "Change", value: formatPositionDelta(row.positionDelta) },{ label: "Language", value: row.result.language ?? "—" }],
+      selection: onToggle && !mine ? <ChartSelection name={row.result.fullName} checked={selectedIds.includes(row.result.githubRepositoryId)} onChange={() => onToggle(row.result.githubRepositoryId)} /> : undefined };
+  })} />;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] table-fixed text-sm">
         <thead>
           <tr className="text-left text-muted-foreground">
+            {onToggle && <th className="w-10 px-4 py-2" />}
             <SortHeader className="w-10" label="#" align="left" active={sortKey === "position"} dir={sortDir} onClick={() => toggle("position")} />
             <SortHeader label="Repository" align="left" active={sortKey === "fullName"} dir={sortDir} onClick={() => toggle("fullName")} />
             <SortHeader className="w-[7.5rem]" label="Stars" active={sortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
@@ -63,6 +78,7 @@ export function TopicResultsTable({
             const mine = trackedGithubId != null && row.result.githubRepositoryId === trackedGithubId;
             return (
               <tr key={row.result.githubRepositoryId} className={`border-t ${mine ? "bg-blue-50 font-medium" : ""}`}>
+                {onToggle && <td className="px-4 py-2.5">{!mine && <input type="checkbox" aria-label={`Show ${row.result.fullName} on the chart`} checked={selectedIds.includes(row.result.githubRepositoryId)} onChange={() => onToggle(row.result.githubRepositoryId)} />}</td>}
                 <td className="whitespace-nowrap px-4 py-2.5 align-top">{row.result.position}</td>
                 <td className="max-w-0 px-4 py-2.5 align-top">
                   <RepositoryName row={row} to={nameTo?.(row) ?? null} />

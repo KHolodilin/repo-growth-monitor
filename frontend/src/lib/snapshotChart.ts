@@ -72,7 +72,8 @@ export function snapshotChartOption({
             if (selected.includes(row.key)) {
               continue;
             }
-            const value = chartValue(row.cells[dateIndex], metric);
+            const cell = row.cells[dateIndex];
+            const value = cell ? chartValue(cell, metric) : null;
             if (value !== null) {
               sum = (sum ?? 0) + value;
             }

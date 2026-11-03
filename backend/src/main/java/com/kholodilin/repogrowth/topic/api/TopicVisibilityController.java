@@ -76,6 +76,14 @@ public class TopicVisibilityController {
         return topicVisibilityService.latestResultsByTopic(id, topic, scope);
     }
 
+    @GetMapping("/repositories/{id}/topics/{topic}/series")
+    public List<TopicCompetitorService.RankSeries> series(
+            @PathVariable long id, @PathVariable String topic,
+            @RequestParam(defaultValue = "all") String scope
+    ) {
+        return topicCompetitorService.series(id, topic, scope);
+    }
+
     @GetMapping("/repositories/{id}/topics/{topic}/competitors/{githubRepositoryId}")
     public CompetitorCardService.CompetitorCard competitor(
             @PathVariable long id,

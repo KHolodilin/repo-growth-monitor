@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
 import { useMutationAccess } from "../lib/mutationAccess";
@@ -26,6 +26,9 @@ export function TopicDetailsPage() {
   const [results, setResults] = useState<TopicRunResults | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [competitors, setCompetitors] = useState<{ githubRepositoryId: number; fullName: string; points: { date: string; position: number }[] }[]>([]);
+  const generation = useRef(0);
 
   const topicName = topic ? decodeURIComponent(topic) : "";
 
@@ -33,27 +36,36 @@ export function TopicDetailsPage() {
     if (!repositoryId || !topicName) {
       return;
     }
+    const version = generation.current;
     const [repository, topicHistory] = await Promise.all([
       api<Repository>(`/api/v1/repositories/${repositoryId}`),
       api<TopicHistory>(
         `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
       ),
     ]);
+    if (version !== generation.current) return;
     setRepo(repository);
     setHistory(topicHistory);
-    try {
-      setResults(
-        await api<TopicRunResults>(
-          `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`,
-        ),
-      );
-    } catch {
-      setResults(null);
-    }
+    const [nextResults, nextSeries] = await Promise.all([
+      api<TopicRunResults>(`/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`).catch(() => null),
+      api<typeof competitors>(`/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`).catch(() => []),
+    ]);
+    if (version !== generation.current) return;
+    setResults(nextResults);
+    setCompetitors(nextSeries);
+
   }
 
   useEffect(() => {
-    load().catch((err: Error) => setError(err.message));
+    generation.current++;
+    setSelected([]);
+    setCompetitors([]);
+    setHistory(null);
+    setResults(null);
+    setError(null);
+    const version = generation.current;
+    load().catch((err: Error) => { if (version === generation.current) setError(err.message); });
+    return () => { generation.current++; };
   }, [repositoryId, topicName, scope]);
 
   const searchBusy =
@@ -129,6 +141,11 @@ export function TopicDetailsPage() {
       ? `https://github.com/topics/${encodeURIComponent(history.watch.topic)}?o=desc&s=stars&l=${encodeURIComponent(repo.language)}`
       : `https://github.com/topics/${encodeURIComponent(history.watch.topic)}?o=desc&s=stars`;
 
+  const selectedSeries = competitors.filter(item => selected.includes(item.githubRepositoryId));
+  const rankSeries = [{ name: history.watch.topic, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
+    ...selectedSeries.map(item => ({ name: item.fullName, points: item.points, limit: history.watch.resultLimit }))];
+  const chartSeries = [{ key: String(history.watch.id), name: history.watch.topic }, ...selectedSeries.map(item => ({ key: `competitor:${item.githubRepositoryId}`, name: item.fullName }))];
+  const unavailable = selected.filter(id => !competitors.some(item => item.githubRepositoryId === id && item.points.length > 0));
   return (
     <div className="space-y-6">
       <header className="grid grid-cols-1 items-start gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -197,24 +214,21 @@ export function TopicDetailsPage() {
         repositoryId={repo.id}
         period="all"
         context={`repository:${repo.id}:topic:${history.watch.id}`}
-        mobileSeries={[{ key: String(history.watch.id), name: history.watch.topic }]}
+        mobileSeries={chartSeries}
       >
+        {unavailable.length > 0 && <p role="status" className="mb-2 text-sm text-muted-foreground">No rank history for one or more selected competitors.</p>}
         <ChartModePlot
           chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
-          series={[{ key: String(history.watch.id), name: history.watch.topic }]}
+          series={chartSeries}
+          persistSelection={false}
           style={{ height: 360, width: "100%" }}
           build={({ axis, events }) => rankHistoryOption({
-            dates: datesFromHistory([history.points], history.missedDates),
+            dates: datesFromHistory(rankSeries.map(item => item.points), history.missedDates),
             axis,
             events,
-            series: [
-              {
-                name: history.watch.topic,
-                points: history.points,
-                limit: history.watch.resultLimit,
-                missedDates: history.missedDates,
-              },
-            ],
+            series: rankSeries,
+            legend: true,
+            legendToggle: false,
           })}
         />
       </ChartCard>
@@ -228,6 +242,8 @@ export function TopicDetailsPage() {
             rows={results.rows}
             repositoryId={repo.id}
             trackedGithubId={repo.githubId}
+            selectedIds={selected}
+            onToggle={id => setSelected(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])}
             nameTo={(row) => topicCompetitorPath(repo.id, history.watch.topic, row.result.githubRepositoryId, scope)}
           />
         )}

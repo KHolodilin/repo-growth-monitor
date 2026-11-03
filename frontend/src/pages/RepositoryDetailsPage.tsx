@@ -1450,6 +1450,7 @@ function SearchPanel({
         ) : (
           <h2 className="mb-3 font-medium">Search Queries</h2>
         )}
+        {visibility.length === 0 ? <p className="text-sm text-muted-foreground">{allowMutations ? "Add a search query to start tracking visibility." : "An administrator can configure search queries."}</p> : <>
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -1566,6 +1567,7 @@ function SearchPanel({
           </tbody>
         </table>
         </div>
+        </>}
       </Card>
     </div>
   );
@@ -1650,6 +1652,16 @@ function CombinedRankChart({
     [drawn],
   );
 
+  if (visibility.length === 0) {
+    return <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
+      <p className="text-sm text-muted-foreground">No search queries configured yet.</p>
+    </ChartCard>;
+  }
+  if (drawn.length > 0 && drawn.every(item => item.points.length === 0)) {
+    return <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
+      <p className="text-sm text-muted-foreground">No rank history for the selected queries yet.</p>
+    </ChartCard>;
+  }
   if (drawn.length === 0) {
     return (
       <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
