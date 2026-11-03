@@ -40,6 +40,8 @@ export function TrafficHistoryPage() {
   const includeService = kind === "paths" && showServicePaths;
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SnapshotHistory | null>(null);
+  const [loadedContext, setLoadedContext] = useState<string | null>(null);
+  const context = `${id}:${kind}`;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,6 +60,7 @@ export function TrafficHistoryPage() {
         if (!cancelled) {
           setRepo(repository);
           setHistory(data);
+          setLoadedContext(`${id}:${kind}`);
         }
       })
       .catch((err: Error) => {
@@ -73,7 +76,7 @@ export function TrafficHistoryPage() {
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
-  if (!repo || !history) {
+  if (!repo || !history || loadedContext !== context) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-7 w-72" />

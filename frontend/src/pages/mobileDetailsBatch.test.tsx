@@ -12,6 +12,7 @@ import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { GrowthEventsPanel } from "../components/GrowthEventsPanel";
 import { SearchVisibilityKpis } from "../components/SearchVisibilityKpis";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
+import { TrafficHistoryPage } from "./TrafficHistoryPage";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
 import { repository, traffic, searchHistory, searchResults, snapshotHistory, topicHistory, topicResults } from "../test/fixtures";
@@ -244,6 +245,27 @@ describe("batch 178–182", () => {
     await screen.findAllByRole("article");
     await userEvent.click(screen.getByRole("checkbox", { name: "Show other/repo on the chart" }));
     expect(await screen.findByRole("status")).toHaveTextContent("No history for one or more selected competitors.");
+  });
+
+  it("does not initialize Paths selection from stale Referrers while history is loading", async () => {
+    const user = userEvent.setup();
+    let finishPaths: (value: unknown) => void = () => {};
+    api.mockImplementation(async (url: string) => {
+      if (url.includes("traffic-history") && url.includes("kind=paths")) return new Promise(resolve => { finishPaths = resolve; });
+      if (url.includes("traffic-history")) return snapshotHistory;
+      return respond(String(url));
+    });
+    render(<MemoryRouter initialEntries={["/repositories/13/traffic/history?kind=referrers"]}><Routes><Route path="/repositories/:id/traffic/history" element={<TrafficHistoryPage />} /></Routes></MemoryRouter>);
+    await screen.findAllByRole("article");
+    expect(screen.getByRole("checkbox", { name: "Show github.com on the chart" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Popular Paths" }));
+    expect(screen.queryByRole("article")).toBeNull();
+    const paths = { ...snapshotHistory, kind: "PATHS", rows: [{ ...snapshotHistory.rows[0], key: "/repository/very/long/path", title: "Path" }] };
+    await act(async () => finishPaths(paths));
+    expect(await screen.findByRole("checkbox", { name: "Show /repository/very/long/path on the chart" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Show github.com on the chart" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Referrers" }));
+    expect(await screen.findByRole("checkbox", { name: "Show github.com on the chart" })).toBeChecked();
   });
 
 });
