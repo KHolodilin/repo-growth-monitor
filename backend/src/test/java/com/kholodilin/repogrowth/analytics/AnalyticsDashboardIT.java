@@ -543,4 +543,20 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(trafficJdbcRepository.observedDays(java.util.Set.of(kafka.id()), yesterday, yesterday.minusDays(1))).isZero();
     }
 
+    @Test
+    void portfolioCoverageAndSeriesOnlyIncludeVisibleRepositories() {
+        createRepos();
+        LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+        trafficJdbcRepository.upsertDaily(kafka.id(), yesterday, 5, 2, 1, 1);
+        trafficJdbcRepository.upsertDaily(outbox.id(), yesterday, 99, 99, 99, 99);
+        jdbcClient.sql("UPDATE repository SET visibility = 'PRIVATE' WHERE id = :id").param("id", outbox.id()).update();
+        var dashboard = analyticsService.dashboard("1d");
+        assertThat(dashboard.summary().repositories()).isEqualTo(1);
+        assertThat(dashboard.summary().views().value()).isEqualTo(5);
+        assertThat(dashboard.summary().views().coverage().expectedDays()).isEqualTo(1);
+        assertThat(dashboard.traffic()).hasSize(1);
+        assertThat(dashboard.traffic().getFirst().views()).isEqualTo(5);
+        assertThat(dashboard.traffic().getFirst().viewsLeaders()).extracting(DashboardResponse.TrafficLeader::fullName).containsExactly(kafka.fullName());
+    }
+
 }

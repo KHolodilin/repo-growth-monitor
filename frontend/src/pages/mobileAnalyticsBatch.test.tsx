@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 import { DashboardPage } from "./DashboardPage";
-import { dashboardReady, repository } from "../test/fixtures";
+import { dashboardReady, repository, traffic } from "../test/fixtures";
 import { NavigationButton } from "../components/NavigationButton";
 import { RepositoryWarningSheet } from "../components/RepositoryWarningSheet";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
@@ -14,9 +15,9 @@ const { api } = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock("../lib/api", async original => ({ ...await original<typeof import("../lib/api")>(), api }));
 vi.mock("echarts-for-react", async () => {
   const React = await import("react");
-  return { default: React.forwardRef(function Plot({ option }: { option: { legend?: { selected?: Record<string, boolean> } } }, ref) {
+  return { default: React.forwardRef(function Plot({ option }: { option: { legend?: { selected?: Record<string, boolean> }; series?: unknown } }, ref) {
     React.useImperativeHandle(ref, () => ({ getEchartsInstance: () => ({ getDataURL: () => "data:image/png;base64,AAAA" }) }));
-    return <div data-testid="batch-chart" data-selected={JSON.stringify(option.legend?.selected)} />;
+    return <div data-testid="batch-chart" data-selected={JSON.stringify(option.legend?.selected)} data-values={JSON.stringify(option.series)} />;
   }) };
 });
 function mobile(matches = true) { vi.stubGlobal("matchMedia", vi.fn(() => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }))); }
@@ -24,6 +25,35 @@ beforeEach(() => { mobile(); api.mockReset(); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe("mobile analytics batch", () => {
+  it("ignores an old period response and keeps an empty current period honest", async () => {
+    const user = userEvent.setup();
+    let release!: (value: unknown) => void;
+    const missing = { value: null, growthPercent: null, coverage: { observedDays: 0, expectedDays: 1 } };
+    const empty = { ...dashboardReady, summary: { ...dashboardReady.summary, views: missing, visitors: missing, uniqueCloners: missing }, traffic: [{ date: "2026-11-02", views: null, visitors: null, clones: null }] };
+    api.mockImplementation((path: string) => path.includes("dashboard") ? path.includes("30d") ? new Promise(resolve => { release = resolve; }) : Promise.resolve(path.includes("1d") ? empty : dashboardReady) : Promise.resolve([]));
+    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+    await user.click(await screen.findByRole("tab", { name: "Views" }));
+    await user.click(screen.getByRole("button", { name: "30d" }));
+    await user.click(screen.getByRole("button", { name: "1d" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("No traffic data for selected period");
+    await act(async () => release(dashboardReady));
+    expect(screen.getByRole("status")).toHaveTextContent("No traffic data for selected period");
+    expect(screen.getByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("batch-chart")).not.toBeInTheDocument();
+  });
+  it("keeps repository missing-data states distinct from data available only for one metric", async () => {
+    const user = userEvent.setup();
+    let points: typeof traffic.traffic = [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: null }];
+    api.mockImplementation((path: string) => Promise.resolve(path.includes("/traffic?") ? { ...traffic, traffic: points } : path.endsWith("/repositories/13") ? repository : []));
+    render(<MemoryRouter initialEntries={["/repositories/13"]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
+    expect(await screen.findByRole("status")).toHaveTextContent("No traffic data for selected period");
+    points = [{ date: "2026-11-02", views: null, uniqueVisitors: 2, clones: null, uniqueCloners: null }];
+    await user.click(screen.getByRole("button", { name: "30d" }));
+    expect(await screen.findByTestId("batch-chart")).toBeInTheDocument();
+    points = [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: 3 }];
+    await user.click(screen.getByRole("button", { name: "1d" }));
+    await waitFor(() => expect(screen.getByTestId("batch-chart").dataset.values).toContain('"data":[3]'));
+  });
   it("keeps the mobile repository menu usable during viewport and page changes", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue([repository]);
@@ -148,10 +178,12 @@ describe("mobile analytics batch", () => {
     const dialog = screen.getByRole("dialog", { name: "Repository data warnings" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(document.body.style.overflow).toBe("hidden");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Close repository warnings" }));
     fireEvent.click(screen.getByRole("button", { name: "Close repository warnings" }));
     fireEvent(dialog, new Event("cancel", { bubbles: true, cancelable: true }));
     fireEvent.click(dialog, { clientY: -5 });
     const header = screen.getByRole("heading").parentElement!.parentElement!;
+    header.setPointerCapture = vi.fn();
     const pointer = (type: string, x: number, y: number) => { const e = new Event(type, { bubbles: true }); Object.defineProperties(e, { clientX: { value: x }, clientY: { value: y } }); fireEvent(header, e); };
     pointer("pointerdown", 10, 0); pointer("pointerup", 10, 100);
     expect(onClose).toHaveBeenCalledTimes(4);
