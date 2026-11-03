@@ -1,4 +1,5 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useIsMobileChart } from "../lib/useMediaQuery";
+import { useLayoutEffect, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Book, Check, ChevronDown, Lock, Search } from "lucide-react";
 import { api, type Repository } from "../lib/api";
@@ -13,6 +14,8 @@ type RepoSwitcherProps = {
 
 export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: RepoSwitcherProps) {
   const navigate = useNavigate();
+  const mobile = useIsMobileChart();
+  const [menuPosition, setMenuPosition] = useState({ left: 16, top: 0, width: 280 });
   const location = useLocation();
   const rootRef = useRef<HTMLSpanElement>(null);
   const tipId = useId();
@@ -24,6 +27,19 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
   const [repos, setRepos] = useState<Repository[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [highlighted, setHighlighted] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!open || !mobile) return;
+    const update = () => {
+      const rect = rootRef.current!.getBoundingClientRect();
+      const width = Math.min(352, document.documentElement.clientWidth - 32);
+      setMenuPosition({ left: Math.max(16, Math.min(rect.left, document.documentElement.clientWidth - width - 16)), top: rect.bottom + 4, width });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => { window.removeEventListener("resize", update); window.removeEventListener("scroll", update, true); };
+  }, [open, mobile]);
 
   const options = useMemo(() => {
     const tracked = (repos ?? [])
@@ -117,7 +133,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
   }
 
   return (
-    <span ref={rootRef} className="relative inline-block max-w-full align-bottom">
+    <span ref={rootRef} className="relative inline-block min-w-0 max-w-full align-bottom">
       <button
         type="button"
         className="group relative inline-flex max-w-full items-center gap-1 font-medium text-muted-foreground hover:text-foreground"
@@ -133,20 +149,20 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
           void openMenu();
         }}
       >
-        <span className="break-all text-left">{currentLabel}</span>
+        <span className="min-w-0 truncate text-left md:whitespace-normal md:break-all" title={currentLabel}>{currentLabel}</span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
         {tipText && !open && (
           <span
             id={tipId}
             role="tooltip"
-            className="pointer-events-none invisible absolute left-0 top-full z-20 mt-1 w-72 max-w-[calc(100vw-2.5rem)] whitespace-normal break-words rounded-md border bg-card px-2 py-1 text-left text-xs font-normal text-foreground opacity-0 shadow-md transition-opacity delay-300 duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+            className="pointer-events-none invisible absolute left-0 top-full z-20 hidden md:block mt-1 w-72 max-w-[calc(100vw-2.5rem)] whitespace-normal break-words rounded-md border bg-card px-2 py-1 text-left text-xs font-normal text-foreground opacity-0 shadow-md transition-opacity delay-300 duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
           >
             {tipText}
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute left-0 z-50 mt-1 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border bg-card shadow-lg">
+        <div style={mobile ? menuPosition : undefined} className="fixed z-50 mt-1 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border bg-card shadow-lg md:absolute md:left-0">
           <div className="border-b px-3 py-2 text-sm font-medium">Switch repository</div>
           <div className="relative border-b px-2 py-2">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -155,6 +171,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={onSearchKeyDown}
+              aria-label="Search repositories"
               placeholder="Search repositories"
               className="w-full rounded-md border bg-background py-1.5 pl-8 pr-3 text-sm outline-hidden focus:border-primary"
             />

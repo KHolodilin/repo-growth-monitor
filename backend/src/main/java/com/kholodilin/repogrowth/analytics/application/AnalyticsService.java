@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.analytics.application;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse;
+import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficCoverage;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.ActiveCollection;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.CollectionWarning;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.DashboardState;
@@ -168,16 +169,18 @@ public class AnalyticsService {
         DashboardPeriod period = periodForRepository(repositoryId, periodParam);
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
         TrafficTotals current = period.allTime()
-                ? trafficJdbcRepository.totals(repositoryId, null)
-                : trafficJdbcRepository.totalsInRange(repositoryId, period.from(), period.to());
+                ? trafficJdbcRepository.totalsInRange(repositoryId, period.from(), publishedEnd(period.to()))
+                : trafficJdbcRepository.totalsInRange(repositoryId, period.from(), publishedEnd(period.to()));
         TrafficTotals previous = period.allTime()
                 ? new TrafficTotals(0, 0, 0, 0)
-                : trafficJdbcRepository.totalsInRange(repositoryId, period.previousFrom(), period.previousTo());
+                : trafficJdbcRepository.totalsInRange(repositoryId, comparisonFrom(period), period.previousTo());
+        TrafficCoverage coverage = coverage(Set.of(repositoryId), period.from(), period.to());
+        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(Set.of(repositoryId), comparisonFrom(period), period.previousTo());
         RepositoryTrafficTotals totals = new RepositoryTrafficTotals(
-                metric(current.views(), previous.views(), period),
-                metric(current.uniqueVisitors(), previous.uniqueVisitors(), period),
-                metric(current.clones(), previous.clones(), period),
-                metric(current.uniqueCloners(), previous.uniqueCloners(), period)
+                metric(current.views(), previous.views(), period, coverage, previousCoverage),
+                metric(current.uniqueVisitors(), previous.uniqueVisitors(), period, coverage, previousCoverage),
+                metric(current.clones(), previous.clones(), period, coverage, previousCoverage),
+                metric(current.uniqueCloners(), previous.uniqueCloners(), period, coverage, previousCoverage)
         );
         CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
         ReferrerSnapshot referrers = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
@@ -187,7 +190,7 @@ public class AnalyticsService {
                 owner,
                 period.value(),
                 totals,
-                repositorySeries(period, history),
+                repositorySeries(period, history.stream().filter(day -> !day.trafficDate().isAfter(publishedEnd(period.to()))).toList()),
                 referrers.rows(),
                 referrers.snapshotAt(),
                 paths.rows(),
@@ -396,17 +399,19 @@ public class AnalyticsService {
     private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
         Set<Long> visibleIds = tracked.stream().map(Repository::id).collect(Collectors.toSet());
         boolean fullPortfolio = currentUserAccess.canSeePrivateRepositories();
+        TrafficCoverage coverage = coverage(visibleIds, period.from(), period.to());
+        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(visibleIds, comparisonFrom(period), period.previousTo());
         TrafficTotals current = fullPortfolio
-                ? trafficJdbcRepository.portfolioTotalsInRange(period.from(), period.to())
-                : sumVisibleTotals(period.from(), period.to(), visibleIds);
+                ? trafficJdbcRepository.portfolioTotalsInRange(period.from(), publishedEnd(period.to()))
+                : sumVisibleTotals(period.from(), publishedEnd(period.to()), visibleIds);
         TrafficTotals previous = period.allTime()
                 ? new TrafficTotals(0, 0, 0, 0)
                 : fullPortfolio
-                ? trafficJdbcRepository.portfolioTotalsInRange(period.previousFrom(), period.previousTo())
-                : sumVisibleTotals(period.previousFrom(), period.previousTo(), visibleIds);
+                ? trafficJdbcRepository.portfolioTotalsInRange(comparisonFrom(period), period.previousTo())
+                : sumVisibleTotals(comparisonFrom(period), period.previousTo(), visibleIds);
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
         Long starsChange = period.allTime() ? null : trafficJdbcRepository.starsChangeSince(period.from());
-        List<TrafficPoint> traffic = series(period, tracked.size());
+        List<TrafficPoint> traffic = series(period, tracked);
         Map<Long, TrafficNotice> notices = trafficNotices(period, tracked);
         Map<Long, Long> previousVisitors = previousVisitorsByRepo(period);
         List<CollectionRun> latestRuns = runRepository.latestPerTrackedRepository().stream()
@@ -420,7 +425,7 @@ public class AnalyticsService {
                 .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
         Map<Long, DiscoverabilityScore> discoverability = discoverabilityByRepo(tracked);
         Map<Long, RepositorySignals> signals = repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
-        List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), period.to())
+        List<RepositoryRow> rows = trafficJdbcRepository.totalsByTrackedRepository(period.from(), publishedEnd(period.to()))
                 .stream()
                 .filter(row -> visibleIds.contains(row.repositoryId()))
                 .map(row -> toRow(row, period, previousVisitors, runByRepo, jobsByRun, discoverability, signals, notices))
@@ -439,9 +444,9 @@ public class AnalyticsService {
                 activeCollection(latestRuns),
                 new DashboardSummary(
                         tracked.size(),
-                        metric(current.views(), previous.views(), period),
-                        metric(current.uniqueVisitors(), previous.uniqueVisitors(), period),
-                        metric(current.uniqueCloners(), previous.uniqueCloners(), period),
+                        metric(current.views(), previous.views(), period, coverage, previousCoverage),
+                        metric(current.uniqueVisitors(), previous.uniqueVisitors(), period, coverage, previousCoverage),
+                        metric(current.uniqueCloners(), previous.uniqueCloners(), period, coverage, previousCoverage),
                         new StarsMetric(starsTotal, starsChange)
                 ),
                 traffic,
@@ -474,9 +479,9 @@ public class AnalyticsService {
                     return new RepositoryRow(
                             repository.id(),
                             repository.fullName(),
-                            0,
-                            0,
-                            0,
+                            null,
+                            null,
+                            null,
                             repository.stars(),
                             repository.forks(),
                             null,
@@ -506,9 +511,9 @@ public class AnalyticsService {
                 activeCollection(latestRuns),
                 new DashboardSummary(
                         tracked.size(),
-                        new MetricValue(0, null),
-                        new MetricValue(0, null),
-                        new MetricValue(0, null),
+                        new MetricValue(null, null, null, null),
+                        new MetricValue(null, null, null, null),
+                        new MetricValue(null, null, null, null),
                         new StarsMetric(starsTotal, null)
                 ),
                 List.of(),
@@ -546,7 +551,7 @@ public class AnalyticsService {
         if (period.allTime()) {
             return Map.of();
         }
-        return trafficJdbcRepository.totalsByTrackedRepository(period.previousFrom(), period.previousTo()).stream()
+        return trafficJdbcRepository.totalsByTrackedRepository(comparisonFrom(period), period.previousTo()).stream()
                 .collect(Collectors.toMap(RepositoryPeriodTotals::repositoryId, RepositoryPeriodTotals::uniqueVisitors));
     }
 
@@ -560,9 +565,10 @@ public class AnalyticsService {
             Map<Long, RepositorySignals> signals,
             Map<Long, TrafficNotice> notices
     ) {
-        Double growth = period.allTime()
-                ? null
-                : GrowthMath.percent(row.uniqueVisitors(), previousVisitors.getOrDefault(row.repositoryId(), 0L));
+        TrafficCoverage coverage = coverage(Set.of(row.repositoryId()), period.from(), period.to());
+        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(Set.of(row.repositoryId()), comparisonFrom(period), period.previousTo());
+        Double growth = comparable(coverage, previousCoverage)
+                ? GrowthMath.percent(row.uniqueVisitors(), previousVisitors.getOrDefault(row.repositoryId(), 0L)) : null;
         CollectionRun run = runByRepo.get(row.repositoryId());
         List<JobStatus> jobs = run == null
                 ? List.of()
@@ -574,9 +580,9 @@ public class AnalyticsService {
         return new RepositoryRow(
                 row.repositoryId(),
                 row.fullName(),
-                row.uniqueVisitors(),
-                row.views(),
-                row.clones(),
+                coverage.observedDays() == 0 ? null : row.uniqueVisitors(),
+                coverage.observedDays() == 0 ? null : row.views(),
+                coverage.observedDays() == 0 ? null : row.clones(),
                 row.stars(),
                 row.forks(),
                 growth,
@@ -613,12 +619,14 @@ public class AnalyticsService {
         return score == null ? new DiscoverabilityScore(null, null) : score;
     }
 
-    private List<TrafficPoint> series(DashboardPeriod period, int tracked) {
+    private List<TrafficPoint> series(DashboardPeriod period, List<Repository> tracked) {
+        Set<String> names = tracked.stream().map(Repository::fullName).collect(Collectors.toSet());
         Map<LocalDate, List<RepositoryDayTotals>> byDate = new TreeMap<>();
         for (RepositoryDayTotals row : trafficJdbcRepository.dailyByRepository(period.from(), period.to())) {
+            if (!names.contains(row.fullName())) continue;
             byDate.computeIfAbsent(row.date(), date -> new ArrayList<>()).add(row);
         }
-        return portfolioSeries(period.from(), period.to(), LocalDate.now(clock), tracked, byDate);
+        return portfolioSeries(period.from(), period.to(), LocalDate.now(clock), tracked.size(), byDate);
     }
 
     /**
@@ -968,9 +976,32 @@ public class AnalyticsService {
         return new ActiveCollection(active.status().name(), active.successfulJobs(), active.plannedJobs());
     }
 
-    private static MetricValue metric(long current, long previous, DashboardPeriod period) {
-        Double growth = period.allTime() ? null : GrowthMath.percent(current, previous);
-        return new MetricValue(current, growth);
+    /** Coverage counts completed UTC repository-days, never the unpublished current day.
+     * Partial totals remain useful but only fully observed windows may be compared. */
+    private TrafficCoverage coverage(Set<Long> ids, LocalDate from, LocalDate to) {
+        LocalDate end = publishedEnd(to);
+        long days = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(from, end) + 1);
+        return new TrafficCoverage(trafficJdbcRepository.observedDays(ids, from, end), days * ids.size());
+    }
+
+    private LocalDate publishedEnd(LocalDate to) {
+        LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+        return to.isBefore(yesterday) ? to : yesterday;
+    }
+
+    /** Compare equal-sized published-day windows rather than six days against seven. */
+    private LocalDate comparisonFrom(DashboardPeriod period) {
+        long days = java.time.temporal.ChronoUnit.DAYS.between(period.from(), publishedEnd(period.to())) + 1;
+        return period.previousTo().minusDays(Math.max(0, days - 1));
+    }
+
+    static boolean comparable(TrafficCoverage current, TrafficCoverage previous) {
+        return current.complete() && previous != null && previous.complete() && current.expectedDays() == previous.expectedDays();
+    }
+
+    static MetricValue metric(long current, long previous, DashboardPeriod period, TrafficCoverage coverage, TrafficCoverage previousCoverage) {
+        Double growth = !period.allTime() && comparable(coverage, previousCoverage) ? GrowthMath.percent(current, previous) : null;
+        return new MetricValue(coverage.observedDays() == 0 ? null : current, growth, coverage, previousCoverage);
     }
 
     private LocalDate fromDate(String period) {

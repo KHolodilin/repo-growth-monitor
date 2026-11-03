@@ -78,12 +78,14 @@ export function PeriodSelector({
   onPeriod,
   embedded = false,
   scrollable = false,
+  fitMobile = false,
 }: {
   period: Period;
   onPeriod: (period: Period) => void;
   embedded?: boolean;
   /** Keep chips on one row; parent may provide overflow-x-auto. */
   scrollable?: boolean;
+  fitMobile?: boolean;
 }) {
   const activeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -100,6 +102,7 @@ export function PeriodSelector({
       type="button"
       className={cn(
         "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium",
+        fitMobile && "min-h-11 min-w-0 px-0 md:min-h-0 md:px-3",
         period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
       )}
       onClick={() => onPeriod(item)}
@@ -114,6 +117,7 @@ export function PeriodSelector({
     <div
       className={cn(
         "inline-flex max-w-full rounded-lg border bg-muted p-1",
+        fitMobile && "grid w-full grid-cols-6 md:inline-flex md:w-auto",
         scrollable && "flex-nowrap overflow-x-auto",
       )}
     >

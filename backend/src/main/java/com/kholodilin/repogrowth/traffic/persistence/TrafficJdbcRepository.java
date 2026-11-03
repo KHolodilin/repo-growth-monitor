@@ -42,6 +42,16 @@ public class TrafficJdbcRepository {
         this.jdbcClient = jdbcClient;
     }
 
+    public long observedDays(java.util.Set<Long> repositoryIds, LocalDate from, LocalDate to) {
+        if (repositoryIds.isEmpty() || to.isBefore(from)) return 0;
+        return jdbcClient.sql("""
+                SELECT COUNT(*) FROM traffic_daily
+                WHERE repository_id IN (:ids) AND traffic_date BETWEEN :from AND :to
+                """)
+                .param("ids", repositoryIds).param("from", from).param("to", to)
+                .query(Long.class).single();
+    }
+
     public void upsertDaily(
             long repositoryId,
             LocalDate date,

@@ -83,7 +83,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         DashboardResponse dashboard = analyticsService.dashboard("30d");
         assertThat(dashboard.state()).isEqualTo(DashboardState.FIRST_COLLECTION);
         assertThat(dashboard.summary().repositories()).isEqualTo(2);
-        assertThat(dashboard.summary().views().value()).isZero();
+        assertThat(dashboard.summary().views().value()).isNull();
         assertThat(dashboard.traffic()).isEmpty();
         assertThat(dashboard.stats().points()).isEmpty();
         assertThat(dashboard.stats().totals().stars().value()).isNull();
@@ -136,7 +136,8 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.period()).isEqualTo("7d");
         assertThat(dashboard.summary().repositories()).isEqualTo(2);
         assertThat(dashboard.summary().visitors().value()).isEqualTo(140);
-        assertThat(dashboard.summary().visitors().growthPercent()).isEqualTo(100.0);
+        assertThat(dashboard.summary().visitors().growthPercent()).isNull();
+        assertThat(dashboard.summary().visitors().coverage().complete()).isFalse();
         assertThat(dashboard.summary().views().value()).isEqualTo(280);
         assertThat(dashboard.summary().uniqueCloners().value()).isEqualTo(21);
         assertThat(dashboard.summary().stars().total()).isEqualTo(169);
@@ -176,7 +177,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
                 .findFirst()
                 .orElseThrow();
         assertThat(kafkaRow.visitors()).isEqualTo(100);
-        assertThat(kafkaRow.growthPercent()).isEqualTo(100.0);
+        assertThat(kafkaRow.growthPercent()).isNull();
         assertThat(kafkaRow.forks()).isEqualTo(2);
         assertThat(kafkaRow.discoverabilityPassed()).isEqualTo(8);
         assertThat(kafkaRow.discoverabilityTotal()).isEqualTo(13);
@@ -184,8 +185,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(kafkaRow.trafficNotice().reason()).isEqualTo("GITHUB_DATA_MISSING");
         assertThat(kafkaRow.trafficNotice().date()).isEqualTo(today.minusDays(1));
         assertThat(kafkaRow.trafficNotice().lastTrafficDate()).isEqualTo(today.minusDays(4));
-        assertThat(dashboard.highlights().visitors().fullName()).isEqualTo("acme/kafka-starter");
-        assertThat(dashboard.highlights().visitors().growthPercent()).isEqualTo(100.0);
+        assertThat(dashboard.highlights().visitors()).isNull();
         assertThat(dashboard.highlights().rankRise()).isNull();
         assertThat(dashboard.highlights().events()).isNull();
         assertThat(kafkaRow.collectionStatus()).isEqualTo("PARTIAL");
@@ -247,16 +247,22 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         trafficJdbcRepository.upsertDaily(kafka.id(), today, 7, 1, 1, 1);
 
         AnalyticsService.RepositoryTrafficSnapshot week = analyticsService.traffic(kafka.id(), "7d", false);
-        assertThat(week.totals().views()).isEqualTo(new DashboardResponse.MetricValue(47, 135.0));
-        assertThat(week.totals().uniqueVisitors()).isEqualTo(new DashboardResponse.MetricValue(6, -40.0));
-        assertThat(week.totals().clones()).isEqualTo(new DashboardResponse.MetricValue(9, 125.0));
-        assertThat(week.totals().uniqueCloners()).isEqualTo(new DashboardResponse.MetricValue(2, 0.0));
+        assertThat(week.totals().views().value()).isEqualTo(40);
+        assertThat(week.totals().views().growthPercent()).isNull();
+        assertThat(week.totals().uniqueVisitors().value()).isEqualTo(5);
+        assertThat(week.totals().uniqueVisitors().growthPercent()).isNull();
+        assertThat(week.totals().clones().value()).isEqualTo(8);
+        assertThat(week.totals().clones().growthPercent()).isNull();
+        assertThat(week.totals().uniqueCloners().value()).isEqualTo(1);
+        assertThat(week.totals().uniqueCloners().growthPercent()).isNull();
 
         AnalyticsService.RepositoryTrafficSnapshot oneDay = analyticsService.traffic(kafka.id(), "1d", false);
-        assertThat(oneDay.totals().views()).isEqualTo(new DashboardResponse.MetricValue(40, null));
+        assertThat(oneDay.totals().views().value()).isEqualTo(40);
+        assertThat(oneDay.totals().views().growthPercent()).isNull();
 
         AnalyticsService.RepositoryTrafficSnapshot all = analyticsService.traffic(kafka.id(), "all", false);
-        assertThat(all.totals().views()).isEqualTo(new DashboardResponse.MetricValue(167, null));
+        assertThat(all.totals().views().value()).isEqualTo(160);
+        assertThat(all.totals().views().growthPercent()).isNull();
     }
 
     @Test
@@ -410,6 +416,11 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     void portfolioHighlightsFollowTheSelectedPeriod() {
         createRepos();
         LocalDate today = LocalDate.now(clock);
+        // A valid comparison needs real observations, including genuine zero days.
+        for (int daysAgo = 1; daysAgo <= 13; daysAgo++) {
+            trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(daysAgo), 0, 0, 0, 0);
+            trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(daysAgo), 0, 0, 0, 0);
+        }
         trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(3), 20, 80, 1, 1);
         trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(3), 8, 10, 1, 1);
         trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(10), 10, 40, 1, 1);
@@ -508,4 +519,28 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         repositoryJdbcRepository.setTracking(repository.id(), true);
         return repositoryJdbcRepository.findById(repository.id()).orElseThrow();
     }
+    @Test
+    void missingCurrentAndBaselineNeverBecomeZerosOrFalseDeclines() {
+        createRepos();
+        LocalDate yesterday = LocalDate.now(clock).minusDays(1);
+        trafficJdbcRepository.upsertDaily(kafka.id(), yesterday.minusDays(1), 10, 4, 8, 2);
+        var missing = analyticsService.traffic(kafka.id(), "1d", false);
+        assertThat(missing.totals().views().value()).isNull();
+        assertThat(missing.totals().views().growthPercent()).isNull();
+        assertThat(missing.totals().views().coverage().observedDays()).isZero();
+        trafficJdbcRepository.upsertDaily(kafka.id(), yesterday, 0, 0, 0, 0);
+        var zero = analyticsService.traffic(kafka.id(), "1d", false);
+        assertThat(zero.totals().views().value()).isZero();
+        assertThat(zero.totals().views().growthPercent()).isEqualTo(-100.0);
+        var portfolio = analyticsService.dashboard("1d");
+        assertThat(portfolio.summary().views().coverage().observedDays()).isEqualTo(1);
+        assertThat(portfolio.summary().views().coverage().expectedDays()).isEqualTo(2);
+        assertThat(portfolio.summary().views().growthPercent()).isNull();
+        var absentRow = portfolio.repositories().stream().filter(row -> row.id() == outbox.id()).findFirst().orElseThrow();
+        assertThat(absentRow.views()).isNull();
+        assertThat(absentRow.growthPercent()).isNull();
+        assertThat(trafficJdbcRepository.observedDays(java.util.Set.of(), yesterday, yesterday)).isZero();
+        assertThat(trafficJdbcRepository.observedDays(java.util.Set.of(kafka.id()), yesterday, yesterday.minusDays(1))).isZero();
+    }
+
 }

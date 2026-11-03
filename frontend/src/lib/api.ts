@@ -109,6 +109,9 @@ export type RepositoryHealth = {
   communityStandards: HealthCheckItem[];
 };
 
+export type TrafficCoverage = { observedDays: number; expectedDays: number };
+export type TrafficMetric = { value: number | null; growthPercent: number | null; coverage?: TrafficCoverage | null; previousCoverage?: TrafficCoverage | null };
+
 export type Dashboard = {
   period: string;
   from: string;
@@ -120,9 +123,9 @@ export type Dashboard = {
   activeCollection: { status: string; successfulJobs: number; plannedJobs: number } | null;
   summary: {
     repositories: number;
-    views: { value: number; growthPercent: number | null };
-    visitors: { value: number; growthPercent: number | null };
-    uniqueCloners: { value: number; growthPercent: number | null };
+    views: TrafficMetric;
+    visitors: TrafficMetric;
+    uniqueCloners: TrafficMetric;
     stars: { total: number; change: number | null };
   };
   traffic: {
@@ -139,9 +142,9 @@ export type Dashboard = {
   repositories: {
     id: number;
     fullName: string;
-    visitors: number;
-    views: number;
-    clones: number;
+    visitors: number | null;
+    views: number | null;
+    clones: number | null;
     stars: number;
     forks: number;
     growthPercent: number | null;
@@ -292,10 +295,10 @@ export type RepositoryTraffic = {
   owner: Owner;
   period: string;
   totals: {
-    views: { value: number; growthPercent: number | null };
-    uniqueVisitors: { value: number; growthPercent: number | null };
-    clones: { value: number; growthPercent: number | null };
-    uniqueCloners: { value: number; growthPercent: number | null };
+    views: TrafficMetric;
+    uniqueVisitors: TrafficMetric;
+    clones: TrafficMetric;
+    uniqueCloners: TrafficMetric;
   };
   traffic: TrafficPoint[];
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];

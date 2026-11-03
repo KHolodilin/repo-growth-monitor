@@ -1,3 +1,4 @@
+import type { TrafficCoverage } from "../lib/api";
 import type { Period } from "./PeriodSelector";
 import { Card } from "./ui";
 import { cn, formatAbsoluteGrowth, formatGrowth, formatNumber, growthClass } from "../lib/utils";
@@ -14,6 +15,8 @@ export function TrafficKpiCard({
   className,
   preserveGaps = false,
   missingHistory = false,
+  coverage,
+  previousCoverage,
 }: {
   label: string;
   value: number | null;
@@ -27,6 +30,8 @@ export function TrafficKpiCard({
   /** Keep nulls as breaks instead of connecting the measured days. */
   preserveGaps?: boolean;
   missingHistory?: boolean;
+  coverage?: TrafficCoverage | null;
+  previousCoverage?: TrafficCoverage | null;
 }) {
   const growth =
     period === "all"
@@ -43,6 +48,8 @@ export function TrafficKpiCard({
         {note && <div className="text-xs">{note}</div>}
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{missingHistory && value == null ? "N/A" : formatNumber(value)}</div>
+      {coverage && coverage.observedDays < coverage.expectedDays && <div className="mt-1 text-xs text-muted-foreground">{coverage.observedDays === 0 ? "No traffic data for selected period" : `Partial data: ${coverage.observedDays} / ${coverage.expectedDays} repository-days`}</div>}
+      {period !== "all" && previousCoverage && (!previousCoverage.expectedDays || previousCoverage.observedDays < previousCoverage.expectedDays) && <div className="mt-1 text-xs text-muted-foreground">Comparison unavailable: incomplete previous period</div>}
       {period !== "all" && (
         <div className="mt-1 flex items-end justify-between gap-2">
           <div className={cn("text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
