@@ -1,3 +1,5 @@
+import { useIsMobileChart } from "../lib/useMediaQuery";
+import { ChartSelection, ResultCards } from "./ResultCards";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { type SearchRunResults } from "../lib/api";
@@ -42,6 +44,7 @@ export function SearchResultsTable({
   onToggle?: (githubRepositoryId: number) => void;
   nameTo?: (row: ResultRow) => string | null;
 }) {
+  const mobile = useIsMobileChart();
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "search-results",
     scope: repositoryId,
@@ -65,6 +68,13 @@ export function SearchResultsTable({
     return copy;
   }, [rows, sortKey, sortDir]);
 
+  if (mobile) return <ResultCards fields={SORT_KEYS} sortKey={sortKey} sortDir={sortDir} toggle={key => toggle(key as SortKey)} rows={sorted.map(row => {
+    const mine = trackedGithubId != null ? row.result.githubRepositoryId === trackedGithubId : trackedPosition != null && row.result.position === trackedPosition;
+    return { id: row.result.githubRepositoryId, position: row.result.position, tracked: mine,
+      name: <RepositoryName row={row} to={nameTo?.(row) ?? null} />,
+      metrics: [{ label: "Stars", value: formatNumber(row.result.stars) }, { label: "Forks", value: formatNumber(row.result.forks) }, { label: "Change", value: formatPositionDelta(row.positionDelta) },{ label: "Watchers", value: formatNumber(row.result.watchers) }, { label: "Contributors", value: formatNumber(row.result.contributors) }, { label: "Activity", value: formatActivityPresentation(row.result.activityStatus, row.result.activityAt) }],
+      selection: onToggle && !mine ? <ChartSelection name={row.result.fullName} checked={selectedIds.includes(row.result.githubRepositoryId)} onChange={() => onToggle(row.result.githubRepositoryId)} /> : undefined };
+  })} />;
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] table-fixed text-sm">

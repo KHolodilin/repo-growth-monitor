@@ -1,51 +1,35 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { SnapshotHistory } from "../lib/api";
 import { snapshotChartOption } from "../lib/snapshotChart";
 import {
-  readSnapshotChartPrefs,
-  writeSnapshotChartPrefs,
   type SnapshotChartKind,
   type SnapshotMetric,
 } from "../lib/snapshotChartPrefs";
-import { OTHER_KEY, defaultTopKeys } from "../lib/snapshotHistory";
+import { OTHER_KEY, chartValue } from "../lib/snapshotHistory";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 import { cn } from "../lib/utils";
 import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
 import { ReferrerSourceIcon, referrerLineColor } from "./ReferrerSourceIcon";
 
-const DEFAULT_LINES = 5;
 
 export function SnapshotHistoryChart({
   title,
   kind,
   history,
+  selected, metric, onChange,
 }: {
   title: string;
   kind: SnapshotChartKind;
   history: SnapshotHistory;
+  selected: string[];
+  metric: SnapshotMetric;
+  onChange: (metric: SnapshotMetric, keys: string[]) => void;
 }) {
   const repositoryId = history.repositoryId;
   const mobile = useIsMobileChart();
-  const [metric, setMetric] = useState<SnapshotMetric>("VISITORS");
-  const [selected, setSelected] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  useEffect(() => {
-    const stored = readSnapshotChartPrefs(repositoryId, kind);
-    const available = new Set(history.rows.map((row) => row.key));
-    const restored = (stored?.keys ?? []).filter((key) => available.has(key));
-    const nextMetric = stored?.metric ?? "VISITORS";
-    setMetric(nextMetric);
-    setSelected(restored.length > 0 ? restored : defaultTopKeys(history.rows, nextMetric, DEFAULT_LINES));
-  }, [history, repositoryId, kind]);
-
-  function persist(nextMetric: SnapshotMetric, nextKeys: string[]) {
-    setMetric(nextMetric);
-    setSelected(nextKeys);
-    writeSnapshotChartPrefs(repositoryId, kind, { metric: nextMetric, keys: nextKeys });
-  }
-
+  const persist = onChange;
   const option = useMemo(
     () => snapshotChartOption({ history, metric, selected }),
     [history, metric, selected],
@@ -57,6 +41,7 @@ export function SnapshotHistoryChart({
   );
   const moreCount = Math.max(0, history.rows.length - selected.length);
   const enoughHistory = history.dates.length >= 2;
+  const hasData = history.rows.some(row => selected.includes(row.key) && row.cells.some(cell => chartValue(cell, metric) !== null));
   const showIcons = kind === "referrers";
   const metricControls = (
     <div className="inline-flex rounded-lg border bg-muted p-1">
@@ -87,6 +72,9 @@ export function SnapshotHistoryChart({
       )}
       {enoughHistory && (
         <>
+          {selected.length === 0 ? <p className="py-6 text-sm text-muted-foreground">No {kind === "referrers" ? "sources" : "paths"} selected. Select items to display history.</p> : !hasData ? <p className="py-6 text-sm text-muted-foreground">No data for the selected period.</p> : (
+
+        <>
           {!mobile && (
             <div className="mb-3 flex flex-wrap gap-3 text-sm">
               {legend.map((name, index) => (
@@ -104,6 +92,7 @@ export function SnapshotHistoryChart({
             option={option}
             style={{ height: 320, width: "100%" }}
           />
+        </>)}
           <div className="relative mt-3">
             <button
               type="button"
@@ -117,7 +106,7 @@ export function SnapshotHistoryChart({
                 : `+ ${moreCount} more ${kind === "referrers" ? "sources" : "paths"}`}
             </button>
             {pickerOpen && (
-              <div className="absolute z-20 mt-2 w-72 rounded-lg border bg-card p-3 shadow-lg">
+              <div className="absolute z-20 mt-2 w-full max-w-72 rounded-lg border bg-card p-3 shadow-lg">
                 <div className="mb-2 text-sm font-medium">
                   {kind === "referrers" ? "Select sources" : "Select paths"}
                 </div>

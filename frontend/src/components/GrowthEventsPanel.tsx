@@ -66,7 +66,7 @@ export function GrowthEventsPanel({
       </div>
       {recent.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No growth events in this period. Markers appear after collection or when you add a promotion event.
+          No growth events in this period. {allowMutations ? "Markers appear after collection or when you add a promotion event." : "An administrator can configure collection and add promotion events."}
         </p>
       ) : (
         <EventRows
@@ -113,7 +113,7 @@ export function GrowthEventsPanel({
           onChanged={onChanged}
         />
       )}
-      {form && (
+      {form && allowMutations && (
         <EventFormDialog
           repositoryId={repositoryId}
           event={form === "new" ? null : form}

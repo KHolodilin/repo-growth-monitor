@@ -14,7 +14,7 @@ import { ReferrerSourceIcon, referrerLineColor } from "./ReferrerSourceIcon";
 import { SearchResultsTable } from "./SearchResultsTable";
 import { ServicePathBadge, ServicePathToggle } from "./ServicePaths";
 import { SnapshotCards } from "./SnapshotCards";
-import { SnapshotHistoryChart } from "./SnapshotHistoryChart";
+import { SnapshotHistoryView as SnapshotHistoryChart } from "./SnapshotHistoryView";
 import { SnapshotHistoryTable } from "./SnapshotHistoryTable";
 import { TopicResultsTable } from "./TopicResultsTable";
 import { Button, Card, Skeleton } from "./ui";

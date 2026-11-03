@@ -163,7 +163,7 @@ describe("extra coverage", () => {
     await user.click(screen.getByRole("button", { name: "Referrers" }));
     await user.click(screen.getByRole("button", { name: "1d" }));
     await user.click(screen.getByRole("button", { name: "Popular Paths" }));
-    await user.click(screen.getByLabelText("Show service pages"));
+    await user.click(screen.getByLabelText("Show restricted pages"));
     historyView.unmount();
   });
 

@@ -140,6 +140,22 @@ class TopicCompetitorIT extends AbstractPostgresTest {
                 .hasMessageContaining("not found");
     }
 
+    @Test
+    void servesOnlyObservedPositionsWithinTheRequestedTopicScope() {
+        var all = topicCompetitorService.series(repository.id(), "kafka", "all");
+        assertThat(all).extracting(TopicCompetitorService.RankSeries::githubRepositoryId).containsExactly(500L, 301L);
+        assertThat(all.getFirst().points()).containsExactly(new TopicCompetitorService.RankPoint(older, 1));
+        assertThat(all.getLast().points()).containsExactly(
+                new TopicCompetitorService.RankPoint(older, 2), new TopicCompetitorService.RankPoint(newer, 1));
+        var language = topicCompetitorService.series(repository.id(), "kafka", "language");
+        assertThat(language).extracting(TopicCompetitorService.RankSeries::githubRepositoryId).containsExactly(700L);
+        assertThat(language.getFirst().fullName()).isEqualTo("lang/only");
+        assertThat(language.getFirst().points()).containsExactly(new TopicCompetitorService.RankPoint(newer, 1));
+        assertThatThrownBy(() -> topicCompetitorService.series(repository.id(), "missing", "all")).isInstanceOf(ApiException.class);
+        jdbcClient.sql("DELETE FROM topic_result WHERE topic_run_id IN (SELECT id FROM topic_run WHERE topic_watch_id = :id)").param("id", languageKafka.id()).update();
+        assertThat(topicCompetitorService.series(repository.id(), "kafka", "language")).isEmpty();
+    }
+
     private TopicWatch watch(boolean allLanguages) {
         return watchRepository.findEnabledByRepository(repository.id(), allLanguages).stream()
                 .filter(item -> "kafka".equals(item.topic()))

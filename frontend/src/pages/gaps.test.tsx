@@ -7,7 +7,7 @@ import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { Layout } from "../components/Layout";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { SearchResultsTable } from "../components/SearchResultsTable";
-import { SnapshotHistoryChart } from "../components/SnapshotHistoryChart";
+import { SnapshotHistoryView as SnapshotHistoryChart } from "../components/SnapshotHistoryView";
 import { TopicResultsTable } from "../components/TopicResultsTable";
 import { DashboardPage } from "./DashboardPage";
 import { QueryDetailsPage } from "./QueryDetailsPage";

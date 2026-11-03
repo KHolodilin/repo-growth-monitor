@@ -70,7 +70,7 @@ public class TopicResultJdbcRepository {
 
     public List<SnapshotValue> findSnapshots(long topicWatchId) {
         return jdbcClient.sql("""
-                        SELECT r.business_date, s.github_repository_id, s.full_name, s.stars, s.forks
+                        SELECT r.business_date, s.github_repository_id, s.full_name, s.stars, s.forks, s.position
                         FROM topic_run r
                         JOIN topic_result s ON s.topic_run_id = r.id
                         WHERE r.topic_watch_id = :topicWatchId
@@ -83,7 +83,8 @@ public class TopicResultJdbcRepository {
                         rs.getLong("github_repository_id"),
                         rs.getString("full_name"),
                         rs.getInt("stars"),
-                        rs.getInt("forks")
+                        rs.getInt("forks"),
+                        rs.getInt("position")
                 ))
                 .list();
     }
@@ -93,7 +94,8 @@ public class TopicResultJdbcRepository {
             long githubRepositoryId,
             String fullName,
             int stars,
-            int forks
+            int forks,
+            int position
     ) {
     }
 }

@@ -6,8 +6,7 @@ import { cn } from "../lib/utils";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { ServicePathToggle } from "../components/ServicePaths";
-import { SnapshotHistoryChart } from "../components/SnapshotHistoryChart";
-import { SnapshotHistoryTable } from "../components/SnapshotHistoryTable";
+import { SnapshotHistoryView } from "../components/SnapshotHistoryView";
 import { Skeleton } from "../components/ui";
 
 const DAYS = [1, 7, 14] as const;
@@ -41,6 +40,8 @@ export function TrafficHistoryPage() {
   const includeService = kind === "paths" && showServicePaths;
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SnapshotHistory | null>(null);
+  const [loadedContext, setLoadedContext] = useState<string | null>(null);
+  const context = `${id}:${kind}`;
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export function TrafficHistoryPage() {
         if (!cancelled) {
           setRepo(repository);
           setHistory(data);
+          setLoadedContext(`${id}:${kind}`);
         }
       })
       .catch((err: Error) => {
@@ -74,7 +76,7 @@ export function TrafficHistoryPage() {
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
-  if (!repo || !history) {
+  if (!repo || !history || loadedContext !== context) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-7 w-72" />
@@ -119,7 +121,7 @@ export function TrafficHistoryPage() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex max-w-full flex-wrap items-center gap-3">
           {kind === "paths" && (
             <div className="text-xs text-muted-foreground">
               <ServicePathToggle checked={showServicePaths} onChange={setShowServicePaths} />
@@ -142,8 +144,7 @@ export function TrafficHistoryPage() {
           </div>
         </div>
       </div>
-      <SnapshotHistoryChart title={CHART_TITLE[kind]} kind={kind} history={history} />
-      <SnapshotHistoryTable kind={kind} history={history} />
+      <SnapshotHistoryView key={`${repo.id}:${kind}`} title={CHART_TITLE[kind]} kind={kind} history={history} />
     </div>
   );
 }

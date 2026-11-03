@@ -247,6 +247,7 @@ describe("topics visibility scope cookie", () => {
       if (url.includes("history")) {
         return Promise.resolve(topicHistory);
       }
+      if (url.includes("/series")) return Promise.resolve([]);
       return Promise.resolve({ rows: [] });
     });
     const invalid = renderRepo("/repositories/13/topics/outbox?scope=nope");
