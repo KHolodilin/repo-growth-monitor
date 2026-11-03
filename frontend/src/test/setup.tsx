@@ -68,6 +68,9 @@ vi.mock("echarts-for-react", async () => {
 });
 
 Element.prototype.scrollIntoView = vi.fn();
+vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
 
 afterEach(() => {
   cleanup();

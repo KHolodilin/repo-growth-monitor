@@ -48,7 +48,14 @@ public record DashboardResponse(
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record MetricValue(long value, Double growthPercent) {
+    public record MetricValue(Long value, Double growthPercent, TrafficCoverage coverage, TrafficCoverage previousCoverage) {
+        public MetricValue(long value, Double growthPercent) {
+            this(value, growthPercent, null, null);
+        }
+    }
+
+    public record TrafficCoverage(long observedDays, long expectedDays) {
+        public boolean complete() { return expectedDays > 0 && observedDays == expectedDays; }
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
@@ -83,9 +90,9 @@ public record DashboardResponse(
     public record RepositoryRow(
             long id,
             String fullName,
-            long visitors,
-            long views,
-            long clones,
+            Long visitors,
+            Long views,
+            Long clones,
             int stars,
             int forks,
             Double growthPercent,

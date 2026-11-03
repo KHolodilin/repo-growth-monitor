@@ -1,3 +1,4 @@
+import { RepositoryWarningSheet } from "../components/RepositoryWarningSheet";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, type Dashboard, type GrowthEvent, type RankHighlight } from "../lib/api";
@@ -43,14 +44,18 @@ export function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "stats" ? "stats" : "traffic";
   const [period, setPeriod] = usePeriod();
+  const requestVersion = useRef(0);
+  const [trafficSeries, setTrafficSeries] = useState("Visitors");
+  const [statsSeries, setStatsSeries] = useState("Stars");
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const access = useGitHubAccess();
 
   async function load() {
+    const version = ++requestVersion.current;
     const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}`);
-    setData(dashboard);
+    if (version === requestVersion.current) setData(dashboard);
     return dashboard;
   }
 
@@ -72,6 +77,7 @@ export function DashboardPage() {
       });
     return () => {
       cancelled = true;
+      requestVersion.current++;
     };
   }, [period]);
 
@@ -124,6 +130,8 @@ export function DashboardPage() {
           <KpiCard label="Repositories" value={data.summary.repositories} />
           <TrafficKpiCard
             label="Views"
+            coverage={data.summary.views.coverage}
+            previousCoverage={data.summary.views.previousCoverage}
             value={data.summary.views.value}
             growthPercent={data.summary.views.growthPercent}
             period={period}
@@ -131,6 +139,8 @@ export function DashboardPage() {
           />
           <TrafficKpiCard
             label="Visitors"
+            coverage={data.summary.visitors.coverage}
+            previousCoverage={data.summary.visitors.previousCoverage}
             value={data.summary.visitors.value}
             growthPercent={data.summary.visitors.growthPercent}
             period={period}
@@ -138,6 +148,8 @@ export function DashboardPage() {
           />
           <TrafficKpiCard
             label="Unique Cloners"
+            coverage={data.summary.uniqueCloners.coverage}
+            previousCoverage={data.summary.uniqueCloners.previousCoverage}
             value={data.summary.uniqueCloners.value}
             growthPercent={data.summary.uniqueCloners.growthPercent}
             period={period}
@@ -166,9 +178,9 @@ export function DashboardPage() {
       {data.state === "FIRST_COLLECTION" ? (
         <CollectingCard rows={data.repositories} />
       ) : tab === "traffic" ? (
-        <TrafficChart traffic={data.traffic} events={portfolioEvents} period={period} />
+        <TrafficChart traffic={data.traffic} events={portfolioEvents} period={period} selectedMobileSeries={trafficSeries} onMobileSeriesChange={setTrafficSeries} />
       ) : (
-        <StatsChart points={data.stats.points} events={portfolioEvents} period={period} />
+        <StatsChart points={data.stats.points} events={portfolioEvents} period={period} selectedMobileSeries={statsSeries} onMobileSeriesChange={setStatsSeries} />
       )}
       <PeriodHighlights highlights={data.highlights} />
       <RepositoryTable rows={data.repositories} />
@@ -191,11 +203,12 @@ function DashboardHeader({
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const mobile = useIsMobileChart();
   const problems = (data?.repositories ?? [])
     .map((row) => ({ row, lines: repositoryProblemLines(row) }))
     .filter((item) => item.lines.length > 0);
   useEffect(() => {
-    if (!open) {
+    if (!open || mobile) {
       return;
     }
     function onPointerDown(event: MouseEvent) {
@@ -214,7 +227,8 @@ function DashboardHeader({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, mobile]);
+  const warningList = problems.map(({ row, lines }) => <div key={row.id} className="border-b py-3 text-sm last:border-0"><Link className="inline-block min-h-11 max-w-full break-words py-2 text-primary hover:underline [overflow-wrap:anywhere]" to={`/repositories/${row.id}`} onClick={() => setOpen(false)}>{row.fullName}</Link>{lines.map(line => <div key={line} className="break-words text-muted-foreground">{line}</div>)}</div>);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -229,7 +243,8 @@ function DashboardHeader({
             >
               ⚠ {repositoryProblemBadge(problems.length)}
             </button>
-            {open && (
+            {open && mobile && <RepositoryWarningSheet count={problems.length} onClose={() => setOpen(false)}>{warningList}</RepositoryWarningSheet>}
+            {open && !mobile && (
               <div className="absolute left-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border bg-card p-3 text-left shadow-lg">
                 {problems.map(({ row, lines }) => (
                   <div key={row.id} className="py-1 text-sm">
@@ -329,10 +344,14 @@ function TrafficChart({
   traffic,
   events,
   period,
+  selectedMobileSeries,
+  onMobileSeriesChange,
 }: {
   traffic: Dashboard["traffic"];
   events: GrowthEvent[];
   period: string;
+  selectedMobileSeries: string;
+  onMobileSeriesChange: (name: string) => void;
 }) {
   const option = useMemo(() => dashboardTrafficOption(traffic), [traffic]);
 
@@ -342,15 +361,17 @@ function TrafficChart({
       events={events}
       period={period}
       context="portfolio:traffic"
+      selectedMobileSeries={selectedMobileSeries}
+      onMobileSeriesChange={onMobileSeriesChange}
       mobileSeries={TRAFFIC_SERIES}
     >
-      <PersistentECharts
+      {!traffic.some(point => point.views != null || point.visitors != null || point.clones != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <PersistentECharts
         chartId={dashboardTrafficChartId()}
         series={TRAFFIC_SERIES}
         option={option}
         style={{ height: 360, width: "100%" }}
         opts={{ renderer: "canvas" }}
-      />
+      />}
     </ChartCard>
   );
 }
@@ -359,10 +380,14 @@ function StatsChart({
   points,
   events,
   period,
+  selectedMobileSeries,
+  onMobileSeriesChange,
 }: {
   points: Dashboard["stats"]["points"];
   events: GrowthEvent[];
   period: string;
+  selectedMobileSeries: string;
+  onMobileSeriesChange: (name: string) => void;
 }) {
   const option = useMemo(
     () => statsChartOption(points, { contributorsLabel: "Unique Contributors" }),
@@ -374,6 +399,8 @@ function StatsChart({
       events={events}
       period={period}
       context="portfolio:stats"
+      selectedMobileSeries={selectedMobileSeries}
+      onMobileSeriesChange={onMobileSeriesChange}
       mobileSeries={DASHBOARD_STATS_SERIES}
     >
       <PersistentECharts

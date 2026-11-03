@@ -116,6 +116,8 @@ export function ChartCard({
   context,
   onEventsChanged,
   mobileSeries,
+  selectedMobileSeries,
+  onMobileSeriesChange,
 }: {
   title: string;
   controls?: ReactNode;
@@ -130,6 +132,8 @@ export function ChartCard({
   onEventsChanged?: () => void;
   /** When set (even empty), mobile (&lt;768px) uses the one-series ChartCard shell. */
   mobileSeries?: readonly MobileSeriesOption[];
+  selectedMobileSeries?: string;
+  onMobileSeriesChange?: (name: string) => void;
 }) {
   const mobile = useIsMobileChart();
   const mobileShell = mobile && mobileSeries != null;
@@ -141,6 +145,7 @@ export function ChartCard({
   const [mobileSeriesName, setMobileSeriesName] = useState<string | null>(() =>
     mobileSeries ? defaultMobileSeriesName(mobileSeries) : null,
   );
+  const effectiveMobileSeriesName = selectedMobileSeries && mobileSeries?.some(item => item.name === selectedMobileSeries) ? selectedMobileSeries : mobileSeriesName;
   const [axisDates, setAxisDatesState] = useState<string[]>([]);
   const setAxisDates = useCallback((dates: string[]) => {
     setAxisDatesState((prev) =>
@@ -221,11 +226,11 @@ export function ChartCard({
       period,
       openMarker,
       mobile: mobileShell,
-      mobileSeriesName: mobileShell ? mobileSeriesName : null,
+      mobileSeriesName: mobileShell ? effectiveMobileSeriesName : null,
       axisDates,
       setAxisDates,
     }),
-    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker, mobileShell, mobileSeriesName, axisDates],
+    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker, mobileShell, effectiveMobileSeriesName, axisDates],
   );
 
   return (
@@ -239,8 +244,8 @@ export function ChartCard({
                 <MobileChartMenu />
               </div>
               {mobileControls}
-              {mobileSeries && mobileSeries.length > 1 && mobileSeriesName && (
-                <SeriesSegment options={mobileSeries} value={mobileSeriesName} onChange={setMobileSeriesName} />
+              {mobileSeries && mobileSeries.length > 1 && effectiveMobileSeriesName && (
+                <SeriesSegment options={mobileSeries} value={effectiveMobileSeriesName} onChange={name => { setMobileSeriesName(name); onMobileSeriesChange?.(name); }} />
               )}
               <EventsToggle
                 on={eventFilter !== "off"}

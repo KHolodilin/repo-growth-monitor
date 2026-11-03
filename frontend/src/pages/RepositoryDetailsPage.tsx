@@ -1,3 +1,4 @@
+import { NavigationButton } from "../components/NavigationButton";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -497,8 +498,8 @@ export function RepositoryDetailsPage() {
           </div>
         </div>
       </header>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-lg border bg-muted p-1">
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
+        <div className="grid w-full min-w-0 grid-cols-3 rounded-lg border bg-muted p-1 md:inline-flex md:w-auto">
           {([
             ["traffic", "Traffic"],
             ["stats", "Stats"],
@@ -507,39 +508,42 @@ export function RepositoryDetailsPage() {
             ["overview", "Overview"],
             ["growth-events", "Growth Events"],
           ] as const).map(([key, label]) => (
-            <button
+            <NavigationButton
               key={key}
+              label={label}
+              mobileLabel={key === "search" ? "Search" : key === "topics" ? "Topics" : key === "growth-events" ? "Events" : label}
+              aria-pressed={tab === key}
               type="button"
               className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium",
+                "min-h-11 px-1 md:min-h-0 md:px-3",
                 tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setTab(key)}
-            >
-              {label}
-            </button>
+            />
           ))}
         </div>
         {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "topics" || tab === "growth-events") && (
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-2">
             {tab === "topics" && repo.language && (
-              <div className="inline-flex items-center rounded-lg border bg-muted p-1">
+              <div className="flex w-full min-w-0 items-center rounded-lg border bg-muted p-1 md:w-auto">
                 {(["all", "language"] as const).map((key) => (
-                  <button
+                  <NavigationButton
                     key={key}
+                    label={key === "all" ? "All" : repo.language!}
+                    truncate={key === "language"}
+                    aria-pressed={scope === key}
                     type="button"
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm font-medium",
+                      "min-h-11 md:min-h-0",
+                      key === "language" ? "flex-1 md:flex-none" : "shrink-0",
                       scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => setScope(key)}
-                  >
-                    {key === "all" ? "All" : repo.language}
-                  </button>
+                  />
                 ))}
               </div>
             )}
-            <PeriodSelector period={period} onPeriod={setPeriod} />
+            <PeriodSelector fitMobile period={period} onPeriod={setPeriod} />
           </div>
         )}
       </div>
@@ -840,17 +844,18 @@ function CollectionStatusCard({
   const failureReason = collectionFailureReason(failed?.errorMessage, failed?.jobType);
   return (
     <Card className="h-full">
-      <CollectionTitle success={run.status === "SUCCESS"} />
+      <CollectionTitle success={run.status === "SUCCESS" && !trafficGap} />
       {run.status === "FAILED" && <h3 className="mb-2 font-medium text-red-700">Collection failed</h3>}
       <div className="text-sm">
         {formatBusinessDate(run.businessDate)} · {run.status}
       </div>
       <div className="mt-1 text-sm text-muted-foreground">
-        {run.successfulJobs} / {run.plannedJobs} successful
+        Execution: {run.successfulJobs} / {run.plannedJobs} successful
       </div>
       {(run.completedAt || run.createdAt) && (
         <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
       )}
+      <p className="mt-2 text-sm">Traffic data availability: {trafficGap ? repositoryGapText(trafficGap) : "No missing latest-day data reported"}</p>
       {failureReason && <p className="mt-2 text-sm">{failureReason}</p>}
       <div className="mt-4 divide-y divide-border text-sm">
         {run.jobs.map((job) => (
@@ -956,6 +961,8 @@ function TrafficPanel({
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TrafficKpiCard
           label="Visitors"
+          coverage={traffic.totals.uniqueVisitors.coverage}
+          previousCoverage={traffic.totals.uniqueVisitors.previousCoverage}
           value={traffic.totals.uniqueVisitors.value}
           growthPercent={traffic.totals.uniqueVisitors.growthPercent}
           period={period}
@@ -963,6 +970,8 @@ function TrafficPanel({
         />
         <TrafficKpiCard
           label="Views"
+          coverage={traffic.totals.views.coverage}
+          previousCoverage={traffic.totals.views.previousCoverage}
           value={traffic.totals.views.value}
           growthPercent={traffic.totals.views.growthPercent}
           period={period}
@@ -970,6 +979,8 @@ function TrafficPanel({
         />
         <TrafficKpiCard
           label="Clones"
+          coverage={traffic.totals.clones.coverage}
+          previousCoverage={traffic.totals.clones.previousCoverage}
           value={traffic.totals.clones.value}
           growthPercent={traffic.totals.clones.growthPercent}
           period={period}
@@ -977,6 +988,8 @@ function TrafficPanel({
         />
         <TrafficKpiCard
           label="Unique Cloners"
+          coverage={traffic.totals.uniqueCloners.coverage}
+          previousCoverage={traffic.totals.uniqueCloners.previousCoverage}
           value={traffic.totals.uniqueCloners.value}
           growthPercent={traffic.totals.uniqueCloners.growthPercent}
           period={period}
@@ -992,12 +1005,12 @@ function TrafficPanel({
         onEventsChanged={loadEvents}
         mobileSeries={REPO_TRAFFIC_SERIES}
       >
-        <ChartModePlot
+        {!traffic.traffic.some(point => point.views != null || point.uniqueVisitors != null || point.uniqueCloners != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <ChartModePlot
           chartId={repoTrafficChartId(repositoryId)}
           series={REPO_TRAFFIC_SERIES}
           style={{ height: 360, width: "100%" }}
           build={({ events: marked }) => trafficChartOption(traffic.traffic, marked, period, traffic.trafficGap)}
-        />
+        />}
       </ChartCard>
       <SnapshotCards
         repositoryId={repositoryId}
