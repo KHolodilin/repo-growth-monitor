@@ -103,7 +103,7 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
       mode.setAxisDates([]);
       return;
     }
-    mode.setAxisDates(axis.data.map((value) => String(value)));
+    mode.setAxisDates((presented as { eventAxisDates?: string[] }).eventAxisDates ?? axis.data.map((value) => String(value)));
   }, [presented, mode.setAxisDates]);
 
   const plotStyle = mode.mobile

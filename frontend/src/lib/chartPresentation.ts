@@ -15,6 +15,9 @@ type Series = {
 };
 type ChartOption = {
   snapshotHistory?: boolean;
+  /** ISO dates aligned with rendered axis slots; independent of Day N labels. */
+  eventAxisDates?: string[];
+  yAxis?: { name?: string } | unknown[];
   xAxis?: { data?: unknown; axisLabel?: Record<string, unknown> } | unknown[];
   series?: Series[];
   tooltip?: { formatter?: (params: unknown) => unknown };
@@ -173,6 +176,7 @@ function toTimeline(option: ChartOption): ChartOption {
   const axis = option.xAxis as { data?: unknown; axisLabel?: Record<string, unknown> };
   return {
     ...option,
+    eventAxisDates: framed.labels.map(day => framed.dayToDate.get(day)!),
     tooltip: wrapTooltip(option.tooltip, framed.dayToDate, option.snapshotHistory),
     xAxis: {
       ...axis,
@@ -203,7 +207,7 @@ export function presentChartOption<T>(
   if (mode.mobile) {
     next = stripEventMarks(next);
     // Reserve space for labels dynamically instead of the desktop legend and gutters.
-    next = { ...next, grid: { ...next.grid, left: 4, right: 4, top: 12, bottom: 8, containLabel: true } };
+    next = { ...next, grid: { ...next.grid, left: 4, right: 4, top: next.yAxis && !Array.isArray(next.yAxis) && next.yAxis.name ? 32 : 12, bottom: 8, containLabel: true } };
   } else if (mode.events.length > 0 && !hasEvents(next)) {
     next = withEvents(next, mode.events, mode.period);
   }

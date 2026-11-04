@@ -264,7 +264,7 @@ export function ChartCard({
             </div>
           )}
           <div className={mobileShell ? "-mx-4" : undefined}>{children}</div>
-          {mobileShell && eventFilter !== "off" && events.length > 0 && (
+          {mobileShell && eventFilter !== "off" && (
             <MobileEventStrip events={events} dates={axisDates} onOpen={openMarker} />
           )}
         </Card>
@@ -348,7 +348,7 @@ function MobileEventStrip({
   const onAxis = new Set(axis);
   const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
   if (axis.length === 0 || groups.length === 0) {
-    return null;
+    return <p role="status" className="mt-2 text-xs text-muted-foreground">No events in the displayed range.</p>;
   }
   const first = axis[0];
   const last = axis[axis.length - 1];
@@ -363,7 +363,7 @@ function MobileEventStrip({
             key={group.date}
             type="button"
             className="absolute top-0 flex h-11 w-11 -translate-x-1/2 items-center justify-center"
-            style={{ left: `${left}%` }}
+            style={{ left: `clamp(22px, ${left}%, calc(100% - 22px))` }}
             aria-label={`${group.events.length} event${group.events.length === 1 ? "" : "s"} on ${group.date}`}
             onClick={() => onOpen(group.events)}
           >

@@ -1,4 +1,5 @@
-import { act, render, screen } from "@testing-library/react";
+import * as chartExports from "../lib/chartExport";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -70,5 +71,40 @@ describe("chart batch integration", () => {
     expect(screen.getByRole("checkbox", { name: "Show github.com on the chart" })).toBeChecked();
     expect(screen.getByRole("combobox", { name: "Snapshot date" })).toHaveValue(date);
     expect(screen.queryByText("No data for the selected period.")).toBeNull();
+  });
+});
+
+
+describe("query metric labels", () => {
+  it("keeps selected competitors while cycling metric headings and restores the metric from its URL", async () => {
+    const user = userEvent.setup();
+    api.mockImplementation(async (url: string) => {
+      if (url.endsWith("/repositories/13")) return repository;
+      if (url.includes("/history")) return searchHistory;
+      if (url.includes("/results")) return searchResults;
+      return [];
+    });
+    const png = vi.spyOn(chartExports, "downloadChartPng").mockImplementation(() => {});
+    const csv = vi.spyOn(chartExports, "downloadChartCsv").mockImplementation(() => {});
+    const view = mount("/repositories/13/search-queries/1?metric=stars", <QueryDetailsPage />);
+    expect(await screen.findByRole("heading", { name: "Stars History" })).toBeInTheDocument();
+    const rival = screen.getByRole("checkbox", { name: "Show other/repo on the chart" });
+    await user.click(rival);
+    for (const [metric, title] of [["Forks", "Forks History"], ["Place", "Rank History"], ["Stars", "Stars History"]]) {
+      await user.click(screen.getByRole("button", { name: metric }));
+      expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+      expect(rival).toBeChecked();
+      await user.click(screen.getByRole("button", { name: "Chart menu" }));
+      await user.click(screen.getByRole("menuitem", { name: "PNG" }));
+      expect(png).toHaveBeenLastCalledWith(expect.anything(), expect.any(String), title);
+      await user.click(screen.getByRole("button", { name: "Chart menu" }));
+      await user.click(screen.getByRole("menuitem", { name: "CSV" }));
+      expect(csv.mock.lastCall?.[1]).toContain(metric === "Place" ? "(Rank)" : `(${metric})`);
+      expect(screen.getByRole("button", { name: metric })).toHaveAttribute("aria-pressed", "true");
+    }
+    view.unmount();
+    mount("/repositories/13/search-queries/1?metric=invalid", <QueryDetailsPage />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Rank History" })).toBeInTheDocument());
+    png.mockRestore(); csv.mockRestore();
   });
 });

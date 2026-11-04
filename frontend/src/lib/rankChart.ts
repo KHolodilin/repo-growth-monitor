@@ -48,6 +48,7 @@ function timelineRank(dates: string[], series: RankHistorySeries[]) {
   const axis = Array.from({ length: longest.span.length }, (_, index) => String(index + 1));
   return {
     dates: axis,
+    eventAxisDates: longest.span,
     dateToDay: new Map(longest.span.map((date, index) => [date, String(index + 1)])),
     series: spans.map(({ item, byDate, span }) => ({
       ...item,
@@ -77,6 +78,7 @@ export function rankHistoryOption({
   formatAxis = formatChartAxisDate,
   axis = "calendar",
   markerAt,
+  tooltipDate,
 }: {
   dates: string[];
   series: RankHistorySeries[];
@@ -91,6 +93,7 @@ export function rankHistoryOption({
   axis?: "calendar" | "timeline";
   /** Puts an event on a timeline day. Calendar charts use the event's UTC date. */
   markerAt?: (event: GrowthEvent) => string;
+  tooltipDate?: (seriesName: string, axisValue: string) => string | undefined;
 }) {
   const windowDates = period ? periodDates(period, today) : null;
   const visibleEvents = windowDates
@@ -166,6 +169,7 @@ export function rankHistoryOption({
     ];
   });
   return {
+    eventAxisDates: frame?.eventAxisDates ?? calendarAxis,
     tooltip: {
       trigger: "axis",
       formatter: (params: { axisValue: string }[]) => {
@@ -177,7 +181,8 @@ export function rankHistoryOption({
           .map((item) => {
             const point = item.points.find((entry) => entry.date === date);
             const missed = item.missedDates?.includes(date) ?? false;
-            return `<span style="color:${seriesStyle(item.key ?? item.name).color}">●</span> ${item.name}: ${rankTooltipText(point, item.limit, missed)}`;
+            const observedOn = tooltipDate?.(item.name, date);
+            return `<span style="color:${seriesStyle(item.key ?? item.name).color}">●</span> ${item.name}${observedOn ? ` (${observedOn})` : ""}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
         const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];

@@ -60,7 +60,7 @@ describe("searchSeriesChart", () => {
       limit: 50,
       lines,
     });
-    expect(stars.yAxis).toEqual({ type: "value" });
+    expect(stars.yAxis).toMatchObject({ type: "value", name: "Stars" });
     expect(stars.xAxis.boundaryGap).toBe(true);
     expect(stars.series[0].data).toEqual([null]);
     expect(stars.series[1].data).toEqual([11]);
