@@ -1,3 +1,4 @@
+import { lineStyle, metricColor } from "./seriesStyle";
 import type { GrowthEvent, TrafficNotice, TrafficPoint } from "./api";
 import { nextIsoDay, repositoryGapText, trafficWarningDate } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
@@ -177,7 +178,7 @@ export function trafficChartOption(
   const byDate = new Map(points.map((point) => [point.date, point]));
   const peak = Math.max(
     1,
-    ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.uniqueCloners].filter((value): value is number => value != null)),
+    ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.clones, point.uniqueCloners].filter((value): value is number => value != null)),
   );
   const { groups, markLine } = eventMarkOverlays(dates, events, peak, period);
 
@@ -196,7 +197,7 @@ export function trafficChartOption(
           .filter((item) => item.seriesName !== "Events")
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-            return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value}</span></div>`;
+            return `<div style="display:flex;justify-content:space-between;gap:24px"><span><span style="color:${metricColor(item.seriesName)}">●</span> ${item.seriesName}</span><span>${value}</span></div>`;
           })
           .join("");
         const dayEvents = groups.find((group) => group.date === params[0].axisValue)?.events ?? [];
@@ -209,7 +210,7 @@ export function trafficChartOption(
         return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}${eventRows}</div>`;
       },
     },
-    legend: { top: 0, data: ["Views", "Visitors", "Unique Cloners"] },
+    legend: { top: 0, data: ["Views", "Visitors", "Clones", "Unique Cloners"] },
     grid: {
       left: 48,
       right: 72,
@@ -234,6 +235,7 @@ export function trafficChartOption(
     series: [
       {
         name: "Views",
+        ...lineStyle("Views"),
         type: "line",
         showSymbol: true,
         symbolSize: 8,
@@ -252,6 +254,7 @@ export function trafficChartOption(
       },
       {
         name: "Visitors",
+        ...lineStyle("Visitors"),
         type: "line",
         showSymbol: true,
         symbolSize: 8,
@@ -259,7 +262,12 @@ export function trafficChartOption(
         data: dates.map((date) => byDate.get(date)?.uniqueVisitors ?? null),
       },
       {
+        name: "Clones", markPoint: undefined, ...lineStyle("Clones"), type: "line", showSymbol: true, symbolSize: 8, connectNulls: true,
+        data: dates.map(date => byDate.get(date)?.clones ?? null),
+      },
+      {
         name: "Unique Cloners",
+        ...lineStyle("Unique Cloners"),
         type: "line",
         showSymbol: true,
         symbolSize: 8,

@@ -70,8 +70,8 @@ describe("trafficChart", () => {
     expect(sparse.series[0].data).toContain(null);
     expect(sparse.series[1].data).toContain(null);
     expect(sparse.series[2].data).toContain(null);
-    expect(sparse.series[3].markPoint).toBeUndefined();
-    expect(sparse.series[3].markLine.data[0].events[0].title).toBeUndefined();
+    expect(("markPoint" in sparse.series[4] ? sparse.series[4].markPoint : undefined)).toBeUndefined();
+    expect(sparse.series[4].markLine!.data[0].events[0].title).toBeUndefined();
     expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
 
@@ -87,9 +87,9 @@ describe("trafficChart", () => {
     expect(broken.xAxis.data).toContain("2026-10-16");
     expect(broken.xAxis.data).toContain("2026-10-18");
     expect(broken.series[0].data[broken.xAxis.data.indexOf("2026-10-16")]).toBeNull();
-    expect(broken.series[0].connectNulls).toBe(true);
-    expect(broken.series[0].markPoint?.data[0]).toMatchObject({ xAxis: "2026-10-18" });
-    expect(broken.series[0].markPoint?.tooltip.formatter()).toBe("GitHub traffic data is missing for Oct 18 (T-1).");
+    expect(("connectNulls" in broken.series[0] && broken.series[0].connectNulls)).toBe(true);
+    expect(("markPoint" in broken.series[0] ? broken.series[0].markPoint : undefined)?.data[0]).toMatchObject({ xAxis: "2026-10-18" });
+    expect(("markPoint" in broken.series[0] ? broken.series[0].markPoint : undefined)?.tooltip.formatter()).toBe("GitHub traffic data is missing for Oct 18 (T-1).");
     const gapFormatter = broken.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
     expect(gapFormatter([{ axisValue: "2026-10-18", seriesName: "Views", data: null }])).toBe(
       "GitHub traffic data is missing for Oct 18 (T-1).",
@@ -100,7 +100,7 @@ describe("trafficChart", () => {
       "7d",
       { reason: "COLLECTION_FAILED", date: "2026-10-19", lastTrafficDate: null },
     );
-    expect(kept.series[0].markPoint).toBeUndefined();
+    expect(("markPoint" in kept.series[0] ? kept.series[0].markPoint : undefined)).toBeUndefined();
     expect(kept.series[0].data).toEqual([0]);
     expect(trafficChartOption([], [], "7d", {
       reason: "COLLECTION_NOT_EXECUTED",

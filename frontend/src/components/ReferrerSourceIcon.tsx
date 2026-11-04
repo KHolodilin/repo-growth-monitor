@@ -1,3 +1,4 @@
+import { seriesStyle } from "../lib/seriesStyle";
 type IconProps = { className?: string };
 
 const SIZE = "h-4 w-4 shrink-0";
@@ -145,17 +146,6 @@ function GlobeIcon({ className }: IconProps) {
   );
 }
 
-export function referrerLineColor(source: string, index: number) {
-  const known: Record<string, string> = {
-    "github.com": "#2563eb",
-    "chatgpt.com": "#7c3aed",
-    Google: "#16a34a",
-    "reddit.com": "#ef4444",
-    Other: "#94a3b8",
-  };
-  if (known[source]) {
-    return known[source];
-  }
-  const palette = ["#0ea5e9", "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6", "#f97316"];
-  return palette[index % palette.length];
+export function referrerLineColor(source: string, _index: number) {
+  return seriesStyle(source === "Other" ? source : `source:${source}`).color;
 }

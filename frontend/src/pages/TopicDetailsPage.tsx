@@ -1,8 +1,9 @@
+import { RankSummary } from "../components/RankSummary";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
 import { useMutationAccess } from "../lib/mutationAccess";
-import { formatDelta, formatNumber, formatRank, formatSyncTime } from "../lib/utils";
+import { formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { writeTopicScope } from "../lib/topicScope";
 import { ComparisonSeries } from "../components/ComparisonSeries";
@@ -143,9 +144,9 @@ export function TopicDetailsPage() {
       : `https://github.com/topics/${encodeURIComponent(history.watch.topic)}?o=desc&s=stars`;
 
   const selectedSeries = competitors.filter(item => selected.includes(item.githubRepositoryId));
-  const rankSeries = [{ name: repo.fullName, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
-    ...selectedSeries.map(item => ({ name: item.fullName, points: item.points, limit: history.watch.resultLimit }))];
-  const chartSeries = [{ key: String(history.watch.id), name: repo.fullName }, ...selectedSeries.map(item => ({ key: `competitor:${item.githubRepositoryId}`, name: item.fullName }))];
+  const rankSeries = [{ key: `repository:${repo.githubId}`, name: repo.fullName, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
+    ...selectedSeries.map(item => ({ key: `repository:${item.githubRepositoryId}`, name: item.fullName, points: item.points, limit: history.watch.resultLimit }))];
+  const chartSeries = [{ key: `repository:${repo.githubId}`, name: repo.fullName }, ...selectedSeries.map(item => ({ key: `repository:${item.githubRepositoryId}`, name: item.fullName }))];
   const unavailable = selected.filter(id => !competitors.some(item => item.githubRepositoryId === id && item.points.length > 0));
   return (
     <div className="space-y-6">
@@ -202,13 +203,7 @@ export function TopicDetailsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Kpi label="Current Rank" value={formatRank(history.currentRank, history.watch.resultLimit)} />
-        <Kpi label="7d Change" value={formatDelta(history.change7d)} />
-        <Kpi label="30d Change" value={formatDelta(history.change30d)} />
-        <Kpi label="Best Rank" value={formatRank(history.bestRank, history.watch.resultLimit)} />
-        <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
-      </div>
+      <RankSummary current={history.currentRank} best={history.bestRank} limit={history.watch.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
 
       <ChartCard
         title="Rank History"
@@ -251,14 +246,5 @@ export function TopicDetailsPage() {
         )}
       </Card>
     </div>
-  );
-}
-
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-    </Card>
   );
 }

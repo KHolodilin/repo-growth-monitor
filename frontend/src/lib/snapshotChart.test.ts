@@ -40,7 +40,7 @@ describe("snapshotChart", () => {
       params: { axisValue: string; seriesName: string; data: number | null }[],
     ) => string;
     expect(formatter([])).toBe("");
-    expect(formatter([{ axisValue: "2026-09-23", seriesName: "github.com", data: 1 }])).toContain("Since previous");
+    expect(formatter([{ axisValue: "2026-09-23", seriesName: "github.com", data: 1 }])).toContain("rolling-window values");
     expect(formatter([{ axisValue: "2026-09-20", seriesName: "github.com", data: null }])).toContain("—");
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
     expect(option.series.map((item) => item.name)).toEqual(["github.com", "missing", "Other"]);

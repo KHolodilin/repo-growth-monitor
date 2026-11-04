@@ -14,6 +14,7 @@ type Series = {
   markPoint?: { data?: MarkItem[] };
 };
 type ChartOption = {
+  snapshotHistory?: boolean;
   xAxis?: { data?: unknown; axisLabel?: Record<string, unknown> } | unknown[];
   series?: Series[];
   tooltip?: { formatter?: (params: unknown) => unknown };
@@ -95,7 +96,7 @@ function rewriteTooltipItem(item: unknown, day: string, date: string) {
   };
 }
 
-function wrapTooltip(tooltip: ChartOption["tooltip"], dayToDate: Map<string, string>) {
+function wrapTooltip(tooltip: ChartOption["tooltip"], dayToDate: Map<string, string>, preserveSnapshotDate = false) {
   if (!tooltip || typeof tooltip.formatter !== "function") {
     return tooltip;
   }
@@ -117,6 +118,7 @@ function wrapTooltip(tooltip: ChartOption["tooltip"], dayToDate: Map<string, str
       if (typeof html !== "string") {
         return html;
       }
+      if (preserveSnapshotDate) return `<div>Day ${day}</div>${html}`;
       return html.replaceAll(formatChartAxisDate(date), `Day ${day}`).replaceAll(date, `Day ${day}`);
     },
   };
@@ -160,14 +162,18 @@ function toTimeline(option: ChartOption): ChartOption {
   const columns = series.map((item) =>
     Array.isArray(item.data) ? (item.data as (number | null)[]) : dates.map(() => null),
   );
-  const framed = timelineColumns(dates, columns);
+  const framed = option.snapshotHistory ? {
+    labels: dates.map((_, index) => String(index + 1)), columns,
+    dateToDay: new Map(dates.map((date, index) => [date, String(index + 1)])),
+    dayToDate: new Map(dates.map((date, index) => [String(index + 1), date])),
+  } : timelineColumns(dates, columns);
   if (framed.labels.length === 0) {
     return option;
   }
   const axis = option.xAxis as { data?: unknown; axisLabel?: Record<string, unknown> };
   return {
     ...option,
-    tooltip: wrapTooltip(option.tooltip, framed.dayToDate),
+    tooltip: wrapTooltip(option.tooltip, framed.dayToDate, option.snapshotHistory),
     xAxis: {
       ...axis,
       data: framed.labels,

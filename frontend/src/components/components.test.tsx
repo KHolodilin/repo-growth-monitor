@@ -396,8 +396,8 @@ describe("components", () => {
     ]) {
       rerender(<ReferrerSourceIcon source={source} className="h-4" />);
     }
-    expect(referrerLineColor("github.com", 0)).toBe("#2563eb");
-    expect(referrerLineColor("unknown", 1)).toBe("#f59e0b");
+    expect(referrerLineColor("github.com", 0)).toBe(referrerLineColor("github.com", 20));
+    expect(referrerLineColor("unknown", 1)).toBe(referrerLineColor("unknown", 2));
   });
 
   it("sorts result tables and snapshot cards", async () => {
@@ -491,7 +491,7 @@ describe("components", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
-    expect(screen.getByRole("tablist", { name: "Chart series" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Chart series" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Visitors" }));
     await user.click(screen.getByRole("button", { name: "Views" }));
     await user.click(screen.getByRole("button", { name: /more sources|Select sources/ }));

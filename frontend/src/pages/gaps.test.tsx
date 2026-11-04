@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -93,9 +93,9 @@ describe("coverage gaps", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText("KHolodilin/other")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Visitors/ }));
-    await user.click(screen.getByRole("button", { name: /Views/ }));
-    await user.click(screen.getByRole("button", { name: /Clones/ }));
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /Visitors/ }));
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /Views/ }));
+    await user.click(within(screen.getByRole("table")).getByRole("button", { name: /Clones/ }));
     await user.click(screen.getByRole("button", { name: /Stars/ }));
     await user.click(screen.getByRole("button", { name: "Forks" }));
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
@@ -279,7 +279,7 @@ describe("coverage gaps", () => {
     expect(screen.getAllByText("github.com").length).toBeGreaterThan(0);
     await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getAllByRole("button", { name: "Views" })[0]);
-    expect(screen.getByText("Not enough history yet.")).toBeInTheDocument();
+    expect(screen.getByText(/No paths selected/)).toBeInTheDocument();
   });
 
   it("covers settings errors and empty/error pages", async () => {

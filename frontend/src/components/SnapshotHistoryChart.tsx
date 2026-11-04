@@ -1,16 +1,17 @@
 import { useMemo, useState } from "react";
 import type { SnapshotHistory } from "../lib/api";
-import { snapshotChartOption } from "../lib/snapshotChart";
+import { snapshotChartOption, snapshotSeriesKey } from "../lib/snapshotChart";
 import {
   type SnapshotChartKind,
   type SnapshotMetric,
 } from "../lib/snapshotChartPrefs";
 import { OTHER_KEY, chartValue } from "../lib/snapshotHistory";
-import { useIsMobileChart } from "../lib/useMediaQuery";
+import { seriesStyle } from "../lib/seriesStyle";
+import { SeriesSwatch } from "./SeriesSwatch";
 import { cn } from "../lib/utils";
 import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
-import { ReferrerSourceIcon, referrerLineColor } from "./ReferrerSourceIcon";
+import { ReferrerSourceIcon } from "./ReferrerSourceIcon";
 
 
 export function SnapshotHistoryChart({
@@ -27,7 +28,6 @@ export function SnapshotHistoryChart({
   onChange: (metric: SnapshotMetric, keys: string[]) => void;
 }) {
   const repositoryId = history.repositoryId;
-  const mobile = useIsMobileChart();
   const [pickerOpen, setPickerOpen] = useState(false);
   const persist = onChange;
   const option = useMemo(
@@ -35,12 +35,8 @@ export function SnapshotHistoryChart({
     [history, metric, selected],
   );
   const legend = [...selected, OTHER_KEY];
-  const mobileSeries = useMemo(
-    () => [...selected, OTHER_KEY].map((name) => ({ key: name, name })),
-    [selected],
-  );
   const moreCount = Math.max(0, history.rows.length - selected.length);
-  const enoughHistory = history.dates.length >= 2;
+  const enoughHistory = history.dates.length >= 1;
   const hasData = history.rows.some(row => selected.includes(row.key) && row.cells.some(cell => chartValue(cell, metric) !== null));
   const showIcons = kind === "referrers";
   const metricControls = (
@@ -62,12 +58,13 @@ export function SnapshotHistoryChart({
       context={`repository:${repositoryId}:${kind}`}
       controls={metricControls}
       mobileControls={metricControls}
-      mobileSeries={mobileSeries}
+      mobileSeries={[]}
     >
+      <p className="mb-3 text-xs text-muted-foreground">Values reported for GitHub’s rolling window at each snapshot date, not exact daily traffic. Other sums the remaining sources/paths; Visitors are not deduplicated across sources.</p>
       {!enoughHistory && (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-          <div className="font-medium text-foreground">Not enough history yet.</div>
-          <div className="mt-1">At least two snapshots are required.</div>
+          <div className="font-medium text-foreground">No recorded snapshot values.</div>
+          <div className="mt-1">A recorded snapshot is needed to display history.</div>
         </div>
       )}
       {enoughHistory && (
@@ -75,13 +72,13 @@ export function SnapshotHistoryChart({
           {selected.length === 0 ? <p className="py-6 text-sm text-muted-foreground">No {kind === "referrers" ? "sources" : "paths"} selected. Select items to display history.</p> : !hasData ? <p className="py-6 text-sm text-muted-foreground">No data for the selected period.</p> : (
 
         <>
-          {!mobile && (
+          {(
             <div className="mb-3 flex flex-wrap gap-3 text-sm">
-              {legend.map((name, index) => (
-                <span key={name} className="inline-flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: referrerLineColor(name, index) }} />
+              {legend.map((name) => (
+                <span key={name} className="inline-flex min-w-0 max-w-full items-start gap-1.5">
+                  <SeriesSwatch style={seriesStyle(snapshotSeriesKey(history, name))} />
                   {(showIcons || name === OTHER_KEY) && <ReferrerSourceIcon source={name} />}
-                  {name}
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
                 </span>
               ))}
             </div>
@@ -90,6 +87,8 @@ export function SnapshotHistoryChart({
             chartId={`${repositoryId}:snapshot-${kind}`}
             series={legend.map((name) => ({ key: name, name }))}
             option={option}
+            exportTitle={title}
+            persistSelection={false}
             style={{ height: 320, width: "100%" }}
           />
         </>)}

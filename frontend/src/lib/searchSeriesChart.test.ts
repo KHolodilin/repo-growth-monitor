@@ -118,9 +118,9 @@ describe("searchSeriesChart", () => {
       metric: "stars",
     });
     expect(chart?.series).toEqual([
-      { key: "99", name: "acme/app" },
-      { key: "1", name: "other/repo" },
-      { key: "7", name: "bare/repo" },
+      { key: "repository:99", name: "acme/app" },
+      { key: "repository:1", name: "other/repo" },
+      { key: "repository:7", name: "bare/repo" },
     ]);
     const drawn = chart?.option.series as { data: (number | null)[] }[];
     expect(drawn.map((item) => item.data)).toEqual([[null], [10], [null]]);
@@ -139,7 +139,7 @@ describe("searchSeriesChart", () => {
       selected: [1],
       metric: "forks",
     });
-    expect(storedOurs?.series).toEqual([{ key: "99", name: "acme/app" }]);
+    expect(storedOurs?.series).toEqual([{ key: "repository:99", name: "acme/app" }]);
     expect((storedOurs?.option.series as { data: (number | null)[] }[]).map((item) => item.data)).toEqual([[16]]);
   });
 

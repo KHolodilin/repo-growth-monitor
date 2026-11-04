@@ -1,8 +1,9 @@
+import { RankSummary } from "../components/RankSummary";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
 import { useMutationAccess } from "../lib/mutationAccess";
-import { formatDelta, formatNumber, formatRank, formatSyncTime, cn } from "../lib/utils";
+import { formatSyncTime, cn } from "../lib/utils";
 import { queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
 import { ComparisonSeries } from "../components/ComparisonSeries";
 import { ChartCard, useChartMode } from "../components/ChartDownloadMenu";
@@ -175,13 +176,7 @@ export function QueryDetailsPage() {
         )}
       </header>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Kpi label="Current Rank" value={formatRank(history.currentRank, history.query.resultLimit)} />
-        <Kpi label="7d Change" value={formatDelta(history.change7d)} />
-        <Kpi label="30d Change" value={formatDelta(history.change30d)} />
-        <Kpi label="Best Rank" value={formatRank(history.bestRank, history.query.resultLimit)} />
-        <Kpi label="Total Results" value={formatNumber(history.totalResults)} />
-      </div>
+      <RankSummary current={history.currentRank} best={history.bestRank} limit={history.query.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
 
       <ChartCard
         title="Rank History"
@@ -255,14 +250,5 @@ function QueryRankChart({
       option={{ ...chart.option, legend: { ...chart.option.legend, selectedMode: false } }}
       style={{ height: 360, width: "100%" }}
     />
-  );
-}
-
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-    </Card>
   );
 }

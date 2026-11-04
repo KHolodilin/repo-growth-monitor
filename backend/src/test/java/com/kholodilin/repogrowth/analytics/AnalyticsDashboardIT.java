@@ -151,6 +151,10 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
 
         assertThat(dashboard.traffic()).extracting(DashboardResponse.TrafficPoint::date)
                 .containsExactly(today.minusDays(6), today.minusDays(5), today.minusDays(4));
+        assertThat(dashboard.traffic().getFirst().clones()).isEqualTo(17);
+        assertThat(dashboard.traffic().getFirst().uniqueCloners()).isEqualTo(13);
+        assertThat(dashboard.traffic().get(1).clones()).isNull();
+        assertThat(dashboard.traffic().get(1).uniqueCloners()).isNull();
         assertThat(dashboard.traffic().get(1).views()).isNull();
         assertThat(dashboard.traffic().get(1).missingRepositories()).isEqualTo(2);
         assertThat(dashboard.traffic().get(0).missingRepositories()).isZero();

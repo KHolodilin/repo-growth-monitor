@@ -6,11 +6,13 @@ export const TRAFFIC_SERIES = [
   { key: "Views", name: "Views" },
   { key: "Visitors", name: "Visitors" },
   { key: "Clones", name: "Clones" },
+  { key: "Unique Cloners", name: "Unique Cloners" },
 ] as const;
 
 export const REPO_TRAFFIC_SERIES = [
   { key: "Views", name: "Views" },
   { key: "Visitors", name: "Visitors" },
+  { key: "Total Clones", name: "Clones" },
   { key: "Clones", name: "Unique Cloners" },
 ] as const;
 

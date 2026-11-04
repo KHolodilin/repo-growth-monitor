@@ -1,94 +1,55 @@
-import { referrerLineColor } from "../components/ReferrerSourceIcon";
 import type { SnapshotHistory } from "./api";
 import { OTHER_KEY, chartValue } from "./snapshotHistory";
 import type { SnapshotMetric } from "./snapshotChartPrefs";
+import { lineStyle, prepareSeriesStyles, seriesStyle } from "./seriesStyle";
 import { formatChartAxisDate, formatNumber } from "./utils";
-
-export function snapshotChartOption({
-  history,
-  metric,
-  selected,
-}: {
-  history: SnapshotHistory;
-  metric: SnapshotMetric;
-  selected: string[];
-}) {
-  const dates = history.dates;
-  const visitors = metric === "VISITORS";
-  const unit = visitors ? "Visitors" : "Views";
-  const byKey = new Map(history.rows.map((row) => [row.key, row]));
-  const seriesNames = [...selected, OTHER_KEY];
-  const previousByDate = new Map(dates.slice(1).map((date, index) => [date, dates[index]]));
-
-  return {
-    tooltip: {
-      trigger: "axis" as const,
-      formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
-        if (!Array.isArray(params) || params.length === 0) {
-          return "";
-        }
-        const date = params[0].axisValue;
-        const previous = previousByDate.get(date);
-        const gap =
-          previous && nextDay(previous) !== date
-            ? `<div style="margin-bottom:6px;opacity:.7">Since previous snapshot: ${formatChartAxisDate(previous)}</div>`
-            : "";
-        const rows = params
-          .map((item) => {
-            const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-            return `<div style="display:flex;justify-content:space-between;gap:24px"><span>${item.seriesName}</span><span>${value} ${unit}</span></div>`;
-          })
-          .join("");
-        return `<div style="min-width:180px"><div style="margin-bottom:6px">${formatChartAxisDate(date)}</div>${gap}${rows}</div>`;
-      },
-    },
-    grid: { left: 48, right: 72, top: 16, bottom: 40, containLabel: false },
-    xAxis: {
-      type: "category",
-      data: dates,
-      boundaryGap: dates.length < 2,
-      axisLabel: {
-        hideOverlap: true,
-        showMinLabel: true,
-        showMaxLabel: true,
-        alignMinLabel: "left",
-        alignMaxLabel: "right",
-        formatter: (value: string) => formatChartAxisDate(String(value)),
-      },
-    },
-    yAxis: { type: "value", name: unit },
-    series: seriesNames.map((name, index) => ({
-      name,
-      type: "line",
-      showSymbol: true,
-      symbolSize: 8,
-      connectNulls: true,
-      itemStyle: { color: referrerLineColor(name, index) },
-      lineStyle: { color: referrerLineColor(name, index) },
-      data: dates.map((_, dateIndex) => {
-        if (name === OTHER_KEY) {
-          let sum: number | null = null;
-          for (const row of history.rows) {
-            if (selected.includes(row.key)) {
-              continue;
-            }
-            const cell = row.cells[dateIndex];
-            const value = cell ? chartValue(cell, metric) : null;
-            if (value !== null) {
-              sum = (sum ?? 0) + value;
-            }
-          }
-          return sum;
-        }
-        const cell = byKey.get(name)?.cells[dateIndex];
-        return cell ? chartValue(cell, metric) : null;
-      }),
-    })),
-  };
+export function snapshotSeriesKey(history: SnapshotHistory, name: string) {
+  return name === OTHER_KEY ? name : `${history.kind === "REFERRERS" ? "source" : "path"}:${name}`;
 }
-
-function nextDay(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
-  return date.toISOString().slice(0, 10);
+export function snapshotChartOption({ history, metric, selected }: { history: SnapshotHistory; metric: SnapshotMetric; selected: string[] }) {
+  const dates = history.dates;
+  const unit = metric === "VISITORS" ? "Visitors" : "Views";
+  const byKey = new Map(history.rows.map(row => [row.key, new Map(row.cells.map(cell => [cell.date, cell]))]));
+  const names = [...selected, OTHER_KEY];
+  prepareSeriesStyles(names.map(name => snapshotSeriesKey(history, name)));
+  function observation(name: string, date: string) {
+    if (name !== OTHER_KEY) {
+      const cell = byKey.get(name)?.get(date);
+      return { value: cell ? chartValue(cell, metric) : null, missing: 0 };
+    }
+    let sum: number | null = null;
+    let missing = 0;
+    for (const row of history.rows) {
+      if (selected.includes(row.key)) continue;
+      const cell = byKey.get(row.key)!.get(date);
+      const value = cell ? chartValue(cell, metric) : null;
+      if (value === null) missing++;
+      else sum = (sum ?? 0) + value;
+    }
+    return { value: sum, missing };
+  }
+  return {
+    snapshotHistory: true,
+    exportDates: dates,
+    exportExtraColumns: [{ name: "Other observation completeness", data: dates.map(date => {
+      const point = observation(OTHER_KEY, date);
+      return point.missing > 0 ? `partial: ${point.missing} unavailable` : point.value === null ? "unavailable / no residual sources" : "observed";
+    }) }],
+    exportLabels: Object.fromEntries(names.map(name => [name, `${name} - ${unit} (snapshot rolling window)`])),
+    tooltip: { trigger: "axis" as const, formatter: (params: { axisValue: string; seriesName: string }[]) => {
+      if (!Array.isArray(params) || params.length === 0) return "";
+      const date = params[0].axisValue;
+      const rows = params.map(item => {
+        const point = observation(item.seriesName, date);
+        const value = point.value === null ? "— (No observation)" : formatNumber(point.value);
+        const partial = point.missing > 0 ? ` (partial: ${point.missing} sources/paths unavailable)` : "";
+        return `<div><span style="color:${seriesStyle(snapshotSeriesKey(history, item.seriesName)).color}">●</span> ${item.seriesName}: ${value} ${unit}${partial}</div>`;
+      }).join("");
+      return `<div>Snapshot: ${date}</div>${rows}<div>GitHub rolling-window values; not traffic for this calendar day.</div>`;
+    } },
+    grid: { left: 48, right: 36, top: 24, bottom: 40, containLabel: false },
+    xAxis: { type: "category", data: dates, boundaryGap: dates.length < 2, axisLabel: { hideOverlap: true, showMinLabel: true, showMaxLabel: true, alignMinLabel: "left", alignMaxLabel: "right", formatter: (value: string) => formatChartAxisDate(value) } },
+    yAxis: { type: "value", name: unit },
+    series: names.map(name => ({ name, type: "line", showSymbol: true, symbolSize: 8, connectNulls: true, ...lineStyle(snapshotSeriesKey(history, name)), data: dates.map(date => observation(name, date).value) })),
+  };
 }

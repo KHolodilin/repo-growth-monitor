@@ -65,7 +65,7 @@ describe("PersistentECharts mobile shell", () => {
     );
 
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
-    expect(screen.getByTestId("echart").parentElement).toHaveClass("-mx-4");
+    expect(screen.getByTestId("echart").closest(".-mx-4")).not.toBeNull();
     expect(screen.getByRole("tab", { name: "Visitors" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("checkbox", { name: "Events" })).not.toBeChecked();
     await user.click(screen.getByRole("checkbox", { name: "Events" }));
@@ -95,7 +95,7 @@ describe("PersistentECharts mobile shell", () => {
       </ChartCard>,
     );
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
-    expect(screen.getByTestId("echart").parentElement).toHaveClass("-mx-4");
+    expect(screen.getByTestId("echart").closest(".-mx-4")).not.toBeNull();
   });
 
   it("keeps desktop plot insets", () => {
@@ -105,7 +105,7 @@ describe("PersistentECharts mobile shell", () => {
         <PersistentECharts chartId="desktop-insets" series={[]} option={{ series: [] }} />
       </ChartCard>,
     );
-    expect(screen.getByTestId("echart").parentElement).not.toHaveClass("-mx-4");
+    expect(screen.getByTestId("echart").closest(".-mx-4")).toBeNull();
   });
 
   it("clears axis dates when the chart has no category axis", async () => {
@@ -121,7 +121,7 @@ describe("PersistentECharts mobile shell", () => {
       </ChartCard>,
     );
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
-    expect(screen.getByTestId("echart").parentElement).toHaveClass("-mx-4");
+    expect(screen.getByTestId("echart").closest(".-mx-4")).not.toBeNull();
     expect(screen.queryByLabelText("Growth events")).not.toBeInTheDocument();
   });
 });

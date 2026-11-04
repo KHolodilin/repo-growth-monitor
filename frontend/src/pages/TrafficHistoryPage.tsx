@@ -18,8 +18,8 @@ const KIND_LABEL: Record<SnapshotChartKind, string> = {
 };
 
 const CHART_TITLE: Record<SnapshotChartKind, string> = {
-  referrers: "Referrer Traffic (by day)",
-  paths: "Path Traffic (by day)",
+  referrers: "Referrer Snapshot History",
+  paths: "Path Snapshot History",
 };
 
 function parseKind(value: string | null): SnapshotChartKind {
