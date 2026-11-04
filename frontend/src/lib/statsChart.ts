@@ -1,3 +1,4 @@
+import { lineStyle, metricColor } from "./seriesStyle";
 import type { StatsHistoryPoint } from "./api";
 import { partialDayTooltip } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
@@ -87,7 +88,7 @@ export function statsChartOption(
             const value = pointValue(item.data);
             const shown = value === null || value === undefined ? "—" : formatNumber(value);
             const share = shareLines(value, leadersFor(point, item.seriesName));
-            return `<div>${item.seriesName} - ${shown}</div>${share}`;
+            return `<div><span style="color:${metricColor(item.seriesName)}">●</span> ${item.seriesName} - ${shown}</div>${share}`;
           })
           .join("");
         return `<div><div>${formatChartAxisDate(dateKey)}</div>${partial}${rows}</div>`;
@@ -119,6 +120,7 @@ export function statsChartOption(
     series: [
       {
         name: "Stars",
+        ...lineStyle("Stars"),
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
@@ -127,6 +129,7 @@ export function statsChartOption(
       },
       {
         name: "Forks",
+        ...lineStyle("Forks"),
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
@@ -135,6 +138,7 @@ export function statsChartOption(
       },
       {
         name: "Watchers",
+        ...lineStyle("Watchers"),
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,
@@ -143,6 +147,7 @@ export function statsChartOption(
       },
       {
         name: contributorsLabel,
+        ...lineStyle(contributorsLabel),
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,

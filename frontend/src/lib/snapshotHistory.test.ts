@@ -13,14 +13,14 @@ const cell = (partial: Partial<SnapshotHistoryCell>): SnapshotHistoryCell => ({
 });
 
 describe("snapshotHistory", () => {
-  it("reads metric values and chart deltas", () => {
+  it("reads recorded snapshot values independently of deltas", () => {
     expect(cellValue(cell({}), "VISITORS")).toBe(3);
     expect(cellValue(cell({}), "VIEWS")).toBe(8);
     expect(chartValue(cell({ visitors: null }), "VISITORS")).toBeNull();
     expect(chartValue(cell({ firstSeen: true }), "VISITORS")).toBe(3);
-    expect(chartValue(cell({ visitorsDelta: null }), "VISITORS")).toBeNull();
-    expect(chartValue(cell({ visitorsDelta: -2 }), "VISITORS")).toBeNull();
-    expect(chartValue(cell({}), "VISITORS")).toBe(1);
+    expect(chartValue(cell({ visitorsDelta: null }), "VISITORS")).toBe(3);
+    expect(chartValue(cell({ visitorsDelta: -2 }), "VISITORS")).toBe(3);
+    expect(chartValue(cell({}), "VISITORS")).toBe(3);
   });
 
   it("picks latest values and default keys", () => {

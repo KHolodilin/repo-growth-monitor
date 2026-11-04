@@ -1,3 +1,4 @@
+import { lineStyle, prepareSeriesStyles, seriesStyle } from "./seriesStyle";
 import type { GrowthEvent, SearchSeries } from "./api";
 import { eventUtcDate } from "./growthEvents";
 import { datesFromHistory, rankHistoryOption } from "./rankChart";
@@ -31,15 +32,17 @@ export function queryChartLines({
   snapshotDates: string[];
   ours: {
     name: string;
+    key?: string;
     rank: { date: string; position: number | null }[];
     stored: { date: string; stars: number; forks: number }[];
   };
-  neighbors: { name: string; stored: { date: string; position: number; stars: number; forks: number }[] }[];
-}): { name: string; points: SearchChartPoint[] }[] {
+  neighbors: { name: string; key?: string; stored: { date: string; position: number; stars: number; forks: number }[] }[];
+}): { name: string; key?: string; points: SearchChartPoint[] }[] {
   const ourRank = new Map(ours.rank.map((point) => [point.date, point.position]));
   const ourStored = new Map(ours.stored.map((point) => [point.date, point]));
   const oursLine = {
     name: ours.name,
+    key: ours.key,
     tracked: true,
     points: snapshotDates.map((date) => {
       const stored = ourStored.get(date);
@@ -55,6 +58,7 @@ export function queryChartLines({
     const stored = new Map(neighbor.stored.map((point) => [point.date, point]));
     return {
       name: neighbor.name,
+      key: neighbor.key,
       points: snapshotDates.map((date) => {
         const point = stored.get(date);
         if (!point) {
@@ -67,7 +71,7 @@ export function queryChartLines({
   return [oursLine, ...neighborLines];
 }
 
-type ChartLine = { name: string; tracked?: boolean; points: SearchChartPoint[] };
+type ChartLine = { name: string; key?: string; tracked?: boolean; points: SearchChartPoint[] };
 
 function hasStoredSnapshot(point: SearchChartPoint | undefined) {
   return point != null && (point.position != null || point.stars != null || point.forks != null);
@@ -95,6 +99,7 @@ export function timelineFrame(dates: string[], lines: ChartLine[], missedDates: 
     dateToDay: new Map(longestSpan.map((date, index) => [date, String(index + 1)])),
     lines: spans.map(({ line, byDate, span }) => ({
       name: line.name,
+      key: line.key,
       points: axis.flatMap((label, index) => {
         if (index >= span.length || missed.has(span[index])) {
           return [];
@@ -142,6 +147,7 @@ export function searchMetricOption({
       markerAt,
       series: (frame?.lines ?? lines).map((line) => ({
         name: line.name,
+      key: line.key,
         limit,
         missedDates: "missedDays" in line ? line.missedDays : missedDates,
         points: line.points.map((point) => ({ date: point.date, position: point.position })),
@@ -157,6 +163,7 @@ export function searchMetricOption({
     markerAt,
     series: plotted.map((line) => ({
       name: line.name,
+      key: line.key,
       data: axisDates.map((date) => line.points.find((point) => point.date === date)?.[field] ?? null),
     })),
   });
@@ -196,12 +203,13 @@ export function queryDetailsChart({
     if (!row) {
       return [];
     }
-    return [{ name: row.result.fullName, stored: storedById.get(id)?.points ?? [] }];
+    return [{ key: `repository:${id}`, name: row.result.fullName, stored: storedById.get(id)?.points ?? [] }];
   });
   const lines = queryChartLines({
     snapshotDates: history.points.map((point) => point.date),
     ours: {
       name: repo.fullName,
+      key: `repository:${repo.githubId}`,
       rank: history.points,
       stored: storedById.get(repo.githubId)?.points ?? [],
     },
@@ -218,13 +226,13 @@ export function queryDetailsChart({
       events,
     }),
     series: [
-      { key: String(repo.githubId), name: repo.fullName },
+      { key: `repository:${repo.githubId}`, name: repo.fullName },
       ...selected.flatMap((id) => {
         const row = rows?.find((item) => item.result.githubRepositoryId === id);
         if (!row || id === repo.githubId) {
           return [];
         }
-        return [{ key: String(id), name: row.result.fullName }];
+        return [{ key: `repository:${id}`, name: row.result.fullName }];
       }),
     ],
   };
@@ -235,7 +243,7 @@ export function storedCountOption({
   series,
 }: {
   dates: string[];
-  series: { name: string; data: (number | null)[] }[];
+  series: { name: string; key?: string; data: (number | null)[] }[];
 }) {
   return countHistoryOption({ dates, series });
 }
@@ -248,11 +256,12 @@ function countHistoryOption({
   markerAt,
 }: {
   dates: string[];
-  series: { name: string; data: (number | null)[] }[];
+  series: { name: string; key?: string; data: (number | null)[] }[];
   formatAxis?: (value: string) => string;
   events?: GrowthEvent[];
   markerAt?: (event: GrowthEvent) => string;
 }) {
+  prepareSeriesStyles(series.map(item => item.key ?? item.name));
   const overlays = events.length > 0 ? eventMarkOverlays(dates, events, 1, undefined, markerAt) : null;
   const eventSeries = overlays && overlays.groups.length > 0
     ? [{
@@ -277,7 +286,8 @@ function countHistoryOption({
           .filter((item) => item.seriesName !== "Events")
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
-            return `<div>${item.seriesName}: ${value}</div>`;
+            const identity = series.find(line => line.name === item.seriesName);
+            return `<div><span style="color:${seriesStyle(identity?.key ?? item.seriesName).color}">●</span> ${item.seriesName}: ${value}</div>`;
           })
           .join("");
         return `<div>${date}${rows}</div>`;
@@ -300,6 +310,7 @@ function countHistoryOption({
     series: [
       ...series.map((item) => ({
         name: item.name,
+        ...lineStyle(item.key ?? item.name),
         type: "line" as const,
         showSymbol: true,
         symbolSize: 8,

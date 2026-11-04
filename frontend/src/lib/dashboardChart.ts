@@ -1,3 +1,4 @@
+import { lineStyle, metricColor } from "./seriesStyle";
 import { partialDayTooltip } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
@@ -8,6 +9,7 @@ type DashboardTrafficPoint = {
   views: number | null;
   visitors: number | null;
   clones: number | null;
+  uniqueCloners?: number | null;
   viewsLeaders?: TrafficLeader[] | null;
   visitorsLeaders?: TrafficLeader[] | null;
   clonesLeaders?: TrafficLeader[] | null;
@@ -88,13 +90,13 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
             const value = pointValue(item.data);
             const shown = value === null || value === undefined ? "—" : formatNumber(value);
             const share = shareLines(value, leadersFor(point, item.seriesName));
-            return `<div>${item.seriesName} - ${shown}</div>${share}`;
+            return `<div><span style="color:${metricColor(item.seriesName)}">●</span> ${item.seriesName} - ${shown}</div>${share}`;
           })
           .join("");
         return `<div><div>${formatChartAxisDate(dateKey)}</div>${partial}${rows}</div>`;
       },
     },
-    legend: { top: 0, data: ["Views", "Visitors", "Clones"] },
+    legend: { top: 0, data: ["Views", "Visitors", "Clones", "Unique Cloners"] },
     grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
     xAxis: {
       type: "category" as const,
@@ -111,9 +113,10 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
     },
     yAxis: { type: "value" as const },
     series: [
-      ...metricSeries(traffic, "views", "Views", "#5470c6"),
-      ...metricSeries(traffic, "visitors", "Visitors", "#91cc75"),
-      ...metricSeries(traffic, "clones", "Clones", "#fac858"),
+      ...metricSeries(traffic, "views", "Views", metricColor("Views")!),
+      ...metricSeries(traffic, "visitors", "Visitors", metricColor("Visitors")!),
+      ...metricSeries(traffic, "clones", "Clones", metricColor("Clones")!),
+      ...metricSeries(traffic, "uniqueCloners", "Unique Cloners", metricColor("Unique Cloners")!),
     ],
   };
 }
@@ -122,6 +125,7 @@ const METRIC_KEY = {
   views: "views",
   visitors: "visitors",
   clones: "clones",
+  uniqueCloners: "uniqueCloners",
 } as const;
 
 function metricSeries(
@@ -134,6 +138,7 @@ function metricSeries(
     {
       name,
       type: "line" as const,
+      ...lineStyle(name),
       color,
       showSymbol: true,
       symbolSize: 8,

@@ -1,3 +1,4 @@
+import { metricColor } from "../lib/seriesStyle";
 import type { TrafficCoverage } from "../lib/api";
 import type { Period } from "./PeriodSelector";
 import { Card } from "./ui";
@@ -57,7 +58,7 @@ export function TrafficKpiCard({
             {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}
           </div>
           {hasSparkline && (
-            <Sparkline values={sparklineValues} direction={growth?.direction} color={sparklineColor} />
+            <Sparkline values={sparklineValues} direction={growth?.direction} color={metricColor(label) ?? sparklineColor} />
           )}
         </div>
       )}

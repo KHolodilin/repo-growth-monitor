@@ -1,0 +1,63 @@
+---
+description: Keep semantic chart colors consistent across KPI, charts, legends, tooltips and exports; verify identity and collision handling
+alwaysApply: true
+---
+
+# Chart color and series identity consistency
+
+Tracking issue: https://github.com/KHolodilin/repo-growth-monitor/issues/185
+Related: #184 (Traffic metric parity).
+
+Apply this rule when adding or changing analytical KPI, sparklines, graph series, chart legends/tooltips, series selection or chart exports. Existing inconsistencies are tracked by #185; this document does not mean they are already fixed. Keep unrelated work scoped and report pre-existing violations separately.
+
+## Fixed metrics: one semantic identity
+
+- Resolve Views, Visitors, Clones, Unique Cloners, Stars, Forks, Watchers and Contributors through a single shared metric-style registry.
+- Bind style to the underlying metric ID, not its display text, translated label or position in an array. Display aliases must resolve deliberately; never merge different measures just because labels are similar.
+- Clones and Unique Cloners are different metric IDs and need distinct styles. Contributors / Unique Contributors labels must use their deliberate metric-family mapping without changing their aggregation semantics.
+- Reuse that style across the named metric's KPI sparkline, chart line/point, legend swatch, tooltip marker, mobile series marker and PNG export; preserve it between Portfolio, repository and relevant competitor views.
+- Do not let chart-library default palette ordering choose a named metric's color. Do not duplicate independent metric hex constants in page components.
+- Document the canonical mapping in the shared registry. Prefer intentional established colors when migrating; do not recolor unrelated UI as part of a local fix.
+- Keep axes, numeric text and ordinary labels readable and neutral. A colored swatch is sufficient to express series identity.
+
+## Series identity and status mean different things
+
+- Increase/decrease/warning/error/missing colors describe state, not metric identity.
+- A delta arrow or change label may use a semantic status color. Do not make the named metric's sparkline change color merely because the trend changes sign.
+- Events, unavailable observations and Other use explicit shared conventions. Do not accidentally allocate their neutral/status styles to ordinary metrics.
+- Preserve semantic identity in supported themes; theme-specific colors may differ in RGB while staying recognizable and maintaining readable contrast.
+
+## Dynamic query/topic/source/path/repository series
+
+- Key styles by stable domain identity: query/watch/repository ID, full source key or full normalized path, with repository/scope qualification where needed.
+- Do not use current row index, selected-array index, sorting order, truncated name or legend position as identity.
+- Preserve an existing series style through sorting, selection changes, hide/show, refresh, period changes, responsive transitions and reordering. If scope changes the actual data series, make that identity distinction explicit.
+- Handle palette/hash collisions deterministically. Do not recolor existing series each time the selected subset changes.
+- For the normal supported visible series count, choose distinct usable colors. If visible series exceed the useful palette, distinguish them with stable line-pattern and marker combinations as well.
+- Two concurrently visible series must not have the same complete color + line pattern + marker signature. Match those signatures in chart, legend and tooltip where applicable.
+- Keep readable names available. Do not depend on hue alone to distinguish series; preserve marker/pattern/label cues and selection state.
+
+## Required verification for affected work
+
+Use this checklist in the PR validation report. State what was actually checked; do not claim automated enforcement because this Markdown file exists.
+
+- [ ] The same fixed metric uses the shared identity/style in KPI, graph, legend, tooltip/mobile marker and PNG, on all affected screens.
+- [ ] Clones and Unique Cloners are distinct; display aliases do not accidentally change the underlying mapping.
+- [ ] Named-metric colors do not depend on series order or chart-library defaults; no new independent per-page metric palette was introduced.
+- [ ] Delta/status colors remain separate from series colors; a sign change does not recolor the metric sparkline.
+- [ ] Sort/reorder, hide/show, refresh, period changes and desktop/mobile transitions preserve existing series styles.
+- [ ] Dynamic-series fixtures include intentional collisions and more visible series than palette entries; active signatures remain distinguishable and deterministic.
+- [ ] Supported themes keep chart marks and labels readable, with non-color identity cues where needed.
+- [ ] Relevant automated regression tests pass and test real consumers: KPI/chart option agreement, aliases, dynamic identity/collisions and status separation. Tests must not merely copy the registry constants into expected constants.
+- [ ] Interactively compare affected sibling screens. For the #185 migration cover Portfolio/Repository Traffic and Stats, Search/Topics, competitor graphs and History sources/paths; check mobile and desktop.
+- [ ] Record remaining pre-existing violations and scope limitations explicitly rather than marking them passed.
+
+This rule adds review requirements. The shared registry is frontend/src/lib/seriesStyle.ts; consumer regression checks accompany #185. Follow issue-workflow.mdc and issue-execution.mdc when implementation is requested; do not infer permission to merge, release or deploy from this rule.
+
+## Canonical mapping and dynamic assignment
+
+- Views / Stars: #4267b2; Visitors / Forks: #2e8540; Clones / Watchers: #b7791f; Unique Cloners: #7c3aed; Contributors (including Unique Contributors): #c43c3c.
+- These colors target the supported light theme; no dark theme is currently exposed by the app. Status arrows retain their separate status palette.
+- Dynamic styles use full domain keys (query/watch IDs, repository GitHub ID, source key, full path). Allocate sorted new identities through prepareSeriesStyles before selecting a subset. Never derive identity from rank/table position.
+- Assignments are persisted locally in rgm-series-styles-v1. If browser storage is unavailable, the in-memory registry keeps the current session stable. Existing assignments are never displaced by newly discovered identities.
+- The first usable palette is followed by unique generated hues and stable line/marker variants. Legend swatches and tooltip markers must use the same identity. Neutral Other and missing observations are reserved explicitly.

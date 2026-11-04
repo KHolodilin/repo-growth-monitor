@@ -519,7 +519,7 @@ describe("pages", () => {
     runView.unmount();
 
     const historyView = renderPath("/repositories/13/traffic/history?kind=paths&days=7", <TrafficHistoryPage />);
-    expect(await screen.findByRole("heading", { name: "Path Traffic (by day)" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Path Snapshot History" })).toBeInTheDocument();
     historyView.unmount();
 
     render(

@@ -10,18 +10,21 @@ import { TrafficKpiCard } from "./TrafficKpiCard";
 import { Card } from "./ui";
 
 const STATS_CARDS = [
-  { key: "stars", label: "Stars", color: "#5470c6" },
-  { key: "forks", label: "Forks", color: "#91cc75" },
-  { key: "watchers", label: "Watchers", color: "#fac858" },
-  { key: "contributors", label: "Contributors", color: "#ee6666" },
+  { key: "stars", label: "Stars" },
+  { key: "forks", label: "Forks" },
+  { key: "watchers", label: "Watchers" },
+  { key: "contributors", label: "Contributors" },
 ] as const;
 
 export function RepositoryStatsPanel({
   repositoryId,
   period,
+  selectedMobileSeries, onMobileSeriesChange,
 }: {
   repositoryId: number;
   period: Period;
+  selectedMobileSeries?: string;
+  onMobileSeriesChange?: (name: string) => void;
 }) {
   const [history, setHistory] = useState<RepositoryStatsHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -75,7 +78,7 @@ export function RepositoryStatsPanel({
               absoluteChange={total.absoluteChange}
               period={period}
               series={history.points.map((point) => point[card.key])}
-              sparklineColor={card.color}
+
             />
           );
         })}
@@ -86,6 +89,8 @@ export function RepositoryStatsPanel({
         period={period}
         context={`repository:${repositoryId}:stats`}
         mobileSeries={STATS_SERIES}
+        selectedMobileSeries={selectedMobileSeries}
+        onMobileSeriesChange={onMobileSeriesChange}
       >
         {history.points.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
@@ -94,6 +99,8 @@ export function RepositoryStatsPanel({
           </div>
         ) : (
           <PersistentECharts
+            accessibleTitle="Repository Stats"
+            dataAlternative={false}
             chartId={repoStatsChartId(repositoryId)}
             series={STATS_SERIES}
             option={option}
@@ -103,9 +110,9 @@ export function RepositoryStatsPanel({
       </ChartCard>
       {history.points.length > 0 && (
         <Card>
-          <h2 className="mb-3 font-medium">Daily totals</h2>
+          <h2 id={`stats-daily-${repositoryId}`} className="mb-3 font-medium">Daily totals</h2>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table aria-labelledby={`stats-daily-${repositoryId}`} className="w-full text-sm">
               <thead>
                 <tr className="text-left text-muted-foreground">
                   <th className="py-2 pr-4 font-medium">Date</th>

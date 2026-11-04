@@ -55,7 +55,7 @@ describe("portfolio highlights", () => {
         <DashboardPage />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Unique Cloners")).toBeInTheDocument();
+    expect((await screen.findAllByText("Unique Cloners"))[0]).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "acme/outbox · outbox 22 → 14" })).toHaveAttribute(
       "href",
       "/repositories/13?tab=search",

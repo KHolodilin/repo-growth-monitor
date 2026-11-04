@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps } from "react";
+import { seriesStyle } from "../lib/seriesStyle";
+import { SeriesSwatch } from "./SeriesSwatch";
+import { ChartDataAlternative } from "./ChartDataAlternative";
 import ReactECharts from "echarts-for-react";
 import type { GrowthEvent } from "../lib/api";
 import { defaultChartSelection, readChartSelection, writeChartSelection } from "../lib/chartLegend";
@@ -14,6 +17,9 @@ type Props = {
   series: readonly SeriesRef[];
   /** Rank History uses the query table instead of the legend cookie. */
   persistSelection?: boolean;
+  accessibleTitle?: string;
+  exportTitle?: string;
+  dataAlternative?: boolean;
 } & ComponentProps<typeof ReactECharts>;
 
 export function ChartModePlot({
@@ -30,7 +36,8 @@ export function ChartModePlot({
   return <PersistentECharts {...rest} option={option} />;
 }
 
-export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, style, ...rest }: Props) {
+export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, accessibleTitle, exportTitle, dataAlternative = true, style, ...rest }: Props) {
+  const descriptionId = useId();
   const chartRef = useRef<ReactECharts>(null);
   const mode = useChartMode();
   const [stored, setStored] = useState<Record<string, boolean> | null>(() => readChartSelection(chartId));
@@ -55,7 +62,7 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
         selected[item.name] = defaults[item.key];
         continue;
       }
-      selected[item.name] = Object.prototype.hasOwnProperty.call(stored, item.key) ? stored[item.key] : true;
+      selected[item.name] = Object.prototype.hasOwnProperty.call(stored, item.key) ? stored[item.key] : (item.key === "Total Clones" || item.key === "Unique Cloners" ? false : true);
     }
     if (mode.mobile) {
       selected.Events = false;
@@ -67,17 +74,17 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     const base = option as { legend?: unknown; grid?: Record<string, unknown> };
     const legend = base.legend;
     if (!legend || typeof legend !== "object" || Array.isArray(legend)) {
-      return mode.mobile
+      return mode.mobile || accessibleTitle
         ? { ...option, legend: { show: false, selected: selectedByName } }
         : option;
     }
     return {
       ...option,
-      legend: mode.mobile
+      legend: mode.mobile || accessibleTitle
         ? { ...legend, show: false, selected: selectedByName }
         : { ...legend, selected: selectedByName },
     };
-  }, [option, selectedByName, mode.mobile]);
+  }, [option, selectedByName, mode.mobile, accessibleTitle]);
 
   const presented = useMemo(
     () =>
@@ -115,11 +122,24 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
 
   const fileBase = chartExportBase(chartId);
   useRegisterChartExport({
-    downloadPng: () => downloadChartPng(chartRef.current, `${fileBase}.png`),
+    downloadPng: () => downloadChartPng(chartRef.current, `${fileBase}.png`, exportTitle ?? accessibleTitle),
     downloadCsv: () => downloadChartCsv(`${fileBase}.csv`, chartCsv(presented)),
   });
 
+  const shown = series.filter(item => selectedByName[item.name]).map(item => item.name);
+  function toggleSeries(name: string) {
+    onLegendSelectChanged({ selected: { ...selectedByName, [name]: !selectedByName[name] } });
+  }
   return (
+    <div role="group" aria-label={accessibleTitle ?? `${chartId} chart`}>
+      {accessibleTitle && !mode.mobile && <div role="group" aria-label={`${accessibleTitle} series`} className="mb-3 flex flex-wrap justify-center gap-2">
+        {series.map(item => <button key={item.key} type="button" aria-pressed={selectedByName[item.name]} onClick={() => toggleSeries(item.name)} className="inline-flex min-h-10 items-center gap-1.5 rounded border px-3 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+          <SeriesSwatch style={seriesStyle(item.name)} />{item.name}<span aria-hidden="true">{selectedByName[item.name] ? "✓" : "—"}</span>
+        </button>)}
+      </div>}
+      <p id={descriptionId} className="sr-only">{accessibleTitle ?? chartId}. Period: {mode.period ?? "all"}. Visible series: {shown.join(", ") || "none"}. Historical values are available below the chart.</p>
+      {accessibleTitle && shown.length === 0 && <p role="status" className="py-3 text-center text-sm text-muted-foreground">No series selected. Choose a metric to display the chart.</p>}
+      <div role="img" aria-label={`${accessibleTitle ?? chartId} graph`} aria-describedby={descriptionId}>
     <ReactECharts
       option={presented}
       notMerge
@@ -139,5 +159,8 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
       {...rest}
       ref={chartRef}
     />
+      </div>
+      {accessibleTitle && dataAlternative && <ChartDataAlternative option={presented} title={accessibleTitle} />}
+    </div>
   );
 }

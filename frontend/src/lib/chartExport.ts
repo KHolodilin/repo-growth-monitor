@@ -3,12 +3,20 @@ type Axis = { data?: unknown[] };
 type Series = { name?: string; type?: string; data?: unknown[] };
 
 type ChartOption = {
+  exportDates?: string[];
+  exportExtraColumns?: { name: string; data: unknown[] }[];
+  exportLabels?: Record<string, string>;
   xAxis?: Axis | Axis[];
   series?: Series[];
 };
 
 type ChartView = {
   getEchartsInstance: () => {
+    getOption?: () => unknown;
+    getWidth?: () => number;
+    getHeight?: () => number;
+    resize?: (size: { width: number; height: number; silent: boolean }) => void;
+    setOption?: (option: unknown, replace?: boolean) => void;
     getDataURL: (opts: { type: "png"; pixelRatio: number; backgroundColor: string }) => string;
   };
 };
@@ -22,26 +30,43 @@ export function chartExportBase(chartId: string) {
 }
 
 /** One row per axis date, one column per line series. Event markers and rank glyphs stay off the sheet. */
+export function chartTable(option: object) {
+  const chart = option as ChartOption;
+  const axis = Array.isArray(chart.xAxis) ? chart.xAxis[0] : chart.xAxis;
+  const dates = (chart.exportDates ?? axis?.data ?? []).map(value => value == null ? "" : String(value));
+  return { dates, columns: [...mergedColumns(chart.series ?? []), ...(chart.exportExtraColumns ?? [])].map(column => ({ name: chart.exportLabels?.[column.name] ?? column.name, values: dates.map((_, index) => cellText(column.data[index])) })) };
+}
+
 export function chartCsv(option: object) {
   const chart = option as ChartOption;
   const axis = Array.isArray(chart.xAxis) ? chart.xAxis[0] : chart.xAxis;
-  const dates = (axis?.data ?? []).map((value) => (value == null ? "" : String(value)));
-  const columns = mergedColumns(chart.series ?? []);
-  const header = ["date", ...columns.map((series) => series.name)].map(csvField).join(",");
+  const dates = (chart.exportDates ?? axis?.data ?? []).map((value) => (value == null ? "" : String(value)));
+  const columns = [...mergedColumns(chart.series ?? []), ...(chart.exportExtraColumns ?? [])];
+  const header = ["date", ...columns.map((series) => chart.exportLabels?.[series.name] ?? series.name)].map(csvField).join(",");
   const rows = dates.map((date, index) =>
     [date, ...columns.map((series) => cellText(series.data?.[index]))].map(csvField).join(","),
   );
   return [header, ...rows].join("\n");
 }
 
-export function downloadChartPng(chart: ChartView | null, filename: string) {
+export function downloadChartPng(chart: ChartView | null, filename: string, title?: string) {
   if (!chart) {
     return;
   }
-  saveDownload(
-    filename,
-    chart.getEchartsInstance().getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#fff" }),
-  );
+  const instance = chart.getEchartsInstance();
+  const original = title && instance.getOption && instance.setOption ? instance.getOption() : null;
+  const size = original && instance.resize && instance.getWidth && instance.getHeight ? { width: instance.getWidth(), height: instance.getHeight() } : null;
+  try {
+    if (original) instance.setOption!({ animation: false, title: { text: title, left: "center", top: 0, textStyle: { fontSize: 14 } }, legend: { show: true, top: 24 }, grid: { top: 96, left: 48, right: 32, bottom: 40, containLabel: true } });
+    if (size) instance.resize!({ width: Math.max(760, size.width), height: Math.max(400, size.height), silent: true });
+    const image = instance.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#fff" });
+    const bytes = Uint8Array.from(atob(image.split(",")[1]), char => char.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+    try { saveDownload(filename, url); } finally { URL.revokeObjectURL(url); }
+  } finally {
+    if (original) instance.setOption!(original, true);
+    if (size) instance.resize!({ ...size, silent: true });
+  }
 }
 
 export function downloadChartCsv(filename: string, csv: string) {
@@ -77,7 +102,7 @@ function mergedColumns(series: Series[]) {
       }
     }
   }
-  return order.map((name) => ({ name, data: data.get(name) }));
+  return order.map((name) => ({ name, data: data.get(name)! }));
 }
 
 function isExportedSeries(series: Series): series is Series & { name: string } {

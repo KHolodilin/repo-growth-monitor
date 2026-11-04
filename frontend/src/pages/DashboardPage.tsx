@@ -34,10 +34,10 @@ const SORT_LABELS: Record<SortKey, string> = {
 };
 
 const PORTFOLIO_STATS = [
-  { key: "stars", label: "Stars", color: "#5470c6" },
-  { key: "forks", label: "Forks", color: "#91cc75" },
-  { key: "watchers", label: "Watchers", color: "#fac858" },
-  { key: "contributors", label: "Unique Contributors", color: "#ee6666" },
+  { key: "stars", label: "Stars" },
+  { key: "forks", label: "Forks" },
+  { key: "watchers", label: "Watchers" },
+  { key: "contributors", label: "Unique Contributors" },
 ] as const;
 
 export function DashboardPage() {
@@ -169,7 +169,7 @@ export function DashboardPage() {
                 absoluteChange={total.absoluteChange}
                 period={period}
                 series={data.stats.points.map((point) => point[card.key])}
-                sparklineColor={card.color}
+
               />
             );
           })}
@@ -365,7 +365,8 @@ function TrafficChart({
       onMobileSeriesChange={onMobileSeriesChange}
       mobileSeries={TRAFFIC_SERIES}
     >
-      {!traffic.some(point => point.views != null || point.visitors != null || point.clones != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <PersistentECharts
+      {!traffic.some(point => point.views != null || point.visitors != null || point.clones != null || point.uniqueCloners != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <PersistentECharts
+        accessibleTitle="Portfolio Traffic"
         chartId={dashboardTrafficChartId()}
         series={TRAFFIC_SERIES}
         option={option}
@@ -404,6 +405,7 @@ function StatsChart({
       mobileSeries={DASHBOARD_STATS_SERIES}
     >
       <PersistentECharts
+        accessibleTitle="Portfolio Stats"
         chartId={dashboardStatsChartId()}
         series={DASHBOARD_STATS_SERIES}
         option={option}

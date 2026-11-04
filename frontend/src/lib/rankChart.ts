@@ -1,3 +1,4 @@
+import { prepareSeriesStyles, seriesStyle, MISSING_COLOR } from "./seriesStyle";
 import type { Period } from "../components/PeriodSelector";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
@@ -5,25 +6,19 @@ import { eventUtcDate } from "./growthEvents";
 import { periodDates } from "./searchVisibilityKpi";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
-export const RANK_LINE_COLORS = ["#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de", "#3ba272", "#fc8452", "#9a60b4"];
-
-export function rankLineColor(index: number) {
-  return RANK_LINE_COLORS[index % RANK_LINE_COLORS.length];
-}
-const MISSED_COLOR = "#9ca3af";
+const MISSED_COLOR = MISSING_COLOR;
 
 export type RankHistoryPoint = { date: string; position: number | null };
 
 export type RankHistorySeries = {
   name: string;
+  key?: string;
   points: RankHistoryPoint[];
   limit: number;
   /** Days the planner never ran. GitHub Search cannot be replayed, so they stay empty forever. */
   missedDates?: string[];
   highlighted?: boolean;
   dimmed?: boolean;
-  /** Stable color so hiding another query does not repaint this line. */
-  color?: string;
 };
 
 export function rankTooltipText(point: RankHistoryPoint | undefined, limit: number, missed = false) {
@@ -112,8 +107,11 @@ export function rankHistoryOption({
   const locate = frame ? (event: GrowthEvent) => frame.dateToDay.get(eventUtcDate(event)) ?? "" : markerAt;
   const overlays = visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period, locate) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
-  const lines = plotSeries.flatMap((item, index) => {
-    const color = item.color ?? rankLineColor(index);
+  prepareSeriesStyles(plotSeries.map(item => item.key ?? item.name));
+  const lines = plotSeries.flatMap((item) => {
+    const identity = item.key ?? item.name;
+    const style = seriesStyle(identity);
+    const color = style.color;
     const byDate = new Map(item.points.map((point) => [point.date, point]));
     const missed = new Set(item.missedDates ?? []);
     return [
@@ -122,9 +120,9 @@ export function rankHistoryOption({
         type: "line",
         connectNulls: true,
         showSymbol: true,
-        symbol: "circle",
+        symbol: style.symbol,
         symbolSize: item.highlighted ? 8 : 6,
-        lineStyle: { width: item.highlighted ? 3.5 : 2, opacity: item.dimmed ? 0.25 : 1, color },
+        lineStyle: { type: style.line, width: item.highlighted ? 3.5 : 2, opacity: item.dimmed ? 0.25 : 1, color },
         itemStyle: { color, opacity: item.dimmed ? 0.25 : 1 },
         data: axisDates.map((date) => {
           const point = byDate.get(date);
@@ -179,7 +177,7 @@ export function rankHistoryOption({
           .map((item) => {
             const point = item.points.find((entry) => entry.date === date);
             const missed = item.missedDates?.includes(date) ?? false;
-            return `${item.name}: ${rankTooltipText(point, item.limit, missed)}`;
+            return `<span style="color:${seriesStyle(item.key ?? item.name).color}">●</span> ${item.name}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
         const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];

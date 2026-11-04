@@ -54,7 +54,7 @@ describe("chartExport", () => {
       [{ date: "2026-09-23", views: 8, uniqueVisitors: 3, clones: 2, uniqueCloners: 1 }],
       [event],
     );
-    expect(chartCsv(traffic)).toBe("date,Views,Visitors,Unique Cloners\n2026-09-21,,,\n2026-09-23,8,3,1");
+    expect(chartCsv(traffic)).toBe("date,Views,Visitors,Clones,Unique Cloners\n2026-09-21,,,,\n2026-09-23,8,3,2,1");
     expect(chartCsv(traffic)).not.toContain("Events");
 
     expect(
@@ -70,7 +70,7 @@ describe("chartExport", () => {
           { date: "2026-10-09", views: 2, visitors: null, clones: null },
         ]),
       ),
-    ).toBe("date,Views,Visitors,Clones\n2026-10-08,,3,1\n2026-10-09,2,,");
+    ).toBe("date,Views,Visitors,Clones,Unique Cloners\n2026-10-08,,3,1,\n2026-10-09,2,,,");
     expect(chartCsv({
       xAxis: { data: ["2026-10-18"] },
       series: [
@@ -128,13 +128,14 @@ describe("chartExport", () => {
     const getDataURL = vi.fn(() => "data:image/png;base64,AAAA");
     downloadChartPng({ getEchartsInstance: () => ({ getDataURL }) }, "13-traffic.png");
     expect(getDataURL).toHaveBeenCalledWith({ type: "png", pixelRatio: 2, backgroundColor: "#fff" });
-    expect(downloads).toEqual([{ href: "data:image/png;base64,AAAA", download: "13-traffic.png" }]);
+    expect(downloads).toEqual([{ href: "blob:chart", download: "13-traffic.png" }]);
 
     downloadChartCsv("13-traffic.csv", "date,Views\n2026-09-23,4");
     expect(revoke).toHaveBeenCalledWith("blob:chart");
     expect(downloads[1]?.download).toBe("13-traffic.csv");
-    expect(blobs[0]?.type).toBe("text/csv;charset=utf-8");
-    return blobs[0].arrayBuffer().then((buffer) => {
+    expect(blobs[0]?.type).toBe("image/png");
+    expect(blobs[1]?.type).toBe("text/csv;charset=utf-8");
+    return blobs[1].arrayBuffer().then((buffer) => {
       const bytes = new Uint8Array(buffer);
       expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
       expect(new TextDecoder().decode(bytes.slice(3))).toBe("date,Views\n2026-09-23,4");

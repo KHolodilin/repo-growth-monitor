@@ -17,7 +17,7 @@ describe("dashboardTrafficOption", () => {
     expect(option.tooltip.trigger).toBe("item");
     expect(option.tooltip.triggerOn).toBe("click");
     expect(option.xAxis.boundaryGap).toBe(false);
-    expect(option.series).toHaveLength(3);
+    expect(option.series).toHaveLength(4);
     expect(option.series.some((series) => series.lineStyle?.type === "dashed")).toBe(false);
     expect(formatter({})).toBe("");
     expect(dashboardTrafficOption([{ date: "2026-10-08", views: 1, visitors: 1, clones: 1 }]).xAxis.boundaryGap).toBe(true);
@@ -67,8 +67,8 @@ describe("dashboardTrafficOption", () => {
     expect(clones).toContain("owner/outbox - 5");
     expect(clones).not.toContain("Views");
     expect(clones).not.toContain("Visitors");
-    expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
-    expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).toBe("<div><div>Oct 9</div><div>Views - 40</div></div>");
+    expect(formatter([{ axisValue: "2026-10-09", seriesName: "Views", data: 40 }])).toContain("Views - 40");
+    expect(formatter({ name: "2026-10-09", seriesName: "Views", data: 40 })).toContain("Views - 40");
     expect(formatter({ seriesName: "Views", data: 1 })).toBe("");
     expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: undefined as unknown as null }])).toContain("Views - —");
     expect(formatter([{ axisValue: "2026-10-08", seriesName: "Views", data: { value: 40 } }])).toContain("Views - 40");

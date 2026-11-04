@@ -1,3 +1,4 @@
+import { statsChartOption } from "../lib/statsChart";
 import { Layout } from "../components/Layout";
 import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -159,7 +160,7 @@ describe("extra coverage", () => {
     runView.unmount();
 
     const historyView = renderAt("/repositories/13/traffic/history?kind=paths&days=7", <TrafficHistoryPage />);
-    expect(await screen.findByRole("heading", { name: "Path Traffic (by day)" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Path Snapshot History" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Referrers" }));
     await user.click(screen.getByRole("button", { name: "1d" }));
     await user.click(screen.getByRole("button", { name: "Popular Paths" }));
@@ -361,7 +362,7 @@ describe("extra coverage", () => {
     expect(screen.getByText("Daily totals")).toBeInTheDocument();
     expect(
       [...stats.container.querySelectorAll("polyline")].map((line) => line.getAttribute("stroke")),
-    ).toEqual(["#5470c6", "#91cc75", "#fac858", "#ee6666"]);
+    ).toEqual(statsChartOption([]).series.map(line => line.itemStyle.color));
     stats.unmount();
 
     api.mockResolvedValueOnce({

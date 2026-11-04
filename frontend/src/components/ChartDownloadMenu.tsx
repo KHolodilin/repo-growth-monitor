@@ -5,6 +5,8 @@ import { defaultMobileSeriesName } from "../lib/chartLegend";
 import { asGrowthEvents, eventUtcDate, filterGrowthEvents, groupEventsByUtcDate, type EventFilter } from "../lib/growthEvents";
 import type { ChartAxis } from "../lib/chartPresentation";
 import { useIsMobileChart } from "../lib/useMediaQuery";
+import { metricColor, prepareSeriesStyles, seriesStyle } from "../lib/seriesStyle";
+import { SeriesSwatch } from "./SeriesSwatch";
 import { Card } from "./ui";
 import { EventDetailsDialog } from "./GrowthEventsPanel";
 
@@ -293,8 +295,9 @@ function SeriesSegment({
   value: string;
   onChange: (name: string) => void;
 }) {
+  prepareSeriesStyles(options.map(item => metricColor(item.name) ? item.name : item.key));
   return (
-    <div role="tablist" aria-label="Chart series" className="flex gap-1 overflow-x-auto">
+    <div role="tablist" aria-label="Chart series" className={options.every(item => metricColor(item.name)) ? "grid grid-cols-2 gap-1" : "flex gap-1 overflow-x-auto"}>
       {options.map((item) => {
         const active = item.name === value;
         return (
@@ -305,12 +308,12 @@ function SeriesSegment({
             aria-selected={active}
             className={
               active
-                ? "shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground"
-                : "shrink-0 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                ? "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-md bg-primary px-2 py-1.5 text-sm font-medium text-primary-foreground"
+                : "inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
             }
             onClick={() => onChange(item.name)}
           >
-            {item.name}
+            <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} /><span>{item.name}</span>
           </button>
         );
       })}

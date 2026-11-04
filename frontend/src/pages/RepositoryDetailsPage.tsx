@@ -38,7 +38,9 @@ import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { useMutationAccess } from "../lib/mutationAccess";
 import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
 import { asGrowthEvents } from "../lib/growthEvents";
-import { datesFromHistory, rankHistoryOption, rankLineColor } from "../lib/rankChart";
+import { seriesStyle, prepareSeriesStyles } from "../lib/seriesStyle";
+import { SeriesSwatch } from "../components/SeriesSwatch";
+import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import type { RunAllMenuAction } from "../components/Layout";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
@@ -134,6 +136,9 @@ export function RepositoryDetailsPage() {
       cancelled = true;
     };
   }, [repo?.accessible, repo?.trafficPermissionMissing]);
+  const [trafficSeries, setTrafficSeries] = useState("Visitors");
+  const [statsSeries, setStatsSeries] = useState("Stars");
+  const requestVersion = useRef(0);
   const [loading, setLoading] = useState(true);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
   const [runningAll, setRunningAll] = useState(false);
@@ -201,6 +206,7 @@ export function RepositoryDetailsPage() {
     if (!id) {
       return;
     }
+    const version = ++requestVersion.current;
     const [repository, trafficData, searchData, plainTopicData, languageTopicData] = await Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
       api<RepositoryTraffic>(
@@ -210,6 +216,7 @@ export function RepositoryDetailsPage() {
       api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=all`),
       api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=language`),
     ]);
+    if (version !== requestVersion.current) return;
     setRepo(repository);
     setTraffic(trafficData);
     setVisibility(searchData);
@@ -554,7 +561,7 @@ export function RepositoryDetailsPage() {
         <GrowthEventsTab repositoryId={repo.id} period={period} />
       )}
       {tab === "traffic" && (
-        <TrafficPanel
+        <TrafficPanel selectedMobileSeries={trafficSeries} onMobileSeriesChange={setTrafficSeries}
           repositoryId={repo.id}
           traffic={traffic}
           period={period}
@@ -563,7 +570,7 @@ export function RepositoryDetailsPage() {
         />
       )}
       {tab === "stats" && (
-        <RepositoryStatsPanel repositoryId={repo.id} period={period} />
+        <RepositoryStatsPanel repositoryId={repo.id} period={period} selectedMobileSeries={statsSeries} onMobileSeriesChange={setStatsSeries} />
       )}
       {tab === "topics" && (
         <TopicsPanel
@@ -932,6 +939,7 @@ function GrowthEventsTab({
 }
 
 function TrafficPanel({
+  selectedMobileSeries, onMobileSeriesChange,
   repositoryId,
   traffic,
   period,
@@ -941,6 +949,8 @@ function TrafficPanel({
   repositoryId: number;
   traffic: RepositoryTraffic;
   period: Period;
+  selectedMobileSeries: string;
+  onMobileSeriesChange: (name: string) => void;
   showServicePaths: boolean;
   onShowServicePathsChange: (next: boolean) => void;
 }) {
@@ -1004,8 +1014,11 @@ function TrafficPanel({
         context={`repository:${repositoryId}:traffic`}
         onEventsChanged={loadEvents}
         mobileSeries={REPO_TRAFFIC_SERIES}
+        selectedMobileSeries={selectedMobileSeries}
+        onMobileSeriesChange={onMobileSeriesChange}
       >
-        {!traffic.traffic.some(point => point.views != null || point.uniqueVisitors != null || point.uniqueCloners != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <ChartModePlot
+        {!traffic.traffic.some(point => point.views != null || point.uniqueVisitors != null || point.clones != null || point.uniqueCloners != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <ChartModePlot
+          accessibleTitle="Repository Traffic"
           chartId={repoTrafficChartId(repositoryId)}
           series={REPO_TRAFFIC_SERIES}
           style={{ height: 360, width: "100%" }}
@@ -1054,6 +1067,7 @@ function TopicsPanel({
   allowMutations?: boolean;
   onRun: (id: number) => void;
 }) {
+  prepareSeriesStyles(visibility.map(item => `topic:${repositoryId}:${scope}:${item.watch.id}`));
   const [hoveredWatchId, setHoveredWatchId] = useState<number | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
   const knownKey = knownTopics.map((item) => `${item.watch.topic}:${item.currentRank ?? ""}`).join("\n");
@@ -1188,10 +1202,7 @@ function TopicsPanel({
                     <td className="py-3 pr-4">
                       <span className="inline-flex items-center gap-2">
                         {selected.has(item.watch.topic) && (
-                          <span
-                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: rankLineColor(visibility.findIndex((row) => row.watch.id === item.watch.id)) }}
-                          />
+                          <SeriesSwatch style={seriesStyle(`topic:${repositoryId}:${scope}:${item.watch.id}`)} />
                         )}
                         <Link
                           className="text-primary hover:underline"
@@ -1281,12 +1292,12 @@ function CombinedTopicRankChart({
       missedDates: item.missedDates,
       highlighted: highlightWatchId === item.watch.id,
       dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
-      color: rankLineColor(visibility.findIndex((row) => row.watch.id === item.watch.id)),
+      key: `topic:${repositoryId}:${scope}:${item.watch.id}`,
     })),
     [drawn, highlightWatchId, visibility],
   );
   const series = useMemo(
-    () => drawn.map((item) => ({ key: String(item.watch.id), name: item.watch.topic })),
+    () => drawn.map((item) => ({ key: `topic:${repositoryId}:${scope}:${item.watch.id}`, name: item.watch.topic })),
     [drawn],
   );
 
@@ -1353,6 +1364,7 @@ function SearchPanel({
   onRun: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
+  prepareSeriesStyles(visibility.map(item => `query:${item.query.id}`));
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   useEffect(() => {
@@ -1517,10 +1529,7 @@ function SearchPanel({
                   <td className="py-3 pr-4">
                     <span className="inline-flex items-center gap-2">
                       {selected.has(item.query.id) && (
-                        <span
-                          className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)) }}
-                        />
+                        <SeriesSwatch style={seriesStyle(`query:${item.query.id}`)} />
                       )}
                       <Link
                         className="text-primary hover:underline"
@@ -1643,12 +1652,12 @@ function CombinedRankChart({
       missedDates: item.missedDates,
       highlighted: highlightQueryId === item.query.id,
       dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
-      color: rankLineColor(visibility.findIndex((row) => row.query.id === item.query.id)),
+      key: `query:${item.query.id}`,
     })),
     [drawn, highlightQueryId, visibility],
   );
   const series = useMemo(
-    () => drawn.map((item) => ({ key: String(item.query.id), name: item.query.name })),
+    () => drawn.map((item) => ({ key: `query:${item.query.id}`, name: item.query.name })),
     [drawn],
   );
 
