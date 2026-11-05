@@ -1,3 +1,4 @@
+import { PeriodSelector, usePeriod } from "../components/PeriodSelector";
 import { RankSummary } from "../components/RankSummary";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -14,6 +15,7 @@ import { SearchResultsTable } from "../components/SearchResultsTable";
 
 export function QueryDetailsPage() {
   const { repositoryId, queryId } = useParams();
+  const [period, setPeriod] = usePeriod(repositoryId);
   const { allowMutations } = useMutationAccess();
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SearchHistory | null>(null);
@@ -178,12 +180,14 @@ export function QueryDetailsPage() {
         )}
       </header>
 
+      <div role="group" aria-label="History period" className="flex justify-end"><PeriodSelector fitMobile period={period} onPeriod={setPeriod} /></div>
+
       <RankSummary current={history.currentRank} best={history.bestRank} limit={history.query.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
 
       <ChartCard
         title={SEARCH_METRICS[metric].title}
         repositoryId={repo.id}
-        period="all"
+        period={period}
         context={`repository:${repo.id}:query:${history.query.id}`}
         controls={metricControls}
         mobileControls={metricControls}
@@ -239,10 +243,10 @@ function QueryRankChart({
   selected: number[];
   metric: SearchChartMetric;
 }) {
-  const { axis, events } = useChartMode();
+  const { axis, events, period } = useChartMode();
   const chart = useMemo(
-    () => queryDetailsChart({ history, repo, rows, series, selected, metric, axis, events })!,
-    [history, repo, rows, series, selected, metric, axis, events],
+    () => queryDetailsChart({ history, repo, rows, series, selected, metric, axis, events, period })!,
+    [history, repo, rows, series, selected, metric, axis, events, period],
   );
   return (
     <PersistentECharts

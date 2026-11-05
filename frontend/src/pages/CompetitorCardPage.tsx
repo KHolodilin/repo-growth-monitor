@@ -1,3 +1,4 @@
+import { PeriodSelector, usePeriod } from "../components/PeriodSelector";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ChartCard } from "../components/ChartDownloadMenu";
@@ -79,8 +80,10 @@ export function CompetitorCardView({
   chartId: string;
   repositoryId: number;
 }) {
+  const [period, setPeriod] = usePeriod(String(repositoryId));
   const passed = card.discoverability.filter((item) => item.passed).length;
   const option = storedCountOption({
+    period,
     dates: card.points.map((point) => point.date),
     series: [
       { name: "Stars", data: card.points.map((point) => point.stars) },
@@ -128,14 +131,15 @@ export function CompetitorCardView({
         </ul>
       </section>
 
+      <div role="group" aria-label="History period" className="flex justify-end"><PeriodSelector fitMobile period={period} onPeriod={setPeriod} /></div>
       <ChartCard
         title="Stars and forks"
         repositoryId={repositoryId}
-        period="all"
+        period={period}
         context={`repository:${repositoryId}:competitor`}
         mobileSeries={COMPETITOR_SERIES}
       >
-        <PersistentECharts chartId={chartId} series={COMPETITOR_SERIES} option={option} style={{ height: 320 }} />
+        <PersistentECharts exportTitle="Stars and forks" chartId={chartId} series={COMPETITOR_SERIES} option={option} style={{ height: 320 }} />
       </ChartCard>
     </div>
   );
