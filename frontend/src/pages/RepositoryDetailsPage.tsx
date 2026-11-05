@@ -1,3 +1,5 @@
+import { WatchListCards } from "../components/WatchListCards";
+import { useIsMobileChart } from "../lib/useMediaQuery";
 import { NavigationButton } from "../components/NavigationButton";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router-dom";
@@ -1067,6 +1069,7 @@ function TopicsPanel({
   allowMutations?: boolean;
   onRun: (id: number) => void;
 }) {
+  const mobile = useIsMobileChart();
   prepareSeriesStyles(visibility.map(item => `topic:${repositoryId}:${scope}:${item.watch.id}`));
   const [hoveredWatchId, setHoveredWatchId] = useState<number | null>(null);
   const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
@@ -1132,6 +1135,20 @@ function TopicsPanel({
               ? "No language-scoped topic watches yet."
               : "No topics yet. Add topics to the repository on GitHub."}
           </p>
+        ) : mobile ? (
+          <WatchListCards nameLabel="Topic" sortKey={sortKey} sortDir={sortDir} toggle={toggle}
+            allChecked={allChecked} onToggleAll={() => {
+              const hidden = selectedSlugs.filter(slug => !visibleSlugs.includes(slug));
+              writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs]);
+            }} rows={sorted.map(item => {
+              const running = runningQueryId === item.watch.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
+              return {
+              id: item.watch.id, name: item.watch.topic, href: `/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
+              seriesKey: `topic:${repositoryId}:${scope}:${item.watch.id}`, checked: selected.has(item.watch.topic),
+              onToggle: () => writeSelection(selected.has(item.watch.topic) ? selectedSlugs.filter(slug => slug !== item.watch.topic) : [...selectedSlugs, item.watch.topic]),
+              rank: item.currentRank, limit: item.watch.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
+              actions: allowMutations ? <Button className="bg-muted text-foreground" disabled={running || searchBusy} onClick={() => onRun(item.watch.id)}>{running || runningAll ? "Running..." : "Run"}</Button> : undefined,
+            }; })} />
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -1364,6 +1381,7 @@ function SearchPanel({
   onRun: (id: number) => void;
   onDelete: (id: number) => void;
 }) {
+  const mobile = useIsMobileChart();
   prepareSeriesStyles(visibility.map(item => `query:${item.query.id}`));
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -1462,7 +1480,18 @@ function SearchPanel({
         ) : (
           <h2 className="mb-3 font-medium">Search Queries</h2>
         )}
-        {visibility.length === 0 ? <p className="text-sm text-muted-foreground">{allowMutations ? "Add a search query to start tracking visibility." : "An administrator can configure search queries."}</p> : <>
+        {visibility.length === 0 ? <p className="text-sm text-muted-foreground">{allowMutations ? "Add a search query to start tracking visibility." : "An administrator can configure search queries."}</p> : mobile ? <WatchListCards nameLabel="Search Query" sortKey={sortKey} sortDir={sortDir} toggle={toggle}
+          allChecked={allChecked} onToggleAll={() => writeSelection(allChecked ? [] : visibility.map(item => item.query.id))}
+          rows={sorted.map(item => {
+            const running = runningQueryId === item.query.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
+            return {
+              id: item.query.id, name: item.query.name, href: `/repositories/${repositoryId}/search-queries/${item.query.id}`,
+              seriesKey: `query:${item.query.id}`, checked: selected.has(item.query.id),
+              onToggle: () => writeSelection(selected.has(item.query.id) ? selectedIds.filter(id => id !== item.query.id) : [...selectedIds, item.query.id]),
+              rank: item.currentRank, limit: item.query.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
+              actions: allowMutations ? <><Button className="bg-muted text-foreground" disabled={running || searchBusy} onClick={() => onRun(item.query.id)}>{running || runningAll ? "Running..." : "Run"}</Button><Button className="bg-muted text-red-700" disabled={running} onClick={() => onDelete(item.query.id)}>Delete</Button></> : undefined,
+            };
+          })} /> : <>
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

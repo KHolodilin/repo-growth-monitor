@@ -1,10 +1,10 @@
 import { RankSummary } from "../components/RankSummary";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
 import { useMutationAccess } from "../lib/mutationAccess";
 import { formatSyncTime, cn } from "../lib/utils";
-import { queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
+import { SEARCH_METRICS, queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
 import { ComparisonSeries } from "../components/ComparisonSeries";
 import { ChartCard, useChartMode } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -20,7 +20,9 @@ export function QueryDetailsPage() {
   const [results, setResults] = useState<SearchRunResults | null>(null);
   const [series, setSeries] = useState<SearchSnapshotSeries[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
-  const [metric, setMetric] = useState<SearchChartMetric>("place");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedMetric = searchParams.get("metric");
+  const metric: SearchChartMetric = requestedMetric === "stars" || requestedMetric === "forks" ? requestedMetric : "place";
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
 
@@ -124,7 +126,7 @@ export function QueryDetailsPage() {
             metric === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
           )}
           aria-pressed={metric === key}
-          onClick={() => setMetric(key)}
+          onClick={() => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set("metric", key); return next; }, { replace: true })}
         >
           {label}
         </button>
@@ -179,7 +181,7 @@ export function QueryDetailsPage() {
       <RankSummary current={history.currentRank} best={history.bestRank} limit={history.query.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
 
       <ChartCard
-        title="Rank History"
+        title={SEARCH_METRICS[metric].title}
         repositoryId={repo.id}
         period="all"
         context={`repository:${repo.id}:query:${history.query.id}`}
@@ -247,6 +249,7 @@ function QueryRankChart({
       chartId={`${repo.id}:query:${history.query.id}`}
       series={chart.series}
       persistSelection={false}
+      exportTitle={SEARCH_METRICS[metric].title}
       option={{ ...chart.option, legend: { ...chart.option.legend, selectedMode: false } }}
       style={{ height: 360, width: "100%" }}
     />

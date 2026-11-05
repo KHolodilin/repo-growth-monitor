@@ -6,6 +6,12 @@ import { eventMarkOverlays } from "./trafficChart";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
 export type SearchChartMetric = "place" | "stars" | "forks";
+export const SEARCH_METRICS = {
+  place: { label: "Rank", title: "Rank History" },
+  stars: { label: "Stars", title: "Stars History" },
+  forks: { label: "Forks", title: "Forks History" },
+} as const;
+
 export type SearchChartAxis = "calendar" | "timeline";
 
 export type SearchChartPoint = {
@@ -96,6 +102,8 @@ export function timelineFrame(dates: string[], lines: ChartLine[], missedDates: 
   );
   return {
     dates: axis,
+    eventAxisDates: longestSpan,
+    seriesDates: Object.fromEntries(spans.map(item => [item.line.name, item.span])),
     dateToDay: new Map(longestSpan.map((date, index) => [date, String(index + 1)])),
     lines: spans.map(({ line, byDate, span }) => ({
       name: line.name,
@@ -138,35 +146,55 @@ export function searchMetricOption({
   const axisDates = frame?.dates ?? dates;
   const formatAxis = axis === "timeline" ? (value: string) => `Day ${value}` : formatChartAxisDate;
   const markerAt = frame ? (event: GrowthEvent) => frame.dateToDay.get(eventUtcDate(event)) ?? "" : undefined;
+  const tooltipDate = frame ? (name: string, day: string) => frame.seriesDates[name]?.[Number(day) - 1] : undefined;
   if (metric === "place") {
-    return rankHistoryOption({
+    const option = rankHistoryOption({
       dates: axisDates,
       formatAxis,
       legend: lines.length > 0,
       events,
       markerAt,
+      tooltipDate,
       series: (frame?.lines ?? lines).map((line) => ({
         name: line.name,
-      key: line.key,
+        key: line.key,
         limit,
         missedDates: "missedDays" in line ? line.missedDays : missedDates,
         points: line.points.map((point) => ({ date: point.date, position: point.position })),
       })),
     });
+    return labelMetricOption(option, metric, frame?.eventAxisDates ?? option.eventAxisDates);
   }
   const field = metric === "stars" ? "stars" : "forks";
   const plotted = frame?.lines ?? lines;
-  return countHistoryOption({
+  return labelMetricOption(countHistoryOption({
     dates: axisDates,
     formatAxis,
     events,
     markerAt,
+    tooltipDate,
     series: plotted.map((line) => ({
       name: line.name,
       key: line.key,
       data: axisDates.map((date) => line.points.find((point) => point.date === date)?.[field] ?? null),
     })),
-  });
+  }), metric, frame?.eventAxisDates ?? dates);
+}
+
+/** Query-only labels leave shared topic/rank consumers unchanged. */
+function labelMetricOption<T extends ReturnType<typeof rankHistoryOption> | ReturnType<typeof countHistoryOption>>(option: T, metric: SearchChartMetric, eventAxisDates: string[]) {
+  const { label } = SEARCH_METRICS[metric];
+  const formatter = option.tooltip.formatter;
+  return {
+    ...option,
+    eventAxisDates,
+    exportLabels: Object.fromEntries(option.series.filter(item => item.name !== "Events").map(item => [item.name, `${item.name} (${label})`])),
+    yAxis: { ...option.yAxis, name: label, nameLocation: metric === "place" ? "start" : "end", nameGap: 8, nameTextStyle: { fontSize: 11 } },
+    tooltip: { ...option.tooltip, formatter: (params: Parameters<typeof formatter>[0]) => {
+      const html = formatter(params as never);
+      return html ? html.replace("<div>", `<div>${label} · `) : html;
+    } },
+  };
 }
 
 type ChartRow = { result: { githubRepositoryId: number; fullName: string } };
@@ -254,12 +282,14 @@ function countHistoryOption({
   formatAxis = formatChartAxisDate,
   events = [],
   markerAt,
+  tooltipDate,
 }: {
   dates: string[];
   series: { name: string; key?: string; data: (number | null)[] }[];
   formatAxis?: (value: string) => string;
   events?: GrowthEvent[];
   markerAt?: (event: GrowthEvent) => string;
+  tooltipDate?: (seriesName: string, axisValue: string) => string | undefined;
 }) {
   prepareSeriesStyles(series.map(item => item.key ?? item.name));
   const overlays = events.length > 0 ? eventMarkOverlays(dates, events, 1, undefined, markerAt) : null;
@@ -287,7 +317,8 @@ function countHistoryOption({
           .map((item) => {
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             const identity = series.find(line => line.name === item.seriesName);
-            return `<div><span style="color:${seriesStyle(identity?.key ?? item.seriesName).color}">●</span> ${item.seriesName}: ${value}</div>`;
+            const observedOn = tooltipDate?.(item.seriesName, item.axisValue);
+            return `<div><span style="color:${seriesStyle(identity?.key ?? item.seriesName).color}">●</span> ${item.seriesName}${observedOn ? ` (${observedOn})` : ""}: ${value}</div>`;
           })
           .join("");
         return `<div>${date}${rows}</div>`;

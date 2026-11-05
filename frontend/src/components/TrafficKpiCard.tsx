@@ -52,8 +52,8 @@ export function TrafficKpiCard({
       {coverage && coverage.observedDays < coverage.expectedDays && <div className="mt-1 text-xs text-muted-foreground">{coverage.observedDays === 0 ? "No traffic data for selected period" : `Partial data: ${coverage.observedDays} / ${coverage.expectedDays} repository-days`}</div>}
       {period !== "all" && previousCoverage && (!previousCoverage.expectedDays || previousCoverage.observedDays < previousCoverage.expectedDays) && <div className="mt-1 text-xs text-muted-foreground">Comparison unavailable: incomplete previous period</div>}
       {period !== "all" && (
-        <div className="mt-1 flex items-end justify-between gap-2">
-          <div className={cn("text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
+        <div className="mt-1 flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
+          <div className={cn("min-w-0 max-w-full break-words text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
             {missingHistory && !growth ? "N/A" : (growth?.label ?? "—")}
             {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}
           </div>
@@ -100,7 +100,7 @@ function Sparkline({
   }
   const stroke = color ?? (direction === "down" ? "#b91c1c" : direction === "flat" || direction == null ? "#6b7280" : "#047857");
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-6 w-16 shrink-0" aria-hidden="true">
+    <svg viewBox={`0 0 ${width} ${height}`} className="ml-auto h-6 w-16 max-w-full shrink-0" aria-hidden="true">
       {segments.map((points) => (
         <polyline key={points} fill="none" stroke={stroke} strokeWidth="1.5" points={points} />
       ))}

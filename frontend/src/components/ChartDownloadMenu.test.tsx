@@ -4,7 +4,9 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
 import { writeChartSelection } from "../lib/chartLegend";
-import { PersistentECharts } from "./PersistentECharts";
+import { rankHistoryOption } from "../lib/rankChart";
+import { searchMetricOption } from "../lib/searchSeriesChart";
+import { ChartModePlot, PersistentECharts } from "./PersistentECharts";
 import { ChartCard, ChartDownloadMenu, ChartExportProvider, useChartMode, useRegisterChartExport } from "./ChartDownloadMenu";
 
 const growthEvent = {
@@ -448,5 +450,49 @@ describe("ChartDownloadMenu", () => {
       </ChartCard>,
     );
     expect(screen.getByRole("button", { name: "Events off" })).toBeInTheDocument();
+  });
+});
+
+
+describe("Timeline mobile event regression", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it.each([320, 360, 390])("keeps real dates, counts and details at %ipx across axis and event toggles", async width => {
+    stubMobile(true); vi.stubGlobal("innerWidth", width);
+    const user = userEvent.setup();
+    const dates = ["2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"];
+    const events = dates.map((date, index) => ({ ...growthEvent, id: index + 10, eventAt: `${date}T12:00:00Z`, title: `Launch ${index}` }));
+    const source = [...events, { ...events[1], id: 20, title: "Second launch" }, { ...events[0], id: 30, eventAt: "2026-10-27T12:00:00Z" }];
+    const view = render(<ChartCard title="Traffic" events={source} context={`test:${width}`} mobileSeries={[{ key: "Visitors", name: "Visitors" }]}><PersistentECharts chartId={`timeline:${width}`} series={[{ key: "Visitors", name: "Visitors" }]} option={{ xAxis: { data: dates }, series: [{ name: "Visitors", type: "line", data: [1, null, 0, 4] }] }} /></ChartCard>);
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
+    expect(screen.getAllByRole("button", { name: /events? on/ })).toHaveLength(4);
+    expect(screen.queryByRole("button", { name: /on 2026-10-27/ })).toBeNull();
+    for (const axis of ["Timeline", "Calendar", "Timeline"]) {
+      await user.click(screen.getByRole("button", { name: "Chart menu" }));
+      await user.click(screen.getByRole("menuitemradio", { name: axis }));
+      expect(screen.getByRole("checkbox", { name: "Events" })).toBeChecked();
+      expect(screen.getAllByRole("button", { name: /events? on/ })).toHaveLength(4);
+      const group = screen.getByRole("button", { name: "2 events on 2026-10-29" });
+      expect(group.style.left).toContain("33.333");
+      await user.click(group);
+      expect(await screen.findByText("Launch 1")).toBeInTheDocument();
+      expect(screen.getByText("Second launch")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Close" }));
+    }
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
+    expect(screen.queryByRole("button", { name: /events? on/ })).toBeNull();
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
+    expect(screen.getAllByRole("button", { name: /events? on/ })).toHaveLength(4);
+    view.unmount();
+    render(<ChartCard title="Empty" events={[]} context={`test:${width}`} mobileSeries={[]}><p>No plot</p></ChartCard>);
+    expect(screen.getByRole("checkbox", { name: "Events" })).toBeChecked();
+    expect(screen.getByText("No events in the displayed range.")).toBeInTheDocument();
+  });
+  it.each(["topic", "query"])("retains events with preframed %s Timeline options", async kind => {
+    stubMobile(true); const user = userEvent.setup(); const dates = ["2026-09-22", "2026-09-23"];
+    render(<ChartCard title="History" events={[growthEvent]} mobileSeries={[]}><ChartModePlot chartId={`sibling:${kind}`} series={[]} build={({ axis, events }) => kind === "topic" ? rankHistoryOption({ dates, axis, events, series: [{ name: "ours", limit: 50, points: dates.map(date => ({ date, position: 1 })) }] }) : searchMetricOption({ metric: "stars", dates, axis, events, missedDates: [], limit: 50, lines: [{ name: "ours", tracked: true, points: dates.map(date => ({ date, position: 1, stars: 3, forks: 0 })) }] })} /></ChartCard>);
+    await user.click(screen.getByRole("checkbox", { name: "Events" }));
+    await user.click(screen.getByRole("button", { name: "Chart menu" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
+    expect(await screen.findByRole("button", { name: "1 event on 2026-09-23" })).toBeInTheDocument();
   });
 });
