@@ -236,7 +236,7 @@ class ApiControllersWebMvcTest {
         when(analyticsService.dashboard(anyString())).thenReturn(null);
         when(analyticsService.portfolio(anyString())).thenReturn(null);
         when(analyticsService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
-        when(analyticsService.snapshotHistory(eq(13L), any(), any(), anyBoolean())).thenReturn(null);
+        when(analyticsService.snapshotHistory(eq(13L), any(), any(), any(), anyBoolean())).thenReturn(null);
         when(analyticsService.statsHistory(eq(13L), anyString())).thenReturn(null);
         when(gitHubProperties.tokenConfigured()).thenReturn(true);
         when(gitHubClient.maskedToken()).thenReturn("gho_****");
@@ -316,6 +316,8 @@ class ApiControllersWebMvcTest {
         mockMvc.perform(get("/api/v1/portfolio")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/traffic")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/repositories/13/traffic-history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/repositories/13/traffic-history?kind=paths&period=all&days=14&includeServicePaths=true")).andExpect(status().isOk());
+        verify(analyticsService).snapshotHistory(13L, "paths", "all", 14, true);
         mockMvc.perform(get("/api/v1/repositories/13/stats-history")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk());
         mockMvc.perform(get("/dashboard")).andExpect(status().isNotFound());

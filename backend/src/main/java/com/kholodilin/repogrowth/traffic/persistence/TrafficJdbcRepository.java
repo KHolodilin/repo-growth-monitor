@@ -763,6 +763,19 @@ public class TrafficJdbcRepository {
                 .list();
     }
 
+    public Optional<LocalDate> earliestPathSnapshotDate(long repositoryId, boolean includeService) {
+        return jdbcClient.sql("""
+                        SELECT MIN(snapshot_date)
+                        FROM traffic_path_snapshot
+                        WHERE repository_id = :repositoryId
+                          AND (:includeService OR service_path = FALSE)
+                        """)
+                .param("repositoryId", repositoryId)
+                .param("includeService", includeService)
+                .query(LocalDate.class)
+                .optional();
+    }
+
     public Optional<LocalDate> earliestReferrerSnapshotDate(long repositoryId) {
         return jdbcClient.sql("""
                         SELECT MIN(snapshot_date)

@@ -41,9 +41,10 @@ public class AnalyticsController {
             @PathVariable long id,
             @RequestParam(required = false) String kind,
             @RequestParam(required = false) Integer days,
+            @RequestParam(required = false) String period,
             @RequestParam(defaultValue = "false") boolean includeServicePaths
     ) {
-        return analyticsService.snapshotHistory(id, kind, days, includeServicePaths);
+        return analyticsService.snapshotHistory(id, kind, period, days, includeServicePaths);
     }
 
     @GetMapping("/repositories/{id}/stats-history")
