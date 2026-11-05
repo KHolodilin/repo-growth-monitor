@@ -1,3 +1,5 @@
+import type { Period } from "../components/PeriodSelector";
+import { periodDates } from "./searchVisibilityKpi";
 import { lineStyle, prepareSeriesStyles, seriesStyle } from "./seriesStyle";
 import type { GrowthEvent, SearchSeries } from "./api";
 import { eventUtcDate } from "./growthEvents";
@@ -133,6 +135,8 @@ export function searchMetricOption({
   limit,
   lines,
   events = [],
+  period = "all",
+  today = new Date().toISOString().slice(0, 10),
 }: {
   metric: SearchChartMetric;
   axis?: SearchChartAxis;
@@ -141,7 +145,15 @@ export function searchMetricOption({
   limit: number;
   lines: ChartLine[];
   events?: GrowthEvent[];
+  period?: Period;
+  today?: string;
 }) {
+  const window = periodDates(period, today);
+  if (window) {
+    dates = window;
+    const onAxis = new Set(window);
+    events = events.filter(event => onAxis.has(eventUtcDate(event)));
+  }
   const frame = axis === "timeline" ? timelineFrame(dates, lines, missedDates) : null;
   const axisDates = frame?.dates ?? dates;
   const formatAxis = axis === "timeline" ? (value: string) => `Day ${value}` : formatChartAxisDate;
@@ -209,6 +221,8 @@ export function queryDetailsChart({
   metric,
   axis = "calendar",
   events = [],
+  period = "all",
+  today = new Date().toISOString().slice(0, 10),
 }: {
   history: { points: { date: string; position: number | null }[]; missedDates: string[]; query: { resultLimit: number } } | null;
   repo: { githubId: number; fullName: string } | null;
@@ -218,6 +232,8 @@ export function queryDetailsChart({
   metric: SearchChartMetric;
   axis?: SearchChartAxis;
   events?: GrowthEvent[];
+  period?: Period;
+  today?: string;
 }) {
   if (!history || !repo) {
     return null;
@@ -252,6 +268,8 @@ export function queryDetailsChart({
       limit: history.query.resultLimit,
       lines,
       events,
+      period,
+      today,
     }),
     series: [
       { key: `repository:${repo.githubId}`, name: repo.fullName },
@@ -269,11 +287,21 @@ export function queryDetailsChart({
 export function storedCountOption({
   dates,
   series,
+  period = "all",
+  today = new Date().toISOString().slice(0, 10),
 }: {
   dates: string[];
   series: { name: string; key?: string; data: (number | null)[] }[];
+  period?: Period;
+  today?: string;
 }) {
-  return countHistoryOption({ dates, series });
+  const window = periodDates(period, today);
+  if (!window) return countHistoryOption({ dates, series });
+  const indexes = new Map(dates.map((date, index) => [date, index]));
+  return countHistoryOption({ dates: window, series: series.map(item => ({ ...item, data: window.map(date => {
+    const index = indexes.get(date);
+    return index == null ? null : (item.data[index] ?? null);
+  }) })) });
 }
 
 function countHistoryOption({

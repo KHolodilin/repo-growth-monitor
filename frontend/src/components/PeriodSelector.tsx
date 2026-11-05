@@ -105,6 +105,7 @@ export function PeriodSelector({
         fitMobile && "min-h-11 min-w-0 px-0 md:min-h-0 md:px-3",
         period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
       )}
+      aria-pressed={period === item}
       onClick={() => onPeriod(item)}
     >
       {item}

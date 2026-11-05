@@ -1,3 +1,4 @@
+import type { Period } from "./PeriodSelector";
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type GrowthEvent } from "../lib/api";
 import { readChartAxis, readChartEventFilter, subscribeChartMode, writeChartAxis, writeChartEventFilter } from "../lib/chartModePrefs";
@@ -29,7 +30,7 @@ type ChartMode = {
   axis: ChartAxis;
   setAxis: (axis: ChartAxis) => void;
   events: GrowthEvent[];
-  period?: string;
+  period?: Period;
   openMarker: (events: GrowthEvent[]) => void;
   mobile: boolean;
   mobileSeriesName: string | null;
@@ -128,7 +129,7 @@ export function ChartCard({
   children: ReactNode;
   events?: GrowthEvent[];
   repositoryId?: number;
-  period?: string;
+  period?: Period;
   /** Where this chart lives. The All and Calendar choice is stored for this place only. */
   context?: string;
   onEventsChanged?: () => void;

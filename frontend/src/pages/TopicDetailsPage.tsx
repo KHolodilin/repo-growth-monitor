@@ -1,3 +1,4 @@
+import { PeriodSelector, usePeriod } from "../components/PeriodSelector";
 import { RankSummary } from "../components/RankSummary";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -20,6 +21,7 @@ function parseScope(value: string | null): "all" | "language" {
 
 export function TopicDetailsPage() {
   const { repositoryId, topic } = useParams();
+  const [period, setPeriod] = usePeriod(repositoryId);
   const [searchParams, setSearchParams] = useSearchParams();
   const { allowMutations } = useMutationAccess();
   const scope = parseScope(searchParams.get("scope"));
@@ -186,6 +188,7 @@ export function TopicDetailsPage() {
         )}
       </header>
 
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       {repo.language && (
         <div className="inline-flex rounded-lg border bg-muted p-1">
           {(["all", "language"] as const).map((key) => (
@@ -203,18 +206,22 @@ export function TopicDetailsPage() {
         </div>
       )}
 
+      <div role="group" aria-label="History period" className="md:ml-auto"><PeriodSelector fitMobile period={period} onPeriod={setPeriod} /></div>
+      </div>
+
       <RankSummary current={history.currentRank} best={history.bestRank} limit={history.watch.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
 
       <ChartCard
         title="Rank History"
         repositoryId={repo.id}
-        period="all"
+        period={period}
         context={`repository:${repo.id}:topic:${history.watch.id}`}
         mobileSeries={[]}
       >
         {unavailable.length > 0 && <p role="status" className="mb-2 text-sm text-muted-foreground">No rank history for one or more selected competitors.</p>}
         <ComparisonSeries series={chartSeries} />
         <ChartModePlot
+          exportTitle="Rank History"
           chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
           series={chartSeries}
           persistSelection={false}
@@ -222,6 +229,7 @@ export function TopicDetailsPage() {
           build={({ axis, events }) => rankHistoryOption({
             dates: datesFromHistory(rankSeries.map(item => item.points), history.missedDates),
             axis,
+            period,
             events,
             series: rankSeries,
             legend: true,
