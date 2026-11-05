@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes } from "r
 import { useIsMobileChart } from "../lib/useMediaQuery";
 import { cn } from "../lib/utils";
 
-/** Short mobile navigation names retain a full, touch/focus-accessible hint. */
+/** Short tabs keep their accessible name; only actually clipped labels need a visual hint. */
 export function NavigationButton({ label, mobileLabel, truncate = false, className, onClick, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; mobileLabel?: string; truncate?: boolean }) {
   const mobile = useIsMobileChart();
   const text = useRef<HTMLSpanElement>(null);
@@ -11,7 +11,7 @@ export function NavigationButton({ label, mobileLabel, truncate = false, classNa
   const [clipped, setClipped] = useState(false);
   const [open, setOpen] = useState(false);
   const id = useId();
-  const hint = mobile && (Boolean(mobileLabel && mobileLabel !== label) || clipped);
+  const hint = mobile && clipped;
   useEffect(() => {
     const node = text.current!;
     const measure = () => setClipped(truncate && node.scrollWidth > node.clientWidth);
