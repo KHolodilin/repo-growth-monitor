@@ -33,7 +33,7 @@ services:
           memory: 1G
 
   migrate:
-    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.31.3}
+    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.31.4}
     restart: "no"
     depends_on:
       postgres:
@@ -53,7 +53,7 @@ services:
     logging: *default-logging
 
   backend:
-    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.31.3}
+    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.31.4}
     restart: unless-stopped
     depends_on:
       postgres:
