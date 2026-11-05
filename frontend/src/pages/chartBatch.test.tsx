@@ -87,7 +87,7 @@ describe("query metric labels", () => {
     const png = vi.spyOn(chartExports, "downloadChartPng").mockImplementation(() => {});
     const csv = vi.spyOn(chartExports, "downloadChartCsv").mockImplementation(() => {});
     const view = mount("/repositories/13/search-queries/1?metric=stars", <QueryDetailsPage />);
-    expect(await screen.findByRole("heading", { name: "Stars History" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Stars History" })).toBeInTheDocument());
     const rival = screen.getByRole("checkbox", { name: "Show other/repo on the chart" });
     await user.click(rival);
     for (const [metric, title] of [["Forks", "Forks History"], ["Place", "Rank History"], ["Stars", "Stars History"]]) {

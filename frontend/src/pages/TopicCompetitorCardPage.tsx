@@ -69,6 +69,8 @@ export function TopicCompetitorCardPage() {
         { label: history.watch.topic, to: topicTo },
       ]}
       card={card}
+      collectionDates={history.watch.enabled === false ? [] : history.points.map(point => point.date)}
+      missedCollectionDates={history.watch.enabled === false ? [] : history.missedDates}
       chartId={`${repositoryId}:topic-competitor:${topicName}:${githubRepositoryId}`}
       repositoryId={repo.id}
     />

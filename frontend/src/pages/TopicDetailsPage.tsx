@@ -1,4 +1,6 @@
+import { useChartVisibility } from "../lib/chartVisibility";
 import { PeriodSelector, usePeriod } from "../components/PeriodSelector";
+import { NavigationButton } from "../components/NavigationButton";
 import { RankSummary } from "../components/RankSummary";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
@@ -7,7 +9,6 @@ import { useMutationAccess } from "../lib/mutationAccess";
 import { formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import { writeTopicScope } from "../lib/topicScope";
-import { ComparisonSeries } from "../components/ComparisonSeries";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { ChartModePlot } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -31,6 +32,7 @@ export function TopicDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
+  const visibility = useChartVisibility(`${repositoryId}:topic:${history?.watch.id}:${scope}`);
   const [competitors, setCompetitors] = useState<{ githubRepositoryId: number; fullName: string; points: { date: string; position: number }[] }[]>([]);
   const generation = useRef(0);
 
@@ -146,8 +148,8 @@ export function TopicDetailsPage() {
       : `https://github.com/topics/${encodeURIComponent(history.watch.topic)}?o=desc&s=stars`;
 
   const selectedSeries = competitors.filter(item => selected.includes(item.githubRepositoryId));
-  const rankSeries = [{ key: `repository:${repo.githubId}`, name: repo.fullName, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
-    ...selectedSeries.map(item => ({ key: `repository:${item.githubRepositoryId}`, name: item.fullName, points: item.points, limit: history.watch.resultLimit }))];
+  const rankSeries = [{ key: `repository:${repo.githubId}`, name: repo.fullName, expected: history.watch.enabled, points: history.points, limit: history.watch.resultLimit, missedDates: history.missedDates },
+    ...selectedSeries.map(item => ({ key: `repository:${item.githubRepositoryId}`, name: item.fullName, expected: false, points: item.points, limit: history.watch.resultLimit }))];
   const chartSeries = [{ key: `repository:${repo.githubId}`, name: repo.fullName }, ...selectedSeries.map(item => ({ key: `repository:${item.githubRepositoryId}`, name: item.fullName }))];
   const unavailable = selected.filter(id => !competitors.some(item => item.githubRepositoryId === id && item.points.length > 0));
   return (
@@ -190,18 +192,19 @@ export function TopicDetailsPage() {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       {repo.language && (
-        <div className="inline-flex rounded-lg border bg-muted p-1">
+        <div className="inline-flex w-fit max-w-full self-start rounded-lg border bg-muted p-1">
           {(["all", "language"] as const).map((key) => (
-            <button
+            <NavigationButton
               key={key}
+              label={key === "all" ? "All" : languageLabel}
+              truncate={key === "language"}
+              aria-pressed={scope === key}
               type="button"
-              className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+              className={`min-h-11 max-w-[min(16rem,65vw)] md:min-h-0 ${
                 scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               }`}
               onClick={() => setScope(key)}
-            >
-              {key === "all" ? "All" : languageLabel}
-            </button>
+            />
           ))}
         </div>
       )}
@@ -219,7 +222,6 @@ export function TopicDetailsPage() {
         mobileSeries={[]}
       >
         {unavailable.length > 0 && <p role="status" className="mb-2 text-sm text-muted-foreground">No rank history for one or more selected competitors.</p>}
-        <ComparisonSeries series={chartSeries} />
         <ChartModePlot
           exportTitle="Rank History"
           chartId={`${repo.id}:topic:${history.watch.id}:${scope}`}
@@ -247,8 +249,8 @@ export function TopicDetailsPage() {
             rows={results.rows}
             repositoryId={repo.id}
             trackedGithubId={repo.githubId}
-            selectedIds={selected}
-            onToggle={id => setSelected(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])}
+            selectedIds={selected.filter(id => visibility.isVisible(`repository:${id}`))}
+            onToggle={id => !visibility.isVisible(`repository:${id}`) && selected.includes(id) ? visibility.reveal([`repository:${id}`]) : setSelected(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])}
             nameTo={(row) => topicCompetitorPath(repo.id, history.watch.topic, row.result.githubRepositoryId, scope)}
           />
         )}

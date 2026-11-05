@@ -229,11 +229,11 @@ export function ChartCard({
       period,
       openMarker,
       mobile: mobileShell,
-      mobileSeriesName: mobileShell ? effectiveMobileSeriesName : null,
+      mobileSeriesName: mobileShell && mobileSeries!.length > 1 ? effectiveMobileSeriesName : null,
       axisDates,
       setAxisDates,
     }),
-    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker, mobileShell, effectiveMobileSeriesName, axisDates],
+    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker, mobileShell, mobileSeries?.length, effectiveMobileSeriesName, axisDates],
   );
 
   return (
@@ -298,7 +298,7 @@ function SeriesSegment({
 }) {
   prepareSeriesStyles(options.map(item => metricColor(item.name) ? item.name : item.key));
   return (
-    <div role="tablist" aria-label="Chart series" className={options.every(item => metricColor(item.name)) ? "grid grid-cols-2 gap-1" : "flex gap-1 overflow-x-auto"}>
+    <div role="tablist" aria-label="Chart series" className={options.every(item => metricColor(item.name)) ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
       {options.map((item) => {
         const active = item.name === value;
         return (
@@ -314,7 +314,7 @@ function SeriesSegment({
             }
             onClick={() => onChange(item.name)}
           >
-            <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} /><span>{item.name}</span>
+            <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} /><span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">{item.name}</span>
           </button>
         );
       })}

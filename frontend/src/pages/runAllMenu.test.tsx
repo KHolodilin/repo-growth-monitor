@@ -51,10 +51,10 @@ describe("repository Run all account action", () => {
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/search-queries/run", { method: "POST" }));
-    await user.click(screen.getByRole("button", { name: "Topics Visibility", exact: true }));
-    await screen.findByText("outbox");
+    await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
+    await screen.findByRole("link", { name: "outbox" });
     expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Java", exact: true }));
+    await user.click(screen.getByRole("button", { name: "Java" }));
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/topic-watches/run?scope=language", { method: "POST" }));
@@ -63,7 +63,7 @@ describe("repository Run all account action", () => {
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/search-queries/run", { method: "POST" }));
-    await user.click(screen.getByRole("button", { name: "Traffic", exact: true }));
+    await user.click(screen.getByRole("button", { name: "Traffic" }));
     await openMenu(user);
     expect(screen.queryByRole("menuitem", { name: /Run all|Running/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("link", { name: "Leave repository" }));
@@ -75,7 +75,7 @@ describe("repository Run all account action", () => {
     let rejectRun!: (reason: Error) => void;
     run = () => new Promise((_, reject) => { rejectRun = reject; });
     mount(tab);
-    await screen.findByText(tab === "search" ? searchHistory.query.name : "outbox");
+    await screen.findByRole("link", { name: tab === "search" ? searchHistory.query.name : "outbox" });
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await openMenu(user);
@@ -90,10 +90,10 @@ describe("repository Run all account action", () => {
 
   it.each(["search", "topics"])("disables empty and queued %s batches", async (tab) => {
     const user = userEvent.setup(); empty = true; const view = mount(tab);
-    await screen.findByRole("heading", { name: tab === "search" ? "Search Queries" : "Topics", exact: true });
+    await screen.findByRole("heading", { name: tab === "search" ? "Search Queries" : "Topics" });
     await openMenu(user); expect(screen.getByRole("menuitem", { name: "Run all" })).toBeDisabled();
     view.unmount(); empty = false; status = "READY"; mount(tab);
-    await screen.findByText(tab === "search" ? searchHistory.query.name : "outbox");
+    await screen.findByRole("link", { name: tab === "search" ? searchHistory.query.name : "outbox" });
     await openMenu(user); expect(screen.getByRole("menuitem", { name: "Running..." })).toBeDisabled();
   });
 
@@ -102,7 +102,7 @@ describe("repository Run all account action", () => {
     ["registered", registered, "search"], ["registered", registered, "topics"],
   ] as const)("hides actions for %s without mutation access", async (_role, me, tab) => {
     loadMe.mockResolvedValue(me); const user = userEvent.setup(); mount(tab);
-    await screen.findByText(tab === "search" ? searchHistory.query.name : "outbox");
+    await screen.findByRole("link", { name: tab === "search" ? searchHistory.query.name : "outbox" });
     expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Add query" })).not.toBeInTheDocument();
     await openMenu(user);

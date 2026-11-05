@@ -50,7 +50,7 @@ describe("searchSeriesChart", () => {
     expect(place.legend).toMatchObject({ top: 0 });
     const placeLine = place.series[0] as { data: (number | null)[] };
     expect(placeLine.data).toEqual([2, null]);
-    const neighborLine = place.series[3] as { data: (number | null)[] };
+    const neighborLine = place.series[2] as { data: (number | null)[] };
     expect(neighborLine.data).toEqual([null, 1]);
 
     const stars = searchMetricOption({
@@ -196,7 +196,7 @@ describe("searchSeriesChart", () => {
     const series = place.series as { data: (number | null)[] }[];
     expect(series[0].data).toEqual([4, null, 2]);
     expect(series[1].data[1]).toBe(51);
-    expect(series[3].data).toEqual([1, 3, null]);
+    expect(series[2].data).toEqual([1, 3, null]);
 
     const stars = searchMetricOption({
       metric: "stars",

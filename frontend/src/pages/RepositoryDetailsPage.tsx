@@ -1,3 +1,4 @@
+import { useChartVisibility } from "../lib/chartVisibility";
 import { WatchListCards } from "../components/WatchListCards";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 import { NavigationButton } from "../components/NavigationButton";
@@ -534,7 +535,7 @@ export function RepositoryDetailsPage() {
         {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "topics" || tab === "growth-events") && (
           <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-2">
             {tab === "topics" && repo.language && (
-              <div className="flex w-full min-w-0 items-center rounded-lg border bg-muted p-1 md:w-auto">
+              <div className="inline-flex w-fit max-w-full min-w-0 self-start items-center rounded-lg border bg-muted p-1">
                 {(["all", "language"] as const).map((key) => (
                   <NavigationButton
                     key={key}
@@ -544,7 +545,7 @@ export function RepositoryDetailsPage() {
                     type="button"
                     className={cn(
                       "min-h-11 md:min-h-0",
-                      key === "language" ? "flex-1 md:flex-none" : "shrink-0",
+                      key === "language" ? "max-w-[min(16rem,65vw)]" : "shrink-0",
                       scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => setScope(key)}
@@ -1104,11 +1105,15 @@ function TopicsPanel({
       (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
     );
   const scopeQuery = scope === "language" ? "?scope=language" : "";
-  const selected = new Set(selectedSlugs);
+  const lineVisibility = useChartVisibility(repoTopicsChartId(repositoryId, scope));
+  const topicKey = (slug: string) => `topic:${repositoryId}:${scope}:${visibility.find(item => item.watch.topic === slug)?.watch.id}`;
+  const selected = new Set(selectedSlugs.filter(slug => lineVisibility.isVisible(topicKey(slug))));
   const visibleSlugs = visibility.map((item) => item.watch.topic);
   const allChecked = visibleSlugs.length > 0 && visibleSlugs.every((slug) => selected.has(slug));
 
-  function writeSelection(slugs: string[]) {
+  function writeSelection(slugs: string[], reveal: string[] = []) {
+    lineVisibility.reveal(reveal.map(topicKey));
+    slugs = [...new Set(slugs)];
     setSelectedSlugs(slugs);
     writeTopicSelection(repositoryId, slugs);
   }
@@ -1139,13 +1144,13 @@ function TopicsPanel({
           <WatchListCards nameLabel="Topic" sortKey={sortKey} sortDir={sortDir} toggle={toggle}
             allChecked={allChecked} onToggleAll={() => {
               const hidden = selectedSlugs.filter(slug => !visibleSlugs.includes(slug));
-              writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs]);
+              writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs], allChecked ? [] : visibleSlugs);
             }} rows={sorted.map(item => {
               const running = runningQueryId === item.watch.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
               return {
               id: item.watch.id, name: item.watch.topic, href: `/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
               seriesKey: `topic:${repositoryId}:${scope}:${item.watch.id}`, checked: selected.has(item.watch.topic),
-              onToggle: () => writeSelection(selected.has(item.watch.topic) ? selectedSlugs.filter(slug => slug !== item.watch.topic) : [...selectedSlugs, item.watch.topic]),
+              onToggle: () => writeSelection(selected.has(item.watch.topic) ? selectedSlugs.filter(slug => slug !== item.watch.topic) : [...selectedSlugs, item.watch.topic], [item.watch.topic]),
               rank: item.currentRank, limit: item.watch.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
               actions: allowMutations ? <Button className="bg-muted text-foreground" disabled={running || searchBusy} onClick={() => onRun(item.watch.id)}>{running || runningAll ? "Running..." : "Run"}</Button> : undefined,
             }; })} />
@@ -1166,7 +1171,7 @@ function TopicsPanel({
                     checked={allChecked}
                     onChange={() => {
                       const hidden = selectedSlugs.filter((slug) => !visibleSlugs.includes(slug));
-                      writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs]);
+                      writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs], allChecked ? [] : visibleSlugs);
                     }}
                   />
                 </th>
@@ -1212,7 +1217,7 @@ function TopicsPanel({
                           const next = event.target.checked
                             ? [...selectedSlugs, item.watch.topic]
                             : selectedSlugs.filter((slug) => slug !== item.watch.topic);
-                          writeSelection(next);
+                          writeSelection(next, event.target.checked ? [item.watch.topic] : []);
                         }}
                       />
                     </td>
@@ -1305,6 +1310,7 @@ function CombinedTopicRankChart({
     () => drawn.map((item) => ({
       name: item.watch.topic,
       points: item.points,
+      expected: item.watch.enabled,
       limit: item.watch.resultLimit,
       missedDates: item.missedDates,
       highlighted: highlightWatchId === item.watch.id,
@@ -1425,10 +1431,13 @@ function SearchPanel({
       (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
     );
 
-  const selected = new Set(selectedIds);
+  const lineVisibility = useChartVisibility(repoSearchChartId(repositoryId));
+  const selected = new Set(selectedIds.filter(id => lineVisibility.isVisible(`query:${id}`)));
   const allChecked = visibility.length > 0 && visibility.every((item) => selected.has(item.query.id));
 
-  function writeSelection(ids: number[]) {
+  function writeSelection(ids: number[], reveal: number[] = []) {
+    lineVisibility.reveal(reveal.map(id => `query:${id}`));
+    ids = [...new Set(ids)];
     setSelectedIds(ids);
     writeSearchQuerySelection(repositoryId, ids);
   }
@@ -1481,13 +1490,13 @@ function SearchPanel({
           <h2 className="mb-3 font-medium">Search Queries</h2>
         )}
         {visibility.length === 0 ? <p className="text-sm text-muted-foreground">{allowMutations ? "Add a search query to start tracking visibility." : "An administrator can configure search queries."}</p> : mobile ? <WatchListCards nameLabel="Search Query" sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-          allChecked={allChecked} onToggleAll={() => writeSelection(allChecked ? [] : visibility.map(item => item.query.id))}
+          allChecked={allChecked} onToggleAll={() => writeSelection(allChecked ? [] : visibility.map(item => item.query.id), allChecked ? [] : visibility.map(item => item.query.id))}
           rows={sorted.map(item => {
             const running = runningQueryId === item.query.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
             return {
               id: item.query.id, name: item.query.name, href: `/repositories/${repositoryId}/search-queries/${item.query.id}`,
               seriesKey: `query:${item.query.id}`, checked: selected.has(item.query.id),
-              onToggle: () => writeSelection(selected.has(item.query.id) ? selectedIds.filter(id => id !== item.query.id) : [...selectedIds, item.query.id]),
+              onToggle: () => writeSelection(selected.has(item.query.id) ? selectedIds.filter(id => id !== item.query.id) : [...selectedIds, item.query.id], [item.query.id]),
               rank: item.currentRank, limit: item.query.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
               actions: allowMutations ? <><Button className="bg-muted text-foreground" disabled={running || searchBusy} onClick={() => onRun(item.query.id)}>{running || runningAll ? "Running..." : "Run"}</Button><Button className="bg-muted text-red-700" disabled={running} onClick={() => onDelete(item.query.id)}>Delete</Button></> : undefined,
             };
@@ -1506,7 +1515,7 @@ function SearchPanel({
                   type="checkbox"
                   aria-label="Chart lines"
                   checked={allChecked}
-                  onChange={() => writeSelection(allChecked ? [] : visibility.map((item) => item.query.id))}
+                  onChange={() => writeSelection(allChecked ? [] : visibility.map((item) => item.query.id), allChecked ? [] : visibility.map(item => item.query.id))}
                 />
               </th>
               <QuerySortHeader
@@ -1551,7 +1560,7 @@ function SearchPanel({
                         const next = event.target.checked
                           ? [...selectedIds, item.query.id]
                           : selectedIds.filter((id) => id !== item.query.id);
-                        writeSelection(next);
+                        writeSelection(next, event.target.checked ? [item.query.id] : []);
                       }}
                     />
                   </td>
@@ -1677,6 +1686,7 @@ function CombinedRankChart({
     () => drawn.map((item) => ({
       name: item.query.name,
       points: item.points,
+      expected: item.query.enabled,
       limit: item.query.resultLimit,
       missedDates: item.missedDates,
       highlighted: highlightQueryId === item.query.id,

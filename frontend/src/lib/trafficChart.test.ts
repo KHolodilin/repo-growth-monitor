@@ -88,8 +88,8 @@ describe("trafficChart", () => {
     expect(broken.xAxis.data).toContain("2026-10-18");
     expect(broken.series[0].data[broken.xAxis.data.indexOf("2026-10-16")]).toBeNull();
     expect(("connectNulls" in broken.series[0] && broken.series[0].connectNulls)).toBe(true);
-    expect(("markPoint" in broken.series[0] ? broken.series[0].markPoint : undefined)?.data[0]).toMatchObject({ xAxis: "2026-10-18" });
-    expect(("markPoint" in broken.series[0] ? broken.series[0].markPoint : undefined)?.tooltip.formatter()).toBe("GitHub traffic data is missing for Oct 18 (T-1).");
+    expect(broken.collectionWarning?.date).toBe("2026-10-18");
+    expect(broken.collectionWarning?.text).toBe("GitHub traffic data is missing for Oct 18 (T-1).");
     const gapFormatter = broken.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
     expect(gapFormatter([{ axisValue: "2026-10-18", seriesName: "Views", data: null }])).toBe(
       "GitHub traffic data is missing for Oct 18 (T-1).",

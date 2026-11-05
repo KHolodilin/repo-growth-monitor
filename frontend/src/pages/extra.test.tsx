@@ -244,7 +244,7 @@ describe("extra coverage", () => {
     searchErrors.unmount();
 
     const topicErrors = renderAt("/repositories/13?tab=topics", <RepositoryDetailsPage />);
-    expect(await screen.findByText("outbox")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "outbox" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
@@ -432,12 +432,12 @@ describe("extra coverage", () => {
       return [];
     });
     const details = renderAt("/repositories/13?tab=search", <RepositoryDetailsPage />);
-    expect(await screen.findByText("transactional outbox language:java")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "transactional outbox language:java" })).toBeInTheDocument();
     for (const name of ["Search Query", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
       await user.click(screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]);
     }
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
-    expect(await screen.findByText("kafka")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "kafka" })).toBeInTheDocument();
     for (const name of ["Topic", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
       await user.click(screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]);
     }

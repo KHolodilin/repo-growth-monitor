@@ -9,7 +9,7 @@ describe("rankChart", () => {
     expect(rankTooltipText({ date: "2026-09-23", position: 4 }, 50)).toBe("#4");
   });
 
-  it("builds option formatters and missed markers", () => {
+  it("builds option formatters without fictitious missed markers", () => {
     const option = rankHistoryOption({
       dates: ["2026-09-22", "2026-09-23"],
       legend: true,
@@ -36,7 +36,7 @@ describe("rankChart", () => {
     expect(option.xAxis.axisLabel).not.toHaveProperty("alignMinLabel");
     expect(option.xAxis.axisLabel).not.toHaveProperty("alignMaxLabel");
     expect(option.legend).toMatchObject({ top: 0 });
-    expect(option.series).toHaveLength(3);
+    expect(option.series).toHaveLength(2);
     const withoutMisses = rankHistoryOption({
       dates: ["2026-09-23"],
       series: [{ name: "plain", limit: 50, points: [{ date: "2026-09-23", position: 2 }] }],
@@ -58,9 +58,9 @@ describe("rankChart", () => {
       ],
       series: [{ name: "outbox", limit: 50, points: [{ date: "2026-09-23", position: 2 }] }],
     });
-    expect(marked.series).toHaveLength(4);
+    expect(marked.series).toHaveLength(3);
     expect(marked.grid.top).toBe(64);
-    const eventLine = marked.series[3] as {
+    const eventLine = marked.series[2] as {
       markLine: { data: { label: { position: string } }[] };
       markPoint?: unknown;
     };
@@ -112,7 +112,7 @@ describe("rankChart", () => {
     const line = option.series[0] as { data: (number | null)[] };
     expect(line.data[0]).toBeNull();
     expect(line.data[6]).toBe(2);
-    expect(option.series).toHaveLength(3);
+    expect(option.series).toHaveLength(2);
   });
 
   it("starts a timeline at the first stored point and keeps the event on that day", () => {

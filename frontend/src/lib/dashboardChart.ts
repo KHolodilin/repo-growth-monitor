@@ -68,6 +68,8 @@ function tooltipItems(raw: unknown): TooltipItem[] | null {
 export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
   const byDate = new Map(traffic.map((point) => [point.date, point]));
   return {
+    collectionDates: traffic.filter(point => point.views != null || point.visitors != null || point.clones != null).map(point => point.date),
+    partialCollectionDates: traffic.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
     tooltip: {
       trigger: "item" as const,
       triggerOn: "click" as const,

@@ -86,7 +86,7 @@ export function eventMarkOverlays(
       const rows = items
         .map((item) => `<div>${item.title}<div style="opacity:.7">${eventTypeLabel(item.type)}</div></div>`)
         .join("");
-      return `<div style="min-width:180px">${rows}</div>`;
+      return `<div style="max-width:100%">${rows}</div>`;
     },
   };
   return {
@@ -183,6 +183,8 @@ export function trafficChartOption(
   const { groups, markLine } = eventMarkOverlays(dates, events, peak, period);
 
   return {
+    collectionDates: points.map(point => point.date),
+    collectionWarning: marker ? { date: marker, text: gapText } : undefined,
     tooltip: {
       trigger: "axis" as const,
       formatter: (params: { axisValue: string; seriesName: string; data: number | null }[]) => {
@@ -207,7 +209,7 @@ export function trafficChartOption(
             : `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,.08)">${dayEvents
                 .map((item) => `<div>${item.title}</div>`)
                 .join("")}</div>`;
-        return `<div style="min-width:160px"><div style="margin-bottom:6px">${date}</div>${rows}${eventRows}</div>`;
+        return `<div style="max-width:100%"><div style="margin-bottom:6px">${date}</div>${rows}${eventRows}</div>`;
       },
     },
     legend: { top: 0, data: ["Views", "Visitors", "Clones", "Unique Cloners"] },
@@ -241,16 +243,7 @@ export function trafficChartOption(
         symbolSize: 8,
         connectNulls: true,
         data: dates.map((date) => byDate.get(date)?.views ?? null),
-        markPoint: marker
-          ? {
-              symbol: "circle",
-              symbolSize: 22,
-              itemStyle: { color: "#fef3c7", borderColor: "#d97706", borderWidth: 1 },
-              label: { show: true, formatter: "⚠", color: "#b45309", fontSize: 14 },
-              tooltip: { formatter: () => gapText },
-              data: [{ xAxis: marker, yAxis: 0 }],
-            }
-          : undefined,
+
       },
       {
         name: "Visitors",
