@@ -1,3 +1,4 @@
+import type { Period } from "./PeriodSelector";
 import { useChartVisibility } from "../lib/chartVisibility";
 import { useMemo, useState } from "react";
 import type { SnapshotHistory } from "../lib/api";
@@ -15,11 +16,13 @@ import { ReferrerSourceIcon } from "./ReferrerSourceIcon";
 
 export function SnapshotHistoryChart({
   title,
+  period = "all",
   kind,
   history,
   selected, metric, onChange,
 }: {
   title: string;
+  period?: Period;
   kind: SnapshotChartKind;
   history: SnapshotHistory;
   selected: string[];
@@ -54,7 +57,7 @@ export function SnapshotHistoryChart({
     <ChartCard
       title={title}
       repositoryId={repositoryId}
-      period="all"
+      period={period}
       context={`repository:${repositoryId}:${kind}`}
       controls={metricControls}
       mobileControls={metricControls}

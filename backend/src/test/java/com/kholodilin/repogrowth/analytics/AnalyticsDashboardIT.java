@@ -314,6 +314,39 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     }
 
     @Test
+    void snapshotPeriodsReadTheArchiveAndUseSharedCalendarBoundaries() {
+        createRepos();
+        LocalDate today = LocalDate.now(clock);
+        for (int age : List.of(400, 35, 20, 1, 0)) {
+            LocalDate day = today.minusDays(age);
+            Instant collected = day.atTime(12, 0).toInstant(ZoneOffset.UTC);
+            trafficJdbcRepository.insertReferrers(kafka.id(), day, collected, "github.com", age, age);
+            trafficJdbcRepository.insertPath(kafka.id(), day, collected, "/readme", "README", age, age, false);
+        }
+        LocalDate restricted = today.minusDays(500);
+        trafficJdbcRepository.insertPath(kafka.id(), restricted, restricted.atStartOfDay().toInstant(ZoneOffset.UTC), "/settings", "Settings", 3, 3, true);
+        for (String kind : List.of("referrers", "paths")) {
+            var one = analyticsService.snapshotHistory(kafka.id(), kind, "1d", null, false);
+            assertThat(one.from()).isEqualTo(today.minusDays(1));
+            assertThat(one.to()).isEqualTo(today.minusDays(1));
+            assertThat(one.days()).isEqualTo(1);
+            assertThat(one.dates()).containsExactly(today.minusDays(1));
+            var month = analyticsService.snapshotHistory(kafka.id(), kind, "30d", 1, false);
+            assertThat(month.from()).isEqualTo(today.minusDays(29));
+            assertThat(month.dates()).containsExactly(today.minusDays(20), today.minusDays(1), today);
+            assertThat(month.rows().getFirst().cells().getFirst().viewsDelta()).isEqualTo(-15);
+            assertThat(analyticsService.snapshotHistory(kafka.id(), kind, "7d", null, false).days()).isEqualTo(7);
+            assertThat(analyticsService.snapshotHistory(kafka.id(), kind, "90d", null, false).dates()).contains(today.minusDays(35));
+            assertThat(analyticsService.snapshotHistory(kafka.id(), kind, "1y", null, false).dates()).doesNotContain(today.minusDays(400));
+            assertThat(analyticsService.snapshotHistory(kafka.id(), kind, "all", null, false).from()).isEqualTo(today.minusDays(400));
+        }
+        assertThat(analyticsService.snapshotHistory(kafka.id(), "paths", "all", null, true).from()).isEqualTo(restricted);
+        assertThat(analyticsService.snapshotHistory(outbox.id(), "paths", "all", null, false).dates()).isEmpty();
+        assertThat(analyticsService.snapshotHistory(outbox.id(), "referrers", "all", null, false).from()).isEqualTo(today);
+        assertThat(analyticsService.snapshotHistory(kafka.id(), "referrers", "invalid", null, false).days()).isEqualTo(30);
+    }
+
+    @Test
     void trafficHistoryClampsTheRequestedWindowToTwoWeeks() {
         createRepos();
         LocalDate today = LocalDate.now(clock);

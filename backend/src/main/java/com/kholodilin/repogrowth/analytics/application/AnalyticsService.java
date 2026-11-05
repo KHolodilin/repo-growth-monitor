@@ -73,7 +73,7 @@ import java.util.stream.Collectors;
 public class AnalyticsService {
 
     private static final Logger log = LoggerFactory.getLogger(AnalyticsService.class);
-    /** GitHub reports a rolling 14-day window, so a wider history table would repeat itself. */
+    /** Compatibility limit for legacy days requests; period requests read the saved archive. */
     private static final int MAX_HISTORY_DAYS = 14;
 
     private final RepositoryService repositoryService;
@@ -255,7 +255,7 @@ public class AnalyticsService {
 
     /**
      * Both the chart and the table of the history page are served from this payload, so they cannot
-     * disagree about a snapshot. The chart hides negative deltas itself; the table shows them.
+     * disagree about a snapshot. Values retain GitHub rolling-window semantics; deltas are signed.
      */
     public SnapshotHistoryResponse snapshotHistory(
             long repositoryId,
@@ -263,11 +263,31 @@ public class AnalyticsService {
             Integer daysParam,
             boolean includeServicePaths
     ) {
+        return snapshotHistory(repositoryId, kindParam, null, daysParam, includeServicePaths);
+    }
+
+    public SnapshotHistoryResponse snapshotHistory(long repositoryId, String kindParam, String periodParam,
+                                                   Integer daysParam, boolean includeServicePaths) {
         requireVisible(repositoryService.get(repositoryId));
         SnapshotKind kind = snapshotKind(kindParam);
-        int days = historyDays(daysParam);
-        LocalDate to = LocalDate.now(clock);
-        LocalDate from = to.minusDays(days - 1L);
+        LocalDate today = LocalDate.now(clock);
+        LocalDate from;
+        LocalDate to;
+        if (periodParam == null) {
+            to = today;
+            from = to.minusDays(historyDays(daysParam) - 1L);
+        } else {
+            LocalDate earliest = null;
+            if ("all".equals(DashboardPeriod.normalize(periodParam))) {
+                earliest = (kind == SnapshotKind.PATHS
+                        ? trafficJdbcRepository.earliestPathSnapshotDate(repositoryId, includeServicePaths)
+                        : trafficJdbcRepository.earliestReferrerSnapshotDate(repositoryId)).orElse(today);
+            }
+            DashboardPeriod period = DashboardPeriod.of(periodParam, today, earliest);
+            from = period.from();
+            to = period.to();
+        }
+        int days = Math.toIntExact(java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1);
         List<Observation> snapshots = kind == SnapshotKind.PATHS
                 ? trafficJdbcRepository.pathSnapshotsForDelta(repositoryId, from, to, includeServicePaths)
                 : trafficJdbcRepository.referrerSnapshotsForDelta(repositoryId, from, to);

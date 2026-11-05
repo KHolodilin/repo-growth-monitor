@@ -78,3 +78,5 @@ Required validation in every affected PR:
 - [ ] Zero, missing T−1, not-found rank, partial aggregation, before-first-snapshot and disabled collection fixtures use the correct semantics.
 - [ ] Legend hide/restore and selection survive a period switch; long labels remain readable and controls accessible.
 - [ ] Tooltip bounds/dismissal verified interactively for values, events and warnings.
+
+- Referrers/Paths History uses the shared 1d/7d/30d/90d/1y/all calendar periods against saved snapshots (#205); do not confuse GitHub’s rolling-window metric with archive retention or silently clamp a selected period to 14 days.

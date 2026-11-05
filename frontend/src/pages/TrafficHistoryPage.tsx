@@ -1,3 +1,4 @@
+import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type SnapshotHistory } from "../lib/api";
@@ -9,8 +10,6 @@ import { ServicePathToggle } from "../components/ServicePaths";
 import { SnapshotHistoryView } from "../components/SnapshotHistoryView";
 import { Skeleton } from "../components/ui";
 
-const DAYS = [1, 7, 14] as const;
-const DEFAULT_DAYS = 14;
 
 const KIND_LABEL: Record<SnapshotChartKind, string> = {
   referrers: "Referrers",
@@ -26,16 +25,24 @@ function parseKind(value: string | null): SnapshotChartKind {
   return value === "paths" ? "paths" : "referrers";
 }
 
-function parseDays(value: string | null) {
-  const parsed = Number(value);
-  return DAYS.find((option) => option === parsed) ?? DEFAULT_DAYS;
+function historyPeriod(raw: string | null, days: string | null, saved: Period): Period {
+  if (raw) return PERIODS.includes(raw as Period) ? raw as Period : saved;
+  if (days === "1") return "1d";
+  if (days === "7") return "7d";
+  if (days === "14") return "30d";
+  return saved;
 }
 
 export function TrafficHistoryPage() {
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const kind = parseKind(searchParams.get("kind"));
-  const days = parseDays(searchParams.get("days"));
+  const [savedPeriod, savePeriod] = usePeriod(id);
+  const period = historyPeriod(searchParams.get("period"), searchParams.get("days"), savedPeriod);
+  function selectPeriod(next: Period) {
+    savePeriod(next);
+    setSearchParams({ kind, period: next }, { replace: true });
+  }
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const includeService = kind === "paths" && showServicePaths;
   const [repo, setRepo] = useState<Repository | null>(null);
@@ -53,7 +60,7 @@ export function TrafficHistoryPage() {
     Promise.all([
       api<Repository>(`/api/v1/repositories/${id}`),
       api<SnapshotHistory>(
-        `/api/v1/repositories/${id}/traffic-history?kind=${kind}&days=${days}&includeServicePaths=${includeService}`,
+        `/api/v1/repositories/${id}/traffic-history?kind=${kind}&period=${period}&includeServicePaths=${includeService}`,
       ),
     ])
       .then(([repository, data]) => {
@@ -71,7 +78,7 @@ export function TrafficHistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, kind, days, includeService]);
+  }, [id, kind, period, includeService]);
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -97,7 +104,7 @@ export function TrafficHistoryPage() {
               repoSwitcher: {
                 currentId: repo.id,
                 hrefFor: (repositoryId) =>
-                  `/repositories/${repositoryId}/traffic/history?kind=${kind}&days=${days}`,
+                  `/repositories/${repositoryId}/traffic/history?kind=${kind}&period=${period}`,
               },
             },
             { label: "Traffic", to: `/repositories/${repo.id}` },
@@ -115,36 +122,22 @@ export function TrafficHistoryPage() {
                 "rounded-md px-3 py-1.5 text-sm font-medium",
                 kind === option ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
               )}
-              onClick={() => setSearchParams({ kind: option, days: String(days) }, { replace: true })}
+              onClick={() => setSearchParams({ kind: option, period }, { replace: true })}
             >
               {KIND_LABEL[option]}
             </button>
           ))}
         </div>
-        <div className="flex max-w-full flex-wrap items-center gap-3">
+        <div className="flex w-full max-w-full flex-wrap items-center gap-3 md:w-auto">
           {kind === "paths" && (
             <div className="text-xs text-muted-foreground">
               <ServicePathToggle checked={showServicePaths} onChange={setShowServicePaths} />
             </div>
           )}
-          <div className="inline-flex rounded-lg border bg-muted p-1">
-            {DAYS.map((option) => (
-              <button
-                key={option}
-                type="button"
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium",
-                  days === option ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setSearchParams({ kind, days: String(option) }, { replace: true })}
-              >
-                {option}d
-              </button>
-            ))}
-          </div>
+          <div role="group" aria-label="History period" className="w-full md:w-auto"><PeriodSelector fitMobile period={period} onPeriod={selectPeriod} /></div>
         </div>
       </div>
-      <SnapshotHistoryView key={`${repo.id}:${kind}`} title={CHART_TITLE[kind]} kind={kind} history={history} />
+      <SnapshotHistoryView key={`${repo.id}:${kind}`} title={CHART_TITLE[kind]} kind={kind} history={history} period={period} />
     </div>
   );
 }
