@@ -30,7 +30,7 @@ const routes = {
   topicCompetitor: "/repositories/13/topics/outbox/competitors/1?scope=language",
 };
 function mount(path: string) { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} /><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /><Route path="/repositories/:repositoryId/search-queries/:queryId/competitors/:githubRepositoryId" element={<CompetitorCardPage />} /><Route path="/repositories/:repositoryId/topics/:topic/competitors/:githubRepositoryId" element={<TopicCompetitorCardPage />} /></Routes></MemoryRouter>); }
-function option() { return JSON.parse(screen.getByTestId("period-option").textContent!) as { xAxis: { data: string[] }; series: { name: string; data: (number|null)[] }[] }; }
+function option() { return JSON.parse(screen.getByTestId("period-option").textContent!) as { collectionDates: string[]; missedCollectionDates: string[]; xAxis: { data: string[] }; series: { name: string; data: (number|null)[] }[] }; }
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
   writeStoredRepoPeriod("13", "all");
@@ -80,3 +80,22 @@ describe.each([false,true])("detail period controls (mobile=%s)", mobile => {
     expect(screen.getByRole("button", { name: "1d", pressed: true })).toBeInTheDocument();
   });
 });
+
+describe("disabled collection warnings", () => {
+  it.each(Object.keys(routes) as (keyof typeof routes)[])("does not warn about expected collection on disabled %s", async route => {
+    const original = api.getMockImplementation()!;
+    api.mockImplementation((url: string, ...args: unknown[]) => {
+      if (String(url).includes("/history")) {
+        const common = { points: [{ date: "2026-11-03", position: null, searchRunId: 1, topicRunId: 1 }], missedDates: ["2026-11-04"] };
+        return Promise.resolve(String(url).includes("/topics/") ? { ...topic, ...common, watch: { ...topic.watch, enabled: false } } : { ...query, ...common, query: { ...query.query, enabled: false } });
+      }
+      return original(url, ...args);
+    });
+    mount(routes[route]);
+    await screen.findByTestId("period-option");
+    expect(option().collectionDates).toEqual([]);
+    expect(option().missedCollectionDates).toEqual([]);
+    expect(option().series.some((item: { name: string }) => item.name === "Collection warning")).toBe(false);
+  });
+});
+

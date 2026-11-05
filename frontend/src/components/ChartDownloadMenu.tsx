@@ -229,7 +229,7 @@ export function ChartCard({
       period,
       openMarker,
       mobile: mobileShell,
-      mobileSeriesName: mobileShell && (mobileSeries?.length ?? 0) > 1 ? effectiveMobileSeriesName : null,
+      mobileSeriesName: mobileShell && mobileSeries!.length > 1 ? effectiveMobileSeriesName : null,
       axisDates,
       setAxisDates,
     }),

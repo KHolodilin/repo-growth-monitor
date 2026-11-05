@@ -59,4 +59,16 @@ describe("shared observation and interaction policy", () => {
       expect(result.tooltip.extraCssText).toContain("white-space: normal");
     }
   });
+  it("places a known warning on empty numeric and preframed axes without inventing values", () => {
+    for (const yAxis of [undefined, [], { inverse: false }, { inverse: true }]) {
+      const source = { xAxis: { data: [yesterday] }, yAxis, collectionWarning: { date: yesterday, text: "No snapshot" } };
+      const option = withCollectionWarning(source, today);
+      expect(marker(option).markPoint.data[0].yAxis).toBe(yAxis && !Array.isArray(yAxis) && yAxis.inverse ? 1 : 0);
+    }
+    const framed = withCollectionWarning({ xAxis: { data: ["1"] }, eventAxisDates: [yesterday], collectionWarning: { date: yesterday, text: "No snapshot" }, series: [{ name: "empty", type: "line" }] }, today);
+    expect(marker(framed).markPoint.data[0].xAxis).toBe("1");
+    expect(framed.eventAxisDates).toEqual([yesterday]);
+    expect(framed.series?.[0].data).toBeUndefined();
+  });
+
 });
