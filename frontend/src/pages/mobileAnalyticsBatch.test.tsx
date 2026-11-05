@@ -136,12 +136,19 @@ describe("mobile analytics batch", () => {
     expect(screen.getByRole("link", { name: "Portfolio" })).toHaveAttribute("href", "/");
   });
 
-  it("opens full tab hints with focus/hover and suppresses navigation on a long press", () => {
+  it("retains focus/hover/long-press hints for an actually clipped language", () => {
     vi.useFakeTimers();
     const onClick = vi.fn();
-    render(<NavigationButton label="Search Visibility" mobileLabel="Search" onClick={onClick} />);
-    const button = screen.getByRole("button", { name: "Search Visibility" });
-    fireEvent.focus(button); expect(screen.getByRole("tooltip")).toHaveTextContent("Search Visibility");
+    let measure!: () => void;
+    vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { measure = callback; } observe() {} disconnect() {} });
+    render(<NavigationButton label="TypeScript" truncate onClick={onClick} />);
+    const button = screen.getByRole("button", { name: "TypeScript" });
+    const label = within(button).getByText("TypeScript");
+    Object.defineProperty(label, "scrollWidth", { value: 150 });
+    Object.defineProperty(label, "clientWidth", { value: 80 });
+    act(measure);
+    fireEvent.contextMenu(button);
+    fireEvent.focus(button); expect(screen.getByRole("tooltip")).toHaveTextContent("TypeScript");
     fireEvent.keyDown(button, { key: "Escape" }); expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     fireEvent.mouseEnter(button); expect(screen.getByRole("tooltip")).toBeInTheDocument();
     fireEvent.mouseLeave(button); fireEvent.blur(button);
@@ -150,6 +157,20 @@ describe("mobile analytics batch", () => {
     fireEvent.pointerUp(button); fireEvent.click(button); expect(onClick).not.toHaveBeenCalled();
     fireEvent.click(button); expect(onClick).toHaveBeenCalledOnce();
     fireEvent.pointerCancel(button);
+  });
+  it.each([["Search Visibility", "Search"], ["Topics Visibility", "Topics"], ["Growth Events", "Events"]])("does not overlay navigation with a %s hint", (label, short) => {
+    vi.useFakeTimers(); const onClick = vi.fn();
+    render(<NavigationButton label={label} mobileLabel={short} onClick={onClick} />);
+    const button = screen.getByRole("button", { name: label });
+    expect(within(button).getByText(short)).toBeInTheDocument();
+    fireEvent.focus(button); fireEvent.mouseEnter(button); fireEvent.click(button);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    const pointer = new Event("pointerdown", { bubbles: true }); Object.defineProperty(pointer, "pointerType", { value: "touch" });
+    fireEvent(button, pointer); act(() => vi.advanceTimersByTime(510));
+    fireEvent.pointerUp(button); fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(button).not.toHaveAttribute("aria-describedby");
   });
   it("only gives language hints when the full label is actually clipped and updates on resize", () => {
     let measure!: () => void;
