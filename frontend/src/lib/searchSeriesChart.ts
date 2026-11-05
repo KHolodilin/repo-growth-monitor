@@ -175,11 +175,11 @@ export function searchMetricOption({
         points: line.points.map((point) => ({ date: point.date, position: point.position })),
       })),
     });
-    return labelMetricOption(option, metric, frame?.eventAxisDates ?? option.eventAxisDates);
+    return { ...labelMetricOption(option, metric, frame?.eventAxisDates ?? option.eventAxisDates), collectionDates: lines.flatMap(line => line.points.filter(hasStoredSnapshot).map(point => point.date)), missedCollectionDates: missedDates };
   }
   const field = metric === "stars" ? "stars" : "forks";
   const plotted = frame?.lines ?? lines;
-  return labelMetricOption(countHistoryOption({
+  return { ...labelMetricOption(countHistoryOption({
     dates: axisDates,
     formatAxis,
     events,
@@ -190,7 +190,7 @@ export function searchMetricOption({
       key: line.key,
       data: axisDates.map((date) => line.points.find((point) => point.date === date)?.[field] ?? null),
     })),
-  }), metric, frame?.eventAxisDates ?? dates);
+  }), metric, frame?.eventAxisDates ?? dates), collectionDates: lines.flatMap(line => line.points.filter(hasStoredSnapshot).map(point => point.date)), missedCollectionDates: missedDates };
 }
 
 /** Query-only labels leave shared topic/rank consumers unchanged. */
@@ -199,6 +199,7 @@ function labelMetricOption<T extends ReturnType<typeof rankHistoryOption> | Retu
   const formatter = option.tooltip.formatter;
   return {
     ...option,
+    collectionSeries: [],
     eventAxisDates,
     exportLabels: Object.fromEntries(option.series.filter(item => item.name !== "Events").map(item => [item.name, `${item.name} (${label})`])),
     yAxis: { ...option.yAxis, name: label, nameLocation: metric === "place" ? "start" : "end", nameGap: 8, nameTextStyle: { fontSize: 11 } },
@@ -224,7 +225,7 @@ export function queryDetailsChart({
   period = "all",
   today = new Date().toISOString().slice(0, 10),
 }: {
-  history: { points: { date: string; position: number | null }[]; missedDates: string[]; query: { resultLimit: number } } | null;
+  history: { points: { date: string; position: number | null }[]; missedDates: string[]; query: { resultLimit: number; enabled?: boolean } } | null;
   repo: { githubId: number; fullName: string } | null;
   rows: ChartRow[] | null;
   series: SearchSeries["series"];
@@ -260,7 +261,7 @@ export function queryDetailsChart({
     neighbors,
   });
   return {
-    option: searchMetricOption({
+    option: { ...searchMetricOption({
       metric,
       axis,
       dates: datesFromHistory([history.points], history.missedDates),
@@ -270,7 +271,7 @@ export function queryDetailsChart({
       events,
       period,
       today,
-    }),
+    }), collectionDates: history.query.enabled === false ? [] : history.points.map(point => point.date), missedCollectionDates: history.query.enabled === false ? [] : history.missedDates },
     series: [
       { key: `repository:${repo.githubId}`, name: repo.fullName },
       ...selected.flatMap((id) => {
@@ -296,12 +297,12 @@ export function storedCountOption({
   today?: string;
 }) {
   const window = periodDates(period, today);
-  if (!window) return countHistoryOption({ dates, series });
+  if (!window) return { ...countHistoryOption({ dates, series }), collectionDates: dates };
   const indexes = new Map(dates.map((date, index) => [date, index]));
-  return countHistoryOption({ dates: window, series: series.map(item => ({ ...item, data: window.map(date => {
+  return { ...countHistoryOption({ dates: window, series: series.map(item => ({ ...item, data: window.map(date => {
     const index = indexes.get(date);
     return index == null ? null : (item.data[index] ?? null);
-  }) })) });
+  }) })) }), collectionDates: dates };
 }
 
 function countHistoryOption({

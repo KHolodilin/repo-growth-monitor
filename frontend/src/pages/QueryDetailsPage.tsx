@@ -1,3 +1,4 @@
+import { useChartVisibility } from "../lib/chartVisibility";
 import { PeriodSelector, usePeriod } from "../components/PeriodSelector";
 import { RankSummary } from "../components/RankSummary";
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +7,6 @@ import { api, type Repository, type SearchHistory, type SearchRunResults, type S
 import { useMutationAccess } from "../lib/mutationAccess";
 import { formatSyncTime, cn } from "../lib/utils";
 import { SEARCH_METRICS, queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
-import { ComparisonSeries } from "../components/ComparisonSeries";
 import { ChartCard, useChartMode } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
@@ -22,6 +22,7 @@ export function QueryDetailsPage() {
   const [results, setResults] = useState<SearchRunResults | null>(null);
   const [series, setSeries] = useState<SearchSnapshotSeries[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
+  const visibility = useChartVisibility(`${repositoryId}:query:${queryId}`);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedMetric = searchParams.get("metric");
   const metric: SearchChartMetric = requestedMetric === "stars" || requestedMetric === "forks" ? requestedMetric : "place";
@@ -86,19 +87,6 @@ export function QueryDetailsPage() {
     }
   }
 
-  const chartSeries = useMemo(() => {
-    if (!repo || !history) {
-      return [] as { key: string; name: string }[];
-    }
-    return queryDetailsChart({
-      history,
-      repo,
-      rows: results?.rows ?? null,
-      series,
-      selected,
-      metric,
-    })!.series;
-  }, [history, repo, results, series, selected, metric]);
 
   if (error) {
     return <p className="text-red-600">{error}</p>;
@@ -194,7 +182,6 @@ export function QueryDetailsPage() {
         mobileSeries={[]}
       >
         {selected.some(id => !series.some(item => item.githubRepositoryId === id && item.points.length > 0)) && <p role="status" className="mb-2 text-sm text-muted-foreground">No history for one or more selected competitors.</p>}
-        <ComparisonSeries series={chartSeries} />
         <QueryRankChart
           history={history}
           repo={repo}
@@ -214,9 +201,9 @@ export function QueryDetailsPage() {
             rows={results.rows}
             repositoryId={repo.id}
             trackedGithubId={repo.githubId}
-            selectedIds={selected}
+            selectedIds={selected.filter(id => visibility.isVisible(`repository:${id}`))}
             onToggle={(id) =>
-              setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+              !visibility.isVisible(`repository:${id}`) && selected.includes(id) ? visibility.reveal([`repository:${id}`]) : setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
             }
             nameTo={(row) =>
               `/repositories/${repo.id}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`

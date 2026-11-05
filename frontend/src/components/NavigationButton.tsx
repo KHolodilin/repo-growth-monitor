@@ -35,7 +35,7 @@ export function NavigationButton({ label, mobileLabel, truncate = false, classNa
     }}
     onPointerUp={() => clearTimeout(timer.current)} onPointerCancel={() => clearTimeout(timer.current)}
     onContextMenu={event => { if (hint) event.preventDefault(); }}
-    onClick={event => { if (suppressClick.current) { event.preventDefault(); suppressClick.current = false; return; } setOpen(false); onClick?.(event); }}>
+    onClick={event => { if (suppressClick.current) { event.preventDefault(); suppressClick.current = false; return; } setOpen(hint); onClick?.(event); }}>
     <span ref={text} className={cn("block", truncate && "truncate")}>{mobile ? mobileLabel ?? label : label}</span>
     {hint && open && <span id={id} role="tooltip" style={{ top: text.current!.getBoundingClientRect().bottom + 6 }} className="pointer-events-none fixed inset-x-4 z-50 whitespace-normal break-words rounded border bg-card px-2 py-1 text-left text-xs text-foreground shadow">{label}</span>}
   </button>;

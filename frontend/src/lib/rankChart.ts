@@ -1,4 +1,4 @@
-import { prepareSeriesStyles, seriesStyle, MISSING_COLOR } from "./seriesStyle";
+import { prepareSeriesStyles, seriesStyle } from "./seriesStyle";
 import type { Period } from "../components/PeriodSelector";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
@@ -6,7 +6,6 @@ import { eventUtcDate } from "./growthEvents";
 import { periodDates } from "./searchVisibilityKpi";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
-const MISSED_COLOR = MISSING_COLOR;
 
 export type RankHistoryPoint = { date: string; position: number | null };
 
@@ -17,6 +16,7 @@ export type RankHistorySeries = {
   limit: number;
   /** Days the planner never ran. GitHub Search cannot be replayed, so they stay empty forever. */
   missedDates?: string[];
+  expected?: boolean;
   highlighted?: boolean;
   dimmed?: boolean;
 };
@@ -149,26 +149,18 @@ export function rankHistoryOption({
         },
         data: axisDates.map((date) => {
           const point = byDate.get(date);
-          if (!point || point.position != null) {
+          if (!point || point.position != null || missed.has(date)) {
             return null;
           }
           return maxLimit + 1;
         }),
       },
-      // A day nobody collected is not the same as a day the repository fell out of the results,
-      // so it gets its own grey marker instead of an unexplained break in the line.
-      {
-        name: item.name,
-        type: "scatter",
-        symbol: "circle",
-        symbolSize: 7,
-        tooltip: { show: false },
-        itemStyle: { color: MISSED_COLOR, opacity: item.dimmed ? 0.25 : 0.8 },
-        data: axisDates.map((date) => (missed.has(date) ? maxLimit + 1 : null)),
-      },
     ];
   });
   return {
+    collectionSeries: series.filter(item => item.expected !== false).map(item => ({ name: item.name, dates: item.points.map(point => point.date) })),
+    collectionDates: series.filter(item => item.expected !== false).flatMap(item => item.points.map(point => point.date)),
+    missedCollectionDates: series.filter(item => item.expected !== false).flatMap(item => item.missedDates ?? []),
     eventAxisDates: frame?.eventAxisDates ?? calendarAxis,
     tooltip: {
       trigger: "axis",

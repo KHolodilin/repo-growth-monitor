@@ -56,7 +56,13 @@ describe.each([false,true])("detail period controls (mobile=%s)", mobile => {
     await user.click(within(group).getByRole("button", { name: "1d" }));
     await waitFor(() => expect(option().xAxis.data).toEqual(["2026-11-04"]));
     expect(within(group).getByRole("button", { name: "1d", pressed: true })).toBeInTheDocument();
-    if (route === "query" || route === "topic") expect(screen.getByRole("checkbox", { name: `Show ${competitorName} on the chart` })).toBeChecked();
+    if (route === "query" || route === "topic") {
+      const checkbox = screen.getByRole("checkbox", { name: `Show ${competitorName} on the chart` });
+      expect(checkbox).toBeChecked();
+      const legend = screen.getByRole("button", { name: competitorName });
+      await user.click(legend); expect(checkbox).not.toBeChecked();
+      await user.click(checkbox); expect(checkbox).toBeChecked(); expect(legend).toHaveAttribute("aria-pressed", "true");
+    }
     if (route !== "topic") expect(option().series[0].data).toEqual([0]);
     const csv = vi.spyOn(exports,"downloadChartCsv").mockImplementation(() => {});
     await user.click(screen.getByRole("button", { name: mobile ? "Chart menu" : "Download" }));

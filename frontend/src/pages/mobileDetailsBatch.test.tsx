@@ -162,8 +162,8 @@ describe("batch 178–182", () => {
     const check = screen.getByRole("checkbox", { name: "Show big/outbox on the chart" });
     await user.click(check); expect(check).toBeChecked();
     expect(screen.queryByRole("tablist", { name: "Chart series" })).toBeNull();
-    expect(screen.getByRole("list", { name: "Compared repositories" })).toHaveTextContent("big/outbox");
-    expect(screen.getByRole("list", { name: "Compared repositories" })).toHaveTextContent(repository.fullName);
+    expect(screen.getByRole("group", { name: "13:topic:7:all series" })).toHaveTextContent("big/outbox");
+    expect(screen.getByRole("group", { name: "13:topic:7:all series" })).toHaveTextContent(repository.fullName);
     await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "stars"); expect(check).toBeChecked();
     expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/repositories/13/topics/outbox/competitors/2");
     await user.click(check); expect(check).not.toBeChecked();

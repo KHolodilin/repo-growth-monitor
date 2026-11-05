@@ -88,7 +88,7 @@ describe("topics visibility scope cookie", () => {
   it("stays on All when the cookie is missing", async () => {
     renderRepo("/repositories/13?tab=topics");
     expect(await screen.findByRole("button", { name: "All" })).toHaveClass("bg-card");
-    expect(screen.getByText("outbox")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "outbox" })).toBeInTheDocument();
     expect(readTopicScope(13)).toBeNull();
     expect(screen.getByTestId("search")).toHaveTextContent("tab=topics");
     expect(screen.getByTestId("search")).not.toHaveTextContent("scope=");
@@ -98,7 +98,7 @@ describe("topics visibility scope cookie", () => {
     writeTopicScope(13, "language");
     renderRepo("/repositories/13?tab=topics");
     expect(await screen.findByRole("button", { name: "Java" })).toHaveClass("bg-card");
-    expect(screen.getByText("kafka")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "kafka" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("search").textContent).toContain("scope=language"));
     expect(readTopicScope(13)).toBe("language");
   });
@@ -107,7 +107,7 @@ describe("topics visibility scope cookie", () => {
     renderRepo("/repositories/13?tab=topics&scope=language");
     expect(await screen.findByRole("button", { name: "Java" })).toHaveClass("bg-card");
     await waitFor(() => expect(readTopicScope(13)).toBe("language"));
-    expect(screen.getByText("kafka")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "kafka" })).toBeInTheDocument();
   });
 
   it("saves All and opens All on the next visit without a query", async () => {
@@ -117,7 +117,7 @@ describe("topics visibility scope cookie", () => {
     await user.click(await screen.findByRole("button", { name: "All" }));
     await waitFor(() => expect(readTopicScope(13)).toBe("all"));
     await waitFor(() => expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="));
-    expect(screen.getByText("outbox")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "outbox" })).toBeInTheDocument();
     view.unmount();
 
     renderRepo("/repositories/13?tab=topics");
@@ -128,7 +128,7 @@ describe("topics visibility scope cookie", () => {
   it("keeps the scope when the period or a topic checkbox changes", async () => {
     const user = userEvent.setup();
     renderRepo("/repositories/13?tab=topics&scope=language");
-    expect(await screen.findByText("kafka")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "kafka" })).toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "7d" })[0]);
     await user.click(screen.getByRole("checkbox", { name: "Chart line for kafka" }));
     expect(readTopicScope(13)).toBe("language");
@@ -165,7 +165,7 @@ describe("topics visibility scope cookie", () => {
       return Promise.resolve([]);
     });
     renderRepo("/repositories/13?tab=topics");
-    expect(await screen.findByText("outbox")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "outbox" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Java" })).not.toBeInTheDocument();
     await waitFor(() => expect(readTopicScope(13)).toBe("all"));
     expect(screen.getByTestId("search").textContent).toBe("tab=topics");
@@ -187,7 +187,7 @@ describe("topics visibility scope cookie", () => {
       return Promise.resolve([]);
     });
     renderRepo("/repositories/13?tab=topics&scope=language");
-    expect(await screen.findByText("outbox")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "outbox" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Java" })).not.toBeInTheDocument();
     await waitFor(() => expect(readTopicScope(13)).toBe("all"));
     await waitFor(() => expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="));
@@ -207,7 +207,7 @@ describe("topics visibility scope cookie", () => {
     renderRepo("/repositories/13");
     await user.click(await screen.findByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByRole("button", { name: "Java" })).toHaveClass("bg-card");
-    expect(screen.getByText("kafka")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "kafka" })).toBeInTheDocument();
   });
 
   it("saves a topic page scope query without restoring a missing one", async () => {

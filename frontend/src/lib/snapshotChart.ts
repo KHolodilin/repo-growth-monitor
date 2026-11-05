@@ -30,6 +30,7 @@ export function snapshotChartOption({ history, metric, selected }: { history: Sn
   }
   return {
     snapshotHistory: true,
+    collectionDates: history.dates,
     exportDates: dates,
     exportExtraColumns: [{ name: "Other observation completeness", data: dates.map(date => {
       const point = observation(OTHER_KEY, date);

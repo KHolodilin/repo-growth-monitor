@@ -63,6 +63,8 @@ export function CompetitorCardPage() {
         { label: history.query.query, to: `/repositories/${repo.id}/search-queries/${history.query.id}` },
       ]}
       card={card}
+      collectionDates={history.query.enabled === false ? [] : history.points.map(point => point.date)}
+      missedCollectionDates={history.query.enabled === false ? [] : history.missedDates}
       chartId={`${repositoryId}:competitor:${queryId}:${githubRepositoryId}`}
       repositoryId={repo.id}
     />
@@ -74,11 +76,15 @@ export function CompetitorCardView({
   card,
   chartId,
   repositoryId,
+  collectionDates = [],
+  missedCollectionDates = [],
 }: {
   items: BreadcrumbItem[];
   card: CompetitorCard;
   chartId: string;
   repositoryId: number;
+  collectionDates?: string[];
+  missedCollectionDates?: string[];
 }) {
   const [period, setPeriod] = usePeriod(String(repositoryId));
   const passed = card.discoverability.filter((item) => item.passed).length;
@@ -139,7 +145,7 @@ export function CompetitorCardView({
         context={`repository:${repositoryId}:competitor`}
         mobileSeries={COMPETITOR_SERIES}
       >
-        <PersistentECharts exportTitle="Stars and forks" chartId={chartId} series={COMPETITOR_SERIES} option={option} style={{ height: 320 }} />
+        <PersistentECharts exportTitle="Stars and forks" chartId={chartId} series={COMPETITOR_SERIES} option={{ ...option, collectionDates, missedCollectionDates }} style={{ height: 320 }} />
       </ChartCard>
     </div>
   );

@@ -288,9 +288,9 @@ describe("pages", () => {
     api.mockResolvedValueOnce({});
     await user.click(within(dialog as HTMLElement).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByText("A match in time does not prove a cause.")).not.toBeInTheDocument());
-    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
-    fireEvent.mouseEnter(screen.getByText(searchHistory.query.name));
-    fireEvent.mouseLeave(screen.getByText(searchHistory.query.name));
+    expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
+    fireEvent.mouseEnter(screen.getByRole("link", { name: searchHistory.query.name }));
+    fireEvent.mouseLeave(screen.getByRole("link", { name: searchHistory.query.name }));
     await user.click(screen.getByRole("checkbox", { name: `Chart line for ${searchHistory.query.name}` }));
     expect(screen.getByText("Select search queries from the table to display rank history")).toBeInTheDocument();
     await user.click(screen.getByRole("checkbox", { name: `Chart line for ${searchHistory.query.name}` }));
@@ -306,16 +306,19 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Delete" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
-    expect(screen.getByText("outbox")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "outbox" })).toBeInTheDocument();
     const scopeBar = screen.getByRole("button", { name: "All" }).parentElement as HTMLElement;
     expect(scopeBar).toHaveTextContent("Java");
     expect(scopeBar).not.toHaveTextContent("7d");
     expect(scopeBar.parentElement?.contains(screen.getAllByRole("button", { name: "7d" })[0])).toBe(true);
     const outboxLine = screen.getByRole("checkbox", { name: "Chart line for outbox" });
+    const topicLegend = within(screen.getByRole("group", { name: "13:topics:all series" })).getByRole("button", { name: "outbox" });
+    await user.click(topicLegend); expect(outboxLine).not.toBeChecked();
+    await user.click(outboxLine); expect(topicLegend).toHaveAttribute("aria-pressed", "true");
     await user.click(outboxLine);
     await user.click(outboxLine);
-    fireEvent.mouseEnter(screen.getByText("outbox"));
-    fireEvent.mouseLeave(screen.getByText("outbox"));
+    fireEvent.mouseEnter(screen.getByRole("link", { name: "outbox" }));
+    fireEvent.mouseLeave(screen.getByRole("link", { name: "outbox" }));
     await user.click(screen.getByRole("button", { name: "mark-empty" }));
     await user.click(screen.getByRole("button", { name: "mark" }));
     expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
@@ -383,7 +386,7 @@ describe("pages", () => {
     await act(async () => {
       pending[2].resolve({});
     });
-    expect(screen.getByText("outbox")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "outbox" })).toBeInTheDocument();
   });
 
   it("shows dashes when overview fields and topics were never stored", async () => {
@@ -551,7 +554,7 @@ describe("pages", () => {
       return json([]);
     });
     const rejected = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
-    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     rejected.unmount();
 
     api.mockImplementation((path: string) => {
@@ -571,7 +574,7 @@ describe("pages", () => {
       return json([]);
     });
     const odd = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
-    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     odd.unmount();
 
     const pending: ((value: unknown) => void)[] = [];
@@ -592,7 +595,7 @@ describe("pages", () => {
       return json([]);
     });
     const late = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
-    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     late.unmount();
     pending.forEach((resolve) => resolve([growthEvent]));
     await act(async () => {
@@ -617,7 +620,7 @@ describe("pages", () => {
       return json([]);
     });
     const abandoned = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
-    expect(await screen.findByText(searchHistory.query.name)).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     abandoned.unmount();
     failing.forEach((reject) => reject(new Error("down")));
     await act(async () => {

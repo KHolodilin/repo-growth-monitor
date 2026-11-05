@@ -61,3 +61,20 @@ This rule adds review requirements. The shared registry is frontend/src/lib/seri
 - Dynamic styles use full domain keys (query/watch IDs, repository GitHub ID, source key, full path). Allocate sorted new identities through prepareSeriesStyles before selecting a subset. Never derive identity from rank/table position.
 - Assignments are persisted locally in rgm-series-styles-v1. If browser storage is unavailable, the in-memory registry keeps the current session stable. Existing assignments are never displaced by newly discovered identities.
 - The first usable palette is followed by unique generated hues and stable line/marker variants. Legend swatches and tooltip markers must use the same identity. Neutral Other and missing observations are reserved explicitly.
+
+## Observations, warnings and interactive legends (issues #196–#201)
+
+- Every main line chart shows a marker for every observed value on mobile and desktop (`showAllSymbol: true`), including zero, peaks and flat sections. Keep semantic color and symbol identity. KPI sparklines are exempt from point markers.
+- Missing collection is not zero and is not a rank. Never add neutral scatter dots to encode uncollected days. Connect neighboring real observations through missing slots; do not invent observations.
+- An expected missing T−1 snapshot uses the shared triangle with `!` inside the plot, on its date, independently of the selected metric. Never move it into the title or attach visibility to Views. Base collection completeness on snapshot/run metadata, not a competitor disappearing from Top N or a null rank from a successful search. A stored zero is complete data. Do not warn before tracking began or for disabled/not-expected collection.
+- Tooltips distinguish known source absence, collection failure, not-executed and partial aggregation. If only absence is known, say no stored snapshot without inventing a failure reason.
+- All legends toggle line visibility via label and marker. Preserve the hidden entry for restoring a line, expose keyboard/touch operation and accessible selected state, and retain choices across periods. Keep candidate selection and visible-series controls coordinated.
+- Mobile selectors wrap readable complete names into rows without horizontal overflow. All/language controls use content width, consistent padding and a full touch/focus hint when ellipsized.
+- Every tooltip, including warnings/events, stays inside the viewport and wraps long content. Mobile uses deliberate taps. Outside tap, scroll, period/metric change and route change dismiss it.
+
+Required validation in every affected PR:
+- [ ] Main graph families audited: Portfolio/Repository Traffic/Stats, Search/Topics watch lists, query/topic details, both competitor details, Referrers/Paths History.
+- [ ] 320/390 px and desktop, Calendar/Timeline, all supported periods; every observation has a marker and missing slots have none.
+- [ ] Zero, missing T−1, not-found rank, partial aggregation, before-first-snapshot and disabled collection fixtures use the correct semantics.
+- [ ] Legend hide/restore and selection survive a period switch; long labels remain readable and controls accessible.
+- [ ] Tooltip bounds/dismissal verified interactively for values, events and warnings.

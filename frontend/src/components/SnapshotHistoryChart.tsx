@@ -1,3 +1,4 @@
+import { useChartVisibility } from "../lib/chartVisibility";
 import { useMemo, useState } from "react";
 import type { SnapshotHistory } from "../lib/api";
 import { snapshotChartOption, snapshotSeriesKey } from "../lib/snapshotChart";
@@ -6,8 +7,6 @@ import {
   type SnapshotMetric,
 } from "../lib/snapshotChartPrefs";
 import { OTHER_KEY, chartValue } from "../lib/snapshotHistory";
-import { seriesStyle } from "../lib/seriesStyle";
-import { SeriesSwatch } from "./SeriesSwatch";
 import { cn } from "../lib/utils";
 import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
@@ -28,8 +27,10 @@ export function SnapshotHistoryChart({
   onChange: (metric: SnapshotMetric, keys: string[]) => void;
 }) {
   const repositoryId = history.repositoryId;
+  const visibility = useChartVisibility(`${repositoryId}:snapshot-${kind}`);
   const [pickerOpen, setPickerOpen] = useState(false);
   const persist = onChange;
+  const showIcons = kind === "referrers";
   const option = useMemo(
     () => snapshotChartOption({ history, metric, selected }),
     [history, metric, selected],
@@ -38,7 +39,6 @@ export function SnapshotHistoryChart({
   const moreCount = Math.max(0, history.rows.length - selected.length);
   const enoughHistory = history.dates.length >= 1;
   const hasData = history.rows.some(row => selected.includes(row.key) && row.cells.some(cell => chartValue(cell, metric) !== null));
-  const showIcons = kind === "referrers";
   const metricControls = (
     <div className="inline-flex rounded-lg border bg-muted p-1">
       <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>
@@ -72,20 +72,9 @@ export function SnapshotHistoryChart({
           {selected.length === 0 ? <p className="py-6 text-sm text-muted-foreground">No {kind === "referrers" ? "sources" : "paths"} selected. Select items to display history.</p> : !hasData ? <p className="py-6 text-sm text-muted-foreground">No data for the selected period.</p> : (
 
         <>
-          {(
-            <div className="mb-3 flex flex-wrap gap-3 text-sm">
-              {legend.map((name) => (
-                <span key={name} className="inline-flex min-w-0 max-w-full items-start gap-1.5">
-                  <SeriesSwatch style={seriesStyle(snapshotSeriesKey(history, name))} />
-                  {(showIcons || name === OTHER_KEY) && <ReferrerSourceIcon source={name} />}
-                  <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
-                </span>
-              ))}
-            </div>
-          )}
           <PersistentECharts
             chartId={`${repositoryId}:snapshot-${kind}`}
-            series={legend.map((name) => ({ key: name, name }))}
+            series={legend.map((name) => ({ key: snapshotSeriesKey(history, name), name, icon: kind === "referrers" || name === OTHER_KEY ? <ReferrerSourceIcon source={name} /> : undefined }))}
             option={option}
             exportTitle={title}
             persistSelection={false}
@@ -117,8 +106,9 @@ export function SnapshotHistoryChart({
                     >
                       <input
                         type="checkbox"
-                        checked={selected.includes(row.key)}
+                        checked={selected.includes(row.key) && visibility.isVisible(snapshotSeriesKey(history, row.key))}
                         onChange={() => {
+                          if (selected.includes(row.key) && !visibility.isVisible(snapshotSeriesKey(history, row.key))) { visibility.reveal([snapshotSeriesKey(history, row.key)]); return; }
                           const next = selected.includes(row.key)
                             ? selected.filter((key) => key !== row.key)
                             : [...selected, row.key];

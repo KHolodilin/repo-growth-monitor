@@ -65,6 +65,8 @@ export function statsChartOption(
   const byDate = new Map(points.map((point) => [point.date, point]));
   const dates = points.map((point) => point.date);
   return {
+    collectionDates: points.filter(point => point.stars != null || point.forks != null || point.watchers != null || point.contributors != null).map(point => point.date),
+    partialCollectionDates: points.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
     animation: false,
     tooltip: {
       trigger: "item" as const,

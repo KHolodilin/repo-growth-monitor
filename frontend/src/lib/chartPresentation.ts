@@ -1,3 +1,5 @@
+import { periodDates } from "./searchVisibilityKpi";
+import type { Period } from "../components/PeriodSelector";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { formatChartAxisDate } from "./utils";
@@ -6,18 +8,28 @@ export type ChartAxis = "calendar" | "timeline";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-type MarkItem = { xAxis?: string | number };
+type MarkItem = { xAxis?: string | number; yAxis?: number };
 type Series = {
+  [key: string]: unknown;
+  type?: string;
+  showSymbol?: boolean;
+  showAllSymbol?: boolean;
   name?: string;
   data?: unknown;
   markLine?: { data?: MarkItem[] };
-  markPoint?: { data?: MarkItem[] };
+  markPoint?: { data?: MarkItem[]; [key: string]: unknown };
 };
 type ChartOption = {
   snapshotHistory?: boolean;
+  collectionDates?: string[];
+  collectionSeries?: { name: string; dates: string[] }[];
+  missedCollectionDates?: string[];
+  partialCollectionDates?: string[];
+  collectionWarning?: { date: string; text: string };
+
   /** ISO dates aligned with rendered axis slots; independent of Day N labels. */
   eventAxisDates?: string[];
-  yAxis?: { name?: string } | unknown[];
+  yAxis?: { name?: string; inverse?: boolean } | unknown[];
   xAxis?: { data?: unknown; axisLabel?: Record<string, unknown> } | unknown[];
   series?: Series[];
   tooltip?: { formatter?: (params: unknown) => unknown };
@@ -195,19 +207,74 @@ function toTimeline(option: ChartOption): ChartOption {
   };
 }
 
+/** Missing snapshots are metadata, never numeric zero or a fake rank. */
+export function withCollectionWarning(source: object, today = new Date().toISOString().slice(0, 10), extend = false): ChartOption {
+  const option = source as ChartOption;
+  if (option.series?.some(item => item.name === "Collection warning")) return option;
+  const dates = categoryDates(option);
+  if (!dates?.length) return option;
+  const yesterday = new Date(`${today}T00:00:00Z`);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const date = yesterday.toISOString().slice(0, 10);
+  const observed = option.collectionDates ?? [];
+  const absentSeries = option.collectionSeries?.filter(item => item.dates.some(day => day < date) && !item.dates.includes(date)).map(item => item.name) ?? [];
+  const partial = option.partialCollectionDates?.includes(date) || absentSeries.length > 0;
+  const absent = option.missedCollectionDates?.includes(date) || (observed.some(day => day < date) && !observed.includes(date));
+  const warning = option.collectionWarning ?? (partial ? { date, text: `Partial data for ${date}: ${absentSeries.length ? absentSeries.join(", ") : "one or more repositories"} — no stored snapshot.` } : absent ? { date, text: `No stored snapshot for ${date} (T-1).` } : null);
+  if (!warning) return option;
+  // Finite windows already include yesterday. All-history axes may end at the last snapshot.
+  const axisDates = option.eventAxisDates ?? dates;
+  let slot = axisDates.indexOf(warning.date);
+  if (slot < 0 && (extend || option.collectionWarning) && /^\d{4}-/.test(dates[0]) && warning.date > dates[dates.length - 1]) {
+    dates.push(warning.date); slot = dates.length - 1;
+  }
+  if (slot < 0) return option;
+  const values = (option.series ?? []).filter(item => item.type === "line" && item.name !== "Events").flatMap(item => Array.isArray(item.data) ? item.data.filter((value): value is number => typeof value === "number") : []);
+  const inverse = option.yAxis && !Array.isArray(option.yAxis) && option.yAxis.inverse;
+  const height = values.length ? (inverse ? Math.min(...values) : Math.max(...values)) : (inverse ? 1 : 0);
+  return { ...option, xAxis: { ...option.xAxis, data: dates }, eventAxisDates: dates.every(day => /^\d{4}-/.test(day)) ? dates : option.eventAxisDates,
+    series: [...(option.series ?? []).map(item => ({ ...item, data: Array.isArray(item.data) ? [...item.data, ...Array(Math.max(0, dates.length - item.data.length)).fill(null)] : item.data })), {
+      name: "Collection warning", type: "scatter", data: [],
+      markPoint: { symbol: "triangle", symbolSize: 22, symbolOffset: [0, -14],
+        itemStyle: { color: "#fef3c7", borderColor: "#d97706", borderWidth: 1 },
+        label: { show: true, formatter: "!", color: "#92400e", fontSize: 13 },
+        tooltip: { trigger: "item", formatter: () => warning.text },
+        data: [{ xAxis: dates[slot], yAxis: height }],
+      },
+    } as Series],
+  };
+}
+
+/** Confine both normal and marker tooltips; explicit wrapping beats ECharts' nowrap default. */
+function safeTooltip(tooltip: unknown, mobile: boolean): Record<string, unknown> {
+  return { ...(tooltip as Record<string, unknown>), confine: true, appendToBody: false,
+    ...(mobile ? { triggerOn: "click" } : {}),
+    extraCssText: "max-width: min(360px, calc(100vw - 48px)); min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
+  };
+}
+
 /** Calendar dates stay as they are. Timeline and event markers are applied on top of a finished option. */
 export function presentChartOption<T>(
   option: T,
-  mode: { axis: ChartAxis; events: GrowthEvent[]; period?: string; mobile?: boolean },
+  mode: { axis: ChartAxis; events: GrowthEvent[]; period?: Period; mobile?: boolean },
 ): T {
   if (!option || typeof option !== "object") {
     return option;
   }
-  let next = option as ChartOption;
+  const input = option as ChartOption;
+  const windowStart = mode.period ? periodDates(mode.period, new Date().toISOString().slice(0, 10))?.[0] : null;
+  const extend = mode.period === "all" || Boolean(windowStart && (input.eventAxisDates ?? categoryDates(input) ?? []).some(date => date >= windowStart));
+  let next = withCollectionWarning(input, undefined, extend);
+  if (next.tooltip || next.series?.some(item => item.type === "line" || item.markPoint)) next = { ...next, ...(next.tooltip ? { tooltip: safeTooltip(next.tooltip, Boolean(mode.mobile)) } : {}), series: next.series?.map(item => ({
+    ...item,
+    ...(item.type === "line" && item.name !== "Events" ? { showSymbol: true, showAllSymbol: true } : {}),
+    ...("tooltip" in item ? { tooltip: safeTooltip(item.tooltip, Boolean(mode.mobile)) } : {}),
+    ...(item.markPoint ? { markPoint: { ...item.markPoint, tooltip: safeTooltip((item.markPoint as { tooltip?: unknown }).tooltip, Boolean(mode.mobile)) } } : {}),
+  })) };
   if (mode.mobile) {
     next = stripEventMarks(next);
     // Reserve space for labels dynamically instead of the desktop legend and gutters.
-    next = { ...next, grid: { ...next.grid, left: 4, right: 4, top: next.yAxis && !Array.isArray(next.yAxis) && next.yAxis.name ? 32 : 12, bottom: 8, containLabel: true } };
+    next = { ...next, grid: { ...next.grid, left: 4, right: next.series?.some(item => item.name === "Collection warning") ? 20 : 4, top: next.series?.some(item => item.name === "Collection warning") ? 40 : next.yAxis && !Array.isArray(next.yAxis) && next.yAxis.name ? 32 : 12, bottom: 8, containLabel: true } };
   } else if (mode.events.length > 0 && !hasEvents(next)) {
     next = withEvents(next, mode.events, mode.period);
   }
