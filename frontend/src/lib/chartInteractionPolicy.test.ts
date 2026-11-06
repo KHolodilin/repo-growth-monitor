@@ -20,7 +20,7 @@ describe("shared observation and interaction policy", () => {
     expect(option.series[0]).toMatchObject({ connectNulls: true, data: [1, null] });
     expect(option.series.every(item => item.type !== "scatter" || ("symbol" in item && item.symbol === "diamond"))).toBe(true);
     const warning = marker(withCollectionWarning(option, today));
-    expect(warning.markPoint.data[0]).toEqual({ xAxis: yesterday, yAxis: 1 });
+    expect(warning.markPoint.data[0]).toEqual({ xAxis: yesterday, yAxis: 0, y: 38 });
     expect(warning.markPoint.label.formatter).toBe("!");
     const twice = withCollectionWarning(withCollectionWarning(option, today), today);
     expect(twice.series?.filter(item => item.name === "Collection warning")).toHaveLength(1);
@@ -63,7 +63,7 @@ describe("shared observation and interaction policy", () => {
     for (const yAxis of [undefined, [], { inverse: false }, { inverse: true }]) {
       const source = { xAxis: { data: [yesterday] }, yAxis, collectionWarning: { date: yesterday, text: "No snapshot" } };
       const option = withCollectionWarning(source, today);
-      expect(marker(option).markPoint.data[0].yAxis).toBe(yAxis && !Array.isArray(yAxis) && yAxis.inverse ? 1 : 0);
+      expect(marker(option).markPoint.data[0]).toMatchObject({ yAxis: 0, y: 54 });
     }
     const framed = withCollectionWarning({ xAxis: { data: ["1"] }, eventAxisDates: [yesterday], collectionWarning: { date: yesterday, text: "No snapshot" }, series: [{ name: "empty", type: "line" }] }, today);
     expect(marker(framed).markPoint.data[0].xAxis).toBe("1");
