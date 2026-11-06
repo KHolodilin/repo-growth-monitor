@@ -8,7 +8,7 @@ export type ChartAxis = "calendar" | "timeline";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-type MarkItem = { xAxis?: string | number; yAxis?: number };
+type MarkItem = { xAxis?: string | number; yAxis?: number; y?: number };
 type Series = {
   [key: string]: unknown;
   type?: string;
@@ -229,9 +229,9 @@ export function withCollectionWarning(source: object, today = new Date().toISOSt
     dates.push(warning.date); slot = dates.length - 1;
   }
   if (slot < 0) return option;
-  const values = (option.series ?? []).filter(item => item.type === "line" && item.name !== "Events").flatMap(item => Array.isArray(item.data) ? item.data.filter((value): value is number => typeof value === "number") : []);
-  const inverse = option.yAxis && !Array.isArray(option.yAxis) && option.yAxis.inverse;
-  const height = values.length ? (inverse ? Math.min(...values) : Math.max(...values)) : (inverse ? 1 : 0);
+  // Pixel height stays inside the plot even when hidden series have much larger values.
+  // Keep the date in axis coordinates so calendar/timeline placement still follows the day.
+  const top = typeof option.grid?.top === "number" ? option.grid.top : 40;
   return { ...option, xAxis: { ...option.xAxis, data: dates }, eventAxisDates: dates.every(day => /^\d{4}-/.test(day)) ? dates : option.eventAxisDates,
     series: [...(option.series ?? []).map(item => ({ ...item, data: Array.isArray(item.data) ? [...item.data, ...Array(Math.max(0, dates.length - item.data.length)).fill(null)] : item.data })), {
       name: "Collection warning", type: "scatter", data: [],
@@ -239,7 +239,7 @@ export function withCollectionWarning(source: object, today = new Date().toISOSt
         itemStyle: { color: "#fef3c7", borderColor: "#d97706", borderWidth: 1 },
         label: { show: true, formatter: "!", color: "#92400e", fontSize: 13 },
         tooltip: { trigger: "item", formatter: () => warning.text },
-        data: [{ xAxis: dates[slot], yAxis: height }],
+        data: [{ xAxis: dates[slot], yAxis: 0, y: top + 14 }],
       },
     } as Series],
   };
@@ -278,6 +278,10 @@ export function presentChartOption<T>(
   } else if (mode.events.length > 0 && !hasEvents(next)) {
     next = withEvents(next, mode.events, mode.period);
   }
+  const warningTop = typeof next.grid?.top === "number" ? next.grid.top : 40;
+  if (next.series?.some(item => item.name === "Collection warning")) next = { ...next, series: next.series.map(item => item.name === "Collection warning"
+    ? { ...item, markPoint: { ...item.markPoint, data: item.markPoint?.data?.map(point => ({ ...point, y: warningTop + 14 })) } }
+    : item) };
   if (mode.axis === "timeline") {
     next = toTimeline(next);
   }

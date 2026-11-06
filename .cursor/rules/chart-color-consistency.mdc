@@ -81,3 +81,5 @@ Required validation in every affected PR:
 - [ ] Tooltip bounds/dismissal verified interactively for values, events and warnings.
 
 - Referrers/Paths History uses the shared 1d/7d/30d/90d/1y/all calendar periods against saved snapshots (#205); do not confuse GitHub’s rolling-window metric with archive retention or silently clamp a selected period to 14 days.
+
+- Missing-collection warning triangles must use a stable vertical position within the plot, independent of hidden series, selected metrics, numeric range and inverted axes. Keep their date on the category axis and their reason tooltip. Verify visibility with actual ECharts rendering after toggling a high-valued metric off; checking only the option object is insufficient.
