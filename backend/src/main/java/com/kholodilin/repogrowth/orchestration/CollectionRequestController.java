@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.*;
 @ConditionalOnProperty(name="rgm.orchestration.enabled",havingValue="true")
 @RequestMapping("/api/v1/admin/repositories")
 public class CollectionRequestController {
-    private final CollectionRequestService service;
+    private final IdempotentCollectionRequests service;
     private final PlanningWindow window;
-    public CollectionRequestController(CollectionRequestService service,PlanningWindow window) {this.service=service;this.window=window;}
+    public CollectionRequestController(IdempotentCollectionRequests service,PlanningWindow window) {this.service=service;this.window=window;}
     @PostMapping("/{id}/collections")
-    public ResponseEntity<CollectionRequestService.Created> create(@PathVariable long id) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.manual(id,window.businessDate()));
+    public ResponseEntity<CollectionRequestService.Created> create(@PathVariable long id,@RequestHeader("Idempotency-Key") String key,org.springframework.security.core.Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(((com.kholodilin.repogrowth.auth.security.AppUserPrincipal)authentication.getPrincipal()).userId(),key,id,window.businessDate()));
     }
 }

@@ -27,3 +27,5 @@ databaseChangeLog:
       file: db/changelog/013-app-users.yaml
   - include:
       file: db/changelog/014-collector-orchestration.yaml
+  - include:
+      file: db/changelog/015-idempotency.yaml

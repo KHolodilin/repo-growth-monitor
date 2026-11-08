@@ -44,4 +44,21 @@ public class CollectorStorageConfiguration {
         @Qualifier("collectorTransactionManager") DataSourceTransactionManager tm, HistoryPartitions partitions) {
         return new PostgresJobQueue(new JdbcTemplate(ds),new TransactionTemplate(tm),partitions);
     }
+
+    @Bean(name="collectorIdempotencyStore",defaultCandidate=false) @DependsOn("collectorLiquibase")
+    com.kholodilin.idempotency.jdbc.JdbcPersistenceStore collectorIdempotencyStore(@Qualifier("collectorDataSource") DataSource ds) {
+        return com.kholodilin.collector.idempotency.ScopedIdempotency.validatedStore(ds);
+    }
+    @Bean(name="collectorIdempotency",defaultCandidate=false)
+    com.kholodilin.idempotency.IdempotencyService collectorIdempotency(@Qualifier("collectorDataSource") DataSource ds,
+            @Qualifier("collectorIdempotencyStore") com.kholodilin.idempotency.jdbc.JdbcPersistenceStore store,Environment env) {
+        return com.kholodilin.collector.idempotency.ScopedIdempotency.service(ds,store,env.getProperty("collector.idempotency.retention",java.time.Duration.class,java.time.Duration.ofDays(7)));
+    }
+    @Bean
+    com.kholodilin.collector.acceptance.CollectorAcceptanceService collectorAcceptanceService(
+            @Qualifier("collectorIdempotency") com.kholodilin.idempotency.IdempotencyService idempotency,
+            @Qualifier("collectorTransactionManager") DataSourceTransactionManager tm,JobQueue queue,Environment env) {
+        String[] destinations=env.getProperty("collector.acceptance.destinations",String[].class,new String[]{"rgm-results"});
+        return new com.kholodilin.collector.acceptance.CollectorAcceptanceService(idempotency,tm,queue,java.util.Set.of(destinations));
+    }
 }

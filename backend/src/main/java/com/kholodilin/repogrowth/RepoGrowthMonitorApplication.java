@@ -20,7 +20,15 @@ import org.springframework.context.annotation.Import;
 import org.springframework.boot.context.TypeExcludeFilter;
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter;
 
-@SpringBootApplication
+@SpringBootApplication(excludeName = {
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyJacksonAutoConfiguration",
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyJdbcAutoConfiguration",
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyCaffeineAutoConfiguration",
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyRedisAutoConfiguration",
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyMetricsAutoConfiguration",
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyCleanupAutoConfiguration",
+    "com.kholodilin.idempotency.autoconfigure.IdempotencyAutoConfiguration"
+})
 @Import(CollectorRuntimeConfiguration.class)
 @ComponentScan(basePackages = "com.kholodilin.repogrowth", excludeFilters = {
     @ComponentScan.Filter(type = FilterType.CUSTOM,

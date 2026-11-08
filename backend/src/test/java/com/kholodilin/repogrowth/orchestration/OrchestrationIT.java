@@ -69,7 +69,7 @@ class OrchestrationIT extends AbstractPostgresTest {
     LocalDate day=LocalDate.of(2026,11,8);
     @BeforeEach void seed() {
         server.resetAll();
-        jdbc.execute("TRUNCATE collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
+        jdbc.execute("TRUNCATE idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient);
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
         repositoryId=jdbc.queryForObject("INSERT INTO repository(github_id,owner_id,name,full_name,visibility,tracking_enabled,language) VALUES (202,?,'repo-growth-monitor','KHolodilin/repo-growth-monitor','PUBLIC',true,'Java') RETURNING id",Long.class,owner);
@@ -176,7 +176,7 @@ class OrchestrationIT extends AbstractPostgresTest {
         mvc.perform(post(url).with(asUser("user")).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(post(url).with(asUser("admin"))).andExpect(status().isForbidden());
         assertThat(count("collection_request")).isZero();
-        mvc.perform(post(url).with(asUser("admin")).with(csrf())).andExpect(status().isCreated()).andExpect(jsonPath("$.requestId").isString()).andExpect(jsonPath("$.taskIds.length()").value(8));
+        mvc.perform(post(url).header("Idempotency-Key","manual-test").with(asUser("admin")).with(csrf())).andExpect(status().isCreated()).andExpect(jsonPath("$.requestId").isString()).andExpect(jsonPath("$.taskIds.length()").value(8));
         assertThat(count("collector_dispatch")).isEqualTo(8);
         mvc.perform(post("/api/v1/repositories/"+repositoryId+"/collect").with(asUser("admin")).with(csrf())).andExpect(status().isBadRequest());
         assertThat(count("collection_job")).isZero();

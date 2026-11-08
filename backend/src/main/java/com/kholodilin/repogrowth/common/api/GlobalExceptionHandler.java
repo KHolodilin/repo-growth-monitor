@@ -18,6 +18,19 @@ import java.time.Instant;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.kholodilin.idempotency.exception.IdempotencyConflictException.class)
+    public ResponseEntity<ApiError> handleIdempotencyConflict(Exception ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error(ErrorCode.IDEMPOTENCY_CONFLICT,"Idempotency key was used for different content"));
+    }
+    @ExceptionHandler({org.springframework.web.bind.MissingRequestHeaderException.class,com.kholodilin.collector.idempotency.InvalidIdempotencyKeyException.class})
+    public ResponseEntity<ApiError> handleInvalidRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR,"Invalid request parameters or Idempotency-Key"));
+    }
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleDenied(Exception ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(ErrorCode.FORBIDDEN,"ADMIN role required"));
+    }
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApi(ApiException ex) {
         log.warn("API error category={} message={}", ex.code(), ex.getMessage());

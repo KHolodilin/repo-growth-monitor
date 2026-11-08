@@ -43,9 +43,9 @@ public final class PostgresJobQueue implements JobQueue {
                 UUID.randomUUID(),s.origin(),s.jobId(),s.attemptId(),digest);
             var rows=jdbc.queryForList("SELECT * FROM collector_job_identity WHERE origin_id=? AND external_attempt_id=? FOR UPDATE",s.origin(),s.attemptId());
             var row=rows.getFirst(); long id=((Number)row.get("id")).longValue();
-            if(!digest.equals(row.get("payload_hash")) || !s.jobId().equals(row.get("external_job_id"))) throw new IllegalArgumentException("Attempt already accepted with different content");
+            if(!digest.equals(row.get("payload_hash")) || !s.jobId().equals(row.get("external_job_id"))) throw new AttemptConflictException();
             if(inserted==1) jdbc.update("INSERT INTO collector_job(id,payload,destination_ref,deadline_at) VALUES (?,?::jsonb,?,?)",id,s.payload(),s.destination(),ts(s.deadline()));
-            return new Accepted(id,(UUID)row.get("public_id"),(String)row.get("state"),inserted==0);
+            return new Accepted(id,(UUID)row.get("public_id"),(String)row.get("state"),inserted==0,((Timestamp)row.get("accepted_at")).toInstant());
         });
     }
     @Override public Optional<Lease> claim(String worker, Duration duration) {
@@ -128,7 +128,7 @@ public final class PostgresJobQueue implements JobQueue {
             long id=((Number)row.get("id")).longValue(); Timestamp at=(Timestamp)row.get("archived_at");
             List<String> snapshots=at==null ? jdbc.queryForList("SELECT jsonb_build_object('job',to_jsonb(j),'result',to_jsonb(r))::text FROM collector_job j LEFT JOIN collector_result r ON r.job_id=j.id WHERE j.id=?",String.class,id)
                 : jdbc.queryForList("SELECT snapshot::text FROM collector_job_history WHERE archived_at=? AND job_id=?",String.class,at,id);
-            return Optional.of(new Stored(new Accepted(id,publicId,(String)row.get("state"),true),at==null?null:at.toInstant(),snapshots.isEmpty()?null:snapshots.getFirst()));
+            return Optional.of(new Stored(new Accepted(id,publicId,(String)row.get("state"),true,((Timestamp)row.get("accepted_at")).toInstant()),at==null?null:at.toInstant(),snapshots.isEmpty()?null:snapshots.getFirst()));
         });
     }
 }

@@ -68,3 +68,5 @@ When a partition is detached, identity/state still exist and snapshot is absent:
 archived data unavailable, never accept this as new work. Compact identities are retained permanently.
 Workers do not scan archive partitions. PostgreSQL chooses partial index/bitmap/seq plans based on hot-queue
 size; isolation from history is structural, not dependent on planner cost estimates.
+
+Since #212, both product and Collector replay stores use the released idempotency starter with explicit datasource-bound transaction guards. See [collector-idempotency.md](collector-idempotency.md) for HTTP acceptance, configuration and retention.

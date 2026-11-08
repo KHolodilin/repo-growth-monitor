@@ -61,7 +61,7 @@ and durable request idempotency in #212. Disabling RGM planning still permits di
 
 ## API and duplicate policy
 
-`POST /api/v1/admin/repositories/{id}/collections` has no body. Existing session Admin authorization and
+`POST /api/v1/admin/repositories/{id}/collections` has no body. Since #212 it requires an `Idempotency-Key` header; see [starter integration](collector-idempotency.md) for actor-scoped replay, conflicts and retention. Existing session Admin authorization and
 CSRF protection apply. It snapshots current repository/settings and returns **after transaction commit**:
 
 ```json

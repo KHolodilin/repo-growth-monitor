@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-idempotency
+      author: repo-growth-monitor
+      changes:
+        - sqlFile:
+            path: 015-idempotency.sql
+            relativeToChangelogFile: true
