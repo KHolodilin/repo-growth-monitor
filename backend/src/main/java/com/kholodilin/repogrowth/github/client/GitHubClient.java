@@ -30,6 +30,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -64,6 +65,9 @@ public class GitHubClient {
     private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
     private static final int MAX_PER_PAGE = 100;
     private static final int MAX_LIST_PAGES = 5;
+
+    @Value("${rgm.collector.enabled:true}")
+    private boolean collectorEnabled = true;
 
     private final RestClient restClient;
     private final RestClient webClient;
@@ -635,6 +639,9 @@ public class GitHubClient {
     }
 
     private void requireToken() {
+        if (!collectorEnabled) {
+            throw GitHubException.api(503, false, null, "GitHub collection is disabled in web-only mode");
+        }
         if (!properties.tokenConfigured()) {
             throw GitHubException.auth(401, "GitHub token is not configured");
         }

@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -16,6 +17,9 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class DailyPlanner {
+
+    @Value("${rgm.planner.enabled:true}")
+    private boolean plannerEnabled = true;
 
     private final PlanningWindow planningWindow;
     private final CollectionPlanner collectionPlanner;
@@ -45,7 +49,7 @@ public class DailyPlanner {
 
     @Scheduled(fixedDelayString = "${collection.planner.interval}")
     public void tick() {
-        if (!collectionProperties.planner().enabled()) {
+        if (!plannerEnabled || !collectionProperties.planner().enabled()) {
             log.debug("Planner skipped, scheduling disabled");
             return;
         }
@@ -57,6 +61,7 @@ public class DailyPlanner {
     }
 
     public PlannerResult planNow(boolean requireWindow) {
+        if (!plannerEnabled) throw ApiException.validation("Collection planning is disabled in this role");
         if (requireWindow && !planningWindow.isOpen()) {
             throw ApiException.validation("Collection planner is outside the configured strict window");
         }

@@ -202,3 +202,9 @@ The token is only accepted from environment / Docker secrets. Diagnostics expose
 - OpenAPI UI: http://localhost:8080/swagger-ui.html
 - Health: http://localhost:8080/actuator/health
 - Prometheus (optional scrape): http://localhost:8080/actuator/prometheus
+
+## Collector module development
+
+The Maven reactor contains `collector-contracts`, `github-collector` and `backend`. Build from the repository root with `mvn -B package`; for backend tests with dependencies use `mvn -B -pl backend -am test`.
+
+The default image still runs the combined application. The `web-only` profile disables legacy execution/planning and GitHub calls. The `collector` profile is a headless bootstrap boundary only in #209: durable jobs and execution arrive in subsequent issues. See [collector architecture and protocol](docs/collector-architecture.md) for contracts, role limitations and the existing dependency inventory.

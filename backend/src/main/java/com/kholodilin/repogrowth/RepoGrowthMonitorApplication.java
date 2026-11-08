@@ -1,5 +1,7 @@
 package com.kholodilin.repogrowth;
 
+import com.kholodilin.bootstrap.CollectorRuntimeConfiguration;
+import com.kholodilin.bootstrap.ProductRoleFilter;
 import com.kholodilin.repogrowth.auth.application.UserAccountService;
 import com.kholodilin.repogrowth.auth.cli.UsersCli;
 import com.kholodilin.repogrowth.common.config.AppProperties;
@@ -12,8 +14,22 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
+import org.springframework.boot.context.TypeExcludeFilter;
+import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter;
 
 @SpringBootApplication
+@Import(CollectorRuntimeConfiguration.class)
+@ComponentScan(basePackages = "com.kholodilin.repogrowth", excludeFilters = {
+    @ComponentScan.Filter(type = FilterType.CUSTOM,
+        classes = TypeExcludeFilter.class),
+    @ComponentScan.Filter(type = FilterType.CUSTOM,
+        classes = AutoConfigurationExcludeFilter.class),
+    @ComponentScan.Filter(type = FilterType.CUSTOM,
+        classes = ProductRoleFilter.class)
+})
 @EnableConfigurationProperties({
         AppProperties.class,
         GitHubProperties.class,

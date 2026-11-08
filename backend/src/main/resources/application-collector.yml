@@ -1,0 +1,22 @@
+# #209 bootstrap boundary only; job storage/HTTP acceptance arrives in #210/#212.
+rgm:
+  web:
+    enabled: false
+  collector:
+    enabled: true
+  planner:
+    enabled: false
+spring:
+  main:
+    web-application-type: none
+  liquibase:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState

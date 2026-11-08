@@ -8,3 +8,6 @@ frontend/node_modules/
 docs
 frontend/dist
 .env
+
+collector-contracts/target/
+github-collector/target/
