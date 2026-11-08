@@ -1,4 +1,4 @@
-# #209 bootstrap boundary only; job storage/HTTP acceptance arrives in #210/#212.
+# Independent collector storage is opt-in until dispatch/execution is implemented.
 rgm:
   web:
     enabled: false
@@ -20,3 +20,12 @@ management:
       group:
         readiness:
           include: readinessState
+
+collector:
+  storage:
+    enabled: ${COLLECTOR_STORAGE_ENABLED:false}
+  datasource:
+    url: ${COLLECTOR_DATASOURCE_URL:}
+    username: ${COLLECTOR_DATASOURCE_USERNAME:}
+    password: ${COLLECTOR_DATASOURCE_PASSWORD:}
+    maximum-pool-size: ${COLLECTOR_DATASOURCE_POOL_SIZE:5}

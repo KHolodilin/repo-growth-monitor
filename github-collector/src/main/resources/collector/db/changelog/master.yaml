@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - changeSet:
+      id: collector-001
+      author: rgm
+      changes:
+        - sqlFile:
+            path: initial.sql
+            relativeToChangelogFile: true
