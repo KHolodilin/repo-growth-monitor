@@ -21,6 +21,9 @@ public class DailyPlanner {
     @Value("${rgm.planner.enabled:true}")
     private boolean plannerEnabled = true;
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.kholodilin.repogrowth.orchestration.CollectionRequestService requestService;
+
     private final PlanningWindow planningWindow;
     private final CollectionPlanner collectionPlanner;
     private final SearchPlanner searchPlanner;
@@ -72,6 +75,11 @@ public class DailyPlanner {
         LocalDate date = planningWindow.businessDate();
         Optional<LocalTime> slot = pendingSnapshot(date);
         boolean snapshotDue = slot.isPresent();
+        if (requestService != null) {
+            var counts = requestService.scheduled(date, slot.map(LocalTime::toString).orElse(null));
+            if (snapshotDue) slotRepository.save(date, slot.get());
+            return new PlannerResult(true, counts.repositories(), counts.queries(), counts.watches(), date.toString());
+        }
         int collection = collectionPlanner.planAll(date, snapshotDue);
         int search = searchPlanner.planAll(date, snapshotDue);
         int topics = topicPlanner.planAll(date, snapshotDue);

@@ -16,6 +16,13 @@ import java.util.List;
 @Service
 public class SearchPlanner {
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+    private boolean orchestrationEnabled;
+
+    private void requireLegacyMode() {
+        if (orchestrationEnabled) throw com.kholodilin.repogrowth.common.api.ApiException.validation("Use POST /api/v1/admin/repositories/{id}/collections");
+    }
+
     private final SearchQueryJdbcRepository queryRepository;
     private final SearchRunJdbcRepository runRepository;
     private final SearchProperties searchProperties;
@@ -37,6 +44,7 @@ public class SearchPlanner {
 
     @Transactional
     public int planAll(LocalDate businessDate, boolean snapshotDue) {
+        requireLegacyMode();
         List<SearchQuery> queries = queryRepository.findEnabled();
         for (SearchQuery query : queries) {
             runRepository.insertIgnore(query.id(), query.repositoryId(), businessDate);
@@ -55,6 +63,7 @@ public class SearchPlanner {
 
     @Transactional
     public int planRepository(long repositoryId, LocalDate businessDate) {
+        requireLegacyMode();
         int queued = 0;
         for (SearchQuery query : queryRepository.findByRepository(repositoryId)) {
             if (!query.enabled()) {
@@ -78,6 +87,7 @@ public class SearchPlanner {
 
     @Transactional
     public long planQuery(long searchQueryId, long repositoryId, LocalDate businessDate) {
+        requireLegacyMode();
         var existing = runRepository.find(searchQueryId, businessDate);
         if (existing.isPresent()) {
             var run = existing.get();

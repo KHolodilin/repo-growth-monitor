@@ -28,6 +28,8 @@ import java.util.List;
 @RequestMapping("/api/v1")
 public class CollectionController {
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+    private boolean orchestrationEnabled;
     private final CollectionPlanner collectionPlanner;
     private final PlanningWindow planningWindow;
     private final DailyPlanner dailyPlanner;
@@ -68,6 +70,7 @@ public class CollectionController {
 
     @PostMapping("/repositories/{id}/collect")
     public CollectionRunResponse collect(@PathVariable long id) {
+        if (orchestrationEnabled) throw ApiException.validation("Use POST /api/v1/admin/repositories/{id}/collections");
         if (!gitHubProperties.tokenConfigured()) {
             throw GitHubException.auth(401, "GitHub token is not configured");
         }

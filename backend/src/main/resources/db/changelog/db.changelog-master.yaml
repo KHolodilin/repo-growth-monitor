@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/012-contributor-logins.yaml
   - include:
       file: db/changelog/013-app-users.yaml
+  - include:
+      file: db/changelog/014-collector-orchestration.yaml

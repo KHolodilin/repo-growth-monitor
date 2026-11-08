@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
-@ConditionalOnProperty(name = "rgm.collector.enabled", havingValue = "true", matchIfMissing = true)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("${rgm.collector.enabled:true} && !${rgm.orchestration.enabled:false}")
 @Component
 public class CollectionWorkerPool {
 

@@ -18,6 +18,13 @@ import java.util.List;
 @Service
 public class CollectionPlanner {
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+    private boolean orchestrationEnabled;
+
+    private void requireLegacyMode() {
+        if (orchestrationEnabled) throw com.kholodilin.repogrowth.common.api.ApiException.validation("Use POST /api/v1/admin/repositories/{id}/collections");
+    }
+
     private static final CollectionJobType[] JOB_TYPES = CollectionJobType.values();
     private static final CollectionJobType[] SNAPSHOT_JOBS = {
             CollectionJobType.REFERRERS,
@@ -50,6 +57,7 @@ public class CollectionPlanner {
 
     @Transactional
     public int planAll(LocalDate businessDate, boolean snapshotDue) {
+        requireLegacyMode();
         List<Repository> tracked = repositoryJdbcRepository.findTracked();
         int createdRuns = 0;
         for (Repository repository : tracked) {
@@ -87,6 +95,7 @@ public class CollectionPlanner {
             boolean recollect,
             boolean snapshotDue
     ) {
+        requireLegacyMode();
         CollectionRun run = runRepository.insertIgnore(repositoryId, businessDate, JOB_TYPES.length);
         for (CollectionJobType type : JOB_TYPES) {
             jobRepository.insertIgnore(run.id(), repositoryId, businessDate, type);

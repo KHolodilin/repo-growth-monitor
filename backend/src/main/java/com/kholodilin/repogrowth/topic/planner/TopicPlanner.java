@@ -17,6 +17,13 @@ import java.util.List;
 @Service
 public class TopicPlanner {
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+    private boolean orchestrationEnabled;
+
+    private void requireLegacyMode() {
+        if (orchestrationEnabled) throw com.kholodilin.repogrowth.common.api.ApiException.validation("Use POST /api/v1/admin/repositories/{id}/collections");
+    }
+
     private final TopicWatchJdbcRepository watchRepository;
     private final TopicRunJdbcRepository runRepository;
     private final TopicWatchSync topicWatchSync;
@@ -41,6 +48,7 @@ public class TopicPlanner {
 
     @Transactional
     public int planAll(LocalDate businessDate, boolean snapshotDue) {
+        requireLegacyMode();
         topicWatchSync.syncTracked();
         List<TopicWatch> watches = watchRepository.findEnabled();
         for (TopicWatch watch : watches) {
@@ -60,6 +68,7 @@ public class TopicPlanner {
 
     @Transactional
     public int planRepository(long repositoryId, LocalDate businessDate) {
+        requireLegacyMode();
         int queued = 0;
         for (TopicWatch watch : watchRepository.findByRepository(repositoryId)) {
             if (!watch.enabled()) {
@@ -83,6 +92,7 @@ public class TopicPlanner {
 
     @Transactional
     public long planWatch(long topicWatchId, long repositoryId, LocalDate businessDate) {
+        requireLegacyMode();
         var existing = runRepository.find(topicWatchId, businessDate);
         if (existing.isPresent()) {
             var run = existing.get();
