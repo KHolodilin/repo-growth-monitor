@@ -19,7 +19,9 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties={"spring.task.scheduling.enabled=false","collector.http.clients[0].origin=rgm","collector.http.clients[0].token="+CollectorHttpRoleIT.TOKEN})
+@SpringBootTest(properties={"spring.task.scheduling.enabled=false","collector.credentials.enabled=true",
+    "collector.credentials.origins[0].origin=rgm","collector.credentials.origins[0].endpoint=https://rgm.example",
+    "collector.credentials.origins[0].service-token=node-resolution-token-012345678901234","collector.http.clients[0].origin=rgm","collector.http.clients[0].token="+CollectorHttpRoleIT.TOKEN})
 @ActiveProfiles({"collector","collector-http"})
 @AutoConfigureMockMvc
 class CollectorHttpRoleIT {
@@ -44,6 +46,8 @@ class CollectorHttpRoleIT {
         mvc.perform(post("/internal/v1/jobs").header("Authorization","Bearer "+TOKEN).header("Idempotency-Key",job.attemptId().toString()).contentType("application/json").content(body))
             .andExpect(status().isCreated()).andExpect(jsonPath("$.jobId").value(job.jobId().toString()));
         mvc.perform(post("/internal/v1/jobs").contentType("application/json").content(body)).andExpect(status().isUnauthorized());
+        mvc.perform(post("/internal/v1/credentials/invalidate").header("Authorization","Bearer "+TOKEN).contentType("application/json").content("{\"context\":\"revoked-context\"}")).andExpect(status().isNoContent());
+        mvc.perform(post("/internal/v1/credentials/invalidate").contentType("application/json").content("{\"context\":\"revoked-context\"}")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/me")).andExpect(status().isForbidden());
     }
 }

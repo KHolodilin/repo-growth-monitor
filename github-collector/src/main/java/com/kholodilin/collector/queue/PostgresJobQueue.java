@@ -56,7 +56,7 @@ public final class PostgresJobQueue implements JobQueue {
             jdbc.update("UPDATE collector_job SET state='RUNNING',execution_no=execution_no+1,generation=generation+1,locked_by=?,locked_until=clock_timestamp()+(? * interval '1 millisecond'),updated_at=clock_timestamp() WHERE id=?",worker,ms,id);
             jdbc.update("UPDATE collector_job_identity SET state='RUNNING' WHERE id=?",id);
             jdbc.update("INSERT INTO collector_execution(job_id,execution_no,generation,worker_id,state) SELECT id,execution_no,generation,locked_by,'RUNNING' FROM collector_job WHERE id=?",id);
-            return Optional.of(jdbc.queryForObject("SELECT * FROM collector_job WHERE id=?",(r,n)->new Lease(id,worker,r.getLong("generation"),r.getString("payload"),r.getTimestamp("deadline_at").toInstant()),id));
+            return Optional.of(jdbc.queryForObject("SELECT j.*,i.origin_id FROM collector_job j JOIN collector_job_identity i ON i.id=j.id WHERE j.id=?",(r,n)->new Lease(id,worker,r.getLong("generation"),r.getString("payload"),r.getTimestamp("deadline_at").toInstant(),r.getString("origin_id")),id));
         });
     }
     private boolean lock(Lease lease) {

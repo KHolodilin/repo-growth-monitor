@@ -7,7 +7,7 @@ import java.util.*;
 public interface JobQueue {
     record Submission(String origin, UUID jobId, UUID attemptId, String payload, String destination, Instant deadline) { }
     record Accepted(long id, UUID publicId, String state, boolean replay, Instant acceptedAt) { }
-    record Lease(long id, String owner, long generation, String payload, Instant deadline) { }
+    record Lease(long id, String owner, long generation, String payload, Instant deadline, String origin) { }
     record Delivery(long id, String owner, long generation, String destination, String payload) { }
     record Stored(Accepted identity, Instant archivedAt, String snapshot) { }
     Accepted accept(Submission submission);

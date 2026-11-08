@@ -33,4 +33,8 @@ public class CollectorHttpConfiguration {
         return http.csrf(c->c.disable()).sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(c->c.anyRequest().denyAll()).build();
     }
+    @Configuration(proxyBeanMethods=false)
+    @ConditionalOnProperty(name="collector.credentials.enabled",havingValue="true")
+    @Import(com.kholodilin.collector.credentials.CredentialInvalidationController.class)
+    static class InvalidationHttp { }
 }

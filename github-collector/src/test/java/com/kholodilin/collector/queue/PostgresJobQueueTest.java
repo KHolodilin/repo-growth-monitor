@@ -84,7 +84,7 @@ class PostgresJobQueueTest {
         }
     }
     @Test void expiredLeaseFencesOldWorkerAndSupportsRetriesAcrossMonths() {
-        var old=acceptClaim(); assertThat(queue.renew(old,minute)).isTrue();
+        var old=acceptClaim(); assertThat(old.origin()).isEqualTo("rgm"); assertThat(queue.renew(old,minute)).isTrue();
         jdbc.update("UPDATE collector_job SET locked_until=clock_timestamp()-interval '1 second'");
         assertThat(queue.renew(old,minute)).isFalse();
         assertThat(queue.complete(old,"FAILED",UUID.randomUUID(),UUID.randomUUID(),"{}")).isFalse();

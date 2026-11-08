@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/014-collector-orchestration.yaml
   - include:
       file: db/changelog/015-idempotency.yaml
+  - include:
+      file: db/changelog/016-github-credentials.yaml

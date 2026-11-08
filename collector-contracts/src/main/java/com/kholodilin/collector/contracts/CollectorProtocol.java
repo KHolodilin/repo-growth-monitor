@@ -34,9 +34,18 @@ public final class CollectorProtocol {
         public static Parameters repository() { return new Parameters(null, null, null, null, null, null); }
     }
 
+    public record AuthorizationScope(String context,String credentialRef) {
+        public AuthorizationScope {text(context,"authorization context");text(credentialRef,"credentialRef");}
+    }
     public record JobRequest(int schemaVersion, UUID requestId, UUID jobId, UUID attemptId,
             TaskType type, RepositoryTarget repository, LocalDate businessDate, long configurationRevision,
-            Parameters parameters, String destinationRef, Instant deadlineAt) {
+            Parameters parameters, String destinationRef, Instant deadlineAt,AuthorizationScope authorization) {
+        /** Transitional constructor for pre-credential jobs. New execution requires an explicit scope. */
+        public JobRequest(int schemaVersion,UUID requestId,UUID jobId,UUID attemptId,TaskType type,
+                RepositoryTarget repository,LocalDate businessDate,long configurationRevision,
+                Parameters parameters,String destinationRef,Instant deadlineAt) {
+            this(schemaVersion,requestId,jobId,attemptId,type,repository,businessDate,configurationRevision,parameters,destinationRef,deadlineAt,null);
+        }
         public JobRequest {
             version(schemaVersion); Objects.requireNonNull(requestId); Objects.requireNonNull(jobId);
             Objects.requireNonNull(attemptId); Objects.requireNonNull(type); Objects.requireNonNull(repository);
