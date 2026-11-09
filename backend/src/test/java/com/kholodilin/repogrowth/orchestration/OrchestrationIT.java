@@ -47,6 +47,11 @@ class OrchestrationIT extends AbstractPostgresTest {
         registry.add("rgm.orchestration.nodes[0].endpoint",server::baseUrl);
         registry.add("rgm.orchestration.nodes[0].enabled",()->"true");
         registry.add("rgm.orchestration.nodes[0].service-token",()->"service-test-secret");
+        registry.add("rgm.orchestration.nodes[1].key",()->"node-b");
+        registry.add("rgm.orchestration.nodes[1].pool",()->"default");
+        registry.add("rgm.orchestration.nodes[1].endpoint",()->server.baseUrl()+"/b");
+        registry.add("rgm.orchestration.nodes[1].enabled",()->"true");
+        registry.add("rgm.orchestration.nodes[1].service-token",()->"node-b-service-token-012345678901234");
     }
     @AfterAll static void stopServer() {server.stop();}
     @Autowired JdbcTemplate jdbc;
@@ -196,6 +201,38 @@ class OrchestrationIT extends AbstractPostgresTest {
             assertThat(jdbc.queryForObject("SELECT state FROM collection_attempt WHERE public_id=?",String.class,claim.request().attemptId())).isEqualTo("ASSIGNED");
             assertThat(jdbc.queryForObject("SELECT state FROM collection_task WHERE public_id=?",String.class,claim.request().jobId())).isEqualTo("READY");
         } finally {jdbc.execute("DROP TRIGGER dispatch_ack_crash ON collector_dispatch");jdbc.execute("DROP FUNCTION reject_dispatch_ack()");}
+    }
+    @Autowired AssignmentRecovery recovery;
+    @Test void concurrentReassignmentCreatesOneNewAttemptAndFencesLateAcceptance() throws Exception {
+        var created=service.manual(repositoryId,day);UUID job=created.taskIds().getFirst();
+        UUID original=jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job);
+        var claim=dispatch.claim("old-sender").orElseThrow();
+        jdbc.update("UPDATE collection_attempt SET assigned_at=clock_timestamp()-interval '3 minutes' WHERE public_id=?",original);
+        try(var pool=Executors.newFixedThreadPool(6)) {
+            List<Callable<AssignmentRecovery.Reassigned>> tasks=new ArrayList<>();for(int i=0;i<12;i++)tasks.add(()->recovery.reassign(job,original,"node-b"));
+            int changed=0;for(var result:pool.invokeAll(tasks))if(result.get().changed())changed++;assertThat(changed).isEqualTo(1);
+        }
+        UUID current=jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job);
+        assertThat(current).isNotEqualTo(original);
+        assertThat(jdbc.queryForObject("SELECT state FROM collection_attempt WHERE public_id=?",String.class,original)).isEqualTo("SUPERSEDED");
+        assertThat(dispatch.acknowledge(claim,new JobAccepted(1,UUID.randomUUID(),job,original,JobState.ACCEPTED,Instant.now()))).isFalse();
+        JobRequest moved=json.readValue(jdbc.queryForObject("SELECT payload::text FROM collector_dispatch WHERE attempt_id=?",String.class,current),JobRequest.class);
+        assertThat(moved.jobId()).isEqualTo(job);assertThat(moved.requestId()).isEqualTo(created.requestId());assertThat(moved.attemptId()).isEqualTo(current);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM collection_attempt WHERE task_id=(SELECT id FROM collection_task WHERE public_id=?) AND state='ASSIGNED'",Long.class,job)).isEqualTo(1);
+    }
+    @Test void reassignmentPolicyAndDispatchFailureLeaveOriginalAssignmentIntact() {
+        var created=service.manual(repositoryId,day);UUID job=created.taskIds().getFirst();
+        UUID original=jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job);
+        assertThat(recovery.reassign(job,original,"node-b").reason()).isEqualTo("TOO_RECENT");
+        jdbc.update("UPDATE collection_attempt SET assigned_at=clock_timestamp()-interval '3 minutes' WHERE public_id=?",original);
+        jdbc.execute("CREATE FUNCTION fail_reassignment() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test crash'; END $$");
+        jdbc.execute("CREATE TRIGGER reassignment_crash BEFORE INSERT ON collector_dispatch FOR EACH ROW EXECUTE FUNCTION fail_reassignment()");
+        try {
+            assertThatThrownBy(()->recovery.reassign(job,original,"node-b")).isInstanceOf(RuntimeException.class);
+            assertThat(jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job)).isEqualTo(original);
+            assertThat(jdbc.queryForObject("SELECT state FROM collection_attempt WHERE public_id=?",String.class,original)).isEqualTo("ASSIGNED");
+        }finally{jdbc.execute("DROP TRIGGER reassignment_crash ON collector_dispatch");jdbc.execute("DROP FUNCTION fail_reassignment()");}
+        assertThat(recovery.reassign(job,original,"node-b").changed()).isTrue();
     }
     void accept(JobRequest job) {
         var accepted=new JobAccepted(1,UUID.randomUUID(),job.jobId(),job.attemptId(),JobState.ACCEPTED,Instant.now());

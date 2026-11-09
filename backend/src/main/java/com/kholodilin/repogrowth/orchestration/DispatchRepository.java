@@ -36,6 +36,8 @@ public class DispatchRepository {
         });
     }
     private boolean lock(Claim claim) {
+        // Recovery and result application take the task lock first; keep the same lock order.
+        jdbc.queryForList("SELECT id FROM collection_task WHERE public_id=? FOR UPDATE",Long.class,claim.request().jobId());
         return !jdbc.queryForList("SELECT id FROM collector_dispatch WHERE id=? AND state='SENDING' AND generation=? AND locked_by=? AND locked_until>clock_timestamp() FOR UPDATE",Long.class,claim.id(),claim.generation(),claim.owner()).isEmpty();
     }
     public boolean acknowledge(Claim claim,JobAccepted accepted) {
