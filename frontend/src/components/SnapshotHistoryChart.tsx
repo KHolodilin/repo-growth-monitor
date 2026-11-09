@@ -1,3 +1,4 @@
+import { useDashboardView } from "../lib/dashboardView";
 import type { Period } from "./PeriodSelector";
 import { useChartVisibility } from "../lib/chartVisibility";
 import { useMemo, useState } from "react";
@@ -19,8 +20,9 @@ export function SnapshotHistoryChart({
   period = "all",
   kind,
   history,
-  selected, metric, onChange,
+  selected, metric, onChange, displayLabel = (key: string) => key,
 }: {
+  displayLabel?: (key: string) => string;
   title: string;
   period?: Period;
   kind: SnapshotChartKind;
@@ -29,14 +31,16 @@ export function SnapshotHistoryChart({
   metric: SnapshotMetric;
   onChange: (metric: SnapshotMetric, keys: string[]) => void;
 }) {
+  const view = useDashboardView();
   const repositoryId = history.repositoryId;
-  const visibility = useChartVisibility(`${repositoryId}:snapshot-${kind}`);
+  const context = view.public ? `${view.scopeKey}:snapshot-${kind}` : `${repositoryId}:snapshot-${kind}`;
+  const visibility = useChartVisibility(context);
   const [pickerOpen, setPickerOpen] = useState(false);
   const persist = onChange;
   const showIcons = kind === "referrers";
   const option = useMemo(
-    () => snapshotChartOption({ history, metric, selected }),
-    [history, metric, selected],
+    () => snapshotChartOption({ history, metric, selected, displayLabel }),
+    [history, metric, selected, displayLabel],
   );
   const legend = [...selected, OTHER_KEY];
   const moreCount = Math.max(0, history.rows.length - selected.length);
@@ -56,9 +60,10 @@ export function SnapshotHistoryChart({
   return (
     <ChartCard
       title={title}
-      repositoryId={repositoryId}
+      repositoryId={view.public ? undefined : Number(repositoryId)}
+      events={view.public ? [] : undefined}
       period={period}
-      context={`repository:${repositoryId}:${kind}`}
+      context={view.public ? context : `repository:${repositoryId}:${kind}`}
       controls={metricControls}
       mobileControls={metricControls}
       mobileSeries={[]}
@@ -76,8 +81,9 @@ export function SnapshotHistoryChart({
 
         <>
           <PersistentECharts
-            chartId={`${repositoryId}:snapshot-${kind}`}
-            series={legend.map((name) => ({ key: snapshotSeriesKey(history, name), name, icon: kind === "referrers" || name === OTHER_KEY ? <ReferrerSourceIcon source={name} /> : undefined }))}
+            chartId={context}
+            accessibleTitle={title}
+            series={legend.map((name) => ({ key: snapshotSeriesKey(history, name), name, label: displayLabel(name), icon: kind === "referrers" || name === OTHER_KEY ? <ReferrerSourceIcon source={name} /> : undefined }))}
             option={option}
             exportTitle={title}
             persistSelection={false}
@@ -119,7 +125,7 @@ export function SnapshotHistoryChart({
                         }}
                       />
                       {showIcons && <ReferrerSourceIcon source={row.key} />}
-                      <span className="[overflow-wrap:anywhere]">{row.key}</span>
+                      <span className="[overflow-wrap:anywhere]">{displayLabel(row.key)}</span>
                     </label>
                   ))}
                 </div>

@@ -98,16 +98,16 @@ export function TrafficHistoryPage() {
       <header className="space-y-0">
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/dashboard" },
+            { label: "Portfolio", to: "/admin/dashboard" },
             {
               label: repo.fullName,
               repoSwitcher: {
                 currentId: repo.id,
                 hrefFor: (repositoryId) =>
-                  `/repositories/${repositoryId}/traffic/history?kind=${kind}&period=${period}`,
+                  `/admin/repositories/${repositoryId}/traffic/history?kind=${kind}&period=${period}`,
               },
             },
-            { label: "Traffic", to: `/repositories/${repo.id}` },
+            { label: "Traffic", to: `/admin/repositories/${repo.id}` },
             { label: "History" },
           ]}
         />

@@ -136,7 +136,7 @@ describe("remaining coverage edges", () => {
       <MemoryRouter>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/repositories/:id" element={<p>opened</p>} />
+          <Route path="/admin/repositories/:id" element={<p>opened</p>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -179,7 +179,7 @@ describe("remaining coverage edges", () => {
     });
     api.mockImplementation(async (path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return repository;
       }
       if (url.includes("/topics/") && url.includes("/history")) {
@@ -191,9 +191,9 @@ describe("remaining coverage edges", () => {
       throw new Error("none");
     });
     const query = render(
-      <MemoryRouter initialEntries={["/repositories/13/search-queries/5"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
         <Routes>
-          <Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -202,9 +202,9 @@ describe("remaining coverage edges", () => {
     query.unmount();
 
     const topic = render(
-      <MemoryRouter initialEntries={["/repositories/13/topics/outbox?scope=language"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox?scope=language"]}>
         <Routes>
-          <Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
+          <Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -250,10 +250,10 @@ describe("remaining coverage edges", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Repositories" })).toBeInTheDocument();
     render(
-      <MemoryRouter initialEntries={["/repositories"]}>
+      <MemoryRouter initialEntries={["/admin/repositories"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories" element={<p>repos</p>} />
+            <Route path="/admin/repositories" element={<p>repos</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -262,11 +262,11 @@ describe("remaining coverage edges", () => {
 
     api.mockResolvedValue([repository]);
     render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
           <Route
-            path="/repositories/:id"
-            element={<RepoSwitcher currentId={13} currentLabel="current" hrefFor={() => "/repositories/13"} />}
+            path="/admin/repositories/:id"
+            element={<RepoSwitcher currentId={13} currentLabel="current" hrefFor={() => "/admin/repositories/13"} />}
           />
         </Routes>
       </MemoryRouter>,
@@ -302,11 +302,11 @@ describe("remaining coverage edges", () => {
 
     api.mockResolvedValue([]);
     render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
           <Route
-            path="/repositories/:id"
-            element={<RepoSwitcher currentId={13} currentLabel="empty" hrefFor={() => "/repositories/13"} />}
+            path="/admin/repositories/:id"
+            element={<RepoSwitcher currentId={13} currentLabel="empty" hrefFor={() => "/admin/repositories/13"} />}
           />
         </Routes>
       </MemoryRouter>,
@@ -335,7 +335,7 @@ describe("remaining coverage edges", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve({ ...repository, description: undefined, health: undefined });
       }
       if (url.includes("/traffic?")) {
@@ -360,9 +360,9 @@ describe("remaining coverage edges", () => {
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -406,9 +406,9 @@ describe("remaining coverage edges", () => {
       run: { ...searchResults.run, completedAt: null, enrichmentStatus: "SUCCESS" },
     });
     const results = render(
-      <MemoryRouter initialEntries={["/search-runs/9"]}>
+      <MemoryRouter initialEntries={["/admin/search-runs/9"]}>
         <Routes>
-          <Route path="/search-runs/:id" element={<SearchResultsPage />} />
+          <Route path="/admin/search-runs/:id" element={<SearchResultsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -420,9 +420,9 @@ describe("remaining coverage edges", () => {
       run: { ...searchResults.run, enrichmentStatus: null },
     });
     const plainResults = render(
-      <MemoryRouter initialEntries={["/search-runs/9"]}>
+      <MemoryRouter initialEntries={["/admin/search-runs/9"]}>
         <Routes>
-          <Route path="/search-runs/:id" element={<SearchResultsPage />} />
+          <Route path="/admin/search-runs/:id" element={<SearchResultsPage />} />
         </Routes>
       </MemoryRouter>,
     );

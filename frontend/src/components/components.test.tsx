@@ -60,11 +60,11 @@ describe("components", () => {
       return dashboardReady;
     });
     const ready = render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
+      <MemoryRouter initialEntries={["/admin/dashboard"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/dashboard" element={<p>dash</p>} />
-            <Route path="/repositories" element={<p>repos</p>} />
+            <Route path="/admin/dashboard" element={<p>dash</p>} />
+            <Route path="/admin/repositories" element={<p>repos</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -227,10 +227,10 @@ describe("components", () => {
       return portfolio;
     });
     const repo = render(
-      <MemoryRouter initialEntries={["/repositories/13/traffic/history"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/traffic/history"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories/:id/traffic/history" element={<p>history</p>} />
+            <Route path="/admin/repositories/:id/traffic/history" element={<p>history</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -251,10 +251,10 @@ describe("components", () => {
       return portfolio;
     });
     render(
-      <MemoryRouter initialEntries={["/repositories"]}>
+      <MemoryRouter initialEntries={["/admin/repositories"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories" element={<p>list</p>} />
+            <Route path="/admin/repositories" element={<p>list</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -306,10 +306,10 @@ describe("components", () => {
       };
     });
     const view = render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories/:id" element={<p>repo</p>} />
+            <Route path="/admin/repositories/:id" element={<p>repo</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,

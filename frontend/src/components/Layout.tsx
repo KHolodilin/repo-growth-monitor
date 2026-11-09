@@ -135,7 +135,7 @@ export function Layout() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <NavLink
-              to="/"
+              to="/admin/dashboard"
               className="flex min-w-0 items-center gap-2.5 text-slate-900"
               aria-label="Repo Growth Monitor"
             >
@@ -297,7 +297,7 @@ function AuthChrome({
                 )}
               </div>
               <Link
-                to="/repositories"
+                to="/admin/repositories"
                 role="menuitem"
                 className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={() => setOpen(false)}
@@ -374,7 +374,7 @@ function collectionBriefState(
 }
 
 function repositoryIdFromPath(pathname: string): number | null {
-  const match = pathname.match(/^\/repositories\/(\d+)(?:\/|$)/);
+  const match = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
   if (!match) {
     return null;
   }

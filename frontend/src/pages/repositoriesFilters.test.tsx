@@ -128,7 +128,7 @@ describe("repository filters", () => {
       if (url.includes("/system/status")) {
         return { tokenState: "OK", rateLimitReset: null };
       }
-      if (url.endsWith("/repositories/refresh")) { refreshed = true; return []; }
+      if (url.endsWith("/admin/repositories/refresh")) { refreshed = true; return []; }
       return refreshed ? [{ ...tracked, trackingEnabled: false }] : [];
     });
     renderRepos();
@@ -180,7 +180,7 @@ describe("repository filters", () => {
       if (String(path).includes("/system/status")) {
         return { tokenState: "REJECTED", rateLimitReset: null };
       }
-      if (String(path).includes("/repositories")) {
+      if (String(path).includes("/admin/repositories")) {
         return [lost];
       }
       return dashboardReady;
@@ -241,7 +241,7 @@ describe("repository filters", () => {
       if (String(path).includes("/system/status")) {
         return { tokenState: "REJECTED", rateLimitReset: null };
       }
-      if (String(path).includes("/dashboard")) {
+      if (String(path).includes("/admin/dashboard")) {
         return {
           ...dashboardReady,
           repositories: [{ ...dashboardReady.repositories[0], accessible: false, trafficPermissionMissing: true }],
@@ -263,7 +263,7 @@ describe("repository filters", () => {
       if (url.includes("/system/status")) {
         return { tokenState: "OK", rateLimitReset: "2026-10-16T18:00:00Z" };
       }
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return { ...repository, accessible: false, trafficPermissionMissing: true };
       }
       if (url.includes("/traffic?")) {
@@ -272,9 +272,9 @@ describe("repository filters", () => {
       return [];
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -390,7 +390,7 @@ describe("repository filters", () => {
       if (url.includes("/system/status")) {
         return { tokenState: "REJECTED", rateLimitReset: null };
       }
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return repository;
       }
       if (url.includes("/traffic?")) {
@@ -399,9 +399,9 @@ describe("repository filters", () => {
       return [];
     });
     const details = render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -419,7 +419,7 @@ describe("repository filters", () => {
           releaseDetails = resolve;
         });
       }
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve({ ...repository, accessible: true, trafficPermissionMissing: true });
       }
       if (url.includes("/traffic?")) {
@@ -428,9 +428,9 @@ describe("repository filters", () => {
       return Promise.resolve([]);
     });
     const pendingDetails = render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -443,7 +443,7 @@ describe("repository filters", () => {
       if (String(path).includes("/system/status")) {
         return { tokenState: "RATE_LIMITED", rateLimitReset: null };
       }
-      if (String(path).includes("/dashboard")) {
+      if (String(path).includes("/admin/dashboard")) {
         return dashboardReady;
       }
       return { tokenState: "WEIRD" };
@@ -466,7 +466,7 @@ describe("repository filters", () => {
           releaseStatus = resolve;
         });
       }
-      if (String(path).includes("/dashboard")) {
+      if (String(path).includes("/admin/dashboard")) {
         return {
           ...dashboardReady,
           repositories: [{ ...dashboardReady.repositories[0], accessible: false, trafficPermissionMissing: true }],

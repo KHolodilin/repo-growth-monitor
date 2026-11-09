@@ -96,7 +96,7 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/vite.svg"
                         ).permitAll()
-                        .requestMatchers("/api/v1/admin/**").access(adminAuthorizationManager)
+                        .requestMatchers("/admin", "/admin/**", "/api/v1/admin/**").access(adminAuthorizationManager)
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/me").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/**").permitAll()

@@ -158,15 +158,15 @@ export function TopicDetailsPage() {
         <div className="sm:col-start-1 sm:row-start-1">
           <PageBreadcrumb
             items={[
-              { label: "Portfolio", to: "/dashboard" },
+              { label: "Portfolio", to: "/admin/dashboard" },
               {
                 label: repo.fullName,
                 repoSwitcher: {
                   currentId: repo.id,
-                  hrefFor: (id) => `/repositories/${id}?tab=topics`,
+                  hrefFor: (id) => `/admin/repositories/${id}?tab=topics`,
                 },
               },
-              { label: "Topics Visibility", to: `/repositories/${repo.id}?tab=topics${scope === "language" ? "&scope=language" : ""}` },
+              { label: "Topics Visibility", to: `/admin/repositories/${repo.id}?tab=topics${scope === "language" ? "&scope=language" : ""}` },
             ]}
           />
           <h1 className="mt-2 break-all text-xl font-semibold">

@@ -51,16 +51,16 @@ export function CompetitorCardPage() {
   return (
     <CompetitorCardView
       items={[
-        { label: "Portfolio", to: "/dashboard" },
+        { label: "Portfolio", to: "/admin/dashboard" },
         {
           label: repo.fullName,
           repoSwitcher: {
             currentId: repo.id,
-            hrefFor: (id) => `/repositories/${id}?tab=search`,
+            hrefFor: (id) => `/admin/repositories/${id}?tab=search`,
           },
         },
-        { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
-        { label: history.query.query, to: `/repositories/${repo.id}/search-queries/${history.query.id}` },
+        { label: "Search Visibility", to: `/admin/repositories/${repo.id}?tab=search` },
+        { label: history.query.query, to: `/admin/repositories/${repo.id}/search-queries/${history.query.id}` },
       ]}
       card={card}
       collectionDates={history.query.enabled === false ? [] : history.points.map(point => point.date)}

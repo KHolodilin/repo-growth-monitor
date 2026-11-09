@@ -18,10 +18,10 @@ let status = "SUCCESS";
 let empty = false;
 let run: () => Promise<unknown>;
 function mount(tab = "search") {
-  return render(<MemoryRouter initialEntries={[`/repositories/13?tab=${tab}`]}><AuthProvider><Routes>
+  return render(<MemoryRouter initialEntries={[`/admin/repositories/13?tab=${tab}`]}><AuthProvider><Routes>
     <Route element={<Layout />}>
-      <Route path="/repositories/:id" element={<><Link to="/repositories/8?tab=search">Next repository</Link><Link to="/dashboard">Leave repository</Link><RepositoryDetailsPage /></>} />
-      <Route path="/dashboard" element={<p>Dashboard</p>} />
+      <Route path="/admin/repositories/:id" element={<><Link to="/admin/repositories/8?tab=search">Next repository</Link><Link to="/admin/dashboard">Leave repository</Link><RepositoryDetailsPage /></>} />
+      <Route path="/admin/dashboard" element={<p>Dashboard</p>} />
     </Route>
   </Routes></AuthProvider></MemoryRouter>);
 }

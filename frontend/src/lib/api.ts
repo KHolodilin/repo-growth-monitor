@@ -177,7 +177,7 @@ export type Dashboard = {
 };
 
 export type RankHighlight = {
-  repositoryId: number;
+  repositoryId: number | string;
   fullName: string;
   queryName: string;
   fromRank: number;
@@ -186,13 +186,13 @@ export type RankHighlight = {
 
 export type EventHighlight = {
   count: number;
-  repositoryId: number;
+  repositoryId: number | string;
   fullName: string;
   repositoryNames: string[];
 };
 
 export type VisitorHighlight = {
-  repositoryId: number;
+  repositoryId: number | string;
   fullName: string;
   growthPercent: number;
 };
@@ -250,7 +250,7 @@ export type SnapshotHistoryRow = {
 };
 
 export type SnapshotHistory = {
-  repositoryId: number;
+  repositoryId: number | string;
   kind: SnapshotKind;
   days: number;
   from: string;
@@ -349,8 +349,8 @@ export type SearchHistory = {
 };
 
 export type GrowthEvent = {
-  id: number;
-  repositoryId: number;
+  id: number | string;
+  repositoryId: number | string;
   eventAt: string;
   category: string;
   type: string;

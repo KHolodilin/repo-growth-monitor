@@ -27,16 +27,16 @@ const card = {
   ],
 };
 
-function renderCard(path = "/repositories/13/search-queries/5/competitors/1") {
+function renderCard(path = "/admin/repositories/13/search-queries/5/competitors/1") {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route
-          path="/repositories/:repositoryId/search-queries/:queryId/competitors/:githubRepositoryId"
+          path="/admin/repositories/:repositoryId/search-queries/:queryId/competitors/:githubRepositoryId"
           element={<CompetitorCardPage />}
         />
         <Route path="/missing" element={<CompetitorCardPage />} />
-        <Route path="/repositories/:repositoryId" element={<p>repository</p>} />
+        <Route path="/admin/repositories/:repositoryId" element={<p>repository</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -47,8 +47,8 @@ describe("competitor card", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
-      if (url.includes("/repositories?")) return Promise.resolve([repository]);
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/history")) return Promise.resolve(searchHistory);
       if (url.endsWith("/competitors/1")) return Promise.resolve(card);
       return Promise.resolve(null);
@@ -66,7 +66,7 @@ describe("competitor card", () => {
     expect(screen.getByRole("heading", { name: "Stars and forks" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: searchHistory.query.query })).toHaveAttribute(
       "href",
-      "/repositories/13/search-queries/5",
+      "/admin/repositories/13/search-queries/5",
     );
     await user.click(screen.getByLabelText("Switch repository"));
     await user.click(await screen.findByRole("option", { name: repository.name }));
@@ -75,7 +75,7 @@ describe("competitor card", () => {
   it("shows empty copy when the profile has no description, topics, or days", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.endsWith("/history")) return Promise.resolve(searchHistory);
       if (url.endsWith("/competitors/1")) {
         return Promise.resolve({ ...card, description: "  ", topics: [], points: [], discoverability: [] });

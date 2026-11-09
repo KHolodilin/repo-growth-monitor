@@ -130,15 +130,15 @@ export function QueryDetailsPage() {
         <div className="sm:col-start-1 sm:row-start-1">
           <PageBreadcrumb
             items={[
-              { label: "Portfolio", to: "/dashboard" },
+              { label: "Portfolio", to: "/admin/dashboard" },
               {
                 label: repo.fullName,
                 repoSwitcher: {
                   currentId: repo.id,
-                  hrefFor: (id) => `/repositories/${id}?tab=search`,
+                  hrefFor: (id) => `/admin/repositories/${id}?tab=search`,
                 },
               },
-              { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
+              { label: "Search Visibility", to: `/admin/repositories/${repo.id}?tab=search` },
             ]}
           />
           <h1 className="mt-2 break-all text-xl font-semibold">
@@ -206,7 +206,7 @@ export function QueryDetailsPage() {
               !visibility.isVisible(`repository:${id}`) && selected.includes(id) ? visibility.reveal([`repository:${id}`]) : setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
             }
             nameTo={(row) =>
-              `/repositories/${repo.id}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
+              `/admin/repositories/${repo.id}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
             }
           />
         )}

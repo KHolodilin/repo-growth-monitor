@@ -77,7 +77,7 @@ describe("Layout auth chrome", () => {
           <Routes>
             <Route element={<Layout />}>
               <Route path="/" element={<p>home</p>} />
-              <Route path="/repositories" element={<p>repos</p>} />
+              <Route path="/admin/repositories" element={<p>repos</p>} />
             </Route>
           </Routes>
         </AuthProvider>

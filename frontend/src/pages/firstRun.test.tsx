@@ -59,7 +59,7 @@ describe("first-run portfolio", () => {
       return Promise.resolve({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
     });
     renderDashboard();
-    expect(await screen.findByRole("link", { name: "Select repositories" })).toHaveAttribute("href", "/repositories");
+    expect(await screen.findByRole("link", { name: "Select repositories" })).toHaveAttribute("href", "/admin/repositories");
     expect(screen.getByText(/10:00 to 18:00 Europe\/Moscow/)).toBeInTheDocument();
     expect(screen.getByText(/The first collection starts as soon as a repository is enabled/)).toBeInTheDocument();
     expect(screen.queryByText(/Read permissions/)).not.toBeInTheDocument();

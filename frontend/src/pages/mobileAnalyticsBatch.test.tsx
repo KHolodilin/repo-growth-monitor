@@ -44,8 +44,8 @@ describe("mobile analytics batch", () => {
   it("keeps repository missing-data states distinct from data available only for one metric", async () => {
     const user = userEvent.setup();
     let points: typeof traffic.traffic = [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: null }];
-    api.mockImplementation((path: string) => Promise.resolve(path.includes("/traffic?") ? { ...traffic, traffic: points } : path.endsWith("/repositories/13") ? repository : []));
-    render(<MemoryRouter initialEntries={["/repositories/13"]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
+    api.mockImplementation((path: string) => Promise.resolve(path.includes("/traffic?") ? { ...traffic, traffic: points } : path.endsWith("/admin/repositories/13") ? repository : []));
+    render(<MemoryRouter initialEntries={["/admin/repositories/13"]}><Routes><Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByRole("status")).toHaveTextContent("No traffic data for selected period");
     points = [{ date: "2026-11-02", views: null, uniqueVisitors: 2, clones: null, uniqueCloners: null }];
     await user.click(screen.getByRole("button", { name: "30d" }));
@@ -57,7 +57,7 @@ describe("mobile analytics batch", () => {
   it("keeps the mobile repository menu usable during viewport and page changes", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue([repository]);
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: id => `/repositories/${id}` } }]} /></MemoryRouter>);
+    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: id => `/admin/repositories/${id}` } }]} /></MemoryRouter>);
     await user.click(screen.getByRole("button", { name: "Switch repository" }));
     fireEvent.resize(window); fireEvent.scroll(window);
     await user.type(screen.getByRole("textbox", { name: "Search repositories" }), "spring");
@@ -129,7 +129,7 @@ describe("mobile analytics batch", () => {
   });
 
   it("keeps breadcrumb navigation and complete page labels available", () => {
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: id => `/repositories/${id}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
+    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: id => `/admin/repositories/${id}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
     expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Search Visibility" })).toBeInTheDocument();
     expect(screen.getByTitle("a/very-long-repository-name")).toBeInTheDocument();
@@ -195,7 +195,7 @@ describe("mobile analytics batch", () => {
 
   it("closes the warning sheet via button, cancellation, backdrop and deliberate header swipe", () => {
     const onClose = vi.fn();
-    const { unmount } = render(<RepositoryWarningSheet count={2} onClose={onClose}><a href="/repositories/13">owner/repository</a></RepositoryWarningSheet>);
+    const { unmount } = render(<RepositoryWarningSheet count={2} onClose={onClose}><a href="/admin/repositories/13">owner/repository</a></RepositoryWarningSheet>);
     const dialog = screen.getByRole("dialog", { name: "Repository data warnings" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(document.body.style.overflow).toBe("hidden");

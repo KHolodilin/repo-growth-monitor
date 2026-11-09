@@ -24,18 +24,18 @@ const query = { ...searchHistory, points, query: { ...searchHistory.query, id: 5
 const topic = { ...topicHistory, points };
 const card = { githubRepositoryId: 1, fullName: "other/repo", htmlUrl: "https://github.com/other/repo", description: "Competitor", topics: [], discoverability: [], points };
 const routes = {
-  query: "/repositories/13/search-queries/5?metric=stars",
-  topic: "/repositories/13/topics/outbox?scope=language",
-  queryCompetitor: "/repositories/13/search-queries/5/competitors/1",
-  topicCompetitor: "/repositories/13/topics/outbox/competitors/1?scope=language",
+  query: "/admin/repositories/13/search-queries/5?metric=stars",
+  topic: "/admin/repositories/13/topics/outbox?scope=language",
+  queryCompetitor: "/admin/repositories/13/search-queries/5/competitors/1",
+  topicCompetitor: "/admin/repositories/13/topics/outbox/competitors/1?scope=language",
 };
-function mount(path: string) { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} /><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /><Route path="/repositories/:repositoryId/search-queries/:queryId/competitors/:githubRepositoryId" element={<CompetitorCardPage />} /><Route path="/repositories/:repositoryId/topics/:topic/competitors/:githubRepositoryId" element={<TopicCompetitorCardPage />} /></Routes></MemoryRouter>); }
+function mount(path: string) { return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} /><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /><Route path="/admin/repositories/:repositoryId/search-queries/:queryId/competitors/:githubRepositoryId" element={<CompetitorCardPage />} /><Route path="/admin/repositories/:repositoryId/topics/:topic/competitors/:githubRepositoryId" element={<TopicCompetitorCardPage />} /></Routes></MemoryRouter>); }
 function option() { return JSON.parse(screen.getByTestId("period-option").textContent!) as { collectionDates: string[]; missedCollectionDates: string[]; xAxis: { data: string[] }; series: { name: string; data: (number|null)[] }[] }; }
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
   writeStoredRepoPeriod("13", "all");
   api.mockReset(); api.mockImplementation(async (url: string) => {
-    if (url.endsWith("/repositories/13")) return repository;
+    if (url.endsWith("/admin/repositories/13")) return repository;
     if (url.includes("/competitors/")) return card;
     if (url.includes("/history")) return url.includes("/topics/") ? topic : query;
     if (url.includes("/results")) return url.includes("/topics/") ? topicResults : searchResults;

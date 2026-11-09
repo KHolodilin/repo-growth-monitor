@@ -8,7 +8,7 @@ function parseScope(value: string | null): "all" | "language" {
 }
 
 export function topicCompetitorPath(repositoryId: number, topic: string, githubRepositoryId: number, scope: "all" | "language") {
-  const path = `/repositories/${repositoryId}/topics/${encodeURIComponent(topic)}/competitors/${githubRepositoryId}`;
+  const path = `/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topic)}/competitors/${githubRepositoryId}`;
   return scope === "language" ? `${path}?scope=language` : path;
 }
 
@@ -52,20 +52,20 @@ export function TopicCompetitorCardPage() {
   if (!repo || !history || !card) return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
 
   const scopeQuery = scope === "language" ? "&scope=language" : "";
-  const topicTo = `/repositories/${repo.id}/topics/${encodeURIComponent(history.watch.topic)}${scope === "language" ? "?scope=language" : ""}`;
+  const topicTo = `/admin/repositories/${repo.id}/topics/${encodeURIComponent(history.watch.topic)}${scope === "language" ? "?scope=language" : ""}`;
 
   return (
     <CompetitorCardView
       items={[
-        { label: "Portfolio", to: "/dashboard" },
+        { label: "Portfolio", to: "/admin/dashboard" },
         {
           label: repo.fullName,
           repoSwitcher: {
             currentId: repo.id,
-            hrefFor: (id) => `/repositories/${id}?tab=topics`,
+            hrefFor: (id) => `/admin/repositories/${id}?tab=topics`,
           },
         },
-        { label: "Topics Visibility", to: `/repositories/${repo.id}?tab=topics${scopeQuery}` },
+        { label: "Topics Visibility", to: `/admin/repositories/${repo.id}?tab=topics${scopeQuery}` },
         { label: history.watch.topic, to: topicTo },
       ]}
       card={card}

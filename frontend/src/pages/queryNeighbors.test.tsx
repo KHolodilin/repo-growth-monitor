@@ -16,7 +16,7 @@ describe("query neighbor chart", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/history")) {
@@ -45,9 +45,9 @@ describe("query neighbor chart", () => {
     });
 
     render(
-      <MemoryRouter initialEntries={["/repositories/13/search-queries/5"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
         <Routes>
-          <Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -55,11 +55,11 @@ describe("query neighbor chart", () => {
     const neighbor = await screen.findByRole("checkbox", { name: "Show other/repo on the chart" });
     expect(screen.getByRole("link", { name: "other/repo" })).toHaveAttribute(
       "href",
-      "/repositories/13/search-queries/5/competitors/1",
+      "/admin/repositories/13/search-queries/5/competitors/1",
     );
     expect(screen.getByRole("link", { name: repository.fullName })).toHaveAttribute(
       "href",
-      `/repositories/13/search-queries/5/competitors/${repository.githubId}`,
+      `/admin/repositories/13/search-queries/5/competitors/${repository.githubId}`,
     );
     expect(screen.queryByRole("checkbox", { name: `Show ${repository.fullName} on the chart` })).not.toBeInTheDocument();
     await user.click(neighbor);

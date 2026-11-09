@@ -1,3 +1,4 @@
+import { useDashboardView } from "../lib/dashboardView";
 import type { Period } from "./PeriodSelector";
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type GrowthEvent } from "../lib/api";
@@ -138,6 +139,7 @@ export function ChartCard({
   selectedMobileSeries?: string;
   onMobileSeriesChange?: (name: string) => void;
 }) {
+  const view = useDashboardView();
   const mobile = useIsMobileChart();
   const mobileShell = mobile && mobileSeries != null;
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
@@ -269,9 +271,9 @@ export function ChartCard({
             <MobileEventStrip events={events} dates={axisDates} onOpen={openMarker} />
           )}
         </Card>
-        {marker && marker.length > 0 && (
+        {marker && marker.length > 0 && (view.public ? <PublicEventDialog events={marker} onClose={() => setMarker(null)} /> : (
           <EventDetailsDialog
-            repositoryId={marker[0].repositoryId}
+            repositoryId={Number(marker[0].repositoryId)}
             events={marker}
             onClose={() => setMarker(null)}
             onEdit={() => setMarker(null)}
@@ -281,7 +283,7 @@ export function ChartCard({
               setReloadKey((value) => value + 1);
             }}
           />
-        )}
+        ))}
       </ChartModeContext.Provider>
     </ChartExportProvider>
   );
@@ -731,4 +733,9 @@ export function ChartDownloadMenu() {
       </div>
     </>
   );
+}
+
+function PublicEventDialog({ events, onClose }: { events: GrowthEvent[]; onClose: () => void }) {
+  useEffect(() => { const listener = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); }; window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener); }, [onClose]);
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}><section role="dialog" aria-modal="true" aria-label="Events" className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-xl bg-card p-5" onClick={event => event.stopPropagation()}><button type="button" className="float-right min-h-11 px-3" onClick={onClose} autoFocus>Close</button><h2 className="text-lg font-semibold">Events</h2>{events.map(event => <article key={event.id} className="mt-4 break-words"><time className="text-xs text-muted-foreground">{event.eventAt.slice(0,10)}</time><p>{event.title}</p>{event.description && <p>{event.description}</p>}</article>)}</section></div>;
 }

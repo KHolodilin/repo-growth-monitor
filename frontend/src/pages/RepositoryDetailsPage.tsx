@@ -431,7 +431,7 @@ export function RepositoryDetailsPage() {
       <header>
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/dashboard" },
+            { label: "Portfolio", to: "/admin/dashboard" },
             {
               label: repo.fullName,
               repoSwitcher: {
@@ -439,8 +439,8 @@ export function RepositoryDetailsPage() {
                 description: repo.description,
                 hrefFor: (repositoryId) =>
                   tab === "traffic"
-                    ? `/repositories/${repositoryId}`
-                    : `/repositories/${repositoryId}?tab=${tab}`,
+                    ? `/admin/repositories/${repositoryId}`
+                    : `/admin/repositories/${repositoryId}?tab=${tab}`,
               },
             },
             { label: TAB_LABEL[tab] },
@@ -1148,7 +1148,7 @@ function TopicsPanel({
             }} rows={sorted.map(item => {
               const running = runningQueryId === item.watch.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
               return {
-              id: item.watch.id, name: item.watch.topic, href: `/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
+              id: item.watch.id, name: item.watch.topic, href: `/admin/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
               seriesKey: `topic:${repositoryId}:${scope}:${item.watch.id}`, checked: selected.has(item.watch.topic),
               onToggle: () => writeSelection(selected.has(item.watch.topic) ? selectedSlugs.filter(slug => slug !== item.watch.topic) : [...selectedSlugs, item.watch.topic], [item.watch.topic]),
               rank: item.currentRank, limit: item.watch.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
@@ -1228,7 +1228,7 @@ function TopicsPanel({
                         )}
                         <Link
                           className="text-primary hover:underline"
-                          to={`/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
+                          to={`/admin/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
                         >
                           {item.watch.topic}
                         </Link>
@@ -1494,7 +1494,7 @@ function SearchPanel({
           rows={sorted.map(item => {
             const running = runningQueryId === item.query.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
             return {
-              id: item.query.id, name: item.query.name, href: `/repositories/${repositoryId}/search-queries/${item.query.id}`,
+              id: item.query.id, name: item.query.name, href: `/admin/repositories/${repositoryId}/search-queries/${item.query.id}`,
               seriesKey: `query:${item.query.id}`, checked: selected.has(item.query.id),
               onToggle: () => writeSelection(selected.has(item.query.id) ? selectedIds.filter(id => id !== item.query.id) : [...selectedIds, item.query.id], [item.query.id]),
               rank: item.currentRank, limit: item.query.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
@@ -1571,7 +1571,7 @@ function SearchPanel({
                       )}
                       <Link
                         className="text-primary hover:underline"
-                        to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
+                        to={`/admin/repositories/${repositoryId}/search-queries/${item.query.id}`}
                       >
                         {item.query.name}
                       </Link>
