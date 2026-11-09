@@ -34,7 +34,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
     @Autowired MockMvc mvc;@Autowired JsonMapper json;@Autowired UserAccountService users;@Autowired MockUserCatalog catalog;
     long repositoryId;AuthorizationScope scope;
     @BeforeEach void setup() {
-        jdbc.execute("TRUNCATE github_credential_version,github_credential,repository_credential,collection_request_command,idempotency_records,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
+        jdbc.execute("TRUNCATE github_budget_receipt,github_request_permit,github_budget,github_credential_version,github_credential,repository_credential,collection_request_command,idempotency_records,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient);catalog.syncMissingUsers();
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
         repositoryId=jdbc.queryForObject("INSERT INTO repository(github_id,owner_id,name,full_name,visibility,tracking_enabled) VALUES (202,?,'repo-growth-monitor','KHolodilin/repo-growth-monitor','PUBLIC',true) RETURNING id",Long.class,owner);
@@ -101,5 +101,21 @@ class CredentialVaultIT extends AbstractPostgresTest {
     @Test void encryptedPayloadTamperingFailsClosedWithoutLeakingSecrets() throws Exception {
         var job=task();jdbc.update("UPDATE github_credential_version SET ciphertext=set_byte(ciphertext,0,get_byte(ciphertext,0)#1)");
         assertThat(resolve(credentialRequest(job),NODE_A,503)).doesNotContain("github-secret-v1");
+    }
+    @Autowired SharedGitHubBudget budget;
+    @Test void sharedBudgetPersistsPacingConcurrencyAndCooldownAcrossServiceRestart() {
+        var job=task();var assignment=credentialRequest(job);UUID request=UUID.randomUUID();
+        var acquired=budget.acquire("node-a",new SharedGitHubBudget.Acquisition(request,assignment,"core"));
+        assertThat(acquired.permitId()).isEqualTo(request);
+        assertThat(budget.acquire("node-a",new SharedGitHubBudget.Acquisition(request,assignment,"core")).permitId()).isEqualTo(request);
+        assertThat(jdbc.queryForObject("SELECT remaining FROM github_budget",Long.class)).isEqualTo(2999);
+        assertThat(budget.acquire("node-a",new SharedGitHubBudget.Acquisition(UUID.randomUUID(),assignment,"search")).permitId()).isNull();
+        Instant retry=Instant.now().plusSeconds(600);
+        assertThat(budget.report("node-a",new SharedGitHubBudget.Report(request,429,0L,retry,retry))).isTrue();
+        assertThat(budget.report("node-a",new SharedGitHubBudget.Report(request,200,5000L,null,null))).isFalse();
+        var restarted=new SharedGitHubBudget(jdbc,new org.springframework.jdbc.datasource.DataSourceTransactionManager(jdbc.getDataSource()),vault);
+        var blocked=restarted.acquire("node-a",new SharedGitHubBudget.Acquisition(UUID.randomUUID(),assignment,"core"));
+        assertThat(blocked.permitId()).isNull();assertThat(blocked.retryAt()).isAfterOrEqualTo(retry);
+        assertThat(jdbc.queryForObject("SELECT remaining FROM github_budget WHERE resource='core'",Long.class)).isZero();
     }
 }

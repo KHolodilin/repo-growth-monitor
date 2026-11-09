@@ -8,7 +8,10 @@ public final class CredentialedGitHubRequest {
     @FunctionalInterface public interface Call<T> {T execute(String token);}
     public static final class Failure extends RuntimeException {
         private final int status;
-        public Failure(int status) {super("GitHub request failed (HTTP "+status+")");this.status=status;}
+        private final java.time.Instant retryAt;
+        public Failure(int status) {this(status,null);}
+        public Failure(int status,java.time.Instant retryAt) {super("GitHub request failed (HTTP "+status+")");this.status=status;this.retryAt=retryAt;}
+        public java.time.Instant retryAt() {return retryAt;}
         public int status() {return status;}
     }
     private final CredentialCache cache;private final RequestGate gate;

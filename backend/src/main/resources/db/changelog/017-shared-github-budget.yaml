@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-shared-github-budget
+      author: repo-growth-monitor
+      changes:
+        - sqlFile:
+            path: 017-shared-github-budget.sql
+            relativeToChangelogFile: true
