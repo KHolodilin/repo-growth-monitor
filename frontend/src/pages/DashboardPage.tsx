@@ -285,8 +285,8 @@ function DashboardHeader({
         )}
         data-testid="portfolio-controls"
       >
-        {!view.public && tab != null && onTab != null && (
-          <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Portfolio analytics">
+        {tab != null && onTab != null && (
+          <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label={view.public ? `${view.heading ?? "Owner"} analytics` : "Portfolio analytics"}>
             {([
               ["traffic", "Traffic"],
               ["stats", "Stats"],
@@ -512,7 +512,8 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
   const view = useDashboardView();
   const mobile = useIsMobileChart();
   const [tokenState, setTokenState] = useState<TokenState | null>(null);
-  const needsAccess = rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
+  const sortKeys = view.public ? SORT_KEYS.filter((key) => key !== "discoverability") : SORT_KEYS;
+  const needsAccess = !view.public && rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
   useEffect(() => {
     if (!needsAccess) {
       return;
@@ -531,10 +532,10 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "dashboard-repositories",
     scope: view.scopeKey,
-    keys: SORT_KEYS,
+    keys: sortKeys,
     initial: { key: "visitors", dir: "desc" },
   });
-  const activeSortKey = sortKey as SortKey;
+  const activeSortKey = (sortKeys.includes(sortKey as SortKey) ? sortKey : "visitors") as SortKey;
 
   const sorted = useMemo(() => {
     const copy = [...rows];
@@ -567,7 +568,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               value={activeSortKey}
               onChange={(event) => toggle(event.target.value as SortKey)}
             >
-              {SORT_KEYS.map((key) => (
+              {sortKeys.map((key) => (
                 <option key={key} value={key}>
                   {SORT_LABELS[key]}
                 </option>
@@ -611,14 +612,14 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Stars" active={activeSortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
               <SortHeader label="Forks" active={activeSortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
               <SortHeader label="Growth" active={activeSortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
-              <SortHeader label="Disc." active={activeSortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
-              <th className="px-5 py-2 font-medium">Activity</th>
+              {!view.public && <SortHeader label="Disc." active={activeSortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />}
+              {!view.public && <th className="px-5 py-2 font-medium">Activity</th>}
             </tr>
           </thead>
           <tbody>
             {sorted.map((row) => {
               const growth = formatGrowth(row.growthPercent);
-              const problems = repositoryProblemLines(row).join(" ");
+              const problems = view.public ? "" : repositoryProblemLines(row).join(" ");
               return (
                 <tr
                   key={row.id}
@@ -638,11 +639,13 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                     >
                       {row.fullName}
                     </Link>
-                    <RepositoryAccessNote
-                      accessible={row.accessible}
-                      trafficPermissionMissing={row.trafficPermissionMissing}
-                      tokenState={tokenState}
-                    />
+                    {!view.public && (
+                      <RepositoryAccessNote
+                        accessible={row.accessible}
+                        trafficPermissionMissing={row.trafficPermissionMissing}
+                        tokenState={tokenState}
+                      />
+                    )}
                   </td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.visitors)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.views)}</td>
@@ -652,12 +655,16 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
                   </td>
-                  <td className="px-5 text-right tabular-nums">
-                    <DiscoverabilityCell row={row} />
-                  </td>
-                  <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
-                    {formatActivityPresentation(row.activityStatus, row.activityAt)}
-                  </td>
+                  {!view.public && (
+                    <td className="px-5 text-right tabular-nums">
+                      <DiscoverabilityCell row={row} />
+                    </td>
+                  )}
+                  {!view.public && (
+                    <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
+                      {formatActivityPresentation(row.activityStatus, row.activityAt)}
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -690,16 +697,20 @@ function RepositoryCard({
       label: "Growth",
       value: <span className={cn("font-medium", growthClass(growth?.direction))}>{growth?.label ?? "—"}</span>,
     },
-    { label: "Disc.", value: <DiscoverabilityCell row={row} /> },
-    {
-      label: "Activity",
-      value: <span className={activityClass(row.activityStatus)}>{formatActivityPresentation(row.activityStatus, row.activityAt)}</span>,
-    },
+    ...(!view.public
+      ? [
+          { label: "Disc.", value: <DiscoverabilityCell row={row} /> },
+          {
+            label: "Activity",
+            value: <span className={activityClass(row.activityStatus)}>{formatActivityPresentation(row.activityStatus, row.activityAt)}</span>,
+          },
+        ]
+      : []),
   ];
   return (
     <Card className="cursor-pointer p-4 hover:bg-muted/40" onClick={onOpen}>
       <div className="flex items-start gap-2">
-        {problems ? (
+        {!view.public && problems ? (
           <span role="img" className="mt-0.5 shrink-0 text-amber-700" title={problems} aria-label={problems}>
             !
           </span>
@@ -711,11 +722,13 @@ function RepositoryCard({
           >
             {row.fullName}
           </Link>
-          <RepositoryAccessNote
-            accessible={row.accessible}
-            trafficPermissionMissing={row.trafficPermissionMissing}
-            tokenState={tokenState}
-          />
+          {!view.public && (
+            <RepositoryAccessNote
+              accessible={row.accessible}
+              trafficPermissionMissing={row.trafficPermissionMissing}
+              tokenState={tokenState}
+            />
+          )}
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">

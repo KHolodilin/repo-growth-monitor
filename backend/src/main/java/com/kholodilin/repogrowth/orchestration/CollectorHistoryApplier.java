@@ -53,7 +53,16 @@ public class CollectorHistoryApplier {
             case TRAFFIC -> {
                 for(var day:snapshot.traffic()){
                     if(day.views()!=null && day.visitors()!=null && day.clones()!=null && day.uniqueCloners()!=null)traffic.upsertDaily(repository,day.date(),Math.toIntExact(day.views()),Math.toIntExact(day.visitors()),Math.toIntExact(day.clones()),Math.toIntExact(day.uniqueCloners()));
-                    else jdbc.update("UPDATE traffic_daily SET views=coalesce(?,views),unique_visitors=coalesce(?,unique_visitors),clones=coalesce(?,clones),unique_cloners=coalesce(?,unique_cloners),updated_at=clock_timestamp() WHERE repository_id=? AND traffic_date=?",day.views(),day.visitors(),day.clones(),day.uniqueCloners(),repository,day.date());
+                    else jdbc.update("""
+                            INSERT INTO traffic_daily (repository_id, traffic_date, views, unique_visitors, clones, unique_cloners)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            ON CONFLICT (repository_id, traffic_date) DO UPDATE SET
+                              views = coalesce(EXCLUDED.views, traffic_daily.views),
+                              unique_visitors = coalesce(EXCLUDED.unique_visitors, traffic_daily.unique_visitors),
+                              clones = coalesce(EXCLUDED.clones, traffic_daily.clones),
+                              unique_cloners = coalesce(EXCLUDED.unique_cloners, traffic_daily.unique_cloners),
+                              updated_at = clock_timestamp()
+                            """, repository, day.date(), day.views(), day.visitors(), day.clones(), day.uniqueCloners());
                 }
                 repositories.setTrafficPermissionMissing(repository,false);
             }
@@ -73,7 +82,10 @@ public class CollectorHistoryApplier {
             if(remote.owner()==null || !remote.owner().login().equalsIgnoreCase(job.repository().owner()))throw new IllegalArgumentException("Discovery owner identity mismatch");
             long owner=jdbc.queryForObject("SELECT id FROM github_owner WHERE lower(login)=lower(?)",Long.class,job.repository().owner());
             var existing=repositories.findByGithubId(remote.id());
-            var stored=repositories.upsertKeepingTracking(new com.kholodilin.repogrowth.repository.domain.Repository(null,remote.id(),owner,remote.name(),remote.fullName(),remote.description(),remote.resolvedVisibility(),remote.defaultBranch(),remote.language(),remote.fork(),remote.archived(),remote.stargazersCount(),remote.watchers(),remote.forksCount(),remote.openIssuesCount(),existing.map(value->value.contributors()).orElse(0),false,remote.createdAt(),remote.updatedAt(),remote.pushedAt(),null,null,null,null,null));
+            // Keep the stored visibility until PublicationService.verify() accepts this observation.
+            // Writing remote visibility here would let a stale PUBLIC discovery reopen a newer PRIVATE verification.
+            String visibility=existing.map(value->value.visibility()).orElse(remote.resolvedVisibility());
+            var stored=repositories.upsertKeepingTracking(new com.kholodilin.repogrowth.repository.domain.Repository(null,remote.id(),owner,remote.name(),remote.fullName(),remote.description(),visibility,remote.defaultBranch(),remote.language(),remote.fork(),remote.archived(),remote.stargazersCount(),remote.watchers(),remote.forksCount(),remote.openIssuesCount(),existing.map(value->value.contributors()).orElse(0),false,remote.createdAt(),remote.updatedAt(),remote.pushedAt(),null,null,null,null,null));
             publication.metadata(stored.id(),remote,snapshot.observedAt());
             repositories.markAccountAccessible(stored.id());repositories.replaceTopics(stored.id(),remote.topicsOrEmpty());
         }

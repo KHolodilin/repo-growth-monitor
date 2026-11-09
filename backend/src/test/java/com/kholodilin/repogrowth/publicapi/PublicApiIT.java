@@ -42,6 +42,23 @@ class PublicApiIT extends AbstractPostgresTest {
      .andExpect(status().isOk())
      .andExpect(jsonPath("$.items[0].date").value(org.hamcrest.Matchers.matchesPattern("[0-9]{4}-[0-9]{2}-[0-9]{2}")));
   }
+  jdbc.update("INSERT INTO traffic_path_snapshot(repository_id,snapshot_date,snapshot_at,path,title,views,unique_visitors,service_path) VALUES (?,CURRENT_DATE-1,clock_timestamp(),'/safe','safe',1,1,false)",a);
+  mvc.perform(get("/api/v1/public/repositories/Alpha/one/path-history?period=7d&limit=1"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.items[0].date").value(org.hamcrest.Matchers.matchesPattern("[0-9]{4}-[0-9]{2}-[0-9]{2}")));
+  mvc.perform(get("/api/v1/public/search-queries/"+query+"/history?limit=1"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.items[0].date").value(org.hamcrest.Matchers.matchesPattern("[0-9]{4}-[0-9]{2}-[0-9]{2}")));
+ }
+ @Test void publicRepositoriesOmitTrackingAndOwnerOverviewOmitsStaleFlag() throws Exception {
+  mvc.perform(get("/api/v1/public/owners/Alpha/repositories?period=1d"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.items[0].trackingEnabled").doesNotExist());
+  jdbc.update("UPDATE repository SET enriched_at=clock_timestamp() WHERE id=?",a);
+  mvc.perform(get("/api/v1/public/owners/Alpha"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.freshness.stale").doesNotExist())
+    .andExpect(jsonPath("$.freshness.state").value("READY"));
  }
  @Test void paginationAndSafeHistoryDoNotExposeRunErrors()throws Exception{var history=mvc.perform(get("/api/v1/public/search-queries/"+query+"/history?limit=1")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1)).andReturn().getResponse().getContentAsString();assertThat(history).doesNotContain("DO NOT LEAK","error_message","locked_by","attempt");mvc.perform(get("/api/v1/public/owners/Alpha/repositories?limit=1")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1)).andExpect(jsonPath("$.nextCursor").value(Long.toString(a)));mvc.perform(get("/api/v1/public/owners/Alpha/repositories?limit=101")).andExpect(status().isBadRequest());mvc.perform(get("/api/v1/public/owners/Alpha/stats-history?period=all&limit=1")).andExpect(status().isOk()).andExpect(jsonPath("$.nextDate").isString());}
  @Test void trafficZeroMissingAndRestrictedPathsKeepSemantics()throws Exception{mvc.perform(get("/api/v1/public/owners/Alpha/traffic?period=1d")).andExpect(status().isOk()).andExpect(jsonPath("$.totals.views.value").value(300)).andExpect(jsonPath("$.totals.clones.value").value(0));jdbc.update("DELETE FROM traffic_daily WHERE repository_id=?",b);mvc.perform(get("/api/v1/public/owners/Alpha/traffic?period=1d")).andExpect(jsonPath("$.totals.views.value").isEmpty()).andExpect(jsonPath("$.totals.views.observedValue").value(100));jdbc.update("INSERT INTO traffic_path_snapshot(repository_id,snapshot_date,snapshot_at,path,title,views,unique_visitors,service_path) VALUES (?,CURRENT_DATE,clock_timestamp(),'/safe','safe',1,1,false),(?,CURRENT_DATE,clock_timestamp(),'/settings','secret',1,1,true)",a,a);mvc.perform(get("/api/v1/public/repositories/Alpha/one/paths?includeServicePaths=true")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(1));}
