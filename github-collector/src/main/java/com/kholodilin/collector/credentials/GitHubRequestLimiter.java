@@ -17,10 +17,14 @@ public final class GitHubRequestLimiter implements CredentialedGitHubRequest.Req
  private final CollectorCredentialProperties.Origin authority;
  private final LocalGitHubPacer pacer;
  private final RestClient client;
+ private final Duration requiredRequestTime;
  private final ThreadLocal<Active> active=new ThreadLocal<>();
  public GitHubRequestLimiter(String origin,JobRequest job,String resource,CollectorCredentialProperties properties,LocalGitHubPacer pacer) {
-  this.origin=origin;this.job=job;this.resource=resource;this.pacer=pacer;
-  if(!Set.of("core","search").contains(resource))throw new IllegalArgumentException("Unsupported GitHub resource");
+  this(origin,job,resource,properties,pacer,properties.connectTimeout().plus(properties.readTimeout()).plusSeconds(2));
+ }
+ public GitHubRequestLimiter(String origin,JobRequest job,String resource,CollectorCredentialProperties properties,LocalGitHubPacer pacer,Duration requiredRequestTime) {
+  this.requiredRequestTime=requiredRequestTime;this.origin=origin;this.job=job;this.resource=resource;this.pacer=pacer;
+  if(!Set.of("core","search","graphql").contains(resource))throw new IllegalArgumentException("Unsupported GitHub resource");
   authority=properties.origins().stream().filter(o->o.origin().equals(origin)).findFirst().orElseThrow(CredentialUnavailableException::new);
   var factory=new SimpleClientHttpRequestFactory(){
    @Override protected void prepareConnection(java.net.HttpURLConnection connection,String method) throws java.io.IOException {super.prepareConnection(connection,method);connection.setInstanceFollowRedirects(false);}
@@ -30,10 +34,10 @@ public final class GitHubRequestLimiter implements CredentialedGitHubRequest.Req
  @Override public CredentialedGitHubRequest.Permit acquire(CredentialedGitHubRequest.QuotaKey key) {
   if(!origin.equals(key.origin()) || job.authorization()==null || !job.authorization().credentialRef().equals(key.credentialRef()))throw new CredentialUnavailableException();
   if(active.get()!=null)throw new IllegalStateException("Nested GitHub permits are forbidden");
-  var local=pacer.tryAcquire(origin+":"+key.credentialRef(),resource).orElseThrow(()->new CredentialedGitHubRequest.Failure(429,Instant.now().plusSeconds(3)));
+  var local=pacer.tryAcquire(origin+":"+key.quotaIdentity(),resource).orElseThrow(()->new CredentialedGitHubRequest.Failure(429,Instant.now().plusSeconds(3)));
   try {
    Grant grant=post("acquire",Map.of("requestId",UUID.randomUUID(),"assignment",new CredentialRequest(1,job.jobId(),job.attemptId()),"resource",resource),Grant.class);
-   if(grant==null || grant.permitId()==null || grant.leasedUntil()==null || !grant.leasedUntil().isAfter(Instant.now()))throw new CredentialedGitHubRequest.Failure(429,grant==null?Instant.now().plusSeconds(30):grant.retryAt());
+   if(grant==null || grant.permitId()==null || grant.leasedUntil()==null || !grant.leasedUntil().isAfter(Instant.now().plus(requiredRequestTime)))throw new CredentialedGitHubRequest.Failure(429,grant==null?Instant.now().plusSeconds(30):grant.retryAt());
    Active permit=new Active(grant.permitId(),local);active.set(permit);return permit;
   } catch(RuntimeException error) {local.close();if(error instanceof CredentialedGitHubRequest.Failure failure)throw failure;throw new CredentialedGitHubRequest.Failure(503,Instant.now().plusSeconds(30));}
  }

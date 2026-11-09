@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-quota-identities
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE github_credential ADD COLUMN quota_identity VARCHAR(128) NOT NULL DEFAULT 'github:unclassified';
+              CREATE INDEX github_credential_quota_identity ON github_credential(quota_identity);
+              INSERT INTO github_budget(identity_key,resource,remaining,reset_at,next_request_at,cooldown_until)
+              SELECT 'github:unclassified',resource,greatest(0,(CASE WHEN resource='search' THEN 20 ELSE 3000 END)-sum(greatest(0,(CASE WHEN resource='search' THEN 20 ELSE 3000 END)-remaining))),max(reset_at),max(next_request_at),max(cooldown_until)
+              FROM github_budget WHERE identity_key<>'github:unclassified' GROUP BY resource
+              ON CONFLICT(identity_key,resource) DO UPDATE SET remaining=least(github_budget.remaining,excluded.remaining),reset_at=greatest(github_budget.reset_at,excluded.reset_at),next_request_at=greatest(github_budget.next_request_at,excluded.next_request_at),cooldown_until=greatest(github_budget.cooldown_until,excluded.cooldown_until);

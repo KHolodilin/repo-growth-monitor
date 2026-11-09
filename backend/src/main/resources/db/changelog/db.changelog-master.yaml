@@ -33,3 +33,7 @@ databaseChangeLog:
       file: db/changelog/016-github-credentials.yaml
   - include:
       file: db/changelog/017-shared-github-budget.yaml
+  - include:
+      file: db/changelog/018-graphql-budget.yaml
+  - include:
+      file: db/changelog/021-quota-identities.yaml

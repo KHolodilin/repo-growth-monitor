@@ -2,7 +2,7 @@ package com.kholodilin.collector.credentials;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 /** Execution primitive for #215. A real limiter gate must be supplied by #214; there is no bypass bean. */
 public final class CredentialedGitHubRequest {
-    public record QuotaKey(String origin,String credentialRef) { }
+    public record QuotaKey(String origin,String credentialRef,String quotaIdentity) {public QuotaKey(String origin,String credentialRef){this(origin,credentialRef,"github:unclassified");}}
     public interface Permit extends AutoCloseable {@Override void close();}
     @FunctionalInterface public interface RequestGate {Permit acquire(QuotaKey key);}
     @FunctionalInterface public interface Call<T> {T execute(String token);}
@@ -27,7 +27,7 @@ public final class CredentialedGitHubRequest {
         }
     }
     private <T> T invoke(String origin,CredentialLease lease,Call<T> call) {
-        try(Permit permit=gate.acquire(new QuotaKey(origin,lease.credentialRef()))) {return call.execute(lease.token());}
+        try(Permit permit=gate.acquire(new QuotaKey(origin,lease.credentialRef(),lease.quotaIdentity()))) {return call.execute(lease.token());}
         catch(Failure error) {throw error;}
         catch(RuntimeException error) {throw new Failure(0);}
     }

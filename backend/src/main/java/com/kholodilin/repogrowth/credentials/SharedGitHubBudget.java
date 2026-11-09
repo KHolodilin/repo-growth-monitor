@@ -21,6 +21,9 @@ public class SharedGitHubBudget {
     private final TransactionTemplate tx;
     private final CredentialVault vault;
     private final GitHubBudgetProperties properties;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private io.micrometer.core.instrument.MeterRegistry metrics;
+    private void decision(String resource,String decision){if(metrics!=null)metrics.counter("rgm.github.budget.decisions","resource",resource,"decision",decision).increment();}
     public SharedGitHubBudget(JdbcTemplate jdbc,PlatformTransactionManager tm,CredentialVault vault) {
         this(jdbc,tm,vault,new GitHubBudgetProperties(0,0,0,0,null));
     }
@@ -30,9 +33,9 @@ public class SharedGitHubBudget {
     }
     private static Timestamp ts(Instant time){return Timestamp.from(time);}
     public Grant acquire(String node,Acquisition request) {
-        if(request.requestId()==null || !Set.of("core","search").contains(request.resource())) throw new IllegalArgumentException("Invalid quota request");
+        if(request.requestId()==null || !Set.of("core","search","graphql").contains(request.resource())) throw new IllegalArgumentException("Invalid quota request");
         return tx.execute(status->{
-            String identity=vault.resolve(node,request.assignment()).credentialRef();
+            String identity=vault.resolve(node,request.assignment()).quotaIdentity();
             jdbc.queryForObject("SELECT pg_advisory_xact_lock(hashtextextended(?,0))",Object.class,identity);
             Instant now=jdbc.queryForObject("SELECT clock_timestamp()",Timestamp.class).toInstant();
             var previous=jdbc.queryForList("SELECT * FROM github_request_permit WHERE permit_id=?",request.requestId());
@@ -48,15 +51,15 @@ public class SharedGitHubBudget {
             if(!reset.isAfter(now)){remaining=ceiling;reset=now.plusSeconds(window);}
             Instant retry=((Timestamp)budget.get("next_request_at")).toInstant();
             if(budget.get("cooldown_until")!=null){Instant cooldown=((Timestamp)budget.get("cooldown_until")).toInstant();if(cooldown.isAfter(retry))retry=cooldown;}
-            var active=jdbc.queryForList("SELECT leased_until FROM github_request_permit WHERE identity_key=?",Timestamp.class,identity);
+            var active=jdbc.queryForList("SELECT max(leased_until) FROM github_request_permit WHERE (identity_key=? OR ?='github:unclassified') HAVING count(*)>0",Timestamp.class,identity,identity);
             if(!active.isEmpty() && active.getFirst().toInstant().isAfter(retry))retry=active.getFirst().toInstant();
             if(remaining<=(search?properties.searchReserve():properties.coreReserve()) && reset.isAfter(retry))retry=reset;
-            if(retry.isAfter(now))return new Grant(null,null,retry);
+            if(retry.isAfter(now)){decision(request.resource(),"wait");return new Grant(null,null,retry);}
             jdbc.update("DELETE FROM github_request_permit WHERE identity_key=? AND leased_until<=?",identity,ts(now));
             Instant until=now.plus(properties.permitLease());
             jdbc.update("UPDATE github_budget SET remaining=?,reset_at=?,next_request_at=?,updated_at=? WHERE identity_key=? AND resource=?",remaining-1,ts(reset),ts(now.plusMillis((window*1000+ceiling-1)/ceiling)),ts(now),identity,request.resource());
             jdbc.update("INSERT INTO github_request_permit(permit_id,identity_key,node_key,attempt_id,resource,generation,leased_until) VALUES (?,?,?,?,?,1,?)",request.requestId(),identity,node,request.assignment().attemptId(),request.resource(),ts(until));
-            return new Grant(request.requestId(),until,null);
+            decision(request.resource(),"grant");return new Grant(request.requestId(),until,null);
         });
     }
     public boolean report(String node,Report report) {

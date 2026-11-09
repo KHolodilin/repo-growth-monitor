@@ -6,7 +6,7 @@ public record GitHubBudgetProperties(long coreHourly,long searchPerMinute,long c
  public GitHubBudgetProperties {
   coreHourly=coreHourly==0?3000:coreHourly;searchPerMinute=searchPerMinute==0?20:searchPerMinute;
   coreReserve=coreReserve==0?10:coreReserve;searchReserve=searchReserve==0?1:searchReserve;
-  permitLease=permitLease==null?Duration.ofSeconds(30):permitLease;
+  permitLease=permitLease==null?Duration.ofSeconds(60):permitLease;
   if(coreHourly<=coreReserve || searchPerMinute<=searchReserve || coreReserve<0 || searchReserve<0 || permitLease.compareTo(Duration.ofSeconds(15))<0 || permitLease.compareTo(Duration.ofMinutes(2))>0)throw new IllegalArgumentException("Invalid GitHub budget policy");
  }
 }

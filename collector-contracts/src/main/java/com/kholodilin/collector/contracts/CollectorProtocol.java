@@ -121,8 +121,10 @@ public final class CollectorProtocol {
     }
     /** Never persist/log this value. Context/version keys isolate credential cache entries. */
     public record CredentialLease(int schemaVersion, String authorizationContext, String credentialRef,
-            String credentialVersion, String token, Instant expiresAt, Instant cacheValidUntil) {
+            String credentialVersion, String token, Instant expiresAt, Instant cacheValidUntil,String quotaIdentity) {
+        public CredentialLease(int schemaVersion,String authorizationContext,String credentialRef,String credentialVersion,String token,Instant expiresAt,Instant cacheValidUntil){this(schemaVersion,authorizationContext,credentialRef,credentialVersion,token,expiresAt,cacheValidUntil,"github:unclassified");}
         public CredentialLease {
+            quotaIdentity=quotaIdentity==null?"github:unclassified":quotaIdentity;
             version(schemaVersion); text(authorizationContext, "authorizationContext"); text(credentialRef, "credentialRef");
             text(credentialVersion, "credentialVersion"); text(token, "token"); Objects.requireNonNull(cacheValidUntil);
             if (expiresAt != null && cacheValidUntil.isAfter(expiresAt)) throw new IllegalArgumentException("cache lease exceeds token expiry");
