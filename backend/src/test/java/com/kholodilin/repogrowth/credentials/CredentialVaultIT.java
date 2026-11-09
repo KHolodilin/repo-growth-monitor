@@ -34,7 +34,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
     @Autowired MockMvc mvc;@Autowired JsonMapper json;@Autowired UserAccountService users;@Autowired MockUserCatalog catalog;
     long repositoryId;AuthorizationScope scope;
     @BeforeEach void setup() {
-        jdbc.execute("TRUNCATE collection_history_mapping,collector_snapshot_header,github_budget_receipt,github_request_permit,github_budget,github_credential_version,github_credential,repository_credential,collection_request_command,idempotency_records,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
+        jdbc.execute("TRUNCATE collector_node_health,collection_history_mapping,collector_snapshot_header,github_budget_receipt,github_request_permit,github_budget,github_credential_version,github_credential,repository_credential,collection_request_command,idempotency_records,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient);catalog.syncMissingUsers();
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
         repositoryId=jdbc.queryForObject("INSERT INTO repository(github_id,owner_id,name,full_name,visibility,tracking_enabled) VALUES (202,?,'repo-growth-monitor','KHolodilin/repo-growth-monitor','PUBLIC',true) RETURNING id",Long.class,owner);
@@ -172,6 +172,57 @@ class CredentialVaultIT extends AbstractPostgresTest {
         var job=typedTask(TaskType.STATS);var delivered=result(job,7);callback(delivered,NODE_A,204);callback(delivered,NODE_B,403);callback(delivered,"bad-token",401);
     }
 
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Autowired com.kholodilin.repogrowth.orchestration.OrchestrationProperties orchestration;
+    com.kholodilin.repogrowth.orchestration.CollectorNodeClient nodeClient;
+    com.kholodilin.repogrowth.orchestration.CollectorNodeMonitor monitor(){
+        nodeClient=org.mockito.Mockito.mock(com.kholodilin.repogrowth.orchestration.CollectorNodeClient.class);
+        org.mockito.Mockito.when(nodeClient.ready(org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        return new com.kholodilin.repogrowth.orchestration.CollectorNodeMonitor(jdbc,transactionManager,orchestration,
+            new com.kholodilin.repogrowth.orchestration.RecoveryProperties(true,Duration.ofMillis(100),Duration.ZERO,Duration.ofSeconds(1),2,100,3),nodeClient,recovery,ingestion);
+    }
+    void due(){jdbc.update("UPDATE collector_node_health SET next_check_at=clock_timestamp()-interval '1 second'");jdbc.update("UPDATE collection_attempt SET last_checked_at=NULL");}
+    @Test void lostCallbackIsRecoveredFromTerminalStatusWithoutRedispatch(){
+        var job=typedTask(TaskType.STATS);var delivered=result(job,31);var monitor=monitor();
+        org.mockito.Mockito.when(nodeClient.status("node-a","https://node-a.example",null,job.attemptId())).thenReturn(Optional.of(new JobStatus(1,delivered.collectorJobId(),job.jobId(),job.attemptId(),JobState.SUCCEEDED,Instant.now(),delivered.resultId(),null)));
+        org.mockito.Mockito.when(nodeClient.result("node-a","https://node-a.example",delivered.collectorJobId())).thenReturn(Optional.of(delivered));
+        monitor.tick();
+        assertThat(jdbc.queryForObject("SELECT stars FROM repository WHERE id=?",Integer.class,repositoryId)).isEqualTo(31);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM collection_attempt WHERE task_id=(SELECT id FROM collection_task WHERE public_id=?)",Long.class,job.jobId())).isEqualTo(1);
+        org.mockito.Mockito.verify(nodeClient).confirm("node-a","https://node-a.example",delivered.collectorJobId(),delivered.eventId());
+    }
+    @Test void partitionNeedsRepeatedFailuresAndRestoredMonitorFencesOldNode(){
+        var job=typedTask(TaskType.STATS);var before=budget.acquire("node-a",new SharedGitHubBudget.Acquisition(UUID.randomUUID(),credentialRequest(job),"core"));
+        budget.report("node-a",new SharedGitHubBudget.Report(before.permitId(),429,15L,null,Instant.now().plusSeconds(600)));
+        jdbc.update("UPDATE collection_attempt SET assigned_at=clock_timestamp()-interval '3 minutes'");var monitor=monitor();
+        org.mockito.Mockito.when(nodeClient.ready("node-a","https://node-a.example")).thenReturn(false);
+        monitor.tick();assertThat(jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job.jobId())).isEqualTo(job.attemptId());
+        due();monitor.tick();UUID moved=jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job.jobId());assertThat(moved).isNotEqualTo(job.attemptId());
+        assertThatThrownBy(()->vault.resolve("node-a",credentialRequest(job))).isInstanceOf(RuntimeException.class);
+        JobRequest next=json.readValue(jdbc.queryForObject("SELECT payload::text FROM collector_dispatch WHERE attempt_id=?",String.class,moved),JobRequest.class);
+        assertThat(vault.resolve("node-b",credentialRequest(next)).token()).isEqualTo("github-secret-v1");
+        var restartedBudget=new SharedGitHubBudget(jdbc,transactionManager,vault);assertThat(restartedBudget.acquire("node-b",new SharedGitHubBudget.Acquisition(UUID.randomUUID(),credentialRequest(next),"core")).permitId()).isNull();
+        assertThat(ingestion.apply("node-b",result(next,45)).outcome()).isEqualTo("APPLIED");assertThat(ingestion.apply("node-a",result(job,1)).outcome()).isEqualTo("IGNORED");
+        var restartedMonitor=monitor();due();restartedMonitor.tick();assertThat(jdbc.queryForObject("SELECT stars FROM repository WHERE id=?",Integer.class,repositoryId)).isEqualTo(45);
+    }
+    @Test void terminalButUnavailableResultDoesNotCauseAnotherCollection(){
+        var job=typedTask(TaskType.STATS);var monitor=monitor();UUID collector=UUID.randomUUID();
+        jdbc.update("UPDATE collection_attempt SET assigned_at=clock_timestamp()-interval '3 minutes'");
+        org.mockito.Mockito.when(nodeClient.status("node-a","https://node-a.example",null,job.attemptId())).thenReturn(Optional.of(new JobStatus(1,collector,job.jobId(),job.attemptId(),JobState.SUCCEEDED,Instant.now(),UUID.randomUUID(),null)));
+        org.mockito.Mockito.when(nodeClient.result("node-a","https://node-a.example",collector)).thenThrow(new IllegalStateException("network partition"));
+        monitor.tick();due();org.mockito.Mockito.when(nodeClient.ready("node-a","https://node-a.example")).thenReturn(false);monitor.tick();due();monitor.tick();
+        assertThat(jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job.jobId())).isEqualTo(job.attemptId());
+        assertThat(jdbc.queryForObject("SELECT last_collector_state FROM collection_attempt WHERE public_id=?",String.class,job.attemptId())).isEqualTo("RESULT_UNAVAILABLE");
+    }
+    @Test void concurrentCallbackAndFailoverHaveOneWinningAssignment()throws Exception{
+        var job=typedTask(TaskType.STATS);jdbc.update("UPDATE collection_attempt SET assigned_at=clock_timestamp()-interval '3 minutes'");
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){
+            var callback=pool.submit(()->ingestion.apply("node-a",result(job,17)));var reassignment=pool.submit(()->recovery.reassign(job.jobId(),job.attemptId(),"node-b"));
+            var applied=callback.get();var moved=reassignment.get();
+            if(moved.changed()){assertThat(applied.outcome()).isEqualTo("IGNORED");assertThat(jdbc.queryForObject("SELECT stars FROM repository WHERE id=?",Integer.class,repositoryId)).isZero();}
+            else{assertThat(applied.outcome()).isEqualTo("APPLIED");assertThat(jdbc.queryForObject("SELECT stars FROM repository WHERE id=?",Integer.class,repositoryId)).isEqualTo(17);}
+        }
+    }
     @Test void credentialAliasesShareOnePrincipalBudget(){
         var job=task();vault.rotate("github-main","github-secret-v2",null,"github:user:101");var grant=budget.acquire("node-a",new SharedGitHubBudget.Acquisition(UUID.randomUUID(),credentialRequest(job),"core"));
         budget.report("node-a",new SharedGitHubBudget.Report(grant.permitId(),429,0L,null,Instant.now().plusSeconds(600)));

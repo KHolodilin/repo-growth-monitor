@@ -110,7 +110,7 @@ erDiagram
 - `collector_result_receipt`: BIGSERIAL, unique event/result/attempt UUIDs, task/node/hash/outcome/received time.
   Task history index. This is the ingestion reservation for #216, not a second acceptance idempotency store.
 
-Creation locks the repository row, checks business uniqueness, resolves a configured node and commits
+Creation serializes the repository with a transaction advisory lock, checks business uniqueness, resolves a configured node and commits
 request + tasks + initial attempts + dispatch outbox together. UUID IDs are returned only after commit.
 Network dispatch claims a row with short FOR UPDATE SKIP LOCKED, commits, and then sends outside all
 database transactions. Reclaimed expired leases increment generation; stale owners cannot acknowledge/retry.
@@ -125,9 +125,8 @@ Transport failures, 408, 429 and 5xx retry with bounded exponential delay (max f
 rejections, invalid acceptance and untrusted/disabled configuration become BLOCKED for operator recovery.
 No response bodies, exception text or credentials are persisted as errors. Lease exceeds HTTP timeouts.
 Past-deadline pending work expires without a network call; current pending tasks/attempts fail and the
-request closes when no pending tasks remain. ACKED execution recovery, blocked-assignment recovery and
-cross-node failover belong to #217. Reassignment must create a new attempt and fence current_attempt_id.
-Actual callback authentication, data application, receipt insertion and request completion arrive in #216.
+request closes when no pending tasks remain. ACKED execution reconciliation and cross-node failover are described in [collector-recovery.md](collector-recovery.md).
+Callback authentication, application and receipt completion are implemented in [collector-execution.md](collector-execution.md).
 
 ## Targeted verification
 

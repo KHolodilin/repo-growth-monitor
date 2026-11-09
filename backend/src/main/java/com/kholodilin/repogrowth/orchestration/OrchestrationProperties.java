@@ -12,7 +12,7 @@ public record OrchestrationProperties(boolean enabled, String defaultPool, Strin
     public OrchestrationProperties {
         defaultPool=defaultPool==null?"default":defaultPool;
         destinationRef=destinationRef==null?"rgm-results":destinationRef;
-        jobTimeout=positive(jobTimeout,Duration.ofMinutes(30));
+        jobTimeout=positive(jobTimeout,Duration.ofHours(2));
         dispatchLease=positive(dispatchLease,Duration.ofSeconds(30));
         retryDelay=positive(retryDelay,Duration.ofSeconds(5));
         connectTimeout=positive(connectTimeout,Duration.ofSeconds(3));

@@ -27,6 +27,7 @@ public class AssignmentRecovery {
  }
  public Reassigned reassign(UUID jobId,UUID expectedAttempt,String targetNode) {
   return tx.execute(status->{
+   jdbc.queryForList("SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR UPDATE OF r",Long.class,jobId);
    var tasks=jdbc.queryForList("SELECT t.* FROM collection_task t JOIN collection_request r ON r.id=t.request_id WHERE t.public_id=? AND r.state='ACTIVE' FOR UPDATE OF t",jobId);
    if(tasks.isEmpty())return new Reassigned(false,jobId,expectedAttempt,"NOT_ACTIVE");var task=tasks.getFirst();
    if(!expectedAttempt.equals(task.get("current_attempt_id")))return new Reassigned(false,jobId,(UUID)task.get("current_attempt_id"),"NOT_CURRENT");
@@ -35,7 +36,13 @@ public class AssignmentRecovery {
    if(!Set.of("ASSIGNED","ACCEPTED","RUNNING").contains(prior.get("state")))return new Reassigned(false,jobId,expectedAttempt,"NOT_ACTIVE");
    Instant now=jdbc.queryForObject("SELECT clock_timestamp()",Timestamp.class).toInstant();
    if(((Timestamp)prior.get("assigned_at")).toInstant().plus(minimumAge).isAfter(now))return new Reassigned(false,jobId,expectedAttempt,"TOO_RECENT");
-   int number=((Number)prior.get("attempt_no")).intValue();if(number>=maximumAttempts)return new Reassigned(false,jobId,expectedAttempt,"ATTEMPT_LIMIT");
+   int number=((Number)prior.get("attempt_no")).intValue();if(number>=maximumAttempts){
+    jdbc.update("UPDATE collection_attempt SET state='FAILED',completed_at=clock_timestamp() WHERE public_id=?",expectedAttempt);
+    jdbc.update("UPDATE collection_task SET state='FAILED',completed_at=clock_timestamp() WHERE id=?",task.get("id"));
+    jdbc.update("UPDATE collector_dispatch SET state='BLOCKED',last_error='ATTEMPT_LIMIT',locked_by=NULL,locked_until=NULL WHERE attempt_id=?",expectedAttempt);
+    jdbc.update("UPDATE collection_request r SET state='FAILED',completed_at=clock_timestamp() WHERE r.id=? AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))",task.get("request_id"));
+    return new Reassigned(false,jobId,expectedAttempt,"ATTEMPT_LIMIT");
+   }
    var target=properties.nodes().stream().filter(n->n.enabled() && n.key().equals(targetNode) && n.pool().equals(prior.get("pool")) && !n.key().equals(prior.get("node_key"))).findFirst().orElseThrow(()->new IllegalArgumentException("Reassignment requires another configured node in the same pool"));
    Long nodeId=jdbc.queryForObject("INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true RETURNING id",Long.class,target.key(),target.pool(),OrchestrationProperties.endpoint(target));
    JobRequest original=json.readValue(prior.get("payload").toString(),JobRequest.class);UUID next=UUID.randomUUID();

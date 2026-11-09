@@ -33,6 +33,8 @@ public class CollectionRequestService {
     private record Spec(TaskType type,String key,Parameters parameters) { }
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.kholodilin.repogrowth.credentials.CredentialVault credentialVault;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private CollectorNodeMonitor nodeMonitor;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
     private final OrchestrationProperties properties;
@@ -93,7 +95,7 @@ public class CollectionRequestService {
             String owner=(String)repository.get("owner_login"), githubId=repository.get("github_id").toString();
             AuthorizationScope authorization=credentialVault==null?null:credentialVault.scope(repositoryId);
             String pool=properties.poolFor(owner,githubId);
-            var candidates=properties.nodes().stream().filter(n->n.enabled() && n.pool().equals(pool)).sorted(Comparator.comparing(OrchestrationProperties.Node::key)).toList();
+            var candidates=properties.nodes().stream().filter(n->n.enabled() && n.pool().equals(pool) && (nodeMonitor==null || nodeMonitor.eligible(n.key()))).sorted(Comparator.comparing(OrchestrationProperties.Node::key)).toList();
             if(candidates.isEmpty()) throw new ApiException(ErrorCode.INTERNAL_ERROR,HttpStatus.SERVICE_UNAVAILABLE,"No collector is configured for the repository pool");
             // Stable spread within a pool. Repeated sends use the persisted assignment, never re-route.
             var node=candidates.get(Math.floorMod(githubId.hashCode(),candidates.size()));

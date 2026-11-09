@@ -100,15 +100,15 @@ Defaults, all configurable by YAML/relaxed environment binding:
 | rgm.credentials.cache-lease | 2h maximum issued lease |
 
 Expiry is min(local TTL, issued lease, actual token expiry, original job deadline). Reads do not extend it.
-The default 30-minute orchestration job timeout can therefore cap an issued lease below the configured two
+The default two-hour orchestration job timeout can therefore cap an issued lease below the configured two
 hours. Failed resolution has a short shared negative-cache window and never serves an expired cached secret.
 Per-entry expiry uses a monotonic Caffeine ticker plus wall-clock lease validation; tests inject both clocks.
 No expire-after-access extension is used.
 
 On GitHub 401, CredentialedGitHubRequest quarantines that exact rejected origin/context/ref/version,
 single-flight resolves current credentials and retries the request **at most once**. Every request, including
-the retry, must obtain a RequestGate permit. No bypass gate bean is supplied; #214 implements the shared
-limiter and #215 supplies this pipeline to actual collectors. QuotaKey uses origin/ref so token rotation does
+the retry, must obtain a RequestGate permit. No bypass gate bean is supplied; #214 supplies the shared
+limiter and #215 connects it to actual collection HTTP. QuotaKey uses origin/principal quota identity so token rotation does
 not create a fresh quota budget. GitHub 403/429 do not invalidate or resolve credentials. Other exceptions
 are sanitized before leaving the request primitive.
 
@@ -125,11 +125,11 @@ RGM-origin acceptance bearer credential. It evicts that origin's mapping/secrets
 other origins/contexts are unaffected. A fresh repository binding/context is required for future work.
 This is explicit per-node service invalidation; no automatic cross-VPS fanout or message broker is introduced.
 
-RGM revocation/reassignment denies new resolve requests immediately. Already issued local leases remain
-usable until their cap unless that Collector receives explicit invalidation or GitHub rejects/revokes the token.
+RGM revocation/reassignment denies new resolve requests immediately. Already issued local secrets remain
+in memory until their cap unless invalidated. Every new GitHub request still requires an RGM permit,
+which immediately denies superseded/revoked authorization even when the secret remains cached.
 For immediate removal, revoke the token at GitHub and/or invalidate the context on every affected Collector;
-an in-flight request cannot be recalled. Lease expiry is the bound for an unreachable node. Automatic recovery,
-reconciliation/fanout and assignment fencing remain #217. Never assume that a database revocation instantly
+an in-flight request cannot be recalled. Lease expiry is the bound for an unreachable node. Automatic monitoring/reconciliation and assignment fencing are described in [collector-recovery.md](collector-recovery.md). Never assume that a database revocation instantly
 clears memory on another VPS.
 
 ## Targeted validation

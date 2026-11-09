@@ -74,7 +74,7 @@ class OrchestrationIT extends AbstractPostgresTest {
     LocalDate day=LocalDate.of(2026,11,8);
     @BeforeEach void seed() {
         server.resetAll();
-        jdbc.execute("TRUNCATE idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
+        jdbc.execute("TRUNCATE collection_history_mapping,collector_snapshot_header,idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient);
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
         repositoryId=jdbc.queryForObject("INSERT INTO repository(github_id,owner_id,name,full_name,visibility,tracking_enabled,language) VALUES (202,?,'repo-growth-monitor','KHolodilin/repo-growth-monitor','PUBLIC',true,'Java') RETURNING id",Long.class,owner);
@@ -243,5 +243,20 @@ class OrchestrationIT extends AbstractPostgresTest {
     RequestPostProcessor asUser(String sub) {
         AppUser user=users.findByIssuerAndSub(MockUserCatalog.ISSUER,sub).orElseThrow();
         return authentication(UsernamePasswordAuthenticationToken.authenticated(new AppUserPrincipal(user.id(),user.displayName()),null,SecurityAuthorities.from(user)));
+    }
+
+    @Test void nodeStatusClientUsesConfiguredAuthenticationAndNeverFollowsRedirects(){
+        var client=new CollectorNodeClient(context.getBean(OrchestrationProperties.class),json);
+        server.stubFor(get(urlEqualTo("/internal/v1/status")).willReturn(okJson("{\"schemaVersion\":1,\"accepting\":true,\"executionEnabled\":true}")));
+        assertThat(client.ready("node-a",server.baseUrl())).isTrue();server.verify(getRequestedFor(urlEqualTo("/internal/v1/status")).withHeader("Authorization",equalTo("Bearer service-test-secret")));
+        server.stubFor(get(urlEqualTo("/internal/v1/status")).willReturn(aResponse().withStatus(307).withHeader("Location",server.baseUrl()+"/leak")));
+        assertThatThrownBy(()->client.ready("node-a",server.baseUrl())).hasMessageContaining("unavailable");server.verify(0,anyRequestedFor(urlEqualTo("/leak")));
+        assertThatThrownBy(()->client.ready("node-a",server.baseUrl()+"/other")).isInstanceOf(IllegalStateException.class);
+    }
+    @Test void reassignmentLimitTerminatesTaskInsteadOfLoopingForever(){
+        var created=service.manual(repositoryId,day);UUID job=created.taskIds().getFirst();UUID original=jdbc.queryForObject("SELECT current_attempt_id FROM collection_task WHERE public_id=?",UUID.class,job);
+        jdbc.update("UPDATE collection_attempt SET assigned_at=clock_timestamp()-interval '3 minutes',attempt_no=3 WHERE public_id=?",original);
+        assertThat(recovery.reassign(job,original,"node-b").reason()).isEqualTo("ATTEMPT_LIMIT");assertThat(jdbc.queryForObject("SELECT state FROM collection_task WHERE public_id=?",String.class,job)).isEqualTo("FAILED");
+        assertThat(jdbc.queryForObject("SELECT last_error FROM collector_dispatch WHERE attempt_id=?",String.class,original)).isEqualTo("ATTEMPT_LIMIT");
     }
 }
