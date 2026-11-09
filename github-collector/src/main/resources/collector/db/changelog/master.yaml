@@ -6,3 +6,17 @@ databaseChangeLog:
         - sqlFile:
             path: initial.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: collector-002-execution
+      author: rgm
+      changes:
+        - sqlFile:
+            path: execution.sql
+            relativeToChangelogFile: true
+  - changeSet:
+      id: collector-003-delivery
+      author: rgm
+      changes:
+        - sqlFile:
+            path: delivery.sql
+            relativeToChangelogFile: true

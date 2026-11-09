@@ -8,5 +8,5 @@ import org.springframework.context.annotation.Import;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = "rgm.collector.enabled", havingValue = "true", matchIfMissing = true)
-@Import({CollectorModuleConfiguration.class, CollectorStorageConfiguration.class, com.kholodilin.collector.acceptance.CollectorHttpConfiguration.class, com.kholodilin.collector.credentials.CollectorCredentialConfiguration.class})
+@Import({CollectorModuleConfiguration.class, CollectorStorageConfiguration.class, com.kholodilin.collector.acceptance.CollectorHttpConfiguration.class, com.kholodilin.collector.credentials.CollectorCredentialConfiguration.class, com.kholodilin.collector.execution.CollectorExecutionConfiguration.class, com.kholodilin.collector.delivery.CollectorDeliveryConfiguration.class})
 public class CollectorRuntimeConfiguration { }

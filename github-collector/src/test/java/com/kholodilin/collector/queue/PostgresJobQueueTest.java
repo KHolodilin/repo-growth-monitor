@@ -180,4 +180,64 @@ class PostgresJobQueueTest {
                 assertThat(new JdbcTemplate(rgm).queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_name='collector_job'",Long.class)).isZero();
             });
     }
+
+    @Test void lostCallbackAckRetriesIdenticalResultWithoutCollectingAgain()throws Exception{
+        var received=new java.util.ArrayList<String>();var calls=new java.util.concurrent.atomic.AtomicInteger();
+        var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        server.createContext("/callback",exchange->{
+            assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer callback-service-secret-0123456789012345");
+            received.add(new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8));exchange.sendResponseHeaders(calls.incrementAndGet()==1?503:204,-1);exchange.close();
+        });server.start();
+        try{
+            var endpoint=java.net.URI.create("http://127.0.0.1:"+server.getAddress().getPort());
+            var credentials=new com.kholodilin.collector.credentials.CollectorCredentialProperties(true,null,0,0,null,null,null,true,List.of(new com.kholodilin.collector.credentials.CollectorCredentialProperties.Origin("rgm",endpoint,"callback-service-secret-0123456789012345")));
+            var properties=new com.kholodilin.collector.delivery.DeliveryProperties(true,null,Duration.ofMillis(1),null,3,true,List.of(new com.kholodilin.collector.delivery.DeliveryProperties.Destination("rgm-results","rgm",endpoint.resolve("/callback"))));
+            var sender=new com.kholodilin.collector.delivery.ResultDeliveryWorker(queue,properties,credentials);
+            var lease=acceptClaim();UUID event=UUID.randomUUID();String result="{\"eventId\":\""+event+"\",\"data\":42}";assertThat(queue.complete(lease,"SUCCEEDED",UUID.randomUUID(),event,result)).isTrue();
+            assertThat(sender.poll("sender-a")).isTrue();assertThat(jdbc.queryForObject("SELECT state FROM collector_delivery",String.class)).isEqualTo("RETRY");
+            jdbc.update("UPDATE collector_delivery SET next_attempt_at=clock_timestamp()-interval '1 second'");
+            // Reconstruct sender/queue objects, retaining only database state after a process restart.
+            var restarted=new PostgresJobQueue(jdbc,new TransactionTemplate(new DataSourceTransactionManager(ds)),partitions);
+            assertThat(new com.kholodilin.collector.delivery.ResultDeliveryWorker(restarted,properties,credentials).poll("sender-b")).isTrue();
+            assertThat(received).hasSize(2);assertThat(received.get(0)).isEqualTo(received.get(1));assertThat(toJson(received.getFirst()).path("eventId").asText()).isEqualTo(event.toString());
+            assertThat(queue.claim("collector",minute)).isEmpty();assertThat(jdbc.queryForObject("SELECT count(*) FROM collector_job",Long.class)).isZero();
+            assertThat(queue.result(lease.publicId(),"rgm")).isPresent();assertThat(queue.result(lease.publicId(),"another-origin")).isEmpty();
+            assertThat(queue.status(lease.publicId(),"rgm").orElseThrow().status().name()).isEqualTo("SUCCEEDED");
+        }finally{server.stop(0);}
+    }
+    @Test void deadDeliveryCanBeRecoveredByRecipientAndOldSenderIsFenced(){
+        var s=submission();queue.accept(s);var lease=queue.claim("a",minute).orElseThrow();UUID event=UUID.randomUUID();queue.complete(lease,"SUCCEEDED",UUID.randomUUID(),event,"{}");
+        var sender=queue.claimDelivery("sender-a",minute).orElseThrow();assertThat(queue.deadLetter(sender,"REJECTED")).isTrue();
+        assertThat(queue.diagnostics("rgm")).containsEntry("deadDeliveries",1L);assertThat(queue.requeueDelivery(lease.publicId(),"other")).isFalse();
+        assertThat(queue.requeueDelivery(lease.publicId(),"rgm")).isTrue();var newer=queue.claimDelivery("sender-b",minute).orElseThrow();assertThat(queue.acknowledge(sender)).isFalse();
+        assertThat(queue.confirmDelivery(lease.publicId(),"rgm",UUID.randomUUID())).isFalse();assertThat(queue.confirmDelivery(lease.publicId(),"rgm",event)).isTrue();assertThat(queue.retryDelivery(newer,Instant.now())).isFalse();
+        assertThat(queue.archive(lease.id(),lease.generation())).isTrue();assertThat(queue.statusByAttempt(s.attemptId(),"rgm")).isPresent();
+    }
+    @Test void hundredRepositoriesStayFairAcrossTaskTypesAndQuotaWaits(){
+        long start=System.nanoTime();for(int project=0;project<100;project++)for(String type:List.of("STATS","TRAFFIC","REFERRERS","POPULAR_PATHS","GROWTH_EVENTS","SEARCH_QUERY","TOPIC_WATCH","TOPIC_WATCH")){
+            var base=submission();queue.accept(new Submission("rgm",base.jobId(),base.attemptId(),"{\"type\":\""+type+"\",\"project\":"+project+"}",base.destination(),base.deadline()));
+        }
+        assertThat(queue.diagnostics("rgm")).containsEntry("pending",800L);Set<String> types=new HashSet<>();
+        for(int n=0;n<8;n++){var lease=queue.claim("load",minute).orElseThrow();types.add(toJson(lease.payload()).path("type").asText());queue.retry(lease,Instant.now().plusSeconds(600),false);}
+        assertThat(types).contains("SEARCH_QUERY","TOPIC_WATCH","STATS");var next=queue.claim("load",minute).orElseThrow();assertThat(toJson(next.payload()).path("project").asInt()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT sum(failure_count) FROM collector_job",Long.class)).isZero();
+        System.out.printf("WORKLOAD 100 repositories / 800 jobs: insert=%dms, oldestQueueAgeSeconds=%s, JDBC connections per claim=1%n",(System.nanoTime()-start)/1_000_000,queue.diagnostics("rgm").get("oldestQueueAgeSeconds"));
+    }
+    private tools.jackson.databind.JsonNode toJson(String value){return tools.jackson.databind.json.JsonMapper.builder().build().readTree(value);}
+
+    @Test void failoverQueuesUseIndependentDatabasesAndKeepOneStableExternalJob()throws Exception{
+        jdbc.execute("CREATE DATABASE collector_b");
+        try{
+            String url="jdbc:postgresql://"+pg.getHost()+":"+pg.getMappedPort(5432)+"/collector_b";
+            var bds=new DriverManagerDataSource(url,pg.getUsername(),pg.getPassword());var bj=new JdbcTemplate(bds);var migration=new SpringLiquibase();migration.setDataSource(bds);migration.setChangeLog("classpath:collector/db/changelog/master.yaml");migration.afterPropertiesSet();
+            var bp=new HistoryPartitions(bj);bp.ensureCurrentAndNext();var b=new PostgresJobQueue(bj,new TransactionTemplate(new DataSourceTransactionManager(bds)),bp);
+            var a=submission();var original=queue.accept(a);var old=queue.claim("node-a",minute).orElseThrow();
+            var replacement=new Submission(a.origin(),a.jobId(),UUID.randomUUID(),a.payload(),a.destination(),a.deadline());var accepted=b.accept(replacement);var current=b.claim("node-b",minute).orElseThrow();
+            assertThat(accepted.publicId()).isNotEqualTo(original.publicId());assertThat(b.statusByAttempt(a.attemptId(),"rgm")).isEmpty();assertThat(queue.statusByAttempt(replacement.attemptId(),"rgm")).isEmpty();
+            assertThat(b.complete(current,"SUCCEEDED",UUID.randomUUID(),UUID.randomUUID(),"{\"node\":\"b\"}")).isTrue();
+            jdbc.update("UPDATE collector_job SET locked_until=clock_timestamp()-interval '1 second'");assertThat(queue.complete(old,"SUCCEEDED",UUID.randomUUID(),UUID.randomUUID(),"{}")).isFalse();
+            assertThat(b.statusByAttempt(replacement.attemptId(),"rgm").orElseThrow().jobId()).isEqualTo(a.jobId());
+            assertThat(bj.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_name='repository'",Long.class)).isZero();
+        }finally{jdbc.execute("DROP DATABASE collector_b WITH (FORCE)");}
+    }
 }

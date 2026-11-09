@@ -56,7 +56,7 @@ public final class PostgresJobQueue implements JobQueue {
             jdbc.update("UPDATE collector_job SET state='RUNNING',execution_no=execution_no+1,generation=generation+1,locked_by=?,locked_until=clock_timestamp()+(? * interval '1 millisecond'),updated_at=clock_timestamp() WHERE id=?",worker,ms,id);
             jdbc.update("UPDATE collector_job_identity SET state='RUNNING' WHERE id=?",id);
             jdbc.update("INSERT INTO collector_execution(job_id,execution_no,generation,worker_id,state) SELECT id,execution_no,generation,locked_by,'RUNNING' FROM collector_job WHERE id=?",id);
-            return Optional.of(jdbc.queryForObject("SELECT j.*,i.origin_id FROM collector_job j JOIN collector_job_identity i ON i.id=j.id WHERE j.id=?",(r,n)->new Lease(id,worker,r.getLong("generation"),r.getString("payload"),r.getTimestamp("deadline_at").toInstant(),r.getString("origin_id")),id));
+            return Optional.of(jdbc.queryForObject("SELECT j.*,i.origin_id,i.public_id AS collector_public_id FROM collector_job j JOIN collector_job_identity i ON i.id=j.id WHERE j.id=?",(r,n)->new Lease(id,worker,r.getLong("generation"),r.getString("payload"),r.getTimestamp("deadline_at").toInstant(),r.getString("origin_id"),r.getObject("collector_public_id",UUID.class),r.getInt("failure_count")),id));
         });
     }
     private boolean lock(Lease lease) {
@@ -66,11 +66,12 @@ public final class PostgresJobQueue implements JobQueue {
         long ms=millis(duration);
         return jdbc.update("UPDATE collector_job SET locked_until=clock_timestamp()+(? * interval '1 millisecond'),updated_at=clock_timestamp() WHERE id=? AND state='RUNNING' AND locked_by=? AND generation=? AND locked_until>clock_timestamp()",ms,lease.id(),lease.owner(),lease.generation())==1;
     }
-    @Override public boolean retry(Lease lease,Instant next) {
+    @Override public boolean retry(Lease lease,Instant next) {return retry(lease,next,true);}
+    @Override public boolean retry(Lease lease,Instant next,boolean countFailure) {
         return Boolean.TRUE.equals(tx.execute(status -> {
             if(!lock(lease)) return false;
             jdbc.update("UPDATE collector_execution SET state='RETRY',finished_at=clock_timestamp() WHERE job_id=? AND generation=?",lease.id(),lease.generation());
-            jdbc.update("UPDATE collector_job SET state='RETRY',locked_by=NULL,locked_until=NULL,next_attempt_at=?,updated_at=clock_timestamp() WHERE id=?",ts(next),lease.id());
+            jdbc.update("UPDATE collector_job SET state='RETRY',locked_by=NULL,locked_until=NULL,next_attempt_at=?,failure_count=failure_count+?,updated_at=clock_timestamp() WHERE id=?",ts(next),countFailure?1:0,lease.id());
             jdbc.update("UPDATE collector_job_identity SET state='RETRY' WHERE id=?",lease.id()); return true;
         }));
     }
@@ -91,7 +92,7 @@ public final class PostgresJobQueue implements JobQueue {
             var ids=jdbc.queryForList("SELECT id FROM collector_delivery WHERE (state IN ('READY','RETRY') AND next_attempt_at<=clock_timestamp()) OR (state='SENDING' AND locked_until<=clock_timestamp()) ORDER BY next_attempt_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",Long.class);
             if(ids.isEmpty()) return Optional.empty(); long id=ids.getFirst();
             jdbc.update("UPDATE collector_delivery SET state='SENDING',generation=generation+1,locked_by=?,locked_until=clock_timestamp()+(? * interval '1 millisecond') WHERE id=?",worker,ms,id);
-            return Optional.of(jdbc.queryForObject("SELECT d.*,r.payload FROM collector_delivery d JOIN collector_result r ON r.id=d.result_id WHERE d.id=?",(r,n)->new Delivery(id,worker,r.getLong("generation"),r.getString("destination_ref"),r.getString("payload")),id));
+            return Optional.of(jdbc.queryForObject("SELECT d.*,r.payload,r.job_id,i.origin_id,j.generation AS job_generation FROM collector_delivery d JOIN collector_result r ON r.id=d.result_id JOIN collector_job_identity i ON i.id=r.job_id JOIN collector_job j ON j.id=r.job_id WHERE d.id=?",(r,n)->new Delivery(id,worker,r.getLong("generation"),r.getString("destination_ref"),r.getString("payload"),r.getString("origin_id"),r.getLong("job_id"),r.getLong("job_generation")),id));
         });
     }
     @Override public boolean acknowledge(Delivery d) {
@@ -99,6 +100,41 @@ public final class PostgresJobQueue implements JobQueue {
     }
     @Override public boolean retryDelivery(Delivery d,Instant next) {
         return jdbc.update("UPDATE collector_delivery SET state='RETRY',next_attempt_at=?,locked_by=NULL,locked_until=NULL WHERE id=? AND state='SENDING' AND locked_by=? AND generation=? AND locked_until>clock_timestamp()",ts(next),d.id(),d.owner(),d.generation())==1;
+    }
+    @Override public boolean deadLetter(Delivery delivery,String code) {
+        if(!java.util.Set.of("DESTINATION_UNAVAILABLE","REJECTED","RETRY_EXHAUSTED").contains(code))throw new IllegalArgumentException("Invalid delivery error");
+        return jdbc.update("UPDATE collector_delivery SET state='DEAD',locked_by=NULL,locked_until=NULL,dead_letter_at=clock_timestamp(),error_code=? WHERE id=? AND state='SENDING' AND locked_by=? AND generation=? AND locked_until>clock_timestamp()",code,delivery.id(),delivery.owner(),delivery.generation())==1;
+    }
+    @Override public Optional<com.kholodilin.collector.contracts.CollectorProtocol.JobStatus> statusByAttempt(UUID attempt,String origin){var ids=jdbc.queryForList("SELECT public_id FROM collector_job_identity WHERE external_attempt_id=? AND origin_id=?",UUID.class,attempt,origin);return ids.isEmpty()?Optional.empty():status(ids.getFirst(),origin);}
+    @Override public java.util.Map<String,Object> diagnostics(String origin){
+        java.util.Map<String,Object> values=new java.util.LinkedHashMap<>();
+        values.put("pending",jdbc.queryForObject("SELECT count(*) FROM collector_job j JOIN collector_job_identity i ON i.id=j.id WHERE i.origin_id=? AND j.state IN ('READY','RETRY','RUNNING')",Long.class,origin));
+        values.put("oldestQueueAgeSeconds",jdbc.queryForObject("SELECT coalesce(extract(epoch FROM clock_timestamp()-min(i.accepted_at)),0)::bigint FROM collector_job j JOIN collector_job_identity i ON i.id=j.id WHERE i.origin_id=? AND j.state IN ('READY','RETRY','RUNNING')",Long.class,origin));
+        values.put("deadDeliveries",jdbc.queryForObject("SELECT count(*) FROM collector_delivery d JOIN collector_result r ON r.id=d.result_id JOIN collector_job_identity i ON i.id=r.job_id WHERE i.origin_id=? AND d.state='DEAD'",Long.class,origin));return values;
+    }
+    @Override public Optional<com.kholodilin.collector.contracts.CollectorProtocol.JobStatus> status(UUID id,String origin) {
+        return tx.execute(state->{
+            var rows=jdbc.queryForList("SELECT * FROM collector_job_identity WHERE public_id=? AND origin_id=? FOR SHARE",id,origin);
+            if(rows.isEmpty())return Optional.empty();var identity=rows.getFirst();
+            String storedState=(String)identity.get("state");var status=com.kholodilin.collector.contracts.CollectorProtocol.JobState.valueOf(storedState.equals("READY")?"ACCEPTED":storedState);
+            UUID resultId=null;java.time.Instant updated=((Timestamp)identity.get("accepted_at")).toInstant();var stored=find(id);
+            if(stored.isPresent() && stored.get().snapshot()!=null){var tree=toTree(stored.get().snapshot());var publicResult=tree.path("result").path("public_id");if(!publicResult.isMissingNode() && !publicResult.isNull())resultId=UUID.fromString(publicResult.asText());var time=tree.path("job").path("updated_at");if(time.isTextual())updated=java.time.OffsetDateTime.parse(time.asText()).toInstant();}
+            return Optional.of(new com.kholodilin.collector.contracts.CollectorProtocol.JobStatus(1,id,(UUID)identity.get("external_job_id"),(UUID)identity.get("external_attempt_id"),status,updated,resultId,null));
+        });
+    }
+    private tools.jackson.databind.JsonNode toTree(String value){return tools.jackson.databind.json.JsonMapper.builder().build().readTree(value);}
+    @Override public Optional<String> result(UUID id,String origin) {
+        return tx.execute(state->{
+            if(jdbc.queryForList("SELECT id FROM collector_job_identity WHERE public_id=? AND origin_id=? FOR SHARE",Long.class,id,origin).isEmpty())return Optional.empty();
+            var stored=find(id);if(stored.isEmpty() || stored.get().snapshot()==null)return Optional.empty();var result=toTree(stored.get().snapshot()).path("result").path("payload");
+            return result.isMissingNode() || result.isNull()?Optional.empty():Optional.of(result.toString());
+        });
+    }
+    @Override public boolean confirmDelivery(UUID id,String origin,UUID eventId) {
+        return jdbc.update("UPDATE collector_delivery d SET state='DELIVERED',locked_by=NULL,locked_until=NULL,delivered_at=clock_timestamp() FROM collector_result r JOIN collector_job_identity i ON i.id=r.job_id WHERE d.result_id=r.id AND i.public_id=? AND i.origin_id=? AND r.event_id=?",id,origin,eventId)==1;
+    }
+    @Override public boolean requeueDelivery(UUID id,String origin) {
+        return jdbc.update("UPDATE collector_delivery d SET state='READY',locked_by=NULL,locked_until=NULL,generation=generation+1,next_attempt_at=clock_timestamp(),dead_letter_at=NULL,error_code=NULL FROM collector_result r JOIN collector_job_identity i ON i.id=r.job_id WHERE d.result_id=r.id AND i.public_id=? AND i.origin_id=? AND d.state IN ('DEAD','RETRY')",id,origin)==1;
     }
     @Override public boolean archive(long id,long generation) {
         // DDL is never held inside a queue claim transaction. A rollover cannot strand active work.
@@ -116,6 +152,7 @@ public final class PostgresJobQueue implements JobQueue {
             jdbc.update("UPDATE collector_job_identity SET archived_at=? WHERE id=?",ts(at),id);
             jdbc.update("DELETE FROM collector_delivery WHERE result_id IN (SELECT id FROM collector_result WHERE job_id=?)",id);
             jdbc.update("DELETE FROM collector_result WHERE job_id=?",id);
+            jdbc.update("DELETE FROM collector_observation WHERE job_id=?",id);
             jdbc.update("DELETE FROM collector_execution WHERE job_id=?",id);
             jdbc.update("DELETE FROM collector_job WHERE id=?",id); return true;
         }));

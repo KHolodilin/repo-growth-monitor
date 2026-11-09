@@ -27,6 +27,7 @@ import java.util.Set;
 @Service
 public class RepositoryService {
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}") private boolean durableOrchestration;
     private final GitHubClient gitHubClient;
     private final GitHubProperties gitHubProperties;
     private final GitHubOwnerJdbcRepository ownerRepository;
@@ -55,7 +56,8 @@ public class RepositoryService {
 
     @Transactional
     public List<Repository> list(boolean refresh) {
-        if (!gitHubProperties.tokenConfigured()) {
+        if (refresh && durableOrchestration)throw ApiException.validation("Use POST /api/v1/admin/repositories/refresh");
+        if (!durableOrchestration && !gitHubProperties.tokenConfigured()) {
             return List.of();
         }
         if (refresh) {

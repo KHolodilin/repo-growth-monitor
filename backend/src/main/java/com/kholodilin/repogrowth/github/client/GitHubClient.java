@@ -68,6 +68,8 @@ public class GitHubClient {
 
     @Value("${rgm.collector.enabled:true}")
     private boolean collectorEnabled = true;
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+    private boolean durableOrchestration;
 
     private final RestClient restClient;
     private final RestClient webClient;
@@ -639,7 +641,7 @@ public class GitHubClient {
     }
 
     private void requireToken() {
-        if (!collectorEnabled) {
+        if (!collectorEnabled || durableOrchestration) {
             throw GitHubException.api(503, false, null, "GitHub collection is disabled in web-only mode");
         }
         if (!properties.tokenConfigured()) {

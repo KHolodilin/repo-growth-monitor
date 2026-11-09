@@ -16,7 +16,7 @@ import org.springframework.security.web.context.NullSecurityContextRepository;
 @ConditionalOnWebApplication(type=ConditionalOnWebApplication.Type.SERVLET)
 @ConditionalOnProperty(name={"collector.storage.enabled","collector.http.enabled"},havingValue="true")
 @EnableConfigurationProperties(CollectorHttpProperties.class)
-@Import(CollectorJobController.class)
+@Import({CollectorJobController.class,CollectorRecoveryController.class})
 public class CollectorHttpConfiguration {
     @Bean @Order(0)
     SecurityFilterChain collectorServiceChain(HttpSecurity http,CollectorHttpProperties properties) throws Exception {
