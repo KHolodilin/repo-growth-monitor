@@ -45,3 +45,10 @@ Admin mobile metric state is held above loading skeletons so period reloads pres
 - Interactive browser QA uses the production frontend build against an isolated local Public API fixture, with no product database or GitHub token. Desktop and actual 320/390px checks cover owner/repository changes, canonical rename, two tabs, URL periods, mobile metric retention, Empty/Error/Retry/Stale, source date selection, legend hide/restore, bounded tooltip dismissal, full cross-owner competitor names, CSV and PNG downloads. The PNG was opened and checked for relative labels and matching series styles. The request log contains only Public API calls.
 
 As agreed, complete suites, 95% coverage completion, final CI/Codecov inspection and full local Docker/migration rehearsal remain after #222. No merge, tag, release or production activation was performed.
+
+
+## Local Docker follow-up
+
+The first real Docker smoke check exposed that the generic two-segment entity mapping shadowed Spring's static resource handler: the document loaded but its `/assets/**` JS/CSS returned 404. Reserved first segments are now excluded in the mapping itself, before handler selection, while publication checks remain inside entity handlers. A real static test resource and a missing-asset regression cover successful serving and 404 behavior. PublicApiIT (21) and PublicPageControllerTest (4) pass after the fix.
+
+At the user's request the local Compose application was rebuilt and restarted with its existing PostgreSQL volume. Liquibase applied the 10 pending changesets through 023 successfully. This local smoke check is separate from the complete #222 release/migration rehearsal; it does not enable publication or the new orchestration mode.
