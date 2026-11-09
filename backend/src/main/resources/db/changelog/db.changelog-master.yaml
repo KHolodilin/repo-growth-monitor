@@ -41,3 +41,5 @@ databaseChangeLog:
       file: db/changelog/020-node-recovery.yaml
   - include:
       file: db/changelog/021-quota-identities.yaml
+  - include:
+      file: db/changelog/022-publication.yaml

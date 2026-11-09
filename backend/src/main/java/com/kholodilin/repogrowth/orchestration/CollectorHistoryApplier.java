@@ -27,6 +27,7 @@ import tools.jackson.core.type.TypeReference;
 @Component
 @ConditionalOnProperty(name="rgm.orchestration.enabled",havingValue="true")
 public class CollectorHistoryApplier {
+    @org.springframework.beans.factory.annotation.Autowired private com.kholodilin.repogrowth.publication.PublicationService publication;
     private final JdbcTemplate jdbc;private final JsonMapper json;private final RepositoryJdbcRepository repositories;
     private final TrafficJdbcRepository traffic;private final TopicWatchSync watches;private final ServicePathClassifier paths;
     private final GrowthEventStateJdbcRepository eventState;private final GrowthEventJdbcRepository events;
@@ -73,12 +74,14 @@ public class CollectorHistoryApplier {
             long owner=jdbc.queryForObject("SELECT id FROM github_owner WHERE lower(login)=lower(?)",Long.class,job.repository().owner());
             var existing=repositories.findByGithubId(remote.id());
             var stored=repositories.upsertKeepingTracking(new com.kholodilin.repogrowth.repository.domain.Repository(null,remote.id(),owner,remote.name(),remote.fullName(),remote.description(),remote.resolvedVisibility(),remote.defaultBranch(),remote.language(),remote.fork(),remote.archived(),remote.stargazersCount(),remote.watchers(),remote.forksCount(),remote.openIssuesCount(),existing.map(value->value.contributors()).orElse(0),false,remote.createdAt(),remote.updatedAt(),remote.pushedAt(),null,null,null,null,null));
+            publication.metadata(stored.id(),remote,snapshot.observedAt());
             repositories.markAccountAccessible(stored.id());repositories.replaceTopics(stored.id(),remote.topicsOrEmpty());
         }
     }
     private void stats(long id,JobRequest job,Snapshot snapshot){
         var current=repositories.findById(id).orElseThrow();var remote=Objects.requireNonNull(read(snapshot,"repository",GitHubRepositoryResponse.class));
         if(remote.id()!=current.githubId())throw new IllegalArgumentException("Source repository identity mismatch");
+        publication.metadata(id,remote,snapshot.observedAt());
         int contributors=metric(snapshot,Metric.CONTRIBUTORS,current.contributors());int watchers=metric(snapshot,Metric.WATCHERS,current.watchers());
         repositories.updateStats(id,remote.description(),remote.stargazersCount(),watchers,remote.forksCount(),remote.openIssuesCount(),contributors,remote.updatedAt(),remote.pushedAt(),commit(snapshot,"latestCommits"),snapshot.observedAt(),remote.archived());
         repositories.replaceTopics(id,remote.topicsOrEmpty());watches.sync(id);
