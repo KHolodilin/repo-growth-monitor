@@ -240,4 +240,11 @@ class PostgresJobQueueTest {
             assertThat(bj.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_name='repository'",Long.class)).isZero();
         }finally{jdbc.execute("DROP DATABASE collector_b WITH (FORCE)");}
     }
+
+    @Test void crashAfterAcknowledgmentDoesNotStrandDeliveredRowsInHotQueue(){
+        var lease=acceptClaim();finish(lease);assertThat(queue.acknowledge(queue.claimDelivery("sender",minute).orElseThrow())).isTrue();
+        var restarted=new PostgresJobQueue(jdbc,new TransactionTemplate(new DataSourceTransactionManager(ds)),partitions);
+        assertThat(restarted.archiveDelivered()).isTrue();assertThat(restarted.archiveDelivered()).isFalse();assertThat(restarted.result(lease.publicId(),"rgm")).isPresent();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM collector_job",Long.class)).isZero();
+    }
 }

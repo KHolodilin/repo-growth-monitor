@@ -39,6 +39,8 @@ URLs. Delivery uses the origin's node-to-RGM credential, runs outside DB transac
 commit, retries 408/429/5xx and transport failures, and dead-letters permanent rejects/exhausted retries.
 Collection success and delivery success are separate: retrying delivery never collects GitHub again.
 Delivered rows move to monthly history only after acknowledgment; dead letters remain retrievable.
+A bounded indexed maintenance pass also archives delivery ACKs recovered by RGM or retained across a
+sender crash between acknowledgment and archive, so successful work cannot remain stranded in the hot queue.
 
 ```yaml
 collector:

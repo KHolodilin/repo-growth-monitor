@@ -17,7 +17,7 @@ public final class ResultDeliveryWorker {
         factory.setConnectTimeout(credentials.connectTimeout());factory.setReadTimeout(credentials.readTimeout());client=RestClient.builder().requestFactory(factory).build();
     }
     public boolean poll(String owner){
-        var candidate=queue.claimDelivery(owner,properties.lease());if(candidate.isEmpty())return false;var delivery=candidate.get();
+        var candidate=queue.claimDelivery(owner,properties.lease());if(candidate.isEmpty())return queue.archiveDelivered();var delivery=candidate.get();
         var destination=properties.destinations().stream().filter(d->d.origin().equals(delivery.origin()) && d.ref().equals(delivery.destination())).findFirst();
         var authority=credentials.origins().stream().filter(o->o.origin().equals(delivery.origin())).findFirst();
         if(destination.isEmpty() || authority.isEmpty()){queue.deadLetter(delivery,"DESTINATION_UNAVAILABLE");return true;}

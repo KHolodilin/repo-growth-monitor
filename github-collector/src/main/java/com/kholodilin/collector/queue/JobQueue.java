@@ -26,6 +26,7 @@ public interface JobQueue {
     java.util.Optional<String> result(UUID publicId,String origin);
     boolean confirmDelivery(UUID publicId,String origin,UUID eventId);
     boolean requeueDelivery(UUID publicId,String origin);
+    boolean archiveDelivered();
     boolean archive(long jobId, long expectedGeneration);
     Optional<Stored> find(UUID publicId);
 }

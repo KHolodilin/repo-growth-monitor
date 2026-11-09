@@ -136,6 +136,10 @@ public final class PostgresJobQueue implements JobQueue {
     @Override public boolean requeueDelivery(UUID id,String origin) {
         return jdbc.update("UPDATE collector_delivery d SET state='READY',locked_by=NULL,locked_until=NULL,generation=generation+1,next_attempt_at=clock_timestamp(),dead_letter_at=NULL,error_code=NULL FROM collector_result r JOIN collector_job_identity i ON i.id=r.job_id WHERE d.result_id=r.id AND i.public_id=? AND i.origin_id=? AND d.state IN ('DEAD','RETRY')",id,origin)==1;
     }
+    @Override public boolean archiveDelivered(){
+        var rows=jdbc.queryForList("SELECT j.id,j.generation FROM collector_delivery d JOIN collector_result r ON r.id=d.result_id JOIN collector_job j ON j.id=r.job_id WHERE d.state='DELIVERED' AND j.state IN ('SUCCEEDED','FAILED','CANCELLED') ORDER BY d.delivered_at,d.id LIMIT 1");
+        return !rows.isEmpty() && archive(((Number)rows.getFirst().get("id")).longValue(),((Number)rows.getFirst().get("generation")).longValue());
+    }
     @Override public boolean archive(long id,long generation) {
         // DDL is never held inside a queue claim transaction. A rollover cannot strand active work.
         partitions.ensureCurrentAndNext();

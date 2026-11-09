@@ -20,3 +20,9 @@ databaseChangeLog:
         - sqlFile:
             path: delivery.sql
             relativeToChangelogFile: true
+  - changeSet:
+      id: collector-004-archive-recovery
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: CREATE INDEX collector_delivery_archive_due ON collector_delivery(delivered_at,id) WHERE state='DELIVERED';
