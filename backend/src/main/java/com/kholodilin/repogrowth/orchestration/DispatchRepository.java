@@ -36,6 +36,8 @@ public class DispatchRepository {
         });
     }
     private boolean lock(Claim claim) {
+        // Result application serializes request aggregate completion before locking its task.
+        jdbc.queryForList("SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR UPDATE OF r",Long.class,claim.request().jobId());
         // Recovery and result application take the task lock first; keep the same lock order.
         jdbc.queryForList("SELECT id FROM collection_task WHERE public_id=? FOR UPDATE",Long.class,claim.request().jobId());
         return !jdbc.queryForList("SELECT id FROM collector_dispatch WHERE id=? AND state='SENDING' AND generation=? AND locked_by=? AND locked_until>clock_timestamp() FOR UPDATE",Long.class,claim.id(),claim.generation(),claim.owner()).isEmpty();

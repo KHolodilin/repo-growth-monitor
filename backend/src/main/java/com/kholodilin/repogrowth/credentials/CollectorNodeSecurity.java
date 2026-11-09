@@ -22,7 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CollectorNodeSecurity {
     @Bean @Order(-10)
     SecurityFilterChain credentialResolutionChain(HttpSecurity http,OrchestrationProperties properties) throws Exception {
-        return http.securityMatcher("/internal/v1/credentials/resolve","/internal/v1/github-budget/acquire","/internal/v1/github-budget/report").csrf(c->c.disable()).requestCache(c->c.disable())
+        return http.securityMatcher("/internal/v1/credentials/resolve","/internal/v1/github-budget/acquire","/internal/v1/github-budget/report","/internal/v1/collector-results").csrf(c->c.disable()).requestCache(c->c.disable())
             .formLogin(c->c.disable()).httpBasic(c->c.disable()).logout(c->c.disable())
             .sessionManagement(c->c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .securityContext(c->c.securityContextRepository(new NullSecurityContextRepository()))

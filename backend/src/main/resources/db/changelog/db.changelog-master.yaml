@@ -36,4 +36,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/018-graphql-budget.yaml
   - include:
+      file: db/changelog/019-result-history.yaml
+  - include:
       file: db/changelog/021-quota-identities.yaml

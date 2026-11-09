@@ -68,8 +68,8 @@ class IdempotencyIT extends AbstractPostgresTest {
     long repositoryId,otherId,adminId;
     @BeforeEach void reset() {
         cj=new JdbcTemplate(collectorDs);
-        cj.execute("TRUNCATE idempotency_records,collector_job_identity,collector_job,collector_execution,collector_result,collector_delivery,collector_job_history RESTART IDENTITY");
-        jdbc.execute("TRUNCATE idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
+        cj.execute("TRUNCATE collector_observation,idempotency_records,collector_job_identity,collector_job,collector_execution,collector_result,collector_delivery,collector_job_history RESTART IDENTITY");
+        jdbc.execute("TRUNCATE collection_history_mapping,collector_snapshot_header,idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient); catalog.syncMissingUsers(); adminId=users.findByIssuerAndSub(MockUserCatalog.ISSUER,"admin").orElseThrow().id();
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
         repositoryId=insertRepository(202,owner,"repo-growth-monitor");otherId=insertRepository(303,owner,"other");
