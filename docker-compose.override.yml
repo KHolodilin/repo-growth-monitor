@@ -1,25 +1,6 @@
-# Local opt-in: one JVM/application container, independently stored Collector queue.
-# Prepare the ignored local configuration before starting this override.
 services:
-  collector-postgres:
-    image: postgres:18.6
-    restart: unless-stopped
-    env_file:
-      - ./deploy/tmp/collector-db.local.env
-    volumes:
-      - collector_pgdata_18:/var/lib/postgresql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U collector -d collector"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
   repo-growth-monitor:
     environment:
       SPRING_CONFIG_ADDITIONAL_LOCATION: file:/app/combined-runtime.yml
     volumes:
       - ./deploy/tmp/combined-runtime.local.yml:/app/combined-runtime.yml:ro
-    depends_on:
-      collector-postgres:
-        condition: service_healthy
-volumes:
-  collector_pgdata_18:

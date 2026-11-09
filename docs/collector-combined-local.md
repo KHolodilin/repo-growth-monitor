@@ -3,10 +3,9 @@
 The repository-root Compose stack runs **one Java process in one application container**. The same JVM
 hosts RGM's planner/dispatcher/result ingestion and Collector's acceptance/execution/delivery components.
 Their REST exchanges use authenticated `127.0.0.1:8080` endpoints. Collector owns a separate PostgreSQL
-database/container/volume; it has no product database tables or cross-database foreign keys.
+database in the same PostgreSQL instance. The `postgres` service hosts `repogrowth` for product data
+and `collector` for the queue, results and history. Collector connects as the dedicated `collector` role.
 
-Docker shows three containers: `repo-growth-monitor`, `postgres` (existing product/history data), and
-`collector-postgres` (Collector queue/results/history). There is no separate Collector JVM/container.
 The root `docker-compose.override.yml` enables this local topology automatically. The release pack in
 `deploy/docker-compose.yml` is unchanged and is not a production activation.
 
@@ -22,8 +21,8 @@ python deploy/bootstrap-combined-local.py
 docker compose restart repo-growth-monitor
 ```
 
-Preparation generates `deploy/tmp/combined-runtime.local.yml` and `collector-db.local.env`. They are
-ignored by Git and Docker build context. Encryption and independent service credentials are generated
+Preparation starts PostgreSQL, provisions the Collector role and database, and generates
+`deploy/tmp/combined-runtime.local.yml`, ignored by Git and the Docker build context. Encryption and independent service credentials are generated
 once and preserved across reruns. Keep the encryption configuration with database backups. Bootstrap is
 restricted to the local non-production MOCK stack and never prints the GitHub token. Existing vault
 credentials are preserved; use `--rotate` explicitly when intentionally replacing the local token.

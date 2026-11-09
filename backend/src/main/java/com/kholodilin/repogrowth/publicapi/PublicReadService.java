@@ -35,7 +35,15 @@ public class PublicReadService {
  public static class Fields extends LinkedHashMap<String,Object>{public Fields(Map<String,Object> row){super(row);}}
  private List<Map<String,Object>> safeIds(List<Map<String,Object>> rows){List<Map<String,Object>> result=new ArrayList<>();for(var row:rows){var safe=new Fields(row);for(String key:List.of("id","repositoryId"))if(safe.get(key)!=null)safe.put(key,safe.get(key).toString());result.add(safe);}return result;}
  private Page page(List<Map<String,Object>> rows,int size,String key){boolean more=rows.size()>size;var selected=more?new ArrayList<>(rows.subList(0,size)):rows;Long next=more?((Number)selected.getLast().get(key)).longValue():null;return new Page(safeIds(selected),next);}
- private Page datePage(List<Map<String,Object>> rows,int size){boolean more=rows.size()>size;var selected=more?rows.subList(0,size):rows;LocalDate next=more?((java.sql.Date)selected.getLast().get("date")).toLocalDate():null;return new Page(safeIds(selected),null,next);}
+ private Page datePage(List<Map<String,Object>> rows,int size) {
+  boolean more = rows.size() > size;
+  var selected = more ? rows.subList(0,size) : rows;
+  for (var row : selected) {
+   row.put("date", ((java.sql.Date) row.get("date")).toLocalDate());
+  }
+  LocalDate next = more ? (LocalDate) selected.getLast().get("date") : null;
+  return new Page(safeIds(selected),null,next);
+ }
  private DashboardPeriod period(List<Long> ids,String raw,boolean traffic){var p=Map.of("ids",ids);String table=traffic?"traffic_daily":"repository_daily_stats",date=traffic?"traffic_date":"stat_date";var earliest=sql.queryForObject("SELECT min("+date+") FROM "+table+" WHERE repository_id IN (:ids)",p,LocalDate.class);return DashboardPeriod.of(raw,LocalDate.now(ZoneOffset.UTC),earliest);}
  public Map<String,Object> stats(String owner,String repository,String period){var ids=scope(owner,repository,PublicationService.Module.DASHBOARD);var range=period(ids,period,false);var p=new HashMap<String,Object>();p.put("ids",ids);p.put("to",range.to());p.put("baseline",range.allTime()?range.from():range.previousTo());
  String latest="SELECT DISTINCT ON (repository_id) repository_id,stars,forks,watchers,contributors,contributor_logins_collected,stat_date FROM repository_daily_stats WHERE repository_id IN (:ids) AND stat_date<=:to ORDER BY repository_id,stat_date DESC";
