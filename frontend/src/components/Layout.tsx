@@ -135,7 +135,7 @@ export function Layout() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <NavLink
-              to="/admin/dashboard"
+              to="/"
               className="flex min-w-0 items-center gap-2.5 text-slate-900"
               aria-label="Repo Growth Monitor"
             >

@@ -47,7 +47,7 @@ public class OidcLoginSuccessHandler extends SavedRequestAwareAuthenticationSucc
 
     @Override
     protected String determineTargetUrl(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
-        return authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")) ? "/admin/dashboard" : "/";
+        return authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")) ? "/admin/repositories" : "/";
     }
 
     @Override

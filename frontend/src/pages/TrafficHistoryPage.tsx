@@ -98,7 +98,7 @@ export function TrafficHistoryPage() {
       <header className="space-y-0">
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/admin/dashboard" },
+            { label: "Repositories", to: "/admin/repositories" },
             {
               label: repo.fullName,
               repoSwitcher: {

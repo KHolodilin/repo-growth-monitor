@@ -130,7 +130,7 @@ export function QueryDetailsPage() {
         <div className="sm:col-start-1 sm:row-start-1">
           <PageBreadcrumb
             items={[
-              { label: "Portfolio", to: "/admin/dashboard" },
+              { label: "Repositories", to: "/admin/repositories" },
               {
                 label: repo.fullName,
                 repoSwitcher: {

@@ -431,7 +431,7 @@ export function RepositoryDetailsPage() {
       <header>
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/admin/dashboard" },
+            { label: "Repositories", to: "/admin/repositories" },
             {
               label: repo.fullName,
               repoSwitcher: {

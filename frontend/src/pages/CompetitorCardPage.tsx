@@ -51,7 +51,7 @@ export function CompetitorCardPage() {
   return (
     <CompetitorCardView
       items={[
-        { label: "Portfolio", to: "/admin/dashboard" },
+        { label: "Repositories", to: "/admin/repositories" },
         {
           label: repo.fullName,
           repoSwitcher: {

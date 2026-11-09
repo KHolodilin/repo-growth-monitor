@@ -1,6 +1,5 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { DashboardPage } from "./pages/DashboardPage";
 import { RepositoriesPage } from "./pages/RepositoriesPage";
 import { RepositoryDetailsPage } from "./pages/RepositoryDetailsPage";
 import { QueryDetailsPage } from "./pages/QueryDetailsPage";
@@ -33,8 +32,7 @@ export default function App() {
         <Route path="*" element={<PublicNotFound/>}/>
       </Route>
       <Route element={<AuthProvider><AdminGate/></AuthProvider>}>
-        <Route path="/admin" element={<DashboardPage />} />
-        <Route path="/admin/dashboard" element={<DashboardPage />} />
+        <Route path="/admin" element={<Navigate to="/admin/repositories" replace />} />
         <Route path="/admin/repositories" element={<RepositoriesPage />} />
         <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         <Route path="/admin/repositories/:id/traffic/history" element={<TrafficHistoryPage />} />

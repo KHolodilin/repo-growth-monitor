@@ -13,9 +13,9 @@ Work package #220 adapts the existing dashboard and snapshot components. It does
 | `/{owner}/{repository}/analytics/search/{definitionId}` | Published query ranks and results |
 | `/{owner}/{repository}/analytics/topics/{definitionId}` | Published topic ranks and results |
 | `.../{definitionId}/competitors/{githubId}` | Cross-owner competitor observations |
-| `/admin`, `/admin/dashboard`, `/admin/repositories/**`, `/admin/search-runs/**` | Existing management screens, behind current database-backed Admin authorization |
+| `/admin` → `/admin/repositories`, `/admin/repositories/**`, `/admin/search-runs/**` | Existing management screens, behind current database-backed Admin authorization |
 
-Public pages use only `/api/v1/public/**`, with credentials omitted. They mount neither AuthProvider nor the operational Layout, and request no `/me`, system/token status, management or GitHub endpoints. Public event details contain no edit/delete controls or external links. Local SVG icons do not load avatars or external assets. Admin sign-in lands on `/admin/dashboard`; ordinary users land on `/`.
+Public pages use only `/api/v1/public/**`, with credentials omitted. They mount neither AuthProvider nor the operational Layout, and request no `/me`, system/token status, management or GitHub endpoints. Public event details contain no edit/delete controls or external links. Local SVG icons do not load avatars or external assets. Admin sign-in lands on the existing repository-management list `/admin/repositories`; ordinary users land on `/`.
 
 The server resolves publication before serving public HTML. Unknown, unpublished and wrong-parent nested routes return a real 404. Verified owner/repository aliases redirect with 308 to the current canonical path, preserving the analytics suffix and query string. Public documents and redirects use `Cache-Control: no-store`. A repository name containing a dot remains valid. The old broad SPA fallback and old management browser URLs are removed; no compatibility API is introduced.
 
@@ -52,3 +52,10 @@ As agreed, complete suites, 95% coverage completion, final CI/Codecov inspection
 The first real Docker smoke check exposed that the generic two-segment entity mapping shadowed Spring's static resource handler: the document loaded but its `/assets/**` JS/CSS returned 404. Reserved first segments are now excluded in the mapping itself, before handler selection, while publication checks remain inside entity handlers. A real static test resource and a missing-asset regression cover successful serving and 404 behavior. PublicApiIT (21) and PublicPageControllerTest (4) pass after the fix.
 
 At the user's request the local Compose application was rebuilt and restarted with its existing PostgreSQL volume. Liquibase applied the 10 pending changesets through 023 successfully. This local smoke check is separate from the complete #222 release/migration rehearsal; it does not enable publication or the new orchestration mode.
+
+
+## User clarification: repository management only
+
+There is no separate general Admin dashboard and no dashboard-to-user/repository assignment configuration. Dashboards live at owner/repository public URLs. The existing repository-management list remains the management entry point; Admin sign-in opens that list. Existing repository/query/topic/event management functionality is retained. Public publication policy is a separate unresolved local rollout step, not a new user-facing board configuration screen.
+
+Runtime audit: the local default Compose currently starts the product and its existing PostgreSQL. Collector code is bundled in the same image, but its separate storage, HTTP acceptance, execution/delivery and RGM orchestration are not enabled in this Compose. Legacy worker pools are active. The module/test results do not constitute a running new Collector deployment. The pending local runtime wiring must be completed and verified explicitly.

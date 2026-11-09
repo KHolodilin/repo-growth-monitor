@@ -47,7 +47,7 @@ class OidcLoginSuccessHandlerTest {
     UserAccountService users;
 
     @Test
-    void replacesPrincipalAndRedirectsAdminToDashboard() throws Exception {
+    void replacesPrincipalAndRedirectsAdminToRepositoryManagement() throws Exception {
         AuthProperties properties = new AuthProperties(
                 "zitadel",
                 false,
@@ -78,7 +78,7 @@ class OidcLoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(request, response, authentication);
 
-        assertThat(response.getRedirectedUrl()).isEqualTo("/admin/dashboard");
+        assertThat(response.getRedirectedUrl()).isEqualTo("/admin/repositories");
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
                 .isInstanceOf(AppUserPrincipal.class);
         AppUserPrincipal principal = (AppUserPrincipal) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
