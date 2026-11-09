@@ -1,6 +1,6 @@
 # Public owner and repository dashboards
 
-Work package #220 adapts the existing dashboard and snapshot components. It does not activate publication, rebuild the running deployment or migrate historical data. Homepage features and the owners directory belong to #221; the complete release rehearsal belongs to #222.
+Work package #220 adapts the existing dashboard and snapshot components. It retains historical data in place. The subsequent user-requested local rollout enables the combined Collector and a controlled 9-repository preview; see the combined-runtime follow-up below. Homepage features and the owners directory belong to #221; the complete release rehearsal belongs to #222.
 
 ## Routes and access
 
@@ -58,4 +58,9 @@ At the user's request the local Compose application was rebuilt and restarted wi
 
 There is no separate general Admin dashboard and no dashboard-to-user/repository assignment configuration. Dashboards live at owner/repository public URLs. The existing repository-management list remains the management entry point; Admin sign-in opens that list. Existing repository/query/topic/event management functionality is retained. Public publication policy is a separate unresolved local rollout step, not a new user-facing board configuration screen.
 
-Runtime audit: the local default Compose currently starts the product and its existing PostgreSQL. Collector code is bundled in the same image, but its separate storage, HTTP acceptance, execution/delivery and RGM orchestration are not enabled in this Compose. Legacy worker pools are active. The module/test results do not constitute a running new Collector deployment. The pending local runtime wiring must be completed and verified explicitly.
+The initial local runtime audit exposed that only legacy workers were running. This was resolved in the combined-runtime follow-up: the default contributor Compose now runs one RGM/Collector JVM with independent Collector PostgreSQL, with actual end-to-end jobs verified.
+
+
+## Combined runtime follow-up
+
+The earlier runtime-audit gaps are resolved for the local contributor stack. RGM and Collector now execute in one JVM with a separate Collector database. Real Search and Discovery jobs completed, callbacks were applied and results archived. The local `/KHolodilin` preview contains its 9 selected verified PUBLIC repositories; publication used audited APIs after genuine metadata collection. See [combined runtime setup](collector-combined-local.md). No additional dashboard configuration screen or user/board mapping was introduced.

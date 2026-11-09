@@ -144,7 +144,11 @@ The image is three stages:
 ```bash
 cp .env.example .env
 # set GITHUB_TOKEN — see "Create a GitHub token" above
+python deploy/prepare-combined-local.py
 docker compose up -d --build
+# once the application has started (local MOCK authentication only):
+python deploy/bootstrap-combined-local.py
+docker compose restart repo-growth-monitor
 ```
 
 Open http://localhost:8080. Stop with `docker compose down`.
@@ -208,3 +212,6 @@ The token is only accepted from environment / Docker secrets. Diagnostics expose
 The Maven reactor contains `collector-contracts`, `github-collector` and `backend`. Build from the repository root with `mvn -B package`; for backend tests with dependencies use `mvn -B -pl backend -am test`.
 
 The default image still runs the combined application. The `web-only` profile disables legacy execution/planning and GitHub calls. The `collector` profile is a headless bootstrap boundary only in #209: durable jobs and execution arrive in subsequent issues. See [collector architecture and protocol](docs/collector-architecture.md) for contracts, role limitations and the existing dependency inventory.
+
+
+Repository-root contributor Compose now runs one RGM/Collector JVM with a separate Collector PostgreSQL. See [local combined runtime](docs/collector-combined-local.md) for setup, credential persistence and verified task flow. This local override does not activate the release pack.

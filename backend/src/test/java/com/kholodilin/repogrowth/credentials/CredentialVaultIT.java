@@ -257,4 +257,17 @@ class CredentialVaultIT extends AbstractPostgresTest {
         ingestion.apply("node-a",new ResultDelivery(1,delivered.eventId(),delivered.resultId(),delivered.collectorJobId(),delivered.jobId(),delivered.attemptId(),delivered.type(),delivered.repositoryGithubId(),delivered.status(),verified,null));
         assertThat(jdbc.queryForObject("SELECT public_scope_verified FROM search_run",Boolean.class)).isTrue();
     }
+
+    @Test void configuredDefaultOnlyBindsUnassignedRepositoriesAndCannotBypassRevocation() {
+        org.springframework.test.util.ReflectionTestUtils.setField(vault,"defaultRef","github-main");
+        try {
+            jdbc.update("DELETE FROM repository_credential WHERE repository_id=?",repositoryId);
+            var first=vault.scope(repositoryId);assertThat(first.credentialRef()).isEqualTo("github-main");
+            assertThat(vault.scope(repositoryId)).isEqualTo(first);
+            vault.rotate("explicit","explicit-secret",null);var assigned=vault.bind(repositoryId,"explicit");
+            assertThat(vault.scope(repositoryId)).isEqualTo(assigned);
+            vault.revoke("explicit");assertThatThrownBy(()->vault.scope(repositoryId)).isInstanceOf(com.kholodilin.repogrowth.common.api.ApiException.class);
+            assertThat(jdbc.queryForObject("SELECT c.ref FROM repository_credential b JOIN github_credential c ON c.id=b.credential_id WHERE b.repository_id=?",String.class,repositoryId)).isEqualTo("explicit");
+        } finally {org.springframework.test.util.ReflectionTestUtils.setField(vault,"defaultRef","");}
+    }
 }

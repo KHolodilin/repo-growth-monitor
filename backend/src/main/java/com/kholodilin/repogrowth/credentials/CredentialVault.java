@@ -51,10 +51,19 @@ public class CredentialVault {
         });
     }
     public boolean revoke(String ref) {return jdbc.update("UPDATE github_credential SET revoked=true,updated_at=clock_timestamp() WHERE ref=?",ref)==1;}
+    @org.springframework.beans.factory.annotation.Value("${rgm.credentials.default-ref:}")
+    private String defaultRef = "";
     public AuthorizationScope scope(long repositoryId) {
+        return tx.execute(status -> {
+        // Serialize first-use binding; an explicit/revoked assignment must never be replaced by a default.
+        if (!defaultRef.isBlank()) {
+            jdbc.queryForList("SELECT id FROM repository WHERE id=? FOR UPDATE", Long.class, repositoryId);
+            if (jdbc.queryForObject("SELECT count(*) FROM repository_credential WHERE repository_id=?", Long.class, repositoryId)==0L) bind(repositoryId,defaultRef);
+        }
         var rows=jdbc.queryForList("SELECT b.authorization_context,c.ref FROM repository_credential b JOIN github_credential c ON c.id=b.credential_id WHERE b.repository_id=? AND NOT c.revoked",repositoryId);
         if(rows.isEmpty()) throw new ApiException(ErrorCode.INTERNAL_ERROR,HttpStatus.SERVICE_UNAVAILABLE,"Repository credential is not configured");
         return new AuthorizationScope(rows.getFirst().get("authorization_context").toString(),(String)rows.getFirst().get("ref"));
+        });
     }
     public CredentialLease resolve(String node,CredentialRequest request) {
         return tx.execute(status->{

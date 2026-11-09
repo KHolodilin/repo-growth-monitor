@@ -11,3 +11,6 @@ frontend/dist
 
 collector-contracts/target/
 github-collector/target/
+
+# Local combined-runtime encryption keys and service credentials
+deploy/tmp/
