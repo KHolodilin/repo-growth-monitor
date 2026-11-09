@@ -54,7 +54,7 @@ export function DashboardPage() {
 
   async function load() {
     const version = ++requestVersion.current;
-    const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}`);
+    const dashboard = await api<Dashboard>(`/api/v1/admin/dashboard?period=${period}`);
     if (version === requestVersion.current) setData(dashboard);
     return dashboard;
   }
@@ -315,7 +315,7 @@ function useTrackedEvents(repositoryIds: number[], period: string) {
     let cancelled = false;
     Promise.all(
       ids.map((id) =>
-        api<GrowthEvent[]>(`/api/v1/repositories/${id}/growth-events?period=${period}`)
+        api<GrowthEvent[]>(`/api/v1/admin/repositories/${id}/growth-events?period=${period}`)
           .then((rows) => asGrowthEvents(rows))
           .catch(() => [] as GrowthEvent[]),
       ),
@@ -774,7 +774,7 @@ function useGitHubAccess(): GitHubAccess | null {
     let cancelled = false;
     async function load() {
       try {
-        const next = parseGitHubAccess(await api<unknown>("/api/v1/system/status"));
+        const next = parseGitHubAccess(await api<unknown>("/api/v1/admin/system/status"));
         if (!cancelled) {
           setAccess(next);
         }

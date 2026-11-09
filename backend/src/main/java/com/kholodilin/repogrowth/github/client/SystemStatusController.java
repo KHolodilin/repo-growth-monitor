@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.format.DateTimeFormatter;
 
 @RestController
-@RequestMapping("/api/v1/system")
+@RequestMapping("/api/v1/admin/system")
 public class SystemStatusController {
 
     private static final DateTimeFormatter HOUR_MINUTE = DateTimeFormatter.ofPattern("HH:mm");

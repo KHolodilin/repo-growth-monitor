@@ -112,7 +112,8 @@ public class CollectorHistoryApplier {
         var raw=json.readTree(snapshot.metadata().getOrDefault("search","{\"items\":[]}"));
         if(topic){List<TopicResult> rows=new ArrayList<>();int pos=1;for(var value:raw.path("items")){var item=json.treeToValue(value,GitHubSearchItem.class);rows.add(new TopicResult(null,run,pos++,item.id(),item.fullName(),item.owner()==null?"":item.owner().login(),item.stargazersCount(),0,item.forksCount(),item.language(),item.description(),item.htmlUrl()));}topicResults.replaceAll(run,rows);topicRuns.markSuccess(run,Math.toIntExact(snapshot.totalResults()),snapshot.trackedPosition());}
         else{List<com.kholodilin.repogrowth.search.domain.SearchResult> rows=new ArrayList<>();int pos=1;for(var value:raw.path("items"))rows.add(enricher.fromSearchItem(run,pos++,json.treeToValue(value,GitHubSearchItem.class)));searchResults.replaceAll(run,rows);searchRuns.markSuccess(run,Math.toIntExact(snapshot.totalResults()),snapshot.trackedPosition());searchRuns.markEnrichment(run,"PARTIAL");}
-        jdbc.update("UPDATE "+table+" SET snapshot_at=?,completed_at=? WHERE id=?",ts(snapshot.observedAt()),ts(snapshot.observedAt()),run);
+        boolean publicRows=job.parameters().publicOnly();for(var item:raw.path("items"))if(!item.hasNonNull("private") || !item.get("private").isBoolean() || item.get("private").asBoolean())publicRows=false;
+        jdbc.update("UPDATE "+table+" SET snapshot_at=?,completed_at=?,public_scope_verified=? WHERE id=?",ts(snapshot.observedAt()),ts(snapshot.observedAt()),publicRows,run);
         jdbc.update("INSERT INTO collection_history_mapping VALUES (?,?,?) ON CONFLICT(task_id) DO NOTHING",task,job.type().name(),run);
     }
     private void legacy(long task,long repository,JobRequest job,ResultDelivery result){

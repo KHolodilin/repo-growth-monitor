@@ -24,6 +24,7 @@ export function RepositoriesPage() {
   const [access, setAccess] = useState<GitHubAccess | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [pendingRefresh, setPendingRefresh] = useState<string[]>([]);
   const [search, setSearch] = useState(() => readSession(SEARCH_KEY));
   const [visibilityStored, setVisibilityStored] = useState(() => readSession(VISIBILITY_KEY));
   const [trackingChoice, setTrackingChoice] = useState<TrackingFilter | null>(null);
@@ -38,13 +39,12 @@ export function RepositoriesPage() {
         setAccess(nextAccess);
       }
       if (refresh) {
-        setRepos(await api<Repository[]>("/api/v1/repositories?refresh=true"));
+        const accepted = await api<{ requestId: string }[]>("/api/v1/admin/repositories/refresh", { method: "POST" });
+        setPendingRefresh(Array.isArray(accepted) ? accepted.map((item) => item.requestId).filter(Boolean) : []);
+        setRepos(await api<Repository[]>("/api/v1/admin/repositories"));
         return;
       }
-      let data = await api<Repository[]>("/api/v1/repositories?refresh=false");
-      if (nextAccess.tokenState === "OK" && data.length === 0) {
-        data = await api<Repository[]>("/api/v1/repositories?refresh=true");
-      }
+      let data = await api<Repository[]>("/api/v1/admin/repositories?refresh=false");
       setRepos(data);
     } catch (err) {
       setError((err as Error).message);
@@ -56,6 +56,28 @@ export function RepositoriesPage() {
   useEffect(() => {
     void load(false);
   }, []);
+
+  useEffect(() => {
+    if (!pendingRefresh.length) return;
+    let active = true;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const states = await Promise.all(pendingRefresh.map((id) => api<{ state: string }>(`/api/v1/admin/collection-requests/${id}`, { signal: abort.signal })));
+        if (!active) return;
+        setRepos(await api<Repository[]>("/api/v1/admin/repositories", { signal: abort.signal }));
+        if (states.every((item) => item.state !== "ACTIVE")) {
+          setPendingRefresh([]);
+          if (states.some((item) => item.state === "FAILED" || item.state === "CANCELLED")) setError("Repository refresh did not complete. Saved data is still available.");
+        } else timer = setTimeout(() => void poll(), 5000);
+      } catch (err) {
+        if (active) { setError((err as Error).message); setPendingRefresh([]); }
+      }
+    };
+    timer = setTimeout(() => void poll(), 1000);
+    return () => { active = false; clearTimeout(timer); abort.abort(); };
+  }, [pendingRefresh]);
 
   const listed = useMemo(
     () => (allowMutations ? repos : repos.filter((repo) => repo.visibility === "PUBLIC")),
@@ -92,7 +114,7 @@ export function RepositoriesPage() {
       return;
     }
     try {
-      const updated = await api<Repository>(`/api/v1/repositories/${repo.id}/tracking`, {
+      const updated = await api<Repository>(`/api/v1/admin/repositories/${repo.id}/tracking`, {
         method: "POST",
         body: JSON.stringify({ enabled: !repo.trackingEnabled }),
       });
@@ -113,7 +135,7 @@ export function RepositoriesPage() {
     }
     for (const repo of targets) {
       try {
-        const updated = await api<Repository>(`/api/v1/repositories/${repo.id}/tracking`, {
+        const updated = await api<Repository>(`/api/v1/admin/repositories/${repo.id}/tracking`, {
           method: "POST",
           body: JSON.stringify({ enabled }),
         });
@@ -155,6 +177,7 @@ export function RepositoriesPage() {
           )}
         </div>
       </div>
+      {pendingRefresh.length > 0 && <p role="status">Refreshing repositories. Saved data will update when collection finishes.</p>}
       {error && <p className="text-red-600">{error}</p>}
       <Card>
         <div className="space-y-4">

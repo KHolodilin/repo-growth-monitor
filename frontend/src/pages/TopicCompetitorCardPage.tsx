@@ -30,9 +30,9 @@ export function TopicCompetitorCardPage() {
     setError(null);
     const topicPath = encodeURIComponent(topicName);
     Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
-      api<TopicHistory>(`/api/v1/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`),
-      api<CompetitorCard>(`/api/v1/repositories/${repositoryId}/topics/${topicPath}/competitors/${githubRepositoryId}?scope=${scope}`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<TopicHistory>(`/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`),
+      api<CompetitorCard>(`/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/competitors/${githubRepositoryId}?scope=${scope}`),
     ])
       .then(([repository, topicHistory, competitor]) => {
         if (cancelled) return;

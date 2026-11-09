@@ -44,17 +44,17 @@ export function TopicDetailsPage() {
     }
     const version = generation.current;
     const [repository, topicHistory] = await Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
       api<TopicHistory>(
-        `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
+        `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
       ),
     ]);
     if (version !== generation.current) return;
     setRepo(repository);
     setHistory(topicHistory);
     const [nextResults, nextSeries] = await Promise.all([
-      api<TopicRunResults>(`/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`).catch(() => null),
-      api<typeof competitors>(`/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`).catch(() => []),
+      api<TopicRunResults>(`/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`).catch(() => null),
+      api<typeof competitors>(`/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`).catch(() => []),
     ]);
     if (version !== generation.current) return;
     setResults(nextResults);
@@ -96,7 +96,7 @@ export function TopicDetailsPage() {
     }
     setRunning(true);
     try {
-      await api(`/api/v1/topic-watches/${history.watch.id}/run`, { method: "POST" });
+      await api(`/api/v1/admin/topic-watches/${history.watch.id}/run`, { method: "POST" });
       await load();
     } catch (err) {
       setError((err as Error).message);

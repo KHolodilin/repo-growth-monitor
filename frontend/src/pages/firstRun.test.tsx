@@ -73,7 +73,7 @@ describe("first-run portfolio", () => {
       return Promise.resolve({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
     });
     renderDashboard();
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/system/status"));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/system/status"));
     expect(await screen.findByText("Application is running.")).toBeInTheDocument();
     expect(screen.getByText(/Read permissions/)).toBeInTheDocument();
     expect(screen.queryByText(/Stored data is kept/)).not.toBeInTheDocument();
@@ -124,7 +124,7 @@ describe("first-run portfolio", () => {
       return Promise.resolve(empty);
     });
     const accepted = renderDashboard();
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/system/status"));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/system/status"));
     accepted.unmount();
     await act(async () => {
       resolveStatus(status("OK", true));

@@ -58,9 +58,9 @@ export function TrafficHistoryPage() {
     let cancelled = false;
     setError(null);
     Promise.all([
-      api<Repository>(`/api/v1/repositories/${id}`),
+      api<Repository>(`/api/v1/admin/repositories/${id}`),
       api<SnapshotHistory>(
-        `/api/v1/repositories/${id}/traffic-history?kind=${kind}&period=${period}&includeServicePaths=${includeService}`,
+        `/api/v1/admin/repositories/${id}/traffic-history?kind=${kind}&period=${period}&includeServicePaths=${includeService}`,
       ),
     ])
       .then(([repository, data]) => {

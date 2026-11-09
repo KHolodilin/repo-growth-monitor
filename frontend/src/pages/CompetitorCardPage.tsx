@@ -27,9 +27,9 @@ export function CompetitorCardPage() {
     let cancelled = false;
     setError(null);
     Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
-      api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
-      api<CompetitorCard>(`/api/v1/search-queries/${queryId}/competitors/${githubRepositoryId}`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`),
+      api<CompetitorCard>(`/api/v1/admin/search-queries/${queryId}/competitors/${githubRepositoryId}`),
     ])
       .then(([repository, queryHistory, competitor]) => {
         if (cancelled) return;

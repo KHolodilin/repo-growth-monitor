@@ -56,7 +56,7 @@ public class CollectorResultIngestion {
         }
         jdbc.update("INSERT INTO collector_result_receipt(event_id,result_id,attempt_id,task_id,node_id,payload_hash,outcome) VALUES (?,?,?,?,?,?,?)",result.eventId(),result.resultId(),result.attemptId(),task.get("id"),attempt.get("node_id"),hash,outcome);
         jdbc.update("""
-            UPDATE collection_request r SET state=CASE WHEN EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state='FAILED') THEN 'FAILED' ELSE 'SUCCEEDED' END,completed_at=clock_timestamp()
+            UPDATE collection_request r SET state=CASE WHEN EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state='FAILED') THEN 'FAILED' WHEN EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state='CANCELLED') THEN 'CANCELLED' ELSE 'SUCCEEDED' END,completed_at=clock_timestamp()
             WHERE r.id=? AND r.state='ACTIVE' AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))
             """,task.get("request_id"));
         return new Applied(result.eventId(),outcome);

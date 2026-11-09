@@ -68,6 +68,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(ErrorCode.NOT_FOUND, "Not found"));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<ApiError> handleDatabase(Exception ex){return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error(ErrorCode.INTERNAL_ERROR,"Data temporarily unavailable"));}
+    @ExceptionHandler({org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,org.springframework.web.bind.MissingServletRequestParameterException.class})
+    public ResponseEntity<ApiError> handleParameters(Exception ex){return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR,"Invalid request parameters"));}
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
         log.error("Unhandled error path={}", request.getRequestURI(), ex);

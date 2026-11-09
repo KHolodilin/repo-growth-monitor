@@ -28,6 +28,7 @@ import java.util.Set;
 public class RepositoryService {
 
     @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}") private boolean durableOrchestration;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
     private final GitHubClient gitHubClient;
     private final GitHubProperties gitHubProperties;
     private final GitHubOwnerJdbcRepository ownerRepository;
@@ -97,7 +98,7 @@ public class RepositoryService {
         Repository updated = repositoryJdbcRepository.setTracking(id, enabled);
         metrics.setTrackedRepositories(repositoryJdbcRepository.countTracked());
         if (enabled) {
-            collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
+            if(commands!=null)commands.manual(id,planningWindow.businessDate());else collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
         }
         return updated;
     }

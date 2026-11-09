@@ -16,9 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class SearchQueryController {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+    @org.springframework.beans.factory.annotation.Autowired private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
     private final SearchQueryService searchQueryService;
     private final CompetitorCardService competitorCardService;
 
@@ -32,6 +34,7 @@ public class SearchQueryController {
         return searchQueryService.list(id);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/repositories/{id}/search-queries")
     public SearchQuery create(@PathVariable long id, @Valid @RequestBody SearchQueryRequest request) {
         return searchQueryService.create(id, request.name(), request.query(), request.enabled(), request.resultLimit());
@@ -47,14 +50,18 @@ public class SearchQueryController {
         searchQueryService.delete(id);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/search-queries/{id}/run")
-    public RunAccepted run(@PathVariable long id) {
+    public Object run(@PathVariable long id) {
+        if(commands!=null)return commands.searchCommand(id,commandWindow.businessDate());
         long runId = searchQueryService.runNow(id);
         return new RunAccepted(runId);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/repositories/{id}/search-queries/run")
-    public RunAllAccepted runAll(@PathVariable long id) {
+    public Object runAll(@PathVariable long id) {
+        if(commands!=null)return commands.searchAllCommand(id,commandWindow.businessDate());
         return new RunAllAccepted(searchQueryService.runAll(id));
     }
 

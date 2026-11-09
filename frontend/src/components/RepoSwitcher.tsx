@@ -101,7 +101,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
       return;
     }
     try {
-      setRepos(await api<Repository[]>("/api/v1/repositories?refresh=false"));
+      setRepos(await api<Repository[]>("/api/v1/admin/repositories?refresh=false"));
     } catch (err) {
       setError((err as Error).message);
     }

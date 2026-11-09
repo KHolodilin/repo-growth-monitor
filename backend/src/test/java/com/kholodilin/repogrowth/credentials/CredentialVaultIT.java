@@ -250,4 +250,11 @@ class CredentialVaultIT extends AbstractPostgresTest {
         assertThat(trafficRepository.latestReferrerSnapshot(repositoryId).rows()).isEmpty();assertThat(trafficRepository.latestReferrerSnapshot(repositoryId).snapshotAt()).isNotNull();
         var pivot=com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.pivot(trafficRepository.referrerSnapshotsForDelta(repositoryId,LocalDate.now().minusDays(1),LocalDate.now()),LocalDate.now().minusDays(1),LocalDate.now());assertThat(pivot.dates()).containsExactly(LocalDate.now().minusDays(1),LocalDate.now());
     }
+    @Test void publishedSearchProofIsCheckedAgainAtProductIngestion(){
+        jdbc.update("INSERT INTO search_query(repository_id,name,query,enabled,result_limit,public_enabled) VALUES (?,'public rank','spring',true,50,true)",repositoryId);
+        var job=typedTask(TaskType.SEARCH_QUERY);assertThat(job.parameters().publicOnly()).isTrue();var delivered=result(job,7);var snapshot=delivered.snapshot();var metadata=new TreeMap<>(snapshot.metadata());metadata.put("search",metadata.get("search").replace("\"id\":202,","\"id\":202,\"private\":false,"));
+        var verified=new Snapshot(snapshot.observedAt(),snapshot.complete(),snapshot.metrics(),snapshot.contributorLogins(),snapshot.traffic(),snapshot.sources(),snapshot.rankings(),snapshot.totalResults(),snapshot.trackedPosition(),metadata,snapshot.events());
+        ingestion.apply("node-a",new ResultDelivery(1,delivered.eventId(),delivered.resultId(),delivered.collectorJobId(),delivered.jobId(),delivered.attemptId(),delivered.type(),delivered.repositoryGithubId(),delivered.status(),verified,null));
+        assertThat(jdbc.queryForObject("SELECT public_scope_verified FROM search_run",Boolean.class)).isTrue();
+    }
 }

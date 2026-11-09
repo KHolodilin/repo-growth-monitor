@@ -66,7 +66,12 @@ public class CollectionRequestService {
         return seeds.stream().map(id->create(id,date,null,true)).toList();
     }
     private Created create(long repositoryId,LocalDate date,String triggerKey){return create(repositoryId,date,triggerKey,false);}
-    private Created create(long repositoryId,LocalDate date,String triggerKey,boolean refresh) {
+    public Created searchCommand(long id,LocalDate date){var query=queries.findById(id).orElseThrow(()->ApiException.notFound("Search query not found"));return create(query.repositoryId(),date,null,false,List.of(new Spec(TaskType.SEARCH_QUERY,"query:"+id,new Parameters(query.query(),null,null,query.resultLimit(),"stars","desc",searchPublic(query.id())))));}
+    public Created searchAllCommand(long id,LocalDate date){var specs=queries.findByRepository(id).stream().filter(q->q.enabled()).map(q->new Spec(TaskType.SEARCH_QUERY,"query:"+q.id(),new Parameters(q.query(),null,null,q.resultLimit(),"stars","desc",searchPublic(q.id())))).toList();if(specs.isEmpty())throw ApiException.validation("No enabled search queries");return create(id,date,null,false,specs);}
+    public Created topicCommand(long id,LocalDate date){var watch=watches.findById(id).orElseThrow(()->ApiException.notFound("Topic watch not found"));return create(watch.repositoryId(),date,null,false,List.of(new Spec(TaskType.TOPIC_WATCH,"watch:"+id,new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder(),topicsPublic(watch.repositoryId())))));}
+    public Created topicsCommand(long id,String scope,LocalDate date){if(!Set.of("all","language").contains(scope))throw ApiException.validation("Topic scope must be all or language");watchSync.sync(id);var specs=watches.findEnabledByRepository(id,scope.equals("all")).stream().map(w->new Spec(TaskType.TOPIC_WATCH,"watch:"+w.id(),new Parameters(w.searchQuery(),w.topic(),w.language(),w.resultLimit(),w.sort(),w.sortOrder(),topicsPublic(w.repositoryId())))).toList();if(specs.isEmpty())throw ApiException.validation("No enabled topic watches");return create(id,date,null,false,specs);}
+    private Created create(long repositoryId,LocalDate date,String triggerKey,boolean refresh){return create(repositoryId,date,triggerKey,refresh,null);}
+    private Created create(long repositoryId,LocalDate date,String triggerKey,boolean refresh,List<Spec> requested) {
         return tx.execute(status -> {
             jdbc.queryForObject("SELECT pg_advisory_xact_lock(?)",Object.class,repositoryId);
             // Serialize creation without blocking history writers under the request lock.
@@ -76,6 +81,19 @@ public class CollectionRequestService {
             var existing=jdbc.queryForList("SELECT id,public_id FROM collection_request WHERE repository_id=? AND (state='ACTIVE' OR (?::text IS NOT NULL AND trigger_key=?)) ORDER BY (trigger_key=?::text) DESC NULLS LAST,id DESC LIMIT 1",repositoryId,triggerKey,triggerKey,triggerKey);
             if(!existing.isEmpty()) {
                 long request=((Number)existing.getFirst().get("id")).longValue();
+                if(requested==null&&!refresh){
+                    String state=jdbc.queryForObject("SELECT state FROM collection_request WHERE id=? FOR UPDATE",String.class,request);
+                    if(!state.equals("ACTIVE")){if(triggerKey!=null)return response(request,(UUID)existing.getFirst().get("public_id"),true);return create(repositoryId,date,triggerKey,false,null);}
+                    watchSync.sync(repositoryId);
+                    for(var type:List.of(TaskType.STATS,TaskType.TRAFFIC,TaskType.REFERRERS,TaskType.POPULAR_PATHS,TaskType.GROWTH_EVENTS))append(request,repositoryId,new Spec(type,"repository",Parameters.repository()));
+                    for(var query:queries.findByRepository(repositoryId))if(query.enabled())append(request,repositoryId,new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),new Parameters(query.query(),null,null,query.resultLimit(),"stars","desc",searchPublic(query.id()))));
+                    for(var watch:watches.findByRepository(repositoryId))if(watch.enabled())append(request,repositoryId,new Spec(TaskType.TOPIC_WATCH,"watch:"+watch.id(),new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder(),topicsPublic(watch.repositoryId()))));
+                }
+                if(requested!=null){
+                    String state=jdbc.queryForObject("SELECT state FROM collection_request WHERE id=? FOR UPDATE",String.class,request);
+                    if(!state.equals("ACTIVE"))return create(repositoryId,date,null,false,requested);
+                    for(var spec:requested)append(request,repositoryId,spec);
+                }
                 if(refresh){
                     String state=jdbc.queryForObject("SELECT state FROM collection_request WHERE id=? FOR UPDATE",String.class,request);
                     if(!state.equals("ACTIVE"))return create(repositoryId,date,null,true);
@@ -108,9 +126,10 @@ public class CollectionRequestService {
             for(var setting:eventSettings.ensureDefaults(repositoryId)) growthSettings.put(setting.eventType(),setting.enabled());
             List<Spec> specs=new ArrayList<>();
             for(var type:List.of(TaskType.STATS,TaskType.TRAFFIC,TaskType.REFERRERS,TaskType.POPULAR_PATHS,TaskType.GROWTH_EVENTS)) specs.add(new Spec(type,"repository",Parameters.repository()));
-            for(var query:queries.findByRepository(repositoryId)) if(query.enabled()) specs.add(new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),new Parameters(query.query(),null,null,query.resultLimit(),"stars","desc")));
-            for(var watch:watches.findByRepository(repositoryId)) if(watch.enabled()) specs.add(new Spec(TaskType.TOPIC_WATCH,"watch:"+watch.id(),new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder())));
+            for(var query:queries.findByRepository(repositoryId)) if(query.enabled()) specs.add(new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),new Parameters(query.query(),null,null,query.resultLimit(),"stars","desc",searchPublic(query.id()))));
+            for(var watch:watches.findByRepository(repositoryId)) if(watch.enabled()) specs.add(new Spec(TaskType.TOPIC_WATCH,"watch:"+watch.id(),new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder(),topicsPublic(watch.repositoryId()))));
             if(refresh){specs.clear();specs.add(new Spec(TaskType.DISCOVER_REPOSITORIES,"repository",Parameters.repository()));}
+            if(requested!=null){specs.clear();specs.addAll(requested);}
             Instant deadline=Instant.now().plus(properties.jobTimeout()).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
             for(var spec:specs) {
                 UUID taskId=UUID.randomUUID(), attemptId=UUID.randomUUID();
@@ -130,9 +149,29 @@ public class CollectionRequestService {
             return response(request,requestId,false);
         });
     }
+    private void append(long request,long repository,Spec spec){
+        if(jdbc.queryForObject("SELECT count(*) FROM collection_task WHERE request_id=? AND task_type=? AND target_key=?",Long.class,request,spec.type().name(),spec.key())>0)return;
+        var parent=json.readValue(jdbc.queryForObject("SELECT d.payload::text FROM collection_task t JOIN collector_dispatch d ON d.attempt_id=t.current_attempt_id WHERE t.request_id=? ORDER BY t.id LIMIT 1",String.class,request),JobRequest.class);
+        var authority=credentialVault==null?null:credentialVault.scope(repository);var taskId=UUID.randomUUID();var attemptId=UUID.randomUUID();Map<String,Object> configuration=new TreeMap<>();configuration.put("repository",parent.repository());configuration.put("parameters",spec.parameters());if(authority!=null)configuration.put("authorization",authority);Map<String,Boolean> settings=new TreeMap<>();if(spec.type()==TaskType.GROWTH_EVENTS)for(var setting:eventSettings.ensureDefaults(repository))settings.put(setting.eventType(),setting.enabled());configuration.put("growthEventSettings",settings);String frozen=json.writeValueAsString(configuration);long revision=revision(spec.type()+spec.key()+frozen);
+        var envelope=new JobRequest(1,parent.requestId(),taskId,attemptId,spec.type(),parent.repository(),parent.businessDate(),revision,spec.parameters(),parent.destinationRef(),Instant.now().plus(properties.jobTimeout()),authority);
+        long node=jdbc.queryForObject("SELECT node_id FROM collection_attempt WHERE public_id=?",Long.class,parent.attemptId());
+        long task=jdbc.queryForObject("INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id) VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?,?) RETURNING id",Long.class,taskId,request,repository,spec.type().name(),spec.key(),json.writeValueAsString(spec.parameters()),frozen,revision,attemptId);
+        if(authority!=null)jdbc.update("UPDATE collection_task SET authorization_context=?::uuid,credential_ref=? WHERE id=?",authority.context(),authority.credentialRef(),task);
+        jdbc.update("INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",attemptId,task,node);
+        jdbc.update("INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,(SELECT endpoint FROM collector_node WHERE id=?),?::jsonb,?)",attemptId,node,json.writeValueAsString(envelope),Timestamp.from(envelope.deadlineAt()));
+    }
+    public void cancelSearch(long query){tx.executeWithoutResult(status->{
+        var requests=jdbc.queryForList("SELECT DISTINCT request_id FROM collection_task WHERE task_type='SEARCH_QUERY' AND target_key=? ORDER BY request_id",Long.class,"query:"+query);
+        for(long request:requests){jdbc.queryForList("SELECT id FROM collection_request WHERE id=? FOR UPDATE",Long.class,request);var tasks=jdbc.queryForList("SELECT id,current_attempt_id FROM collection_task WHERE request_id=? AND task_type='SEARCH_QUERY' AND target_key=? AND state IN ('READY','ACCEPTED','RUNNING','RETRY') FOR UPDATE",request,"query:"+query);
+            for(var task:tasks){jdbc.update("UPDATE collection_task SET state='CANCELLED',completed_at=clock_timestamp() WHERE id=?",task.get("id"));jdbc.update("UPDATE collection_attempt SET state='CANCELLED',completed_at=clock_timestamp() WHERE public_id=?",task.get("current_attempt_id"));jdbc.update("UPDATE collector_dispatch SET state='BLOCKED',last_error='DEFINITION_DELETED',locked_by=NULL,locked_until=NULL WHERE attempt_id=?",task.get("current_attempt_id"));}
+            jdbc.update("UPDATE collection_request r SET state='CANCELLED',completed_at=clock_timestamp() WHERE r.id=? AND r.state='ACTIVE' AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))",request);
+        }
+    });}
     private Created response(long id,UUID publicId,boolean coalesced) {
         return new Created(publicId,jdbc.queryForList("SELECT public_id FROM collection_task WHERE request_id=? ORDER BY id",UUID.class,id),coalesced);
     }
+    private boolean searchPublic(long id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT public_enabled FROM search_query WHERE id=?",Boolean.class,id));}
+    private boolean topicsPublic(long id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT public_topics_enabled FROM repository WHERE id=?",Boolean.class,id));}
     private static long revision(String snapshot) {
         try {return ByteBuffer.wrap(MessageDigest.getInstance("SHA-256").digest(snapshot.getBytes(StandardCharsets.UTF_8))).getLong() & Long.MAX_VALUE;}
         catch(NoSuchAlgorithmException impossible) {throw new IllegalStateException(impossible);}

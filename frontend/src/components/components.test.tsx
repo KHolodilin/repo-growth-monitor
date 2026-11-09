@@ -78,7 +78,7 @@ describe("components", () => {
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Repositories" }));
@@ -238,9 +238,9 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
-    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" });
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" });
     repo.unmount();
 
     api.mockClear();
@@ -262,9 +262,9 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" }),
     );
-    expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" });
+    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" });
   });
 
   it("shows job progress under the header until the run finishes", async () => {
@@ -321,7 +321,7 @@ describe("components", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }));
     expect(timers.length).toBeGreaterThan(0);
     const fireTimers = async () => {
       await act(async () => {

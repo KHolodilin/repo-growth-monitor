@@ -26,7 +26,8 @@ public final class CollectorProtocol {
     }
 
     /** Query/watch settings are supplied by RGM, never discovered by a collector scheduler. */
-    public record Parameters(String query, String topic, String language, Integer resultLimit, String sort, String order) {
+    public record Parameters(String query, String topic, String language, Integer resultLimit, String sort, String order,boolean publicOnly) {
+        public Parameters(String query,String topic,String language,Integer resultLimit,String sort,String order){this(query,topic,language,resultLimit,sort,order,false);}
         public Parameters {
             if (resultLimit != null && (resultLimit < 1 || resultLimit > 100)) throw new IllegalArgumentException("resultLimit must be 1..100");
             if (order != null && !List.of("asc", "desc").contains(order)) throw new IllegalArgumentException("order must be asc or desc");

@@ -34,18 +34,18 @@ export function QueryDetailsPage() {
       return;
     }
     const [repository, queryHistory] = await Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
-      api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`),
     ]);
     setRepo(repository);
     setHistory(queryHistory);
     try {
-      setResults(await api<SearchRunResults>(`/api/v1/search-queries/${queryId}/results`));
+      setResults(await api<SearchRunResults>(`/api/v1/admin/search-queries/${queryId}/results`));
     } catch {
       setResults(null);
     }
     try {
-      setSeries(searchSeriesFromPayload(await api(`/api/v1/search-queries/${queryId}/series`)));
+      setSeries(searchSeriesFromPayload(await api(`/api/v1/admin/search-queries/${queryId}/series`)));
     } catch {
       setSeries([]);
     }
@@ -78,7 +78,7 @@ export function QueryDetailsPage() {
     }
     setRunning(true);
     try {
-      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
       await load();
     } catch (err) {
       setError((err as Error).message);

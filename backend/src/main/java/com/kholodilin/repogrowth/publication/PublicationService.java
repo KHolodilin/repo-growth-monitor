@@ -14,8 +14,9 @@ public class PublicationService {
  public PublicationService(JdbcTemplate jdbc,PublicationProperties properties){this.jdbc=jdbc;this.properties=properties;}
  private String eligible(){return "r.public_dashboard_enabled AND r.visibility='PUBLIC' AND r.visibility_verified_at<=clock_timestamp() AND r.visibility_verified_at>clock_timestamp()-(?*interval '1 millisecond')";}
  @Transactional public void publish(long repository,Policy policy){
- var rows=jdbc.queryForList("SELECT o.login FROM repository r JOIN github_owner o ON o.id=r.owner_id WHERE r.id=? FOR UPDATE OF r",repository);
+ var rows=jdbc.queryForList("SELECT o.login,r.visibility,r.visibility_verified_at FROM repository r JOIN github_owner o ON o.id=r.owner_id WHERE r.id=? FOR UPDATE OF r",repository);
  if(rows.isEmpty())throw ApiException.notFound("Repository not found");if(policy.dashboard()&&!PublicRoutes.owner((String)rows.getFirst().get("login")))throw ApiException.validation("Owner conflicts with reserved public namespace");
+ if(policy.dashboard()){var row=rows.getFirst();var checked=(java.sql.Timestamp)row.get("visibility_verified_at");if(!"PUBLIC".equals(row.get("visibility"))||checked==null||checked.toInstant().plus(properties.verificationMaxAge()).isBefore(Instant.now())||checked.toInstant().isAfter(Instant.now()))throw ApiException.validation("Verified public visibility is required before publication");}
  jdbc.update("UPDATE repository SET public_dashboard_enabled=?,public_traffic_enabled=?,public_referrers_enabled=?,public_paths_enabled=?,public_topics_enabled=? WHERE id=?",policy.dashboard(),policy.traffic(),policy.referrers(),policy.paths(),policy.topics(),repository);
  }
  public boolean eligible(long id){var names=jdbc.queryForList("SELECT o.login FROM repository r JOIN github_owner o ON o.id=r.owner_id WHERE r.id=? AND "+eligible(),String.class,id,properties.verificationMaxAge().toMillis());return !names.isEmpty()&&PublicRoutes.owner(names.getFirst());}

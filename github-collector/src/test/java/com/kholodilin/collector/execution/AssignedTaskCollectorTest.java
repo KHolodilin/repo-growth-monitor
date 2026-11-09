@@ -13,8 +13,8 @@ class AssignedTaskCollectorTest {
     JobRequest job(TaskType type){return new JobRequest(1,UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),type,new RepositoryTarget("202","owner","repo"),LocalDate.now(),1,new Parameters("spring","spring",null,50,"stars","desc"),"rgm-results",Instant.now().plusSeconds(3600),new AuthorizationScope("ctx","ref"));}
     Lease lease(JobRequest job){return new Lease(1,"worker",1,json.writeValueAsString(job),job.deadlineAt(),"rgm",UUID.randomUUID(),0);}
     class Reader implements SourceReader {
-        Map<String,String> data=new HashMap<>();List<String> reads=new ArrayList<>(),invalidated=new ArrayList<>();
-        public JsonNode read(Lease l,JobRequest j,String key,String method,String path,String body,boolean optional){reads.add(key);String value=data.get(key);if(value==null){if(optional)return json.readTree("null");throw new IllegalStateException("Missing fixture: "+key);}return json.readTree(value);}
+        Map<String,String> data=new HashMap<>();List<String> reads=new ArrayList<>(),invalidated=new ArrayList<>(),paths=new ArrayList<>();
+        public JsonNode read(Lease l,JobRequest j,String key,String method,String path,String body,boolean optional){reads.add(key);paths.add(path);String value=data.get(key);if(value==null){if(optional)return json.readTree("null");throw new IllegalStateException("Missing fixture: "+key);}return json.readTree(value);}
         public void invalidate(Lease l,String key){invalidated.add(key);}
     }
     @Test void statsPreserveRealZerosAndCollectExactContributorsAndHealthObservations(){
@@ -64,5 +64,8 @@ class AssignedTaskCollectorTest {
         }
         assertThat(counts).containsEntry("search",600).containsEntry("graphql",200);assertThat(counts.get("core")).isGreaterThan(2000);
         System.out.printf("SOURCE WORKLOAD 100 repositories, 100 queries, 200 watches, cold absent rank confirmation: %s requests; CPU fixture duration=%dms%n",counts,(System.nanoTime()-started)/1_000_000);
+    }
+    @Test void explicitlyPublishedSearchRequestsOnlyPublicResultsAndRequiresProof(){
+        var reader=new Reader();reader.data.put("search","{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");var base=job(TaskType.SEARCH_QUERY);var published=new JobRequest(1,base.requestId(),base.jobId(),base.attemptId(),base.type(),base.repository(),base.businessDate(),1,new Parameters("spring",null,null,50,"stars","desc",true),base.destinationRef(),base.deadlineAt(),base.authorization());var snapshot=new AssignedTaskCollector(reader,properties).collect(lease(published),published);assertThat(snapshot.metadata()).containsEntry("publicScopeVerified","true");assertThat(reader.paths).allMatch(path->path.contains("is%3Apublic"));reader.data.put("search",reader.data.get("search").replace("false","true"));assertThat(new AssignedTaskCollector(reader,properties).collect(lease(published),published).metadata()).containsEntry("publicScopeVerified","false");
     }
 }

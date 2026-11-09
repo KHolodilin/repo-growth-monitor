@@ -43,3 +43,5 @@ databaseChangeLog:
       file: db/changelog/021-quota-identities.yaml
   - include:
       file: db/changelog/022-publication.yaml
+  - include:
+      file: db/changelog/023-publication-audit.yaml

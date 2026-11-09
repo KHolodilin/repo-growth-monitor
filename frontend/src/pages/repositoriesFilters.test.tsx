@@ -118,7 +118,9 @@ describe("repository filters", () => {
     vi.spyOn(window, "confirm").mockRestore();
   });
 
-  it("reads the saved list and refreshes once when a token is new", async () => {
+  it("reads saved data and refreshes only through an explicit POST", async () => {
+    const user = userEvent.setup();
+    let refreshed = false;
     const calls: string[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
@@ -126,14 +128,16 @@ describe("repository filters", () => {
       if (url.includes("/system/status")) {
         return { tokenState: "OK", rateLimitReset: null };
       }
-      if (url.includes("refresh=true")) {
-        return [{ ...tracked, trackingEnabled: false }];
-      }
-      return [];
+      if (url.endsWith("/repositories/refresh")) { refreshed = true; return []; }
+      return refreshed ? [{ ...tracked, trackingEnabled: false }] : [];
     });
     renderRepos();
+    expect(await screen.findByText("No repositories yet. Configure GITHUB_TOKEN and refresh.")).toBeInTheDocument();
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/refresh", expect.anything());
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
-    expect(calls.filter((url) => url.includes("refresh=true"))).toHaveLength(1);
+    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/refresh", { method: "POST" });
+    expect(calls.filter((url) => url.includes("refresh=true"))).toHaveLength(0);
     expect(screen.getByRole("button", { name: "All", pressed: true })).toBeInTheDocument();
 
     api.mockImplementation(async (path: string) => {
@@ -359,7 +363,7 @@ describe("repository filters", () => {
     const blocked = renderRepos();
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh from GitHub" })).toBeDisabled();
-    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories?refresh=true");
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories?refresh=true");
     blocked.unmount();
 
     const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {

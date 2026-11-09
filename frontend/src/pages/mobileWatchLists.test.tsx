@@ -74,7 +74,7 @@ describe("mobile repository watch-lists", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Running..." })).toBeNull());
     if (tab === "search") {
       await user.click(within(screen.getByRole("link", { name: searchHistory.query.name }).closest("article")!).getByRole("button", { name: "Delete" }));
-      expect(state.api).toHaveBeenCalledWith("/api/v1/search-queries/5", { method: "DELETE" });
+      expect(state.api).toHaveBeenCalledWith("/api/v1/admin/search-queries/5", { method: "DELETE" });
     }
     view.unmount(); state.busy = true;
     mount(tab);

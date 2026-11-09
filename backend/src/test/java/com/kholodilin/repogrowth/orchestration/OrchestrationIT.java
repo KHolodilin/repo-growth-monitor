@@ -183,7 +183,7 @@ class OrchestrationIT extends AbstractPostgresTest {
         assertThat(count("collection_request")).isZero();
         mvc.perform(post(url).header("Idempotency-Key","manual-test").with(asUser("admin")).with(csrf())).andExpect(status().isCreated()).andExpect(jsonPath("$.requestId").isString()).andExpect(jsonPath("$.taskIds.length()").value(8));
         assertThat(count("collector_dispatch")).isEqualTo(8);
-        mvc.perform(post("/api/v1/repositories/"+repositoryId+"/collect").with(asUser("admin")).with(csrf())).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/v1/repositories/"+repositoryId+"/collect").with(asUser("admin")).with(csrf())).andExpect(status().isNotFound());
         assertThat(count("collection_job")).isZero();
     }
     @Test void redirectsAreNotFollowed() {

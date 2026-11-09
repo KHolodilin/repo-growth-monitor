@@ -40,7 +40,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers,
-    credentials: "include",
+    credentials: path.startsWith("/api/v1/public/") ? "omit" : "include",
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ message: response.statusText }));

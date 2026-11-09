@@ -38,7 +38,7 @@ export function Layout() {
   const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
-    const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+    const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
     if (!dashboard?.repositories) {
       setRows([]);
       return dashboard;
@@ -94,11 +94,11 @@ export function Layout() {
     try {
       const onlyId = repositoryIdFromPath(location.pathname);
       if (onlyId != null) {
-        await api(`/api/v1/repositories/${onlyId}/collect`, { method: "POST" });
+        await api(`/api/v1/admin/repositories/${onlyId}/collect`, { method: "POST" });
       } else {
-        const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+        const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
         const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
-        await Promise.all(ids.map((id) => api(`/api/v1/repositories/${id}/collect`, { method: "POST" })));
+        await Promise.all(ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })));
         if (dashboard?.repositories) {
           setSync(dashboard.lastSyncAt);
           setRows(dashboard.repositories);

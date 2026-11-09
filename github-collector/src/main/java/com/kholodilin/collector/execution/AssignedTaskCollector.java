@@ -77,7 +77,7 @@ public final class AssignedTaskCollector {
                 for(JsonNode row:data)sources.add(new SourceObservation(row.get(paths?"path":"referrer").asText(),row.hasNonNull("title")?row.get("title").asText():null,number(row,"count"),number(row,"uniques")));
             }
             case SEARCH_QUERY,TOPIC_WATCH -> {
-                int limit=job.parameters().resultLimit()==null?50:job.parameters().resultLimit();String query=job.parameters().query();
+                int limit=job.parameters().resultLimit()==null?50:job.parameters().resultLimit();String query=job.parameters().query();if(job.parameters().publicOnly())query=query+" is:public";
                 String path="/search/repositories?q="+URLEncoder.encode(query,StandardCharsets.UTF_8)+"&per_page="+limit+"&sort="+URLEncoder.encode(Objects.requireNonNullElse(job.parameters().sort(),"stars"),StandardCharsets.UTF_8)+"&order="+Objects.requireNonNullElse(job.parameters().order(),"desc");
                 JsonNode data=get(lease,job,"search",path,false);total=number(data,"total_count");
                 position=findPosition(data.path("items"),job.repository().githubId());
@@ -87,7 +87,8 @@ public final class AssignedTaskCollector {
                     if(position==null && (data.path("incomplete_results").asBoolean(false) || data.path("items").size()<Math.min(limit,total))){source.invalidate(lease,"search-confirmation");throw new Incomplete();}
                 }
                 int rank=1;for(JsonNode row:data.path("items"))rankings.add(new RankedRepository(row.get("id").asText(),row.get("full_name").asText(),rank++,number(row,"stargazers_count"),number(row,"forks_count")));
-                keep(metadata,"search",data);metadata.put("enrichmentStatus","DEFERRED");
+                boolean publicRows=true;for(var item:data.path("items"))if(!item.hasNonNull("private") || !item.get("private").isBoolean() || item.get("private").asBoolean())publicRows=false;
+                metadata.put("publicScopeVerified",Boolean.toString(job.parameters().publicOnly() && publicRows));keep(metadata,"search",data);metadata.put("enrichmentStatus","DEFERRED");
             }
         }
         return new Snapshot(source.observedAt(lease),true,metrics,contributorLogins,traffic,sources,rankings,total,position,metadata,List.of());

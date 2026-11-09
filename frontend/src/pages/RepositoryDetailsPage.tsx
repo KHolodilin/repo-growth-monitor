@@ -211,13 +211,13 @@ export function RepositoryDetailsPage() {
     }
     const version = ++requestVersion.current;
     const [repository, trafficData, searchData, plainTopicData, languageTopicData] = await Promise.all([
-      api<Repository>(`/api/v1/repositories/${id}`),
+      api<Repository>(`/api/v1/admin/repositories/${id}`),
       api<RepositoryTraffic>(
-        `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
+        `/api/v1/admin/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
       ),
-      api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=all`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=language`),
+      api<SearchHistory[]>(`/api/v1/admin/repositories/${id}/search-visibility`),
+      api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=all`),
+      api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=language`),
     ]);
     if (version !== requestVersion.current) return;
     setRepo(repository);
@@ -304,7 +304,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/repositories/${id}/search-queries`, {
+      await api(`/api/v1/admin/repositories/${id}/search-queries`, {
         method: "POST",
         body: JSON.stringify({ name: query, query, enabled: true, resultLimit: 50 }),
       });
@@ -322,7 +322,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(queryId);
     try {
-      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -335,7 +335,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/repositories/${id}/search-queries/run`, { method: "POST" });
+      await api(`/api/v1/admin/repositories/${id}/search-queries/run`, { method: "POST" });
       await load();
     } catch (err) {
       setQueryError((err as Error).message);
@@ -350,7 +350,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(watchId);
     try {
-      await api(`/api/v1/topic-watches/${watchId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/topic-watches/${watchId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -363,7 +363,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/repositories/${id}/topic-watches/run?scope=${scope}`, { method: "POST" });
+      await api(`/api/v1/admin/repositories/${id}/topic-watches/run?scope=${scope}`, { method: "POST" });
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -394,7 +394,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/search-queries/${queryId}`, { method: "DELETE" });
+      await api(`/api/v1/admin/search-queries/${queryId}`, { method: "DELETE" });
       pruneChartSelection(
         repoSearchChartId(id),
         visibility.filter((item) => item.query.id !== queryId).map((item) => String(item.query.id)),
@@ -924,7 +924,7 @@ function GrowthEventsTab({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then(setEvents)
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
@@ -960,7 +960,7 @@ function TrafficPanel({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
@@ -1288,7 +1288,7 @@ function CombinedTopicRankChart({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
@@ -1665,7 +1665,7 @@ function CombinedRankChart({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
