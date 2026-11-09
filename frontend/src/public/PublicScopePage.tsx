@@ -126,7 +126,9 @@ export function PublicScopePage() {
   if (!overview) return <p role="status" className="py-10">Loading dashboard…</p>;
   if ((tab === "search" && !overview.modules.search) || (tab === "topics" && !overview.modules.topics)) return <PublicNotFound />;
 
-  const heading = overview.repository?.name ?? overview.owner.login;
+  // Owner keeps a login heading like Portfolio's title. Repository pages already show the
+  // name in breadcrumbs/switcher — do not repeat it as a page H1 (matches admin repo chrome).
+  const heading = overview.repository ? undefined : overview.owner.login;
   const href = (id: number | string) =>
     `/${encodeURIComponent(overview.owner.login)}/${encodeURIComponent(rows.find((row) => row.id === String(id))?.name ?? overview.repository?.name ?? "")}`;
 
@@ -172,10 +174,7 @@ export function PublicScopePage() {
           )}
         </nav>
         {overview.repository && (
-          <label className="flex flex-wrap items-center gap-2 text-sm">
-            Repository{" "}
-            <PublicRepositorySwitcher owner={overview.owner.login} current={overview.repository.id} period={period} />
-          </label>
+          <PublicRepositorySwitcher owner={overview.owner.login} current={overview.repository.id} period={period} />
         )}
         {overview.freshness.state === "EMPTY" && <p role="status" className="text-sm text-muted-foreground">No saved snapshots yet.</p>}
         {isRepo && (
@@ -196,9 +195,7 @@ export function PublicScopePage() {
                 />
               ))}
             </div>
-            {(tab === "search" || tab === "topics" || tab === "events") && (
-              <PeriodSelector fitMobile period={period} onPeriod={changePeriod} />
-            )}
+            <PeriodSelector fitMobile period={period} onPeriod={changePeriod} />
           </div>
         )}
         {busy ? (
@@ -212,14 +209,11 @@ export function PublicScopePage() {
             period={period}
             onPeriod={changePeriod}
             tab={tab}
-            onTab={(next) => changeTab(next)}
+            onTab={isRepo ? undefined : (next) => changeTab(next)}
             events={events}
           />
         ) : model ? (
-          <>
-            <h1 className="break-all text-2xl font-semibold">{heading}</h1>
-            <PublicModules overview={overview} rows={rows} tab={tab} period={period} events={events} />
-          </>
+          <PublicModules overview={overview} rows={rows} tab={tab} period={period} events={events} />
         ) : null}
         {!busy && overview.repository && tab === "traffic" && (
           <PublicModules overview={overview} rows={rows} tab="sources" period={period} events={events} />

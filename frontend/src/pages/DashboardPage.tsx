@@ -136,9 +136,10 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
   const [statsSeries, changeStatsSeries] = useState(() => view.public ? readPublicPreference(view.scopeKey!, "mobile:stats", (v):v is string => typeof v === "string") ?? "Stars" : "Stars");
   const setTrafficSeries=(next:string)=>{changeTrafficSeries(next);mobileSelection?.onTraffic(next);if(view.public)writePublicPreference(view.scopeKey!,"mobile:traffic",next);};
   const setStatsSeries=(next:string)=>{changeStatsSeries(next);mobileSelection?.onStats(next);if(view.public)writePublicPreference(view.scopeKey!,"mobile:stats",next);};
+  const repoPublicChrome = view.public && view.showRepositories === false;
   return (
     <div className="space-y-4">
-      <DashboardHeader data={data} period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />
+      {!repoPublicChrome && <DashboardHeader data={data} period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />}
       {tab === "traffic" ? (
         <div className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
           {view.showRepositories === false && data.summary.clones ? <TrafficKpiCard label="Clones" value={data.summary.clones.value} growthPercent={data.summary.clones.growthPercent} coverage={data.summary.clones.coverage} period={period} series={data.traffic.map(point=>point.clones)}/> : <KpiCard label="Repositories" value={data.summary.repositories} />}
@@ -196,7 +197,7 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
       ) : (
         <StatsChart points={data.stats.points} events={events} period={period} selectedMobileSeries={mobileSelection?.stats ?? statsSeries} onMobileSeriesChange={setStatsSeries} />
       )}
-      <PeriodHighlights highlights={data.highlights} />
+      {view.showRepositories !== false && <PeriodHighlights highlights={data.highlights} />}
       {view.showRepositories !== false && <RepositoryTable rows={data.repositories} />}
     </div>
   );
@@ -247,7 +248,9 @@ function DashboardHeader({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="min-w-0 break-words text-2xl font-semibold [overflow-wrap:anywhere]">{view.heading ?? "Portfolio"}</h1>
+        {(view.heading || !view.public) && (
+          <h1 className="min-w-0 break-words text-2xl font-semibold [overflow-wrap:anywhere]">{view.heading ?? "Portfolio"}</h1>
+        )}
         {problems.length > 0 && (
           <div ref={rootRef} className="relative">
             <button
