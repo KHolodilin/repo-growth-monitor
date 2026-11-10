@@ -58,7 +58,7 @@ At the user's request the local Compose application was rebuilt and restarted wi
 
 There is no separate general Admin dashboard and no dashboard-to-user/repository assignment configuration. Dashboards live at owner/repository public URLs. The existing repository-management list remains the management entry point; Admin sign-in opens that list. Existing repository/query/topic/event management functionality is retained. Public publication policy is a separate unresolved local rollout step, not a new user-facing board configuration screen.
 
-The initial local runtime audit exposed that only legacy workers were running. This was resolved in the combined-runtime follow-up: the default contributor Compose now runs one RGM/Collector JVM with independent Collector PostgreSQL, with actual end-to-end jobs verified.
+The initial local runtime audit exposed that only legacy workers were running. This was resolved in the collector runtime follow-up: contributor Compose runs separate RGM and Collector containers with independent Collector PostgreSQL, with actual end-to-end jobs verified.
 
 
 ## Combined runtime follow-up

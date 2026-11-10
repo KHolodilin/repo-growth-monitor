@@ -1,6 +1,12 @@
 services:
   repo-growth-monitor:
     environment:
-      SPRING_CONFIG_ADDITIONAL_LOCATION: file:/app/combined-runtime.yml
+      SPRING_CONFIG_ADDITIONAL_LOCATION: file:/app/rgm-runtime.yml
     volumes:
-      - ./deploy/tmp/combined-runtime.local.yml:/app/combined-runtime.yml:ro
+      - ./deploy/tmp/rgm-runtime.local.yml:/app/rgm-runtime.yml:ro
+
+  collector:
+    environment:
+      SPRING_CONFIG_ADDITIONAL_LOCATION: file:/app/collector-runtime.yml
+    volumes:
+      - ./deploy/tmp/collector-runtime.local.yml:/app/collector-runtime.yml:ro
