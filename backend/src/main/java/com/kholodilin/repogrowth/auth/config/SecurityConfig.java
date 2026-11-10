@@ -6,6 +6,7 @@ import com.kholodilin.repogrowth.auth.security.AdminAuthorizationManager;
 import com.kholodilin.repogrowth.auth.security.AuthJsonHandlers;
 import com.kholodilin.repogrowth.auth.security.MockLoginSuccessHandler;
 import com.kholodilin.repogrowth.auth.security.OidcLoginSuccessHandler;
+import com.kholodilin.repogrowth.publication.PublishedRepositoryReadFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -51,7 +52,8 @@ public class SecurityConfig {
             MockLoginSuccessHandler mockLoginSuccessHandler,
             OidcLoginSuccessHandler oidcLoginSuccessHandler,
             Clock clock,
-            ClientRegistrationRepository clientRegistrationRepository
+            ClientRegistrationRepository clientRegistrationRepository,
+            PublishedRepositoryReadFilter publishedRepositoryReadFilter
     ) throws Exception {
         CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepository.setCookiePath("/");
@@ -96,6 +98,13 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/vite.svg"
                         ).permitAll()
+                        // Published repository reads reuse admin GET handlers; fence is PublishedRepositoryReadFilter.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/repositories/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/repositories/*/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/search-queries/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/search-queries/*/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/topic-watches/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/topic-watches/*/**").permitAll()
                         .requestMatchers("/admin", "/admin/**", "/api/v1/admin/**").access(adminAuthorizationManager)
 
                         .requestMatchers(HttpMethod.GET, "/api/v1/me").permitAll()
@@ -109,6 +118,7 @@ public class SecurityConfig {
                         .anyRequest().permitAll();
                 })
                 .addFilterBefore(new AbsoluteSessionTimeoutFilter(properties, clock), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(publishedRepositoryReadFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(csrfCookieFilter(), UsernamePasswordAuthenticationFilter.class);
 
         if (provider == AuthProvider.MOCK) {

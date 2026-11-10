@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import type { Repository } from "../lib/api";
 import { RepoSwitcher } from "./RepoSwitcher";
 
 export type BreadcrumbItem = {
@@ -6,7 +7,7 @@ export type BreadcrumbItem = {
   to?: string;
   repoSwitcher?: {
     currentId: number;
-    hrefFor: (repositoryId: number) => string;
+    hrefFor: (repository: Repository) => string;
     description?: string;
   };
 };

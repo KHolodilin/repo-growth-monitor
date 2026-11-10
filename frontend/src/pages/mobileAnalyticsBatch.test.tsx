@@ -57,7 +57,7 @@ describe("mobile analytics batch", () => {
   it("keeps the mobile repository menu usable during viewport and page changes", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue([repository]);
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: id => `/admin/repositories/${id}` } }]} /></MemoryRouter>);
+    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: (repo) => `/${repo.owner.login}/${repo.name}` } }]} /></MemoryRouter>);
     await user.click(screen.getByRole("button", { name: "Switch repository" }));
     fireEvent.resize(window); fireEvent.scroll(window);
     await user.type(screen.getByRole("textbox", { name: "Search repositories" }), "spring");
@@ -129,7 +129,7 @@ describe("mobile analytics batch", () => {
   });
 
   it("keeps breadcrumb navigation and complete page labels available", () => {
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: id => `/admin/repositories/${id}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
+    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: (repo) => `/${repo.owner.login}/${repo.name}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
     expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Search Visibility" })).toBeInTheDocument();
     expect(screen.getByTitle("a/very-long-repository-name")).toBeInTheDocument();

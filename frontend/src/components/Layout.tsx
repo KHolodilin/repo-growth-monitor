@@ -21,9 +21,9 @@ export function Layout() {
   const location = useLocation();
   const [runAll, setRunAll] = useState<RunAllMenuAction | null>(null);
   const { me, loading: authLoading, logout } = useAuth();
-  const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
   const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
+  const repositoryId = repositoryIdFromPath(location.pathname, rows);
   const [collecting, setCollecting] = useState(false);
   const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -373,10 +373,16 @@ function collectionBriefState(
   return planner.open ? "Auto-collect window open" : "Outside auto-collect window";
 }
 
-function repositoryIdFromPath(pathname: string): number | null {
-  const match = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
-  if (!match) {
+function repositoryIdFromPath(pathname: string, rows: Dashboard["repositories"] | null = null): number | null {
+  const admin = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
+  if (admin) {
+    return Number(admin[1]);
+  }
+  const parts = pathname.match(/^\/([^/]+)\/([^/]+)(?:\/|$)/);
+  if (!parts || !rows) {
     return null;
   }
-  return Number(match[1]);
+  const fullName = `${decodeURIComponent(parts[1])}/${decodeURIComponent(parts[2])}`.toLowerCase();
+  const row = rows.find((item) => item.fullName.toLowerCase() === fullName);
+  return row?.id ?? null;
 }

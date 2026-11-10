@@ -15,13 +15,16 @@ import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { TopicResultsTable } from "../components/TopicResultsTable";
 import { topicCompetitorPath } from "./TopicCompetitorCardPage";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 function parseScope(value: string | null): "all" | "language" {
   return value === "language" ? "language" : "all";
 }
 
 export function TopicDetailsPage() {
-  const { repositoryId, topic } = useParams();
+  const { owner = "", repository: repositoryName = "", topic } = useParams();
+  const { id: repositoryId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
   const [period, setPeriod] = usePeriod(repositoryId);
   const [searchParams, setSearchParams] = useSearchParams();
   const { allowMutations } = useMutationAccess();
@@ -128,6 +131,9 @@ export function TopicDetailsPage() {
     }
   }, [repositoryId, repo, searchParams, setSearchParams]);
 
+  if (resolveError) {
+    return <p className="text-red-600">{resolveError}</p>;
+  }
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -158,15 +164,16 @@ export function TopicDetailsPage() {
         <div className="sm:col-start-1 sm:row-start-1">
           <PageBreadcrumb
             items={[
-              { label: "Repositories", to: "/admin/repositories" },
+              { label: "Home", to: "/" },
+              { label: repo.owner.login, to: ownerPath(repo.owner.login) },
               {
-                label: repo.fullName,
+                label: repo.name,
                 repoSwitcher: {
                   currentId: repo.id,
-                  hrefFor: (id) => `/admin/repositories/${id}?tab=topics`,
+                  hrefFor: (next) => repoHref(next.owner.login, next.name, "topics"),
                 },
               },
-              { label: "Topics Visibility", to: `/admin/repositories/${repo.id}?tab=topics${scope === "language" ? "&scope=language" : ""}` },
+              { label: "Topics Visibility", to: `${repoHref(repo.owner.login, repo.name, "topics")}${scope === "language" ? "&scope=language" : ""}` },
             ]}
           />
           <h1 className="mt-2 break-all text-xl font-semibold">
@@ -251,7 +258,7 @@ export function TopicDetailsPage() {
             trackedGithubId={repo.githubId}
             selectedIds={selected.filter(id => visibility.isVisible(`repository:${id}`))}
             onToggle={id => !visibility.isVisible(`repository:${id}`) && selected.includes(id) ? visibility.reveal([`repository:${id}`]) : setSelected(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])}
-            nameTo={(row) => topicCompetitorPath(repo.id, history.watch.topic, row.result.githubRepositoryId, scope)}
+            nameTo={(row) => topicCompetitorPath(repoPath(repo.owner.login, repo.name), history.watch.topic, row.result.githubRepositoryId, scope)}
           />
         )}
       </Card>

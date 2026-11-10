@@ -12,7 +12,8 @@ vi.mock("../lib/api", async (importOriginal) => {
   return { ...actual, api };
 });
 
-const other = { ...repository, id: 8, name: "other", fullName: "acme/other" };
+const other = { ...repository, id: 8, name: "other", fullName: "KHolodilin/other", owner: { ...repository.owner, login: "KHolodilin" } };
+const base = `/${repository.owner.login}/${repository.name}`;
 
 const card = {
   githubRepositoryId: 2,
@@ -41,11 +42,11 @@ function renderTopics(path: string) {
       <Routes>
         <Route path="/admin/dashboard" element={<p>portfolio</p>} />
         <Route path="/missing" element={<TopicCompetitorCardPage />} />
-        <Route path="/no-topic/:repositoryId/:githubRepositoryId" element={<TopicCompetitorCardPage />} />
-        <Route path="/admin/repositories/:id" element={<LocationProbe />} />
-        <Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
+        <Route path="/no-topic/:owner/:repository/:githubRepositoryId" element={<TopicCompetitorCardPage />} />
+        <Route path="/:owner/:repository" element={<LocationProbe />} />
+        <Route path="/:owner/:repository/topics/:topic" element={<TopicDetailsPage />} />
         <Route
-          path="/admin/repositories/:repositoryId/topics/:topic/competitors/:githubRepositoryId"
+          path="/:owner/:repository/topics/:topic/competitors/:githubRepositoryId"
           element={<TopicCompetitorCardPage />}
         />
       </Routes>
@@ -58,6 +59,7 @@ function mockTopicApi(competitor: unknown = card) {
     const url = String(path);
     if (url.includes("/admin/repositories?refresh")) return Promise.resolve([repository, other]);
     if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+    if (url.endsWith("/admin/repositories/8")) return Promise.resolve(other);
     if (url.includes("/topics/") && url.includes("/history")) return Promise.resolve(topicHistory);
     if (url.includes("/topics/") && url.includes("/results")) return Promise.resolve(topicResults);
     if (url.includes("/competitors/")) return Promise.resolve(competitor);
@@ -74,15 +76,15 @@ describe("topic competitor card", () => {
   it("opens another repository and the tracked repository on the same card", async () => {
     const user = userEvent.setup();
     mockTopicApi();
-    renderTopics("/admin/repositories/13/topics/outbox");
+    renderTopics(`${base}/topics/outbox`);
 
     expect(await screen.findByRole("link", { name: "big/outbox" })).toHaveAttribute(
       "href",
-      "/admin/repositories/13/topics/outbox/competitors/2",
+      `${base}/topics/outbox/competitors/2`,
     );
     expect(screen.getByRole("link", { name: repository.fullName })).toHaveAttribute(
       "href",
-      "/admin/repositories/13/topics/outbox/competitors/99",
+      `${base}/topics/outbox/competitors/99`,
     );
     expect(screen.getByRole("link", { name: "big/outbox" })).not.toHaveAttribute("target", "_blank");
 
@@ -96,8 +98,8 @@ describe("topic competitor card", () => {
     expect(screen.getByText("Pass · Repository description exists")).toBeInTheDocument();
     expect(screen.getByText("Miss · License exists")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Stars and forks" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Topics Visibility" })).toHaveAttribute("href", "/admin/repositories/13?tab=topics");
-    expect(screen.getByRole("link", { name: "outbox" })).toHaveAttribute("href", "/admin/repositories/13/topics/outbox");
+    expect(screen.getByRole("link", { name: "Topics Visibility" })).toHaveAttribute("href", `${base}?tab=topics`);
+    expect(screen.getByRole("link", { name: "outbox" })).toHaveAttribute("href", `${base}/topics/outbox`);
 
     await user.click(screen.getByRole("link", { name: "outbox" }));
     expect(await screen.findByRole("heading", { name: "outbox" })).toBeInTheDocument();
@@ -106,29 +108,29 @@ describe("topic competitor card", () => {
   it("keeps the language scope on the card and does not copy it to another repository", async () => {
     const user = userEvent.setup();
     mockTopicApi();
-    renderTopics("/admin/repositories/13/topics/outbox?scope=language");
+    renderTopics(`${base}/topics/outbox?scope=language`);
 
     const result = await screen.findByRole("link", { name: "big/outbox" });
-    expect(result).toHaveAttribute("href", "/admin/repositories/13/topics/outbox/competitors/2?scope=language");
+    expect(result).toHaveAttribute("href", `${base}/topics/outbox/competitors/2?scope=language`);
     await user.click(result);
 
     expect(await screen.findByRole("link", { name: "outbox" })).toHaveAttribute(
       "href",
-      "/admin/repositories/13/topics/outbox?scope=language",
+      `${base}/topics/outbox?scope=language`,
     );
     expect(screen.getByRole("link", { name: "Topics Visibility" })).toHaveAttribute(
       "href",
-      "/admin/repositories/13?tab=topics&scope=language",
+      `${base}?tab=topics&scope=language`,
     );
 
     await user.click(screen.getByLabelText("Switch repository"));
     await user.click(await screen.findByRole("option", { name: "other" }));
-    expect(await screen.findByText("/admin/repositories/8?tab=topics")).toBeInTheDocument();
+    expect(await screen.findByText("/KHolodilin/other?tab=topics")).toBeInTheDocument();
   });
 
   it("shows empty copy when the profile has no description or topics", async () => {
     mockTopicApi({ ...card, description: "  ", topics: [], points: [], discoverability: [] });
-    renderTopics("/admin/repositories/13/topics/outbox/competitors/2");
+    renderTopics(`${base}/topics/outbox/competitors/2`);
     expect(await screen.findByText("No description.")).toBeInTheDocument();
     expect(screen.getByText("No topics yet.")).toBeInTheDocument();
     expect(screen.getByText("Discoverability 0/0")).toBeInTheDocument();
@@ -137,32 +139,45 @@ describe("topic competitor card", () => {
   it("shows a missing repository and ignores a cancelled request", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/")) return Promise.reject(new Error("Repository was not found in this topic"));
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
       return Promise.resolve(null);
     });
-    renderTopics("/admin/repositories/13/topics/outbox/competitors/404");
+    renderTopics(`${base}/topics/outbox/competitors/404`);
     expect(await screen.findByText("Repository was not found in this topic")).toBeInTheDocument();
     cleanup();
 
-    api.mockImplementation(() => Promise.reject("nope"));
-    renderTopics("/admin/repositories/13/topics/outbox/competitors/2");
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/history")) return Promise.resolve(topicHistory);
+      return Promise.reject("nope");
+    });
+    renderTopics(`${base}/topics/outbox/competitors/2`);
     expect(await screen.findByText("Failed to load the competitor card")).toBeInTheDocument();
     cleanup();
 
     api.mockImplementation(() => new Promise(() => undefined));
-    const pending = renderTopics("/admin/repositories/13/topics/outbox/competitors/2");
+    const pending = renderTopics(`${base}/topics/outbox/competitors/2`);
     pending.unmount();
 
     api.mockReset();
-    api.mockResolvedValue(card);
-    renderTopics("/admin/repositories/13/topics/outbox/competitors/0");
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/history")) return Promise.resolve(topicHistory);
+      return Promise.resolve(card);
+    });
+    renderTopics(`${base}/topics/outbox/competitors/0`);
     expect(screen.getByText("Loading competitor card...")).toBeInTheDocument();
-    await waitFor(() => expect(api).not.toHaveBeenCalled());
+    await waitFor(() => expect(api.mock.calls.some((call) => String(call[0]).includes("/competitors/0"))).toBe(false));
     cleanup();
 
-    renderTopics("/no-topic/13/2");
+    renderTopics("/no-topic/KHolodilin/spring-transactional-outbox-kafka/2");
     expect(screen.getByText("Loading competitor card...")).toBeInTheDocument();
     cleanup();
 
@@ -175,6 +190,7 @@ describe("topic competitor card", () => {
     let fail: ((reason: unknown) => void) | null = null;
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/2")) return new Promise((resolve) => { settle = resolve; });
       if (url.includes("/competitors/9")) return new Promise((_, reject) => { fail = reject; });
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
@@ -182,12 +198,12 @@ describe("topic competitor card", () => {
       return Promise.resolve(null);
     });
 
-    const first = renderTopics("/admin/repositories/13/topics/outbox/competitors/2");
+    const first = renderTopics(`${base}/topics/outbox/competitors/2`);
     await waitFor(() => expect(settle).not.toBeNull());
     first.unmount();
     settle?.(card);
 
-    const second = renderTopics("/admin/repositories/13/topics/outbox/competitors/9");
+    const second = renderTopics(`${base}/topics/outbox/competitors/9`);
     await waitFor(() => expect(fail).not.toBeNull());
     second.unmount();
     fail?.(new Error("late"));

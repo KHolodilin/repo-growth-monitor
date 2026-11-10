@@ -6,6 +6,8 @@ import { PageBreadcrumb, type BreadcrumbItem } from "../components/PageBreadcrum
 import { PersistentECharts } from "../components/PersistentECharts";
 import { api, type CompetitorCard, type Repository, type SearchHistory } from "../lib/api";
 import { storedCountOption } from "../lib/searchSeriesChart";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 const COMPETITOR_SERIES = [
   { key: "Stars", name: "Stars" },
@@ -14,7 +16,9 @@ const COMPETITOR_SERIES = [
 
 export function CompetitorCardPage() {
   const params = useParams();
-  const repositoryId = Number(params.repositoryId);
+  const { owner = "", repository: repositoryName = "" } = params;
+  const { id: resolvedId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
+  const repositoryId = Number(resolvedId);
   const queryId = Number(params.queryId);
   const githubRepositoryId = Number(params.githubRepositoryId);
   const [repo, setRepo] = useState<Repository | null>(null);
@@ -45,22 +49,24 @@ export function CompetitorCardPage() {
     };
   }, [repositoryId, queryId, githubRepositoryId]);
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (resolveError || error) return <p className="text-sm text-destructive">{resolveError ?? error}</p>;
   if (!repo || !history || !card) return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
 
+  const base = repoPath(repo.owner.login, repo.name);
   return (
     <CompetitorCardView
       items={[
-        { label: "Repositories", to: "/admin/repositories" },
+        { label: "Home", to: "/" },
+        { label: repo.owner.login, to: ownerPath(repo.owner.login) },
         {
-          label: repo.fullName,
+          label: repo.name,
           repoSwitcher: {
             currentId: repo.id,
-            hrefFor: (id) => `/admin/repositories/${id}?tab=search`,
+            hrefFor: (next) => repoHref(next.owner.login, next.name, "search"),
           },
         },
-        { label: "Search Visibility", to: `/admin/repositories/${repo.id}?tab=search` },
-        { label: history.query.query, to: `/admin/repositories/${repo.id}/search-queries/${history.query.id}` },
+        { label: "Search Visibility", to: repoHref(repo.owner.login, repo.name, "search") },
+        { label: history.query.query, to: `${base}/search-queries/${history.query.id}` },
       ]}
       card={card}
       collectionDates={history.query.enabled === false ? [] : history.points.map(point => point.date)}

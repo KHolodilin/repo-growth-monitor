@@ -244,7 +244,7 @@ function DashboardHeader({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open, mobile]);
-  const warningList = problems.map(({ row, lines }) => <div key={row.id} className="border-b py-3 text-sm last:border-0"><Link className="inline-block min-h-11 max-w-full break-words py-2 text-primary hover:underline [overflow-wrap:anywhere]" to={repositoryHref(view, row.id)} onClick={() => setOpen(false)}>{row.fullName}</Link>{lines.map(line => <div key={line} className="break-words text-muted-foreground">{line}</div>)}</div>);
+  const warningList = problems.map(({ row, lines }) => <div key={row.id} className="border-b py-3 text-sm last:border-0"><Link className="inline-block min-h-11 max-w-full break-words py-2 text-primary hover:underline [overflow-wrap:anywhere]" to={repositoryHref(view, row.id, row.fullName)} onClick={() => setOpen(false)}>{row.fullName}</Link>{lines.map(line => <div key={line} className="break-words text-muted-foreground">{line}</div>)}</div>);
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -266,7 +266,7 @@ function DashboardHeader({
               <div className="absolute left-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border bg-card p-3 text-left shadow-lg">
                 {problems.map(({ row, lines }) => (
                   <div key={row.id} className="py-1 text-sm">
-                    <Link className="text-primary hover:underline" to={repositoryHref(view, row.id)}>
+                    <Link className="text-primary hover:underline" to={repositoryHref(view, row.id, row.fullName)}>
                       {row.fullName}
                     </Link>
                     {lines.map((line) => (
@@ -454,7 +454,7 @@ function PeriodHighlights({ highlights }: { highlights: Dashboard["highlights"] 
         {events ? (
           <Link
             className="block text-primary hover:underline"
-            to={`${repositoryHref(view, events.repositoryId)}?tab=${view.public ? "events" : "growth-events"}`}
+            to={`${repositoryHref(view, events.repositoryId, events.repositoryNames[0])}?tab=${view.public ? "events" : "growth-events"}`}
             aria-label={`${events.count} ${events.count === 1 ? "promotion event" : "promotion events"} · ${events.repositoryNames.join(", ")}`}
           >
             <div className="text-base font-semibold text-foreground">
@@ -470,7 +470,7 @@ function PeriodHighlights({ highlights }: { highlights: Dashboard["highlights"] 
         {visitors && growth ? (
           <Link
             className="block hover:underline"
-            to={repositoryHref(view, visitors.repositoryId)}
+            to={repositoryHref(view, visitors.repositoryId, visitors.fullName)}
             aria-label={`${visitors.fullName} ${growth.label}`}
           >
             <div className={cn("text-base font-semibold", growthClass(growth.direction))}>{growth.label}</div>
@@ -498,7 +498,7 @@ function RankLink({ move }: { move: RankHighlight }) {
   return (
     <Link
       className="block text-primary hover:underline"
-      to={`${repositoryHref(view, move.repositoryId)}?tab=search`}
+      to={`${repositoryHref(view, move.repositoryId, move.fullName)}?tab=search`}
       aria-label={`${move.fullName} · ${move.queryName} ${move.fromRank} → ${move.toRank}`}
     >
       <div className="text-base font-semibold text-foreground">
@@ -593,7 +593,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <RepositoryCard
                 row={row}
                 tokenState={tokenState}
-                onOpen={() => navigate(repositoryHref(view, row.id))}
+                onOpen={() => navigate(repositoryHref(view, row.id, row.fullName))}
               />
             </li>
           ))}
@@ -627,7 +627,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                 <tr
                   key={row.id}
                   className="cursor-pointer border-t hover:bg-muted/60"
-                  onClick={() => navigate(repositoryHref(view, row.id))}
+                  onClick={() => navigate(repositoryHref(view, row.id, row.fullName))}
                 >
                   <td className="max-w-0 px-5 py-3 align-top">
                     {problems && (
@@ -637,7 +637,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                     )}
                     <Link
                       className="break-words [overflow-wrap:anywhere] text-primary hover:underline"
-                      to={repositoryHref(view, row.id)}
+                      to={repositoryHref(view, row.id, row.fullName)}
                       onClick={(event) => event.stopPropagation()}
                     >
                       {row.fullName}
@@ -721,7 +721,7 @@ function RepositoryCard({
         <div className="min-w-0 flex-1">
           <Link
             className="break-words text-base font-medium text-primary [overflow-wrap:anywhere] hover:underline"
-            to={repositoryHref(view, row.id)}
+            to={repositoryHref(view, row.id, row.fullName)}
           >
             {row.fullName}
           </Link>
@@ -758,7 +758,7 @@ function DiscoverabilityCell({ row }: { row: Dashboard["repositories"][number] }
   return (
     <Link
       className="hover:underline"
-      to={`${repositoryHref(view, row.id)}?tab=overview&focus=health`}
+      to={`${repositoryHref(view, row.id, row.fullName)}?tab=overview&focus=health`}
       onClick={(event) => event.stopPropagation()}
     >
       <span className={tone}>{row.discoverabilityPassed}</span>

@@ -23,6 +23,7 @@ type CardRow = {
 
 export function SnapshotCards({
   repositoryId,
+  historyBasePath,
   referrers,
   referrerSnapshotAt,
   paths,
@@ -31,6 +32,7 @@ export function SnapshotCards({
   onShowServicePathsChange,
 }: {
   repositoryId: number | string;
+  historyBasePath?: string;
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   referrerSnapshotAt?: string;
   paths: PathSnapshotRow[];
@@ -38,6 +40,7 @@ export function SnapshotCards({
   showServicePaths: boolean;
   onShowServicePathsChange: (next: boolean) => void;
 }) {
+  const historyRoot = historyBasePath ?? `/admin/repositories/${repositoryId}`;
   const referrerRows = referrers.map((row) => ({
     key: row.referrer,
     title: row.referrer,
@@ -63,7 +66,7 @@ export function SnapshotCards({
         rows={referrerRows}
         snapshotAt={referrerSnapshotAt}
         icons
-        historyTo={`/admin/repositories/${repositoryId}/traffic/history?kind=referrers`}
+        historyTo={`${historyRoot}/traffic/history?kind=referrers`}
       />
       <SnapshotCard
         tableId="popular-paths"
@@ -72,7 +75,7 @@ export function SnapshotCards({
         firstColumn="Path"
         rows={pathRows}
         snapshotAt={pathSnapshotAt}
-        historyTo={`/admin/repositories/${repositoryId}/traffic/history?kind=paths`}
+        historyTo={`${historyRoot}/traffic/history?kind=paths`}
         toolbar={<ServicePathToggle checked={showServicePaths} onChange={onShowServicePathsChange} />}
       />
     </div>

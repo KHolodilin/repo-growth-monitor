@@ -12,9 +12,12 @@ import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { SearchResultsTable } from "../components/SearchResultsTable";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 export function QueryDetailsPage() {
-  const { repositoryId, queryId } = useParams();
+  const { owner = "", repository: repositoryName = "", queryId } = useParams();
+  const { id: repositoryId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
   const [period, setPeriod] = usePeriod(repositoryId);
   const { allowMutations } = useMutationAccess();
   const [repo, setRepo] = useState<Repository | null>(null);
@@ -88,8 +91,8 @@ export function QueryDetailsPage() {
   }
 
 
-  if (error) {
-    return <p className="text-red-600">{error}</p>;
+  if (resolveError || error) {
+    return <p className="text-red-600">{resolveError ?? error}</p>;
   }
   if (!repo || !history) {
     return (
@@ -130,15 +133,16 @@ export function QueryDetailsPage() {
         <div className="sm:col-start-1 sm:row-start-1">
           <PageBreadcrumb
             items={[
-              { label: "Repositories", to: "/admin/repositories" },
+              { label: "Home", to: "/" },
+              { label: repo.owner.login, to: ownerPath(repo.owner.login) },
               {
-                label: repo.fullName,
+                label: repo.name,
                 repoSwitcher: {
                   currentId: repo.id,
-                  hrefFor: (id) => `/admin/repositories/${id}?tab=search`,
+                  hrefFor: (next) => repoHref(next.owner.login, next.name, "search"),
                 },
               },
-              { label: "Search Visibility", to: `/admin/repositories/${repo.id}?tab=search` },
+              { label: "Search Visibility", to: repoHref(repo.owner.login, repo.name, "search") },
             ]}
           />
           <h1 className="mt-2 break-all text-xl font-semibold">
@@ -206,7 +210,7 @@ export function QueryDetailsPage() {
               !visibility.isVisible(`repository:${id}`) && selected.includes(id) ? visibility.reveal([`repository:${id}`]) : setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
             }
             nameTo={(row) =>
-              `/admin/repositories/${repo.id}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
+              `${repoPath(repo.owner.login, repo.name)}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
             }
           />
         )}

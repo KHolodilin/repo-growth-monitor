@@ -248,7 +248,7 @@ export function RepositoriesPage() {
                   )}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link className="break-words [overflow-wrap:anywhere] font-medium text-primary hover:underline" to={`/admin/repositories/${repo.id}`}>
+                      <Link className="break-words [overflow-wrap:anywhere] font-medium text-primary hover:underline" to={`/${encodeURIComponent(repo.owner.login)}/${encodeURIComponent(repo.name)}`}>
                         {repo.fullName}
                       </Link>
                       {repo.visibility === "PRIVATE" && (

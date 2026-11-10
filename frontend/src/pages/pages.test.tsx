@@ -42,10 +42,16 @@ function renderPath(path: string, ui: ReactNode) {
         <Route path="/" element={<div>home</div>} />
         <Route path="/admin/dashboard" element={<div>home</div>} />
         <Route path="/admin/repositories" element={ui} />
-        <Route element={<Layout />}><Route path="/admin/repositories/:id" element={ui} /></Route>
+        <Route element={<Layout />}>
+          <Route path="/admin/repositories/:id" element={ui} />
+          <Route path="/:owner/:repository" element={ui} />
+        </Route>
         <Route path="/admin/repositories/:id/traffic/history" element={ui} />
+        <Route path="/:owner/:repository/traffic/history" element={ui} />
         <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={ui} />
+        <Route path="/:owner/:repository/search-queries/:queryId" element={ui} />
         <Route path="/admin/repositories/:repositoryId/topics/:topic" element={ui} />
+        <Route path="/:owner/:repository/topics/:topic" element={ui} />
         <Route path="/admin/search-runs/:id" element={ui} />
       </Routes>
     </MemoryRouter>,
@@ -212,8 +218,9 @@ describe("pages", () => {
     expect(metaStrip).toContainElement(screen.getByRole("button", { name: "Discoverability 1/2" }));
     expect(metaStrip).toContainElement(screen.getByRole("button", { name: "Community Standards 1/1" }));
     const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
-    expect(crumb).toHaveTextContent("Portfolio");
-    expect(crumb).toHaveTextContent(repository.fullName);
+    expect(crumb).toHaveTextContent("Home");
+    expect(crumb).toHaveTextContent(repository.owner.login);
+    expect(crumb).toHaveTextContent(repository.name);
     expect(crumb).toHaveTextContent("Traffic");
     expect(screen.getByRole("tooltip", { hidden: true, name: repository.description })).toHaveClass(
       "delay-300",

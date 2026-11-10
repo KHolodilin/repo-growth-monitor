@@ -1,5 +1,14 @@
 import { createContext, useContext } from "react";
+import { repoPathFromFullName } from "./repoPaths";
 export type DashboardViewOptions = { public?: boolean; scopeKey?: string; heading?: string; repositoryHref?: (id: number | string) => string; showRepositories?: boolean; trafficEnabled?: boolean; statsEnabled?: boolean };
 export const DashboardViewContext = createContext<DashboardViewOptions>({});
 export const useDashboardView = () => useContext(DashboardViewContext);
-export function repositoryHref(view: DashboardViewOptions, id: number | string) { return view.repositoryHref?.(id) ?? `/admin/repositories/${id}`; }
+export function repositoryHref(view: DashboardViewOptions, id: number | string, fullName?: string | null) {
+  if (view.repositoryHref) {
+    return view.repositoryHref(id);
+  }
+  if (fullName) {
+    return repoPathFromFullName(fullName);
+  }
+  return "/";
+}

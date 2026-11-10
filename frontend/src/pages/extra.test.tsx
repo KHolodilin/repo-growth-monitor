@@ -79,7 +79,7 @@ describe("extra coverage", () => {
         <Routes>
           <Route
             path="/admin/repositories/:id"
-            element={<RepoSwitcher currentId={13} currentLabel="current" hrefFor={(id) => `/admin/repositories/${id}`} />}
+            element={<RepoSwitcher currentId={13} currentLabel="current" hrefFor={(repo) => `/${repo.owner.login}/${repo.name}`} />}
           />
         </Routes>
       </MemoryRouter>,
@@ -102,7 +102,7 @@ describe("extra coverage", () => {
     api.mockRejectedValueOnce(new Error("switcher down"));
     render(
       <MemoryRouter>
-        <RepoSwitcher currentId={13} currentLabel="current" hrefFor={(id) => `/admin/repositories/${id}`} />
+        <RepoSwitcher currentId={13} currentLabel="current" hrefFor={(repo) => `/${repo.owner.login}/${repo.name}`} />
       </MemoryRouter>,
     );
     await user.click(screen.getByLabelText("Switch repository"));
