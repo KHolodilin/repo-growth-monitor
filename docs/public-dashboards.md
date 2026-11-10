@@ -1,11 +1,12 @@
 # Public owner and repository dashboards
 
-Work package #220 adapts the existing dashboard and snapshot components. It retains historical data in place. The subsequent user-requested local rollout enables the combined Collector and a controlled 9-repository preview; see the combined-runtime follow-up below. Homepage features and the owners directory belong to #221; the complete release rehearsal belongs to #222.
+Work package #220 adapts the existing dashboard and snapshot components. It retains historical data in place. The subsequent user-requested local rollout enables the combined Collector and a controlled 9-repository preview; see the combined-runtime follow-up below. Homepage and the sortable owners directory are #221; the complete release rehearsal belongs to #222.
 
 ## Routes and access
 
 | Browser route | Content |
 | --- | --- |
+| `/` | English homepage: brand/Sign in chrome, Explore dashboards, four capability cards, sortable Owners table |
 | `/{owner}` | Owner-scoped Traffic, Stats, published Search/Topics definitions and saved Events |
 | `/{owner}/{repository}` | Repository Traffic/Stats, source snapshots and published modules |
 | `/{owner}/{repository}/analytics/paths` | Popular Paths chart and snapshot history |

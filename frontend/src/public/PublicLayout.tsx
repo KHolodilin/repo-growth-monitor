@@ -51,26 +51,32 @@ export function PublicLayout() {
       </main>
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p>
-              <span className="font-medium text-foreground">
-                {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
-              </span>
-            </p>
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              aria-expanded={aboutOpen}
-              onClick={() => setAboutOpen((value) => !value)}
-            >
-              About data
-            </button>
-          </div>
-          {aboutOpen && (
-            <p>
-              Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
-              between snapshots.
-            </p>
+          {location.pathname === "/" ? (
+            <p>Public dashboards use saved snapshots. Sign in only for repository management.</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <p>
+                  <span className="font-medium text-foreground">
+                    {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  aria-expanded={aboutOpen}
+                  onClick={() => setAboutOpen((value) => !value)}
+                >
+                  About data
+                </button>
+              </div>
+              {aboutOpen && (
+                <p>
+                  Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
+                  between snapshots.
+                </p>
+              )}
+            </>
           )}
         </div>
       </footer>
@@ -90,11 +96,3 @@ export function PublicNotFound() {
   );
 }
 
-export function PublicHomePlaceholder() {
-  return (
-    <section className="space-y-4 py-12">
-      <h1 className="text-3xl font-semibold">Understand how your repositories grow.</h1>
-      <p>Explore saved traffic, stars, search visibility and topic rankings.</p>
-    </section>
-  );
-}

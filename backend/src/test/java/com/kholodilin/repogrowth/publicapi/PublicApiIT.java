@@ -75,6 +75,28 @@ class PublicApiIT extends AbstractPostgresTest {
  @Test void unverifiedLegacySearchSnapshotsCannotLeakPrivateCandidates()throws Exception{jdbc.update("UPDATE search_run SET public_scope_verified=false WHERE id=?",run);mvc.perform(get("/api/v1/public/search-queries/"+query+"/history")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0));mvc.perform(get("/api/v1/public/search-runs/"+run+"/results")).andExpect(status().isNotFound());mvc.perform(get("/api/v1/public/search-queries/"+query+"/competitors/555")).andExpect(status().isNotFound());mvc.perform(get("/api/v1/admin/search-runs/"+run+"/results").with(as("admin"))).andExpect(status().isOk());}
  @Test void deletingQueuedQueryCancelsItsAssignmentBeforeRemovingDefinition()throws Exception{mvc.perform(post("/api/v1/admin/search-queries/"+query+"/run").with(as("admin")).with(csrf())).andExpect(status().isCreated());mvc.perform(delete("/api/v1/admin/search-queries/"+query).with(as("admin")).with(csrf())).andExpect(status().isOk());assertThat(jdbc.queryForObject("SELECT state FROM collection_task",String.class)).isEqualTo("CANCELLED");assertThat(jdbc.queryForObject("SELECT state FROM collection_attempt",String.class)).isEqualTo("CANCELLED");assertThat(jdbc.queryForObject("SELECT state FROM collection_request",String.class)).isEqualTo("CANCELLED");}
  @Test void directorySortAndCompletenessCannotIncludeHiddenRepositories()throws Exception{mvc.perform(get("/api/v1/public/owners?sort=stars&order=desc&limit=1")).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].login").value("Beta")).andExpect(jsonPath("$.nextCursor").value("1"));mvc.perform(get("/api/v1/public/owners?sort=owner&order=asc")).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].repositories").value(2)).andExpect(jsonPath("$.items[0].stars").value(30)).andExpect(jsonPath("$.items[0].contributors").value(3));mvc.perform(get("/api/v1/public/owners?sort=raw_sql")).andExpect(status().isBadRequest());}
+ @Test void directoryPaginationTiesNullContributorsAndRevokesStayConsistent()throws Exception{
+  long gammaOwner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES(103,'Gamma','USER') RETURNING id",Long.class);
+  long gamma=repo(206,"gamma",true,"PUBLIC",gammaOwner);
+  jdbc.update("INSERT INTO repository_daily_stats(repository_id,stat_date,stars,watchers,forks,open_issues,contributors,contributor_logins_collected) VALUES (?,CURRENT_DATE-1,30,1,1,0,0,false)",gamma);
+  mvc.perform(get("/api/v1/public/owners?sort=stars&order=desc&limit=10")).andExpect(status().isOk())
+    .andExpect(jsonPath("$.items[0].login").value("Beta"))
+    .andExpect(jsonPath("$.items[1].login").value("Alpha"))
+    .andExpect(jsonPath("$.items[2].login").value("Gamma"))
+    .andExpect(jsonPath("$.items[2].contributors").value(org.hamcrest.Matchers.nullValue()))
+    .andExpect(jsonPath("$.items[2].contributorsComplete").value(false));
+  mvc.perform(get("/api/v1/public/owners?sort=stars&order=desc&after=1&limit=1")).andExpect(status().isOk())
+    .andExpect(jsonPath("$.items.length()").value(1))
+    .andExpect(jsonPath("$.items[0].login").value("Alpha"))
+    .andExpect(jsonPath("$.nextCursor").value("2"));
+  jdbc.update("UPDATE repository SET public_dashboard_enabled=false WHERE id=?",other);
+  mvc.perform(get("/api/v1/public/owners?sort=stars&order=desc")).andExpect(status().isOk())
+    .andExpect(jsonPath("$.items.length()").value(2))
+    .andExpect(jsonPath("$.items[0].login").value("Alpha"))
+    .andExpect(jsonPath("$.items[1].login").value("Gamma"));
+  jdbc.update("UPDATE repository SET public_dashboard_enabled=false WHERE owner_id IN (SELECT id FROM github_owner WHERE login IN ('Alpha','Gamma'))");
+  mvc.perform(get("/api/v1/public/owners")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(0)).andExpect(jsonPath("$.nextCursor").value(org.hamcrest.Matchers.nullValue()));
+ }
 
  @Test void dashboardRowsUseTheRequestedPeriodAndKeepHiddenRepositoriesOut()throws Exception{mvc.perform(get("/api/v1/public/owners/Alpha/repositories?period=1d")).andExpect(status().isOk()).andExpect(jsonPath("$.items.length()").value(2)).andExpect(jsonPath("$.items[0].stars").value(10)).andExpect(jsonPath("$.items[0].views").value(100));jdbc.update("UPDATE repository SET public_traffic_enabled=false WHERE id=?",a);mvc.perform(get("/api/v1/public/owners/Alpha/repositories?period=1d")).andExpect(jsonPath("$.items[0].views").isEmpty());}
  @Test void directDefinitionsAndHtmlAdminRoutesEnforceTheirGates()throws Exception{mvc.perform(get("/api/v1/public/search-queries/"+query)).andExpect(status().isOk()).andExpect(jsonPath("$.repositoryId").value(Long.toString(a)));jdbc.update("UPDATE search_query SET public_enabled=false WHERE id=?",query);mvc.perform(get("/api/v1/public/search-queries/"+query)).andExpect(status().isNotFound());mvc.perform(get("/admin/dashboard")).andExpect(status().isUnauthorized());mvc.perform(get("/admin/dashboard").with(as("user"))).andExpect(status().isForbidden());}
