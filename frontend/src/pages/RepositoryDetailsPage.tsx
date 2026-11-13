@@ -482,20 +482,24 @@ export function RepositoryDetailsPage() {
             { label: repo.owner.login, to: ownerPath(repo.owner.login) },
             {
               label: repo.name,
-              repoSwitcher: {
-                currentId: repo.id,
-                description: repo.description,
-                hrefFor: (next) => {
-                  // Never carry topic scope (or other query) across repositories.
-                  if (tab === "traffic") {
-                    return repoPath(next.owner.login, next.name);
+              ...(allowMutations
+                ? {
+                    repoSwitcher: {
+                      currentId: repo.id,
+                      description: repo.description,
+                      hrefFor: (next: typeof repo) => {
+                        // Never carry topic scope (or other query) across repositories.
+                        if (tab === "traffic") {
+                          return repoPath(next.owner.login, next.name);
+                        }
+                        if (tab === "topics") {
+                          return `${repoPath(next.owner.login, next.name)}?tab=topics`;
+                        }
+                        return repoHref(next.owner.login, next.name, tab);
+                      },
+                    },
                   }
-                  if (tab === "topics") {
-                    return `${repoPath(next.owner.login, next.name)}?tab=topics`;
-                  }
-                  return repoHref(next.owner.login, next.name, tab);
-                },
-              },
+                : {}),
             },
             { label: TAB_LABEL[tab] },
           ]}

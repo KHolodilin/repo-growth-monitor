@@ -5,14 +5,34 @@ export type PublicRow = { id: string; name: string; description?: string; stars?
 export type PublicPage<T> = { items: T[]; nextCursor?: string | null; nextDate?: string | null };
 export type PublicMetric = { value: number | null; absoluteChange: number | null; growthPercent: number | null; complete: boolean; observedValue?: number; observedRepositories?: number; expectedRepositories?: number };
 export type StatsResponse = { period: string; from: string; to: string; repositories: number; highlights?: Dashboard["highlights"]; totals: Record<"stars" | "forks" | "watchers" | "contributors", PublicMetric> };
-export type TrafficResponse = { totals: Record<"views" | "visitors" | "clones" | "uniqueCloners", PublicMetric>; coverage?: { observedRepositoryDays: number; expectedRepositoryDays: number } };
+export type TrafficResponse = {
+  totals: Record<"views" | "visitors" | "clones" | "uniqueCloners", PublicMetric>;
+  coverage?: { observedRepositoryDays: number; expectedRepositoryDays: number };
+  previousCoverage?: { observedRepositoryDays: number; expectedRepositoryDays: number };
+};
 export type HistoryRow = { date: string; stars?: number | null; forks?: number | null; watchers?: number | null; contributors?: number | null; views?: number | null; visitors?: number | null; clones?: number | null; uniqueCloners?: number | null; missingRepositories?: number; complete?: boolean };
 export function publicBase(owner: string, repository?: string) { return `/api/v1/public/${repository ? `repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}` : `owners/${encodeURIComponent(owner)}`}`; }
 export function publicScope(overview: PublicOverview) { return overview.repository ? `public:repository:${overview.repository.id}` : `public:owner:${overview.owner.id}`; }
 export async function historyRows(url: string, signal: AbortSignal): Promise<HistoryRow[]> { const rows: HistoryRow[] = []; let before: string | undefined; for (let page=0;page<20;page++) { const response = await api<PublicPage<HistoryRow>>(`${url}&limit=100${before ? `&before=${encodeURIComponent(before)}` : ""}`, { signal }); rows.push(...response.items); if (!response.nextDate) return rows.sort((a,b)=>a.date.localeCompare(b.date)); before=response.nextDate; } throw new Error("This archive is too large for one chart. Choose a shorter period."); }
 export function adaptPublicDashboard(overview: PublicOverview, stats: StatsResponse, statsRows: HistoryRow[], traffic: TrafficResponse | null, trafficRows: HistoryRow[], repositories: PublicRow[]): DashboardViewData {
  const unknown = { value: null, growthPercent: null };
- const trafficMetric=(name:"views"|"visitors"|"clones"|"uniqueCloners")=>traffic?{...traffic.totals[name],coverage:traffic.coverage?{observedDays:traffic.coverage.observedRepositoryDays,expectedDays:traffic.coverage.expectedRepositoryDays}:null}:unknown;
+ // Incomplete public totals keep value=null for honesty, but KPIs must still show observedValue
+ // (otherwise Partial data cards render as "—" while observedValue is already known).
+ const trafficMetric=(name:"views"|"visitors"|"clones"|"uniqueCloners")=>{
+  if(!traffic)return unknown;
+  const metric=traffic.totals[name];
+  return {
+   value: metric.value ?? metric.observedValue ?? null,
+   growthPercent: metric.growthPercent,
+   absoluteChange: metric.absoluteChange,
+   coverage: traffic.coverage
+    ? { observedDays: traffic.coverage.observedRepositoryDays, expectedDays: traffic.coverage.expectedRepositoryDays }
+    : null,
+   previousCoverage: traffic.previousCoverage
+    ? { observedDays: traffic.previousCoverage.observedRepositoryDays, expectedDays: traffic.previousCoverage.expectedRepositoryDays }
+    : null,
+  };
+ };
  return { period: stats.period, from: stats.from, to: stats.to, state: "READY", lastSyncAt: overview.freshness.lastSuccessfulSnapshotAt ?? null, partialData: null, collectionWarning: null, activeCollection: null,
  summary: { clones:trafficMetric("clones"), repositories: stats.repositories, stars: { total: stats.totals.stars.value ?? 0, change: stats.totals.stars.absoluteChange }, views: trafficMetric("views"), visitors: trafficMetric("visitors"), uniqueCloners: trafficMetric("uniqueCloners") },
  traffic: trafficRows.map(row=>({ date:row.date, views:row.views ?? null, visitors:row.visitors ?? null, clones:row.clones ?? null, uniqueCloners:row.uniqueCloners ?? null, missingRepositories: row.missingRepositories })),

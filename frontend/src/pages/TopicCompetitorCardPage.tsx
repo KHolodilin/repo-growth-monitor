@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type CompetitorCard, type Repository, type TopicHistory } from "../lib/api";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { CompetitorCardView } from "./CompetitorCardPage";
 import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
 import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
@@ -19,6 +20,7 @@ export function TopicCompetitorCardPage() {
   const [searchParams] = useSearchParams();
   const { owner = "", repository: repositoryName = "" } = params;
   const { id: resolvedId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
+  const { allowMutations } = useMutationAccess();
   const repositoryId = Number(resolvedId);
   const topicName = params.topic ? decodeURIComponent(params.topic) : "";
   const githubRepositoryId = Number(params.githubRepositoryId);
@@ -66,10 +68,14 @@ export function TopicCompetitorCardPage() {
         { label: repo.owner.login, to: ownerPath(repo.owner.login) },
         {
           label: repo.name,
-          repoSwitcher: {
-            currentId: repo.id,
-            hrefFor: (next) => repoHref(next.owner.login, next.name, "topics"),
-          },
+          ...(allowMutations
+            ? {
+                repoSwitcher: {
+                  currentId: repo.id,
+                  hrefFor: (next: typeof repo) => repoHref(next.owner.login, next.name, "topics"),
+                },
+              }
+            : {}),
         },
         { label: "Topics Visibility", to: `${repoHref(repo.owner.login, repo.name, "topics")}${scopeQuery}` },
         { label: history.watch.topic, to: topicTo },

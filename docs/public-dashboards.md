@@ -7,16 +7,15 @@ Work package #220 adapts the existing dashboard and snapshot components. It reta
 | Browser route | Content |
 | --- | --- |
 | `/` | English homepage: brand/Sign in chrome, Explore dashboards, four capability cards, sortable Owners table |
-| `/{owner}` | Owner-scoped Traffic, Stats, published Search/Topics definitions and saved Events |
-| `/{owner}/{repository}` | Repository Traffic/Stats, source snapshots and published modules |
-| `/{owner}/{repository}/analytics/paths` | Popular Paths chart and snapshot history |
-| `/{owner}/{repository}/analytics/referrers` | Referrer chart and snapshot history |
-| `/{owner}/{repository}/analytics/search/{definitionId}` | Published query ranks and results |
-| `/{owner}/{repository}/analytics/topics/{definitionId}` | Published topic ranks and results |
-| `.../{definitionId}/competitors/{githubId}` | Cross-owner competitor observations |
-| `/admin` → `/admin/repositories`, `/admin/repositories/**`, `/admin/search-runs/**` | Existing management screens, behind current database-backed Admin authorization |
+| `/{owner}` | Owner-scoped Traffic, Stats portfolio (public API only) |
+| `/{owner}/{repository}` | Same `RepositoryDetailsPage` as admin (Overview/Traffic/Stats/Search/Topics/Events); anonymous GETs fenced to published repos |
+| `/{owner}/{repository}/traffic/history` | Shared traffic history |
+| `/{owner}/{repository}/search-queries/{queryId}` | Shared query details (published reads) |
+| `/{owner}/{repository}/topics/{topic}` | Shared topic details (published reads) |
+| `.../competitors/{githubId}` | Shared competitor cards |
+| `/admin` → `/admin/repositories`, `/admin/search-runs/**` | Management screens behind Admin authorization |
 
-Public pages use only `/api/v1/public/**`, with credentials omitted. They mount neither AuthProvider nor the operational Layout, and request no `/me`, system/token status, management or GitHub endpoints. Public event details contain no edit/delete controls or external links. Local SVG icons do not load avatars or external assets. Admin sign-in lands on the existing repository-management list `/admin/repositories`; ordinary users land on `/`.
+Owner portfolio pages use only `/api/v1/public/**`. Published repository pages reuse the shared repository UI; anonymous reads go through `/api/v1/admin/repositories/{id}/**` only when publication allows them. Public event details contain no edit/delete controls. Admin sign-in lands on `/admin/repositories`; ordinary users land on `/`.
 
 The server resolves publication before serving public HTML. Unknown, unpublished and wrong-parent nested routes return a real 404. Verified owner/repository aliases redirect with 308 to the current canonical path, preserving the analytics suffix and query string. Public documents and redirects use `Cache-Control: no-store`. A repository name containing a dot remains valid. The old broad SPA fallback and old management browser URLs are removed; no compatibility API is introduced.
 
@@ -24,9 +23,9 @@ The server resolves publication before serving public HTML. Unknown, unpublished
 
 `DashboardPresentation` reuses existing KPI, Traffic/Stats chart helpers, repository rows and highlights. Public adapters supply safe projections and canonical links. The repository view retains a Clones KPI. `SnapshotCards`, `SnapshotHistoryView`, `SnapshotHistoryChart` and `SnapshotHistoryTable` are shared, including mobile date selection and observed snapshot deltas.
 
-Owner headings contain only the login; repository headings contain only the repository name. Breadcrumbs separate owner and repository. Owner-scoped rows and highlights omit the owner prefix. Popular Paths titles, history rows, chart legends, selectors, accessible names, CSV labels and PNG legends use relative paths. Full raw paths and stable IDs remain the selection/style identities. Prefix matching respects path-segment boundaries and known rename/transfer aliases. Cross-owner result/competitor names retain `owner/repository`.
+Owner headings contain only the login; repository headings contain only the repository name. Breadcrumbs separate owner and repository. Anonymous/public repository pages keep a plain repository crumb — the admin `Switch repository` control stays admin-only so it cannot call `/api/v1/admin/repositories` and surface “Authentication required”. Owner-scoped rows and highlights omit the owner prefix. Popular Paths titles, history rows, chart legends, selectors, accessible names, CSV labels and PNG legends use relative paths. Full raw paths and stable IDs remain the selection/style identities. Prefix matching respects path-segment boundaries and known rename/transfer aliases. Cross-owner result/competitor names retain `owner/repository`.
 
-The public repository-list API accepts `period` and projects stored stats and completed-day traffic; hidden/other-owner rows are removed before aggregation. Incomplete totals remain null, while observed zero stays zero. Highlight computation reuses PortfolioHighlightMath after publication/query-proof filtering. Published definition metadata is available by stable ID, with the same parent gate as its history. The client verifies that the definition belongs to the displayed repository.
+The public repository-list API accepts `period` and projects stored stats and completed-day traffic; hidden/other-owner rows are removed before aggregation. Incomplete KPI totals keep `value=null` with `observedValue` for display; observed zero stays zero. Daily Traffic history matches Portfolio: a partial day keeps the sum of observed repositories and reports `missingRepositories` instead of blanking the series. Highlight computation reuses PortfolioHighlightMath after publication/query-proof filtering. Published definition metadata is available by stable ID, with the same parent gate as its history. The client verifies that the definition belongs to the displayed repository.
 
 Owner repository lists page through bounded Public API cursors rather than truncating at 100. Daily charts follow date cursors. Oversized single-chart archives fail explicitly instead of silently dropping history. Source/rank archives expose incremental older-page controls. Requests are aborted on route/period changes, including pending pagination, so earlier responses cannot replace a different context.
 

@@ -33,8 +33,10 @@ export function PageBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
             <Link className="font-medium text-muted-foreground hover:text-foreground" to={item.to}>
               {item.label}
             </Link>
-          ) : (
+          ) : index === items.length - 1 ? (
             <h1 className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">{item.label}</h1>
+          ) : (
+            <span className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">{item.label}</span>
           )}
         </span>
       ))}

@@ -10,7 +10,6 @@ import { SearchResultsPage } from "./pages/SearchResultsPage";
 import { TrafficHistoryPage } from "./pages/TrafficHistoryPage";
 import { AuthProvider, useAuth } from "./lib/AuthContext";
 import { PublicLayout, PublicNotFound } from "./public/PublicLayout";
-import { PublicAnalyticsPage } from "./public/PublicAnalyticsPage";
 import { PublicHomePage } from "./public/PublicHomePage";
 import { PublicScopePage } from "./public/PublicScopePage";
 
@@ -41,17 +40,6 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
   return children;
 }
 
-function OwnerRepositoryPage() {
-  const { me, loading } = useAuth();
-  if (loading) {
-    return <p role="status">Checking access…</p>;
-  }
-  if (me.authenticated && me.roles.includes("ADMIN")) {
-    return <RepositoryDetailsPage />;
-  }
-  return <PublicScopePage />;
-}
-
 export default function App() {
   return (
     <AuthProvider>
@@ -69,13 +57,8 @@ export default function App() {
           <Route path="/admin" element={<Navigate to="/admin/repositories" replace />} />
           <Route path="/admin/search-runs/:id" element={<AdminOnly><SearchResultsPage /></AdminOnly>} />
           <Route path="/:owner" element={<PublicScopePage />} />
-          <Route path="/:owner/:repository" element={<OwnerRepositoryPage />} />
+          <Route path="/:owner/:repository" element={<RepositoryDetailsPage />} />
           <Route path="/:owner/:repository/traffic/history" element={<TrafficHistoryPage />} />
-          <Route path="/:owner/:repository/analytics/:kind/:definitionId?" element={<PublicAnalyticsPage />} />
-          <Route
-            path="/:owner/:repository/analytics/:kind/:definitionId/competitors/:githubId"
-            element={<PublicAnalyticsPage />}
-          />
           <Route path="/:owner/:repository/search-queries/:queryId" element={<QueryDetailsPage />} />
           <Route
             path="/:owner/:repository/search-queries/:queryId/competitors/:githubRepositoryId"

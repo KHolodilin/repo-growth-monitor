@@ -6,6 +6,7 @@ import { PageBreadcrumb, type BreadcrumbItem } from "../components/PageBreadcrum
 import { PersistentECharts } from "../components/PersistentECharts";
 import { api, type CompetitorCard, type Repository, type SearchHistory } from "../lib/api";
 import { storedCountOption } from "../lib/searchSeriesChart";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
 import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
@@ -18,6 +19,7 @@ export function CompetitorCardPage() {
   const params = useParams();
   const { owner = "", repository: repositoryName = "" } = params;
   const { id: resolvedId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
+  const { allowMutations } = useMutationAccess();
   const repositoryId = Number(resolvedId);
   const queryId = Number(params.queryId);
   const githubRepositoryId = Number(params.githubRepositoryId);
@@ -60,10 +62,14 @@ export function CompetitorCardPage() {
         { label: repo.owner.login, to: ownerPath(repo.owner.login) },
         {
           label: repo.name,
-          repoSwitcher: {
-            currentId: repo.id,
-            hrefFor: (next) => repoHref(next.owner.login, next.name, "search"),
-          },
+          ...(allowMutations
+            ? {
+                repoSwitcher: {
+                  currentId: repo.id,
+                  hrefFor: (next: typeof repo) => repoHref(next.owner.login, next.name, "search"),
+                },
+              }
+            : {}),
         },
         { label: "Search Visibility", to: repoHref(repo.owner.login, repo.name, "search") },
         { label: history.query.query, to: `${base}/search-queries/${history.query.id}` },

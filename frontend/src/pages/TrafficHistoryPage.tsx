@@ -9,6 +9,7 @@ import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { ServicePathToggle } from "../components/ServicePaths";
 import { SnapshotHistoryView } from "../components/SnapshotHistoryView";
 import { Skeleton } from "../components/ui";
+import { useMutationAccess } from "../lib/mutationAccess";
 import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
 import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
@@ -38,6 +39,7 @@ function historyPeriod(raw: string | null, days: string | null, saved: Period): 
 export function TrafficHistoryPage() {
   const { owner = "", repository: repositoryName = "" } = useParams();
   const { id, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
+  const { allowMutations } = useMutationAccess();
   const [searchParams, setSearchParams] = useSearchParams();
   const kind = parseKind(searchParams.get("kind"));
   const [savedPeriod, savePeriod] = usePeriod(id);
@@ -105,10 +107,15 @@ export function TrafficHistoryPage() {
             { label: repo.owner.login, to: ownerPath(repo.owner.login) },
             {
               label: repo.name,
-              repoSwitcher: {
-                currentId: repo.id,
-                hrefFor: (next) => `${repoPath(next.owner.login, next.name)}/traffic/history?kind=${kind}&period=${period}`,
-              },
+              ...(allowMutations
+                ? {
+                    repoSwitcher: {
+                      currentId: repo.id,
+                      hrefFor: (next: typeof repo) =>
+                        `${repoPath(next.owner.login, next.name)}/traffic/history?kind=${kind}&period=${period}`,
+                    },
+                  }
+                : {}),
             },
             { label: "Traffic", to: repoHref(repo.owner.login, repo.name) },
             { label: "History" },

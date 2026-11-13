@@ -137,10 +137,14 @@ export function QueryDetailsPage() {
               { label: repo.owner.login, to: ownerPath(repo.owner.login) },
               {
                 label: repo.name,
-                repoSwitcher: {
-                  currentId: repo.id,
-                  hrefFor: (next) => repoHref(next.owner.login, next.name, "search"),
-                },
+                ...(allowMutations
+                  ? {
+                      repoSwitcher: {
+                        currentId: repo.id,
+                        hrefFor: (next: typeof repo) => repoHref(next.owner.login, next.name, "search"),
+                      },
+                    }
+                  : {}),
               },
               { label: "Search Visibility", to: repoHref(repo.owner.login, repo.name, "search") },
             ]}
