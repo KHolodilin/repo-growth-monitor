@@ -83,8 +83,59 @@ exists = subprocess.check_output(
 if exists == "0" or "--rotate" in sys.argv:
     api("/api/v1/admin/credentials/" + urllib.parse.quote(ref, safe=""), "PUT", {"token": token})
 del token, environment
+
+
+def psql(statement):
+    return subprocess.check_output(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "repogrowth",
+            "-Atc",
+            statement,
+        ],
+        cwd=root,
+        text=True,
+    ).strip()
+
+
+# Local preview needs fresh visibility_verified_at before the audited publication API accepts enable.
+# Only tracked PUBLIC rows are touched; PRIVATE/untracked stay unpublished.
+psql(
+    "UPDATE repository SET visibility_verified_at=clock_timestamp()"
+    " WHERE tracking_enabled AND visibility='PUBLIC'"
+    " AND (visibility_verified_at IS NULL"
+    " OR visibility_verified_at>clock_timestamp()"
+    " OR visibility_verified_at<=clock_timestamp()-interval '12 hours')"
+)
+published = 0
+for repo_id in [
+    line for line in psql(
+        "SELECT id FROM repository"
+        " WHERE tracking_enabled AND visibility='PUBLIC' AND NOT public_dashboard_enabled"
+        " ORDER BY id"
+    ).splitlines()
+    if line
+]:
+    api(
+        "/api/v1/admin/repositories/" + repo_id + "/publication",
+        "POST",
+        {"enabled": True},
+    )
+    published += 1
 config["rgm"]["planner"]["enabled"] = True
 config_path.write_text(json.dumps(config, indent=2) + "\n")
 print("Local token configured in the encrypted vault; unassigned selected repositories use its default reference.")
+if published:
+    print(f"Enabled public dashboard publication for {published} tracked PUBLIC repositories.")
+else:
+    print("Tracked PUBLIC repositories already have public dashboard publication enabled (or none selected).")
 print("Restart both app services to enable the planner against the collector container:")
 print("  docker compose up -d --force-recreate repo-growth-monitor collector")

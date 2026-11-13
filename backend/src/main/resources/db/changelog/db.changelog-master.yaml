@@ -45,3 +45,5 @@ databaseChangeLog:
       file: db/changelog/022-publication.yaml
   - include:
       file: db/changelog/023-publication-audit.yaml
+  - include:
+      file: db/changelog/024-enable-tracked-public-publication.yaml
