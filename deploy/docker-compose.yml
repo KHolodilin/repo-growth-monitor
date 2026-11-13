@@ -99,7 +99,7 @@ services:
           memory: 1G
 
   caddy:
-    image: caddy:2.11.6-alpine
+    image: caddy:2.11.8-alpine
     restart: unless-stopped
     depends_on:
       - backend
