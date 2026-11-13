@@ -52,7 +52,7 @@ function expectHidden() {
   expect(screen.queryByText(/Collection continues after/)).not.toBeInTheDocument();
   expect(screen.queryByText("No GitHub token")).not.toBeInTheDocument();
   expect(screen.queryByText(/Collected \d+ of/)).not.toBeInTheDocument();
-  expect(screen.queryByText(/Collecting…|Auto-collect window|Outside auto-collect window|Auto-collect runs/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Collecting|Auto-collect window|Outside auto-collect window|Auto-collect runs/)).not.toBeInTheDocument();
   expect(screen.queryByText(NO_ACCESS)).not.toBeInTheDocument();
   expect(screen.queryByText(TRAFFIC_PERMISSION)).not.toBeInTheDocument();
   expect(document.title).toBe("Repo Growth Monitor");
@@ -72,8 +72,8 @@ describe("operational alerts by authentication", () => {
     await user.click(screen.getByRole("button", { name: "About data" }));
     expectHidden();
     expect(screen.getByText("Stored analytics")).toBeInTheDocument();
-    expect(screen.queryByText(/Last sync/)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.getByText(/Last sync:/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
     expect(screen.getByText(/Data is collected once per day/)).toBeInTheDocument();
   });
 

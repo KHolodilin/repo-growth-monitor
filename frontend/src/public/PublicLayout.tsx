@@ -1,12 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { LogoMark, SignInIcon } from "../components/icons";
+import { api } from "../lib/api";
+import { publicBase, type PublicOverview } from "../lib/publicDashboard";
+import { formatSyncTime } from "../lib/utils";
 
 const PROJECT_GITHUB = "https://github.com/KHolodilin/repo-growth-monitor";
 
 export function PublicLayout() {
   const location = useLocation();
+  const homePage = location.pathname === "/";
+  const [syncAt, setSyncAt] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const syncTime = formatSyncTime(syncAt);
+
+  useEffect(() => {
+    if (homePage) {
+      setSyncAt(null);
+      return;
+    }
+    const parts = location.pathname.split("/").filter(Boolean);
+    if (parts[0] === "admin") {
+      setSyncAt(null);
+      return;
+    }
+    const [owner, repository] = parts;
+    const abort = new AbortController();
+    api<PublicOverview>(publicBase(owner, repository), { signal: abort.signal })
+      .then((overview) => {
+        if (!abort.signal.aborted) {
+          setSyncAt(overview.freshness.lastSuccessfulSnapshotAt ?? null);
+        }
+      })
+      .catch(() => {
+        if (!abort.signal.aborted) {
+          setSyncAt(null);
+        }
+      });
+    return () => abort.abort();
+  }, [homePage, location.pathname]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
@@ -26,23 +58,41 @@ export function PublicLayout() {
       </main>
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
-          {location.pathname === "/" ? (
-            <p>Public dashboards use saved snapshots. Sign in only for repository management.</p>
-          ) : null}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              aria-expanded={aboutOpen}
-              onClick={() => setAboutOpen((value) => !value)}
-            >
-              About data
-            </button>
-            <span aria-hidden="true">·</span>
-            <a className="font-medium text-primary hover:underline" href={PROJECT_GITHUB} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-          </div>
+          {homePage ? (
+            <>
+              <p>Public dashboards use saved snapshots. Sign in only for repository management.</p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  aria-expanded={aboutOpen}
+                  onClick={() => setAboutOpen((value) => !value)}
+                >
+                  About data
+                </button>
+                <span aria-hidden="true">·</span>
+                <a className="font-medium text-primary hover:underline" href={PROJECT_GITHUB} target="_blank" rel="noreferrer">
+                  GitHub
+                </a>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <p>
+                <span className="font-medium text-foreground">
+                  {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
+                </span>
+              </p>
+              <button
+                type="button"
+                className="font-medium text-primary hover:underline"
+                aria-expanded={aboutOpen}
+                onClick={() => setAboutOpen((value) => !value)}
+              >
+                About data
+              </button>
+            </div>
+          )}
           {aboutOpen && (
             <p>
               Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change

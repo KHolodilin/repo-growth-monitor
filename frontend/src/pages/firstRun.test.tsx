@@ -184,16 +184,16 @@ describe("first-run portfolio", () => {
       return Promise.resolve(dashboardReady);
     });
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/KHolodilin"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/:owner" element={<DashboardPage />} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("button", { name: "About data" })).toBeInTheDocument();
-    expect(screen.queryByText(/Auto-collect window open/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Collected \d+ of/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Auto-collect window open/)).toBeInTheDocument();
+    expect(screen.getByText(/Last sync: Sep/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
   });
 });

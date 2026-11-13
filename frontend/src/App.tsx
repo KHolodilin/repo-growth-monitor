@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { DashboardPage } from "./pages/DashboardPage";
 import { RepositoriesPage } from "./pages/RepositoriesPage";
 import { RepositoryDetailsPage } from "./pages/RepositoryDetailsPage";
 import { QueryDetailsPage } from "./pages/QueryDetailsPage";
@@ -40,6 +41,18 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
   return children;
 }
 
+/** Admin Portfolio (Disc./Activity) like main; anonymous keeps the public owner dashboard. */
+function OwnerPortfolioPage() {
+  const { me, loading } = useAuth();
+  if (loading) {
+    return <p role="status">Checking access…</p>;
+  }
+  if (me.authenticated && me.roles.includes("ADMIN")) {
+    return <DashboardPage />;
+  }
+  return <PublicScopePage />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -56,7 +69,7 @@ export default function App() {
           />
           <Route path="/admin" element={<Navigate to="/admin/repositories" replace />} />
           <Route path="/admin/search-runs/:id" element={<AdminOnly><SearchResultsPage /></AdminOnly>} />
-          <Route path="/:owner" element={<PublicScopePage />} />
+          <Route path="/:owner" element={<OwnerPortfolioPage />} />
           <Route path="/:owner/:repository" element={<RepositoryDetailsPage />} />
           <Route path="/:owner/:repository/traffic/history" element={<TrafficHistoryPage />} />
           <Route path="/:owner/:repository/search-queries/:queryId" element={<QueryDetailsPage />} />

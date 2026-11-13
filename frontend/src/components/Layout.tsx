@@ -6,6 +6,7 @@ import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
 import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
+import { formatSyncTime } from "../lib/utils";
 import { RouteScroll } from "./RouteScroll";
 import { LogoMark, SignInIcon } from "./icons";
 
@@ -20,8 +21,10 @@ export type RunAllMenuAction = {
 
 export function Layout() {
   const location = useLocation();
+  const homePage = location.pathname === "/";
   const [runAll, setRunAll] = useState<RunAllMenuAction | null>(null);
   const { me, loading: authLoading, logout } = useAuth();
+  const [sync, setSync] = useState<string | null>(null);
   const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
   const ownerScope = ownerLoginFromPath(location.pathname);
   const repositoryId = repositoryIdFromPath(location.pathname, rows);
@@ -29,6 +32,7 @@ export function Layout() {
   const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
+  const syncTime = formatSyncTime(sync);
   const [aboutOpen, setAboutOpen] = useState(false);
   const progressRows = ownerScope
     ? (rows ?? []).filter((row) => row.fullName.toLowerCase().startsWith(`${ownerScope.toLowerCase()}/`))
@@ -41,6 +45,7 @@ export function Layout() {
   const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
   const allowMutations = canMutate(me) && !authLoading;
   const showOperationalStatus = !authLoading && me.authenticated;
+  const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
     const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
@@ -48,6 +53,7 @@ export function Layout() {
       setRows([]);
       return dashboard;
     }
+    setSync(dashboard.lastSyncAt);
     setRows(dashboard.repositories);
     return dashboard;
   }, []);
@@ -56,6 +62,7 @@ export function Layout() {
     let cancelled = false;
     refreshStatus().catch(() => {
       if (!cancelled) {
+        setSync(null);
         setRows([]);
       }
     });
@@ -103,6 +110,7 @@ export function Layout() {
         const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
         await Promise.all(ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })));
         if (dashboard?.repositories) {
+          setSync(dashboard.lastSyncAt);
           setRows(dashboard.repositories);
         }
       }
@@ -186,23 +194,44 @@ export function Layout() {
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              aria-expanded={aboutOpen}
-              onClick={() => setAboutOpen((value) => !value)}
-            >
-              About data
-            </button>
-            <span aria-hidden="true">·</span>
-            <a
-              className="font-medium text-primary hover:underline"
-              href={PROJECT_GITHUB}
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub
-            </a>
+            {homePage ? (
+              <>
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  aria-expanded={aboutOpen}
+                  onClick={() => setAboutOpen((value) => !value)}
+                >
+                  About data
+                </button>
+                <span aria-hidden="true">·</span>
+                <a
+                  className="font-medium text-primary hover:underline"
+                  href={PROJECT_GITHUB}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  GitHub
+                </a>
+              </>
+            ) : (
+              <>
+                <p>
+                  <span className="font-medium text-foreground">
+                    {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
+                  </span>
+                  {briefState ? <span> · {briefState}</span> : null}
+                </p>
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  aria-expanded={aboutOpen}
+                  onClick={() => setAboutOpen((value) => !value)}
+                >
+                  About data
+                </button>
+              </>
+            )}
           </div>
           {aboutOpen && (
             <div className="space-y-1">
@@ -363,6 +392,19 @@ function AuthChrome({
       )}
     </div>
   );
+}
+
+function collectionBriefState(
+  live: boolean,
+  planner: GitHubAccess["planner"] | null | undefined,
+): string | null {
+  if (live) {
+    return "Collecting…";
+  }
+  if (!planner) {
+    return null;
+  }
+  return planner.open ? "Auto-collect window open" : "Outside auto-collect window";
 }
 
 /** Owner Portfolio path `/:owner` — not home, not repository, not admin. */

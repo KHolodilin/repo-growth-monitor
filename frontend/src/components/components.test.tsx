@@ -69,12 +69,9 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.queryByText(/Last sync/)).not.toBeInTheDocument();
+    expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
-      "href",
-      "https://github.com/KHolodilin/repo-growth-monitor",
-    );
+    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
     expect(screen.queryByText(/collected once per day/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About data" }));
     expect(screen.getByText(/collected once per day/i)).toBeInTheDocument();
@@ -181,6 +178,7 @@ describe("components", () => {
     expect(screen.getByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
     expect(screen.queryByText(/Last sync|No successful sync yet/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
     empty.unmount();
 
     api.mockImplementation((path: string) => {
