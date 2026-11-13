@@ -17,7 +17,7 @@ Work package #220 adapts the existing dashboard and snapshot components. It reta
 
 Owner portfolio pages use only `/api/v1/public/**`. Published repository pages reuse the shared repository UI; anonymous reads go through `/api/v1/admin/repositories/{id}/**` only when publication allows them. Public event details contain no edit/delete controls. Admin sign-in lands on `/admin/repositories`; ordinary users land on `/`.
 
-The server resolves publication before serving public HTML. Unknown, unpublished and wrong-parent nested routes return a real 404. Verified owner/repository aliases redirect with 308 to the current canonical path, preserving the analytics suffix and query string. Public documents and redirects use `Cache-Control: no-store`. A repository name containing a dot remains valid. The old broad SPA fallback and old management browser URLs are removed; no compatibility API is introduced.
+The server resolves publication before serving public HTML for the same SPA paths the client uses: `/{owner}`, `/{owner}/{repository}`, `.../traffic/history`, `.../search-queries/{id}`, `.../topics/{topic}`, and their competitor cards. Unknown, unpublished and wrong-parent nested routes return a real 404. Verified owner/repository aliases redirect with 308 to the current canonical path, preserving the nested SPA suffix and query string. Public documents and redirects use `Cache-Control: no-store`. A repository name containing a dot remains valid. The old broad SPA fallback and old management browser URLs are removed; no compatibility API is introduced.
 
 ## Shared rendering and data
 
