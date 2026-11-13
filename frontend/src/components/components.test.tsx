@@ -69,8 +69,12 @@ describe("components", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/KHolodilin/repo-growth-monitor",
+    );
     expect(screen.queryByText(/collected once per day/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About data" }));
     expect(screen.getByText(/collected once per day/i)).toBeInTheDocument();
@@ -99,7 +103,7 @@ describe("components", () => {
       }
       return dashboardReady;
     });
-    const pending = render(
+    const home = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -110,8 +114,21 @@ describe("components", () => {
     );
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
+    expect(screen.queryByText(/Collected \d+ of \d+/)).not.toBeInTheDocument();
+    home.unmount();
+
+    const pending = render(
+      <MemoryRouter initialEntries={["/KHolodilin"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/:owner" element={<p>owner</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(screen.getByText("Collected 0 of 1")).toBeInTheDocument();
-    expect(screen.getByText(/Collecting/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeDisabled();
     hold = false;
@@ -162,7 +179,8 @@ describe("components", () => {
     );
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
-    expect(screen.getByText("No successful sync yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync|No successful sync yet/)).not.toBeInTheDocument();
     empty.unmount();
 
     api.mockImplementation((path: string) => {
@@ -208,7 +226,8 @@ describe("components", () => {
         <Layout />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("No successful sync yet")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync|No successful sync yet/)).not.toBeInTheDocument();
   });
 
   it("collects one repository from its page and every repository from the list", async () => {

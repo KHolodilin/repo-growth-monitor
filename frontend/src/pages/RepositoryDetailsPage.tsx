@@ -48,7 +48,7 @@ import type { RunAllMenuAction } from "../components/Layout";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
-import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { ChartModePlot } from "../components/PersistentECharts";
@@ -91,7 +91,7 @@ function parseTab(tabParam: string | null): Tab {
   ) {
     return tabParam;
   }
-  if (tabParam === "settings") {
+  if (tabParam === "events" || tabParam === "settings") {
     return "growth-events";
   }
   return "traffic";
@@ -106,11 +106,18 @@ export function RepositoryDetailsPage() {
   const { allowMutations } = useMutationAccess();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
+  const periodParam = searchParams.get("period");
   const scopeQuery = searchParams.get("scope");
   const [resolvedId, setResolvedId] = useState<string | undefined>(idParam);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const id = resolvedId ?? idParam;
   const [period, setPeriod] = usePeriod(id);
+
+  useEffect(() => {
+    if (periodParam && (PERIODS as readonly string[]).includes(periodParam) && periodParam !== period) {
+      setPeriod(periodParam as Period);
+    }
+  }, [periodParam, id]);
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
   const repoBase = repo

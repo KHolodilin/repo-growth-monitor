@@ -197,7 +197,7 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
       ) : (
         <StatsChart points={data.stats.points} events={events} period={period} selectedMobileSeries={mobileSelection?.stats ?? statsSeries} onMobileSeriesChange={setStatsSeries} />
       )}
-      {view.showRepositories !== false && <PeriodHighlights highlights={data.highlights} />}
+      {view.showRepositories !== false && <PeriodHighlights highlights={data.highlights} period={period} />}
       {view.showRepositories !== false && <RepositoryTable rows={data.repositories} />}
     </div>
   );
@@ -437,7 +437,7 @@ function StatsChart({
   );
 }
 
-function PeriodHighlights({ highlights }: { highlights: Dashboard["highlights"] }) {
+function PeriodHighlights({ highlights, period }: { highlights: Dashboard["highlights"]; period: Period }) {
   const view = useDashboardView();
   const rise = highlights?.rankRise;
   const drop = highlights?.rankDrop;
@@ -455,7 +455,7 @@ function PeriodHighlights({ highlights }: { highlights: Dashboard["highlights"] 
         {events ? (
           <Link
             className="block text-primary hover:underline"
-            to={`${repositoryHref(view, events.repositoryId, events.repositoryNames[0])}?tab=${view.public ? "events" : "growth-events"}`}
+            to={`${repositoryHref(view, events.repositoryId, events.repositoryNames[0])}?tab=growth-events&period=${period}`}
             aria-label={`${events.count} ${events.count === 1 ? "promotion event" : "promotion events"} · ${events.repositoryNames.join(", ")}`}
           >
             <div className="text-base font-semibold text-foreground">

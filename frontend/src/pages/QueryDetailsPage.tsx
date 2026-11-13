@@ -4,6 +4,7 @@ import { RankSummary } from "../components/RankSummary";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
+import { waitForCollectionRequest } from "../lib/collectionRequest";
 import { useMutationAccess } from "../lib/mutationAccess";
 import { formatSyncTime, cn } from "../lib/utils";
 import { SEARCH_METRICS, queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
@@ -66,7 +67,6 @@ export function QueryDetailsPage() {
 
   useEffect(() => {
     if (!searchBusy) {
-      setRunning(false);
       return;
     }
     const timer = window.setInterval(() => {
@@ -81,7 +81,10 @@ export function QueryDetailsPage() {
     }
     setRunning(true);
     try {
-      await api(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
+      const created = await api<{ requestId?: string }>(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
+      if (created?.requestId) {
+        await waitForCollectionRequest(created.requestId);
+      }
       await load();
     } catch (err) {
       setError((err as Error).message);

@@ -164,8 +164,9 @@ describe("first-run portfolio", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
-    expect(screen.getByText(/Outside auto-collect window/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Outside auto-collect window/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
     expect(screen.queryByText(/It has not started yet today/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About data" }));
     const line = await screen.findByText(/It has not started yet today/);
@@ -191,6 +192,8 @@ describe("first-run portfolio", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Auto-collect window open/)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "About data" })).toBeInTheDocument();
+    expect(screen.queryByText(/Auto-collect window open/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Collected \d+ of/)).not.toBeInTheDocument();
   });
 });

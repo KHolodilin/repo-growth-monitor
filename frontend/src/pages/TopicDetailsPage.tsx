@@ -5,6 +5,7 @@ import { RankSummary } from "../components/RankSummary";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type Repository, type TopicHistory, type TopicRunResults } from "../lib/api";
+import { waitForCollectionRequest } from "../lib/collectionRequest";
 import { useMutationAccess } from "../lib/mutationAccess";
 import { formatSyncTime } from "../lib/utils";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
@@ -84,7 +85,6 @@ export function TopicDetailsPage() {
 
   useEffect(() => {
     if (!searchBusy) {
-      setRunning(false);
       return;
     }
     const timer = window.setInterval(() => {
@@ -99,7 +99,10 @@ export function TopicDetailsPage() {
     }
     setRunning(true);
     try {
-      await api(`/api/v1/admin/topic-watches/${history.watch.id}/run`, { method: "POST" });
+      const created = await api<{ requestId?: string }>(`/api/v1/admin/topic-watches/${history.watch.id}/run`, { method: "POST" });
+      if (created?.requestId) {
+        await waitForCollectionRequest(created.requestId);
+      }
       await load();
     } catch (err) {
       setError((err as Error).message);

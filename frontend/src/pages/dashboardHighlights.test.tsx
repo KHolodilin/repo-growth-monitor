@@ -66,7 +66,7 @@ describe("portfolio highlights", () => {
     );
     expect(screen.getByRole("link", { name: "2 promotion events · acme/outbox" })).toHaveAttribute(
       "href",
-      "/acme/outbox?tab=growth-events",
+      "/acme/outbox?tab=growth-events&period=7d",
     );
     expect(screen.getByRole("link", { name: /acme\/outbox ↑ 25%/ })).toHaveAttribute("href", "/acme/outbox");
     expect(screen.getByText("12")).toHaveClass("text-emerald-700");
@@ -105,9 +105,52 @@ describe("portfolio highlights", () => {
     expect(screen.queryByText("No rank changes")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "1 promotion event · acme/kafka, acme/outbox" })).toHaveAttribute(
       "href",
-      "/acme/kafka?tab=growth-events",
+      "/acme/kafka?tab=growth-events&period=7d",
     );
     expect(screen.getByText("No visitor growth")).toBeInTheDocument();
+  });
+
+  it("opens Growth Events from a legacy events tab and applies period from the URL", async () => {
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/api/v1/public/resolve")) {
+        return Promise.resolve({
+          ownerId: "1",
+          repositoryId: "13",
+          canonicalPath: `/${repository.owner.login}/${repository.name}`,
+          redirect: false,
+        });
+      }
+      if (url.endsWith("/admin/repositories/13")) {
+        return Promise.resolve(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return Promise.resolve(traffic);
+      }
+      if (url.includes("growth-events")) {
+        return Promise.resolve([
+          {
+            id: "1",
+            repositoryId: "13",
+            eventAt: "2026-09-23T00:00:00Z",
+            title: "Promotion",
+            type: "PROMOTION",
+            category: "GROWTH",
+            source: "MANUAL",
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    render(
+      <MemoryRouter initialEntries={[`/${repository.owner.login}/${repository.name}?tab=events&period=30d`]}>
+        <Routes>
+          <Route path="/:owner/:repository" element={<RepositoryDetailsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("button", { name: "Growth Events", pressed: true })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "30d", pressed: true })).toBeInTheDocument();
   });
 
   it("scrolls overview to repository health from the portfolio link", async () => {

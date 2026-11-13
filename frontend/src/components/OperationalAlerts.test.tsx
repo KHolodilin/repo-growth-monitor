@@ -16,10 +16,35 @@ const registered = { ...anonymousMe, authenticated: true, userId: "1", displayNa
 const admin = { ...registered, roles: ["USER", "ADMIN"], actions: ["MUTATE"] };
 const banners = [["MISSING", TOKEN_MISSING], ["REJECTED", TOKEN_REJECTED], ["RATE_LIMITED", "Collection continues after the rate limit resets."]] as const;
 let tokenState = "MISSING";
-function mount() {
-  return render(<MemoryRouter><AuthProvider><Routes><Route element={<Layout />}><Route path="/" element={<>
-    <p>Stored analytics</p><RepositoryAccessNote accessible={false} trafficPermissionMissing tokenState="OK" />
-  </>} /></Route></Routes></AuthProvider></MemoryRouter>);
+function mount(path = "/KHolodilin") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route
+              path="/"
+              element={
+                <>
+                  <p>Stored analytics</p>
+                  <RepositoryAccessNote accessible={false} trafficPermissionMissing tokenState="OK" />
+                </>
+              }
+            />
+            <Route
+              path="/:owner"
+              element={
+                <>
+                  <p>Stored analytics</p>
+                  <RepositoryAccessNote accessible={false} trafficPermissionMissing tokenState="OK" />
+                </>
+              }
+            />
+          </Route>
+        </Routes>
+      </AuthProvider>
+    </MemoryRouter>,
+  );
 }
 function expectHidden() {
   expect(screen.queryByText(TOKEN_MISSING)).not.toBeInTheDocument();
@@ -47,7 +72,8 @@ describe("operational alerts by authentication", () => {
     await user.click(screen.getByRole("button", { name: "About data" }));
     expectHidden();
     expect(screen.getByText("Stored analytics")).toBeInTheDocument();
-    expect(screen.getByText(/Last sync:/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
     expect(screen.getByText(/Data is collected once per day/)).toBeInTheDocument();
   });
 
@@ -63,6 +89,13 @@ describe("operational alerts by authentication", () => {
       if (state === "MISSING") expect(document.title).toContain("no token");
     },
   );
+
+  it("hides portfolio collect progress on the home page", async () => {
+    loadMe.mockResolvedValue(admin); tokenState = "OK";
+    mount("/");
+    expect(await screen.findByText("Stored analytics")).toBeInTheDocument();
+    expect(screen.queryByText(/Collected \d+ of/)).not.toBeInTheDocument();
+  });
 
   it("does not flash notices while authentication is unresolved", async () => {
     let resolveMe!: (me: typeof admin) => void;
