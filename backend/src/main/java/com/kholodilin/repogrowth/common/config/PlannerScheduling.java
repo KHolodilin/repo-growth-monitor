@@ -11,6 +11,6 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  */
 @Configuration
 @EnableScheduling
-@ConditionalOnProperty(prefix = "spring.task.scheduling", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = {"spring.task.scheduling.enabled", "rgm.planner.enabled"}, havingValue = "true", matchIfMissing = true)
 public class PlannerScheduling {
 }

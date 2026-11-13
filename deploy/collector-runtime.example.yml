@@ -1,0 +1,32 @@
+# Copy to a host-private path and point SPRING_CONFIG_ADDITIONAL_LOCATION at it for the collector service.
+# Replace tokens/passwords; never commit real secrets.
+collector:
+  storage:
+    enabled: true
+  datasource:
+    url: jdbc:postgresql://postgres:5432/collector
+    username: collector
+    password: "COLLECTOR_DB_PASSWORD"
+  http:
+    enabled: true
+    clients:
+      - origin: rgm
+        token: "SERVICE_TOKEN_AT_LEAST_32_CHARS____________"
+  credentials:
+    enabled: true
+    ttl: 2h
+    maximum-size: 100
+    allow-http: false
+    origins:
+      - origin: rgm
+        endpoint: https://rgm.example
+        service-token: "RESOLVE_TOKEN_AT_LEAST_32_CHARS____________"
+  execution:
+    enabled: true
+  delivery:
+    enabled: true
+    allow-http: false
+    destinations:
+      - ref: rgm-results
+        origin: rgm
+        endpoint: https://rgm.example/internal/v1/collector-results

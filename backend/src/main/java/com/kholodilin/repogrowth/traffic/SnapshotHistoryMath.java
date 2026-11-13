@@ -51,8 +51,8 @@ public final class SnapshotHistoryMath {
     public static Result pivot(List<Observation> snapshots, LocalDate fromInclusive, LocalDate toInclusive) {
         TreeMap<LocalDate, Map<String, Observation>> byDate = new TreeMap<>();
         for (Observation snapshot : snapshots) {
-            byDate.computeIfAbsent(snapshot.snapshotDate(), date -> new LinkedHashMap<>())
-                    .put(snapshot.key(), snapshot);
+            var day=byDate.computeIfAbsent(snapshot.snapshotDate(), date -> new LinkedHashMap<>());
+            if(snapshot.key()!=null)day.put(snapshot.key(), snapshot);
         }
         List<LocalDate> dates = byDate.keySet().stream()
                 .filter(date -> !date.isBefore(fromInclusive) && !date.isAfter(toInclusive))

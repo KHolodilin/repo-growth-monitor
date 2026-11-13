@@ -8,12 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 
-/**
- * A browser refresh of a client route reaches the server, so every section of the SPA is served the
- * same index.html and routed again on the client. Sections are matched by prefix because the router
- * grows nested pages, and the build only puts index.html and /assets under the static root, so no
- * real file can hide behind these paths.
- */
+/** Serves the landing page and authorized Admin SPA routes. Public entity HTML is policy-resolved separately. */
 @Controller
 public class SpaController {
 
@@ -21,14 +16,13 @@ public class SpaController {
 
     @GetMapping(value = {
             "/",
-            "/dashboard",
-            "/repositories/**",
-            "/search-runs/**"
+            "/admin",
+            "/admin/**"
     }, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<Resource> spa(HttpServletRequest request) {
         if (!INDEX.exists()) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(INDEX);
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).contentType(MediaType.TEXT_HTML).body(INDEX);
     }
 }

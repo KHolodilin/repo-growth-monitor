@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import type { Repository } from "../lib/api";
 import { RepoSwitcher } from "./RepoSwitcher";
 
 export type BreadcrumbItem = {
@@ -6,7 +7,7 @@ export type BreadcrumbItem = {
   to?: string;
   repoSwitcher?: {
     currentId: number;
-    hrefFor: (repositoryId: number) => string;
+    hrefFor: (repository: Repository) => string;
     description?: string;
   };
 };
@@ -32,8 +33,10 @@ export function PageBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
             <Link className="font-medium text-muted-foreground hover:text-foreground" to={item.to}>
               {item.label}
             </Link>
-          ) : (
+          ) : index === items.length - 1 ? (
             <h1 className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">{item.label}</h1>
+          ) : (
+            <span className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">{item.label}</span>
           )}
         </span>
       ))}

@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 024-enable-tracked-public-publication
+      author: rgm
+      changes:
+        - sqlFile:
+            path: 024-enable-tracked-public-publication.sql
+            relativeToChangelogFile: true
+            splitStatements: false

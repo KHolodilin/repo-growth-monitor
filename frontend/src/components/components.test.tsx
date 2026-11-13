@@ -60,17 +60,18 @@ describe("components", () => {
       return dashboardReady;
     });
     const ready = render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
+      <MemoryRouter initialEntries={["/admin/dashboard"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/dashboard" element={<p>dash</p>} />
-            <Route path="/repositories" element={<p>repos</p>} />
+            <Route path="/admin/dashboard" element={<p>dash</p>} />
+            <Route path="/admin/repositories" element={<p>repos</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
     expect(screen.queryByText(/collected once per day/i)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About data" }));
     expect(screen.getByText(/collected once per day/i)).toBeInTheDocument();
@@ -78,7 +79,7 @@ describe("components", () => {
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Repositories" }));
@@ -99,7 +100,7 @@ describe("components", () => {
       }
       return dashboardReady;
     });
-    const pending = render(
+    const home = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -110,8 +111,21 @@ describe("components", () => {
     );
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
+    expect(screen.queryByText(/Collected \d+ of \d+/)).not.toBeInTheDocument();
+    home.unmount();
+
+    const pending = render(
+      <MemoryRouter initialEntries={["/KHolodilin"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/:owner" element={<p>owner</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     expect(screen.getByText("Collected 0 of 1")).toBeInTheDocument();
-    expect(screen.getByText(/Collecting/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Collect 1 repository" })).toBeDisabled();
     hold = false;
@@ -162,7 +176,9 @@ describe("components", () => {
     );
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     expect(screen.getByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
-    expect(screen.getByText("No successful sync yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync|No successful sync yet/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
     empty.unmount();
 
     api.mockImplementation((path: string) => {
@@ -208,7 +224,8 @@ describe("components", () => {
         <Layout />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("No successful sync yet")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync|No successful sync yet/)).not.toBeInTheDocument();
   });
 
   it("collects one repository from its page and every repository from the list", async () => {
@@ -227,10 +244,10 @@ describe("components", () => {
       return portfolio;
     });
     const repo = render(
-      <MemoryRouter initialEntries={["/repositories/13/traffic/history"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/traffic/history"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories/:id/traffic/history" element={<p>history</p>} />
+            <Route path="/admin/repositories/:id/traffic/history" element={<p>history</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -238,9 +255,9 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
-    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" });
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" });
     repo.unmount();
 
     api.mockClear();
@@ -251,10 +268,10 @@ describe("components", () => {
       return portfolio;
     });
     render(
-      <MemoryRouter initialEntries={["/repositories"]}>
+      <MemoryRouter initialEntries={["/admin/repositories"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories" element={<p>list</p>} />
+            <Route path="/admin/repositories" element={<p>list</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -262,9 +279,9 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" }),
     );
-    expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" });
+    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" });
   });
 
   it("shows job progress under the header until the run finishes", async () => {
@@ -306,10 +323,10 @@ describe("components", () => {
       };
     });
     const view = render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories/:id" element={<p>repo</p>} />
+            <Route path="/admin/repositories/:id" element={<p>repo</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -321,7 +338,7 @@ describe("components", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }));
     expect(timers.length).toBeGreaterThan(0);
     const fireTimers = async () => {
       await act(async () => {

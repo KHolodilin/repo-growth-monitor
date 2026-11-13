@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 023-publication-audit
+      author: rgm
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE publication_audit(id BIGSERIAL PRIMARY KEY,actor_id BIGINT NOT NULL,entity_type VARCHAR(16) NOT NULL,entity_id BIGINT NOT NULL,before_policy JSONB NOT NULL,after_policy JSONB NOT NULL,request_id VARCHAR(128),created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp());
+              CREATE INDEX publication_audit_entity ON publication_audit(entity_type,entity_id,id DESC);
+              ALTER TABLE search_run ADD COLUMN public_scope_verified BOOLEAN NOT NULL DEFAULT FALSE;
+              ALTER TABLE topic_run ADD COLUMN public_scope_verified BOOLEAN NOT NULL DEFAULT FALSE;

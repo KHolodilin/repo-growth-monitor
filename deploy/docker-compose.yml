@@ -52,6 +52,7 @@ services:
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     logging: *default-logging
 
+  # Product web + planner + orchestration. Collector execution stays in the collector service.
   backend:
     image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.4.1}
     restart: unless-stopped
@@ -66,6 +67,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD:-${POSTGRES_PASSWORD}}
       SPRING_LIQUIBASE_ENABLED: "false"
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-json-logs}
+      # Mount a private rgm-runtime.yml and set e.g. file:/app/rgm-runtime.yml (see rgm-runtime.example.yml).
+      SPRING_CONFIG_ADDITIONAL_LOCATION: ${RGM_CONFIG_LOCATION:-}
       LOG_FILE: /var/log/app/app.log
       SERVER_SHUTDOWN: graceful
       MANAGEMENT_PORT: "8081"
@@ -98,11 +101,45 @@ services:
         limits:
           memory: 1G
 
+  # Same image, collector role only. Provide collector-runtime.yml via COLLECTOR_CONFIG_LOCATION (see example).
+  collector:
+    image: ${APP_IMAGE:-ghcr.io/kholodilin/repo-growth-monitor:0.4.1}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: collector,collector-http
+      SPRING_CONFIG_ADDITIONAL_LOCATION: ${COLLECTOR_CONFIG_LOCATION:-}
+      SERVER_PORT: "8080"
+      MANAGEMENT_PORT: "8081"
+      COLLECTOR_STORAGE_ENABLED: "true"
+      COLLECTOR_DATASOURCE_URL: jdbc:postgresql://postgres:5432/collector
+      COLLECTOR_DATASOURCE_USERNAME: ${COLLECTOR_DB_USER:-collector}
+      COLLECTOR_DATASOURCE_PASSWORD: ${COLLECTOR_DB_PASSWORD:-${POSTGRES_PASSWORD}}
+      GITHUB_API_BASE_URL: https://api.github.com
+      APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
+      LOG_FILE: /var/log/collector/app.log
+      SERVER_SHUTDOWN: graceful
+    volumes:
+      - collector_logs:/var/log/collector
+    logging: *default-logging
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
   caddy:
     image: caddy:2.11.6-alpine
     restart: unless-stopped
     depends_on:
       - backend
+      - collector
     ports:
       - "80:80"
       - "443:443"
@@ -123,6 +160,7 @@ services:
 volumes:
   pgdata:
   app_logs:
+  collector_logs:
   caddy_data:
   caddy_config:
   caddy_logs:

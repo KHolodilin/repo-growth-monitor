@@ -18,7 +18,7 @@ import java.time.Instant;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class GrowthEventController {
 
     private final GrowthEventService growthEventService;

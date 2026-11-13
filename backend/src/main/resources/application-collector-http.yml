@@ -1,0 +1,12 @@
+# Use together with collector: --spring.profiles.active=collector,collector-http
+spring:
+  main:
+    web-application-type: servlet
+collector:
+  storage:
+    enabled: true
+  http:
+    enabled: true
+    clients:
+      - origin: ${COLLECTOR_RGM_ORIGIN:rgm}
+        token: ${COLLECTOR_RGM_SERVICE_TOKEN}

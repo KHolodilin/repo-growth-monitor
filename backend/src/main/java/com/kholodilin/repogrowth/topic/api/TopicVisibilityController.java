@@ -13,9 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class TopicVisibilityController {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+    @org.springframework.beans.factory.annotation.Autowired private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
     private final TopicVisibilityService topicVisibilityService;
     private final TopicCompetitorService topicCompetitorService;
 
@@ -35,16 +37,20 @@ public class TopicVisibilityController {
         return topicVisibilityService.visibility(id, scope);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/repositories/{id}/topic-watches/run")
-    public RunAllAccepted runAll(
+    public Object runAll(
             @PathVariable long id,
             @RequestParam(defaultValue = "all") String scope
     ) {
+        if(commands!=null)return commands.topicsCommand(id,scope,commandWindow.businessDate());
         return new RunAllAccepted(topicVisibilityService.runAll(id, scope));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/topic-watches/{id}/run")
-    public RunAccepted run(@PathVariable long id) {
+    public Object run(@PathVariable long id) {
+        if(commands!=null)return commands.topicCommand(id,commandWindow.businessDate());
         return new RunAccepted(topicVisibilityService.runNow(id));
     }
 

@@ -53,7 +53,6 @@ public class TopicVisibilityService {
     public List<TopicHistory> visibility(long repositoryId, String scope) {
         repositoryService.get(repositoryId);
         boolean allLanguages = parseAllLanguages(scope);
-        topicWatchSync.sync(repositoryId);
         return watchRepository.findEnabledByRepository(repositoryId, allLanguages).stream()
                 .map(watch -> history(watch.id()))
                 .toList();
@@ -98,7 +97,6 @@ public class TopicVisibilityService {
     public TopicHistory historyByTopic(long repositoryId, String topic, String scope) {
         repositoryService.get(repositoryId);
         boolean allLanguages = parseAllLanguages(scope);
-        topicWatchSync.sync(repositoryId);
         TopicWatch watch = watchRepository.findEnabledByRepository(repositoryId, allLanguages).stream()
                 .filter(item -> item.topic().equalsIgnoreCase(topic))
                 .findFirst()
@@ -114,7 +112,6 @@ public class TopicVisibilityService {
     public List<Long> runAll(long repositoryId, String scope) {
         repositoryService.get(repositoryId);
         boolean allLanguages = parseAllLanguages(scope);
-        topicWatchSync.sync(repositoryId);
         LocalDate date = planningWindow.businessDate();
         return watchRepository.findEnabledByRepository(repositoryId, allLanguages).stream()
                 .map(watch -> topicPlanner.planWatch(watch.id(), watch.repositoryId(), date))

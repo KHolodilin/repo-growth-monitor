@@ -27,6 +27,7 @@ public class CompetitorCardService {
 
     private static final Logger log = LoggerFactory.getLogger(CompetitorCardService.class);
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}") private boolean durableOrchestration;
     private final SearchQueryService searchQueryService;
     private final SearchResultJdbcRepository resultRepository;
     private final SearchRunJdbcRepository runRepository;
@@ -76,7 +77,7 @@ public class CompetitorCardService {
 
     public CompetitorCard assemble(long githubRepositoryId, String snapshotName, List<CompetitorPoint> points) {
         CompetitorProfile profile = profileRepository.find(githubRepositoryId)
-                .orElseGet(() -> fetchAndStore(githubRepositoryId, snapshotName));
+                .orElseGet(() -> durableOrchestration ? new CompetitorProfile(githubRepositoryId,snapshotName,null,null,List.of(),null,false,null,null,false,false,false,false,false,null) : fetchAndStore(githubRepositoryId,snapshotName));
         RepositoryHealthFacts facts = new RepositoryHealthFacts(
                 profile.homepage(),
                 profile.hasReadme(),

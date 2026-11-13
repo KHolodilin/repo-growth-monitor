@@ -52,7 +52,7 @@ class AuthSecurityIT extends AbstractPostgresTest {
 
     @Test
     void guestCannotMutate() throws Exception {
-        mockMvc.perform(post("/api/v1/collection/plan").with(csrf()))
+        mockMvc.perform(post("/api/v1/admin/collection/plan").with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
@@ -60,7 +60,7 @@ class AuthSecurityIT extends AbstractPostgresTest {
     @Test
     void userCannotMutate() throws Exception {
         AppUser user = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "user").orElseThrow();
-        mockMvc.perform(post("/api/v1/collection/plan")
+        mockMvc.perform(post("/api/v1/admin/collection/plan")
                         .with(csrf())
                         .with(asPrincipal(user)))
                 .andExpect(status().isForbidden())
@@ -71,10 +71,10 @@ class AuthSecurityIT extends AbstractPostgresTest {
     void adminCanMutate() throws Exception {
         AppUser admin = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "admin").orElseThrow();
         assertThat(admin.isAdmin()).isTrue();
-        mockMvc.perform(post("/api/v1/collection/plan")
+        mockMvc.perform(post("/api/v1/admin/collection/plan")
                         .with(csrf())
                         .with(asPrincipal(admin)))
-                .andExpect(status().isOk());
+                .andExpect(status().isCreated());
     }
 
     @Test
@@ -82,7 +82,7 @@ class AuthSecurityIT extends AbstractPostgresTest {
         AppUser admin = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "admin").orElseThrow();
         users.revokeAdmin(admin.id());
         try {
-            mockMvc.perform(post("/api/v1/collection/plan")
+            mockMvc.perform(post("/api/v1/admin/collection/plan")
                             .with(csrf())
                             .with(asPrincipal(admin)))
                     .andExpect(status().isForbidden());
@@ -108,9 +108,9 @@ class AuthSecurityIT extends AbstractPostgresTest {
     }
 
     @Test
-    void systemStatusStaysPublic() throws Exception {
-        mockMvc.perform(get("/api/v1/system/status"))
-                .andExpect(status().isOk());
+    void systemStatusIsAdminOnly() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/system/status"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

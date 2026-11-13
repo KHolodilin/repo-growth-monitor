@@ -25,9 +25,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class CollectionController {
 
+    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+    private boolean orchestrationEnabled;
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+    @org.springframework.beans.factory.annotation.Autowired private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
     private final CollectionPlanner collectionPlanner;
     private final PlanningWindow planningWindow;
     private final DailyPlanner dailyPlanner;
@@ -66,8 +70,10 @@ public class CollectionController {
         this.topicPlanner = topicPlanner;
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/repositories/{id}/collect")
-    public CollectionRunResponse collect(@PathVariable long id) {
+    public Object collect(@PathVariable long id) {
+        if (commands!=null)return commands.manual(id,commandWindow.businessDate());
         if (!gitHubProperties.tokenConfigured()) {
             throw GitHubException.auth(401, "GitHub token is not configured");
         }
@@ -83,6 +89,7 @@ public class CollectionController {
         return toResponse(run);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/collection/plan")
     public DailyPlanner.PlannerResult plan() {
         return dailyPlanner.planNow(true);

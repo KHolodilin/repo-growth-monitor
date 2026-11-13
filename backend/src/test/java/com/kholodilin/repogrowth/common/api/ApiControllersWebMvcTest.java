@@ -3,6 +3,7 @@ package com.kholodilin.repogrowth.common.api;
 import com.kholodilin.repogrowth.analytics.api.AnalyticsController;
 import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -134,6 +135,8 @@ class ApiControllersWebMvcTest {
     GitHubClient gitHubClient;
     @MockitoBean
     CurrentUserAccess currentUserAccess;
+    @MockitoBean
+    PublicationService publicationService;
 
     private Repository repository;
     private SearchQuery query;
@@ -244,122 +247,122 @@ class ApiControllersWebMvcTest {
 
     @Test
     void repositoryCollectionSearchEventAndTopicEndpoints() throws Exception {
-        mockMvc.perform(get("/api/v1/repositories")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/repositories")).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].fullName").value("acme/outbox"));
-        mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/repositories/13/tracking")
+        mockMvc.perform(get("/api/v1/admin/repositories/13")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/repositories/13/tracking")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"enabled\":true}"))
                 .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/repositories/13/collect")).andExpect(status().isOk())
+        mockMvc.perform(post("/api/v1/admin/repositories/13/collect")).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("SUCCESS"));
         verify(searchQueryService).runAll(13L);
         verify(topicWatchSync).sync(13L);
         verify(topicPlanner).planRepository(eq(13L), eq(LocalDate.of(2026, 9, 23)));
-        mockMvc.perform(post("/api/v1/collection/plan")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/collection-runs/1")).andExpect(status().isOk())
+        mockMvc.perform(post("/api/v1/admin/collection/plan")).andExpect(status().isCreated());
+        mockMvc.perform(get("/api/v1/admin/collection-runs/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.jobs[0].jobType").value("TRAFFIC"));
-        mockMvc.perform(get("/api/v1/repositories/13/search-queries")).andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/repositories/13/search-queries")
+        mockMvc.perform(get("/api/v1/admin/repositories/13/search-queries")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/repositories/13/search-queries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"q\",\"query\":\"outbox\",\"enabled\":true,\"resultLimit\":50}"))
+                .andExpect(status().isCreated());
+        mockMvc.perform(put("/api/v1/admin/search-queries/5")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"q\",\"query\":\"outbox\",\"enabled\":true,\"resultLimit\":50}"))
                 .andExpect(status().isOk());
-        mockMvc.perform(put("/api/v1/search-queries/5")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"q\",\"query\":\"outbox\",\"enabled\":true,\"resultLimit\":50}"))
-                .andExpect(status().isOk());
-        mockMvc.perform(delete("/api/v1/search-queries/5")).andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/search-queries/5/run")).andExpect(status().isOk())
+        mockMvc.perform(delete("/api/v1/admin/search-queries/5")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/search-queries/5/run")).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.searchRunId").value(9));
-        mockMvc.perform(post("/api/v1/repositories/13/search-queries/run")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/search-queries/5")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/search-queries/5/history")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/search-visibility")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/search-queries/5/results")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/search-queries/5/series")).andExpect(status().isOk())
+        mockMvc.perform(post("/api/v1/admin/repositories/13/search-queries/run")).andExpect(status().isCreated());
+        mockMvc.perform(get("/api/v1/admin/search-queries/5")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/search-queries/5/history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/search-visibility")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/search-queries/5/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/search-queries/5/series")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.series").isEmpty());
-        mockMvc.perform(get("/api/v1/search-queries/5/competitors/1")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/search-queries/5/competitors/1")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("other/repo"))
                 .andExpect(jsonPath("$.discoverability[0].label").value("Repository description exists"))
                 .andExpect(jsonPath("$.points[0].stars").value(10));
-        mockMvc.perform(get("/api/v1/search-runs/9/results")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/growth-events")).andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/repositories/13/growth-events")
+        mockMvc.perform(get("/api/v1/admin/search-runs/9/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/growth-events")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/repositories/13/growth-events")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"CUSTOM\",\"eventAt\":\"2026-09-22T12:00:00Z\",\"title\":\"Posted\"}"))
                 .andExpect(status().isOk());
-        mockMvc.perform(put("/api/v1/growth-events/1")
+        mockMvc.perform(put("/api/v1/admin/growth-events/1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"type\":\"CUSTOM\",\"eventAt\":\"2026-09-22T12:00:00Z\",\"title\":\"Updated\"}"))
                 .andExpect(status().isOk());
-        mockMvc.perform(delete("/api/v1/growth-events/1")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/growth-event-settings")).andExpect(status().isOk());
-        mockMvc.perform(put("/api/v1/repositories/13/growth-event-settings")
+        mockMvc.perform(delete("/api/v1/admin/growth-events/1")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/growth-event-settings")).andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/admin/repositories/13/growth-event-settings")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("[{\"eventType\":\"STAR_MILESTONE\",\"enabled\":false}]"))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/topics-visibility")).andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/repositories/13/topic-watches/run")).andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/topic-watches/7/run")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/topic-watches/7/history")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/topic-watches/7/results")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/history")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/topics-visibility")).andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/repositories/13/topic-watches/run")).andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/admin/topic-watches/7/run")).andExpect(status().isCreated());
+        mockMvc.perform(get("/api/v1/admin/topic-watches/7/history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/topic-watches/7/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/topics/outbox/history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/topics/outbox/results")).andExpect(status().isOk());
         when(topicCompetitorService.series(13L, "outbox", "language")).thenReturn(List.of(new TopicCompetitorService.RankSeries(2L, "big/outbox", List.of(new TopicCompetitorService.RankPoint(LocalDate.of(2026, 9, 23), 1)))));
-        mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/series?scope=language")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/repositories/13/topics/outbox/series?scope=language")).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].points[0].position").value(1));
-        mockMvc.perform(get("/api/v1/repositories/13/topics/outbox/competitors/2")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/repositories/13/topics/outbox/competitors/2")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("big/outbox"))
                 .andExpect(jsonPath("$.points[0].stars").value(10));
-        mockMvc.perform(get("/api/v1/topic-runs/3/results")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/dashboard")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/portfolio")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/traffic")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/traffic-history")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/repositories/13/traffic-history?kind=paths&period=all&days=14&includeServicePaths=true")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/topic-runs/3/results")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/dashboard")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/portfolio")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/traffic")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/traffic-history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/traffic-history?kind=paths&period=all&days=14&includeServicePaths=true")).andExpect(status().isOk());
         verify(analyticsService).snapshotHistory(13L, "paths", "all", 14, true);
-        mockMvc.perform(get("/api/v1/repositories/13/stats-history")).andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/repositories/13/stats-history")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/system/status")).andExpect(status().isOk());
         mockMvc.perform(get("/dashboard")).andExpect(status().isNotFound());
     }
 
     @Test
     void mapsApiAndGitHubErrors() throws Exception {
         when(repositoryService.get(8L)).thenThrow(ApiException.notFound("missing"));
-        mockMvc.perform(get("/api/v1/repositories/8")).andExpect(status().isNotFound())
+        mockMvc.perform(get("/api/v1/admin/repositories/8")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         when(runRepository.findById(99L)).thenReturn(Optional.empty());
-        mockMvc.perform(get("/api/v1/collection-runs/99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/admin/collection-runs/99")).andExpect(status().isNotFound());
 
-        doThrow(GitHubException.auth(401, "bad token")).when(repositoryService).list(true);
-        mockMvc.perform(get("/api/v1/repositories?refresh=true")).andExpect(status().isUnauthorized());
-        doThrow(GitHubException.rateLimit(Instant.parse("2026-09-23T07:00:00Z"), "slow")).when(repositoryService).list(true);
-        mockMvc.perform(get("/api/v1/repositories?refresh=true")).andExpect(status().isTooManyRequests());
-        doThrow(GitHubException.notFound("gone")).when(repositoryService).list(true);
-        mockMvc.perform(get("/api/v1/repositories?refresh=true")).andExpect(status().isNotFound());
-        doThrow(GitHubException.validation("bad")).when(repositoryService).list(true);
-        mockMvc.perform(get("/api/v1/repositories?refresh=true")).andExpect(status().isBadRequest());
-        doThrow(GitHubException.api(502, true, null, "down")).when(repositoryService).list(true);
-        mockMvc.perform(get("/api/v1/repositories?refresh=true")).andExpect(status().isBadGateway());
+        doThrow(GitHubException.auth(401, "bad token")).when(repositoryService).list(false);
+        mockMvc.perform(get("/api/v1/admin/repositories?refresh=false")).andExpect(status().isUnauthorized());
+        doThrow(GitHubException.rateLimit(Instant.parse("2026-09-23T07:00:00Z"), "slow")).when(repositoryService).list(false);
+        mockMvc.perform(get("/api/v1/admin/repositories?refresh=false")).andExpect(status().isTooManyRequests());
+        doThrow(GitHubException.notFound("gone")).when(repositoryService).list(false);
+        mockMvc.perform(get("/api/v1/admin/repositories?refresh=false")).andExpect(status().isNotFound());
+        doThrow(GitHubException.validation("bad")).when(repositoryService).list(false);
+        mockMvc.perform(get("/api/v1/admin/repositories?refresh=false")).andExpect(status().isBadRequest());
+        doThrow(GitHubException.api(502, true, null, "down")).when(repositoryService).list(false);
+        mockMvc.perform(get("/api/v1/admin/repositories?refresh=false")).andExpect(status().isBadGateway());
 
-        mockMvc.perform(post("/api/v1/repositories/13/tracking")
+        mockMvc.perform(post("/api/v1/admin/repositories/13/tracking")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/repositories/13/tracking")
+        mockMvc.perform(post("/api/v1/admin/repositories/13/tracking")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{"))
                 .andExpect(status().isBadRequest());
         doThrow(new IllegalStateException("boom")).when(repositoryService).get(13L);
-        mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isInternalServerError());
+        mockMvc.perform(get("/api/v1/admin/repositories/13")).andExpect(status().isInternalServerError());
     }
 
     @Test
     void statusAndCollectFollowTheTokenAndRepositorySignals() throws Exception {
         when(gitHubClient.tokenStatus()).thenReturn(null);
         when(gitHubProperties.tokenConfigured()).thenReturn(false);
-        mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/system/status")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenState").value("MISSING"))
                 .andExpect(jsonPath("$.planner.timezone").value("Europe/Berlin"))
                 .andExpect(jsonPath("$.planner.from").value("09:30"))
@@ -369,22 +372,22 @@ class ApiControllersWebMvcTest {
         when(gitHubProperties.tokenConfigured()).thenReturn(true);
         when(gitHubClient.tokenStatus()).thenReturn(
                 new GitHubClient.TokenStatus("RATE_LIMITED", Instant.parse("2033-05-18T03:33:20Z")));
-        mockMvc.perform(get("/api/v1/system/status")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/system/status")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.tokenState").value("RATE_LIMITED"))
                 .andExpect(jsonPath("$.rateLimitReset").exists());
 
         when(gitHubProperties.tokenConfigured()).thenReturn(false);
-        mockMvc.perform(post("/api/v1/repositories/13/collect")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/admin/repositories/13/collect")).andExpect(status().isUnauthorized());
         when(gitHubProperties.tokenConfigured()).thenReturn(true);
         when(gitHubClient.tokenRejected()).thenReturn(true);
-        mockMvc.perform(post("/api/v1/repositories/13/collect")).andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/admin/repositories/13/collect")).andExpect(status().isUnauthorized());
 
         when(repositoryService.signalsFor(any())).thenReturn(Map.of(13L, new RepositorySignals(false, true)));
-        mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/repositories/13")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessible").value(false))
                 .andExpect(jsonPath("$.trafficPermissionMissing").value(true));
         when(repositoryService.signalsFor(any())).thenReturn(Map.of(13L, new RepositorySignals(true, false)));
-        mockMvc.perform(get("/api/v1/repositories/13")).andExpect(status().isOk())
+        mockMvc.perform(get("/api/v1/admin/repositories/13")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessible").value(true))
                 .andExpect(jsonPath("$.trafficPermissionMissing").value(false));
     }

@@ -60,13 +60,15 @@ describe("coverage gaps", () => {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
-            <Route path="/repositories/:id" element={<p>opened</p>} />
+            <Route path="/admin/repositories/:id" element={<p>opened</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByRole("heading", { name: "Collecting" })).toBeInTheDocument();
-    expect(screen.getByText("No successful sync yet")).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync|No successful sync yet/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "About data" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "all" }));
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
@@ -88,7 +90,7 @@ describe("coverage gaps", () => {
       <MemoryRouter>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/repositories/:id" element={<p>opened</p>} />
+          <Route path="/:owner/:repo" element={<p>opened</p>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -136,7 +138,7 @@ describe("coverage gaps", () => {
       <MemoryRouter>
         <Routes>
           <Route path="/" element={<DashboardPage />} />
-          <Route path="/repositories/:id" element={<p>opened</p>} />
+          <Route path="/:owner/:repo" element={<p>opened</p>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -306,9 +308,9 @@ describe("coverage gaps", () => {
 
     api.mockRejectedValue(new Error("gone"));
     const missing = render(
-      <MemoryRouter initialEntries={["/search-runs/1"]}>
+      <MemoryRouter initialEntries={["/admin/search-runs/1"]}>
         <Routes>
-          <Route path="/search-runs/:id" element={<SearchResultsPage />} />
+          <Route path="/admin/search-runs/:id" element={<SearchResultsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -316,9 +318,9 @@ describe("coverage gaps", () => {
     missing.unmount();
 
     const queryError = render(
-      <MemoryRouter initialEntries={["/repositories/13/search-queries/5"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
         <Routes>
-          <Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -326,9 +328,9 @@ describe("coverage gaps", () => {
     queryError.unmount();
 
     const topicError = render(
-      <MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}>
         <Routes>
-          <Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
+          <Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -336,9 +338,9 @@ describe("coverage gaps", () => {
     topicError.unmount();
 
     const trafficError = render(
-      <MemoryRouter initialEntries={["/repositories/13/traffic/history"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/traffic/history"]}>
         <Routes>
-          <Route path="/repositories/:id/traffic/history" element={<TrafficHistoryPage />} />
+          <Route path="/admin/repositories/:id/traffic/history" element={<TrafficHistoryPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -350,7 +352,7 @@ describe("coverage gaps", () => {
     const user = userEvent.setup();
     api.mockImplementation(async (path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return {
           ...repository,
           language: "Java",
@@ -382,9 +384,9 @@ describe("coverage gaps", () => {
       return [];
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=settings"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=settings"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -394,10 +396,10 @@ describe("coverage gaps", () => {
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Collect now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
-    const loadsBefore = api.mock.calls.filter((call) => String(call[0]).endsWith("/repositories/13")).length;
+    const loadsBefore = api.mock.calls.filter((call) => String(call[0]).endsWith("/admin/repositories/13")).length;
     window.dispatchEvent(new Event("repos-collected"));
     await waitFor(() => {
-      const loadsAfter = api.mock.calls.filter((call) => String(call[0]).endsWith("/repositories/13")).length;
+      const loadsAfter = api.mock.calls.filter((call) => String(call[0]).endsWith("/admin/repositories/13")).length;
       expect(loadsAfter).toBeGreaterThan(loadsBefore);
     });
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));

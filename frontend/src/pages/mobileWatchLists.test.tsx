@@ -3,17 +3,31 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, searchHistory, topicHistory, traffic } from "../test/fixtures";
+import { repoBase } from "../test/repoRoutes";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 const state = vi.hoisted(() => ({ api: vi.fn(), admin: false, busy: false }));
 vi.mock("../lib/api", async original => ({ ...await original<typeof import("../lib/api")>(), api: state.api }));
 vi.mock("../lib/mutationAccess", () => ({ useMutationAccess: () => ({ allowMutations: state.admin }) }));
 function Destination() { const location = useLocation(); return <p data-testid="destination">{location.pathname}{location.search}</p>; }
-function mount(tab: string) { return render(<MemoryRouter initialEntries={[`/repositories/13?tab=${tab}&scope=all`]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /><Route path="/repositories/:id/search-queries/:queryId" element={<Destination />} /><Route path="/repositories/:id/topics/:topic" element={<Destination />} /></Routes></MemoryRouter>); }
+function mount(tab: string) {
+  return render(
+    <MemoryRouter initialEntries={[`/admin/repositories/13?tab=${tab}&scope=all`]}>
+      <Routes>
+        <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
+        <Route path="/:owner/:repository" element={<RepositoryDetailsPage />} />
+        <Route path="/admin/repositories/:id/search-queries/:queryId" element={<Destination />} />
+        <Route path="/admin/repositories/:id/topics/:topic" element={<Destination />} />
+        <Route path="/:owner/:repository/search-queries/:queryId" element={<Destination />} />
+        <Route path="/:owner/:repository/topics/:topic" element={<Destination />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 beforeEach(() => {
   state.admin = false; state.busy = false; state.api.mockReset();
   vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
   state.api.mockImplementation(async (url: string) => {
-    if (url.endsWith("/repositories/13")) return { ...repository, language: "Java" };
+    if (url.endsWith("/admin/repositories/13")) return { ...repository, language: "Java" };
     if (url.includes("/traffic?")) return traffic;
     if (url.includes("/search-visibility")) return [{ ...searchHistory, searchStatus: state.busy ? "RUNNING" : undefined }, { ...searchHistory, query: { ...searchHistory.query, id: 6, name: "zeta" }, currentRank: 8 }];
     if (url.includes("/topics-visibility")) return url.includes("scope=language") ? [{ ...topicHistory, watch: { ...topicHistory.watch, language: "Java" }, searchStatus: state.busy ? "RUNNING" : undefined }] : [{ ...topicHistory, searchStatus: state.busy ? "RUNNING" : undefined }, { ...topicHistory, watch: { ...topicHistory.watch, id: 8, topic: "hidden" }, currentRank: 26 }];
@@ -41,7 +55,7 @@ describe("mobile repository watch-lists", () => {
     await user.click(screen.getByRole("button", { name: "30d" }));
     await waitFor(() => expect(screen.getByRole("checkbox", { name: `Chart line for ${name}` })).toBeChecked());
     await user.click(screen.getByRole("link", { name }));
-    expect(await screen.findByTestId("destination")).toHaveTextContent("/repositories/13/search-queries/5");
+    expect(await screen.findByTestId("destination")).toHaveTextContent(`${repoBase}/search-queries/5`);
   });
   it("keeps hidden topic selections when selecting all within language scope", async () => {
     const user = userEvent.setup(); mount("topics");
@@ -58,7 +72,7 @@ describe("mobile repository watch-lists", () => {
     await user.click(screen.getByRole("button", { name: "All" }));
     expect(await screen.findByRole("checkbox", { name: "Chart line for hidden" })).toBeChecked();
     await user.click(screen.getByRole("link", { name: "outbox" }));
-    expect(await screen.findByTestId("destination")).toHaveTextContent("/repositories/13/topics/outbox");
+    expect(await screen.findByTestId("destination")).toHaveTextContent(`${repoBase}/topics/outbox`);
   });
   it.each(["search", "topics"])("retains admin run actions on %s cards", async tab => {
     state.admin = true; const user = userEvent.setup(); const view = mount(tab);
@@ -74,7 +88,7 @@ describe("mobile repository watch-lists", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Running..." })).toBeNull());
     if (tab === "search") {
       await user.click(within(screen.getByRole("link", { name: searchHistory.query.name }).closest("article")!).getByRole("button", { name: "Delete" }));
-      expect(state.api).toHaveBeenCalledWith("/api/v1/search-queries/5", { method: "DELETE" });
+      expect(state.api).toHaveBeenCalledWith("/api/v1/admin/search-queries/5", { method: "DELETE" });
     }
     view.unmount(); state.busy = true;
     mount(tab);

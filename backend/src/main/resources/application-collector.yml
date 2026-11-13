@@ -1,0 +1,31 @@
+# Independent collector storage is opt-in until dispatch/execution is implemented.
+rgm:
+  web:
+    enabled: false
+  collector:
+    enabled: true
+  planner:
+    enabled: false
+spring:
+  main:
+    web-application-type: none
+  liquibase:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState
+
+collector:
+  storage:
+    enabled: ${COLLECTOR_STORAGE_ENABLED:false}
+  datasource:
+    url: ${COLLECTOR_DATASOURCE_URL:}
+    username: ${COLLECTOR_DATASOURCE_USERNAME:}
+    password: ${COLLECTOR_DATASOURCE_PASSWORD:}
+    maximum-pool-size: ${COLLECTOR_DATASOURCE_POOL_SIZE:5}

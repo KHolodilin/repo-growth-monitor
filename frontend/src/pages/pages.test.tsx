@@ -16,6 +16,7 @@ import {
   topicResults,
   traffic,
 } from "../test/fixtures";
+import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
 import { DashboardPage } from "./DashboardPage";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { RepositoriesPage } from "./RepositoriesPage";
@@ -40,13 +41,19 @@ function renderPath(path: string, ui: ReactNode) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/" element={<div>home</div>} />
-        <Route path="/dashboard" element={<div>home</div>} />
-        <Route path="/repositories" element={ui} />
-        <Route element={<Layout />}><Route path="/repositories/:id" element={ui} /></Route>
-        <Route path="/repositories/:id/traffic/history" element={ui} />
-        <Route path="/repositories/:repositoryId/search-queries/:queryId" element={ui} />
-        <Route path="/repositories/:repositoryId/topics/:topic" element={ui} />
-        <Route path="/search-runs/:id" element={ui} />
+        <Route path="/admin/dashboard" element={<div>home</div>} />
+        <Route path="/admin/repositories" element={ui} />
+        <Route element={<Layout />}>
+          <Route path="/admin/repositories/:id" element={ui} />
+          <Route path="/:owner/:repository" element={ui} />
+        </Route>
+        <Route path="/admin/repositories/:id/traffic/history" element={ui} />
+        <Route path="/:owner/:repository/traffic/history" element={ui} />
+        <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={ui} />
+        <Route path="/:owner/:repository/search-queries/:queryId" element={ui} />
+        <Route path="/admin/repositories/:repositoryId/topics/:topic" element={ui} />
+        <Route path="/:owner/:repository/topics/:topic" element={ui} />
+        <Route path="/admin/search-runs/:id" element={ui} />
       </Routes>
     </MemoryRouter>,
   );
@@ -64,7 +71,7 @@ describe("pages", () => {
   it("renders dashboard ready state and sorts repositories", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/dashboard")) {
+      if (String(path).includes("/admin/dashboard")) {
         return json(dashboardReady);
       }
       if (String(path).includes("growth-events")) {
@@ -88,7 +95,7 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: /Growth/ }));
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }));
     await user.click(screen.getByRole("button", { name: "7d" }));
   });
 
@@ -101,7 +108,7 @@ describe("pages", () => {
           planner: { timezone: "UTC", from: "10:00", to: "18:00", open: false },
         });
       }
-      if (String(path).includes("/dashboard")) {
+      if (String(path).includes("/admin/dashboard")) {
         return json({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
       }
       return json({});
@@ -137,7 +144,7 @@ describe("pages", () => {
       }
       return json([repository, { ...repository, id: 8, name: "other", fullName: "KHolodilin/other", trackingEnabled: false }]);
     });
-    renderPath("/repositories", <RepositoriesPage />);
+    renderPath("/admin/repositories", <RepositoriesPage />);
     expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
     await user.click(screen.getAllByRole("checkbox")[0]);
     await user.click(screen.getByRole("button", { name: /Refresh from GitHub/ }));
@@ -150,7 +157,10 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string, init?: RequestInit) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (isPublicResolve(url)) {
+        return json(publicResolveResponse());
+      }
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -187,7 +197,7 @@ describe("pages", () => {
           points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 }],
         });
       }
-      if (url.includes("/repositories?refresh=false")) {
+      if (url.includes("/admin/repositories?refresh=false")) {
         return json([repository, { ...repository, id: 8, name: "other", fullName: "KHolodilin/other", visibility: "PRIVATE" }]);
       }
       if (url.includes("/collect") || url.includes("/run") || url.includes("search-queries")) {
@@ -195,7 +205,7 @@ describe("pages", () => {
       }
       return json([]);
     });
-    renderPath("/repositories/13", <RepositoryDetailsPage />);
+    renderPath("/admin/repositories/13", <RepositoryDetailsPage />);
     expect(await screen.findByRole("link", { name: "GitHub Traffic" })).toHaveAttribute(
       "href",
       "https://github.com/KHolodilin/spring-transactional-outbox-kafka/graphs/traffic",
@@ -212,8 +222,9 @@ describe("pages", () => {
     expect(metaStrip).toContainElement(screen.getByRole("button", { name: "Discoverability 1/2" }));
     expect(metaStrip).toContainElement(screen.getByRole("button", { name: "Community Standards 1/1" }));
     const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
-    expect(crumb).toHaveTextContent("Portfolio");
-    expect(crumb).toHaveTextContent(repository.fullName);
+    expect(crumb).toHaveTextContent("Home");
+    expect(crumb).toHaveTextContent(repository.owner.login);
+    expect(crumb).toHaveTextContent(repository.name);
     expect(crumb).toHaveTextContent("Traffic");
     expect(screen.getByRole("tooltip", { hidden: true, name: repository.description })).toHaveClass(
       "delay-300",
@@ -226,11 +237,11 @@ describe("pages", () => {
     expect(screen.getByText("↑ 25%")).toBeInTheDocument();
     expect(screen.getByText("↓ 50%")).toBeInTheDocument();
     expect(screen.getAllByText("vs prev 7d")).toHaveLength(3);
-    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(screen.getAllByLabelText("Switch repository")[0]);
     expect(await screen.findByPlaceholderText("Search repositories")).toBeInTheDocument();
     expect(await screen.findByText("other")).toBeInTheDocument();
     await user.click(screen.getByRole("option", { name: repository.name }));
-    await user.click(screen.getByRole("button", { name: "legend" }));
+    await user.click(await screen.findByRole("button", { name: "legend" }));
     await user.click(screen.getByRole("button", { name: "mark" }));
     expect(await screen.findByText("Growth event")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit" }));
@@ -262,7 +273,7 @@ describe("pages", () => {
     expect(screen.getByText("Description").parentElement).toHaveClass("text-emerald-700");
     expect(screen.getByText("Topics", { selector: "span" }).parentElement).toHaveClass("text-muted-foreground");
     expect(collection.parentElement?.querySelector(".text-emerald-600")).not.toBeNull();
-    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(screen.getAllByLabelText("Switch repository")[0]);
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();
@@ -339,7 +350,7 @@ describe("pages", () => {
       await user.click(buttons[buttons.length - 1]);
     }
     await user.click(screen.getByRole("button", { name: "Java" }));
-    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(screen.getAllByLabelText("Switch repository")[0]);
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "All" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);
@@ -358,7 +369,7 @@ describe("pages", () => {
     const pending: { resolve: (value: unknown) => void; reject: (error: Error) => void }[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -374,7 +385,7 @@ describe("pages", () => {
       }
       return json([]);
     });
-    renderPath("/repositories/13?tab=topics", <RepositoryDetailsPage />);
+    renderPath("/admin/repositories/13?tab=topics", <RepositoryDetailsPage />);
     expect(await screen.findByText("Tracked topics")).toBeInTheDocument();
     await waitFor(() => expect(pending).toHaveLength(1));
     await user.click(screen.getAllByRole("button", { name: "30d" })[0]);
@@ -392,7 +403,7 @@ describe("pages", () => {
   it("shows dashes when overview fields and topics were never stored", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json({
           ...repository,
           topics: undefined,
@@ -416,7 +427,7 @@ describe("pages", () => {
       }
       return json([]);
     });
-    renderPath("/repositories/13?tab=overview", <RepositoryDetailsPage />);
+    renderPath("/admin/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText("No topics yet.")).toBeInTheDocument();
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(4);
     expect(screen.getByRole("link", { name: "Open repository" })).toHaveAttribute(
@@ -431,7 +442,7 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json({
           ...repository,
           description: "  ",
@@ -456,7 +467,7 @@ describe("pages", () => {
       }
       return json([]);
     });
-    renderPath("/repositories/13?tab=overview", <RepositoryDetailsPage />);
+    renderPath("/admin/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText("Collection failed")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "About this repository" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tooltip", { hidden: true })).not.toBeInTheDocument();
@@ -467,7 +478,7 @@ describe("pages", () => {
     expect(screen.getByRole("button", { name: "1d" })).toBeInTheDocument();
 
     api.mockRejectedValueOnce(new Error("missing"));
-    renderPath("/repositories/13", <RepositoryDetailsPage />);
+    renderPath("/admin/repositories/13", <RepositoryDetailsPage />);
     expect(await screen.findByText("missing")).toBeInTheDocument();
   });
 
@@ -475,10 +486,10 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13") || url.includes("/repositories?refresh")) {
+      if (url.endsWith("/admin/repositories/13") || url.includes("/admin/repositories?refresh")) {
         return json(url.includes("refresh") ? [repository] : repository);
       }
-      if (url.includes("/dashboard")) {
+      if (url.includes("/admin/dashboard")) {
         return json(dashboardReady);
       }
       if (url.includes("/topics/") && url.includes("history")) {
@@ -493,7 +504,7 @@ describe("pages", () => {
       if (url.includes("/search-queries/") && url.includes("results")) {
         return json(searchResults);
       }
-      if (url.includes("/search-runs/")) {
+      if (url.includes("/admin/search-runs/")) {
         return json(searchResults);
       }
       if (url.includes("traffic-history")) {
@@ -504,39 +515,39 @@ describe("pages", () => {
       }
       return json([]);
     });
-    const topicView = renderPath("/repositories/13/topics/outbox", <TopicDetailsPage />);
+    const topicView = renderPath("/admin/repositories/13/topics/outbox", <TopicDetailsPage />);
     expect(await screen.findByRole("heading", { name: "outbox" })).toBeInTheDocument();
     expect(screen.queryByText(/Not collected on/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Java" }));
     await user.click(screen.getByRole("button", { name: "Run now" }));
     topicView.unmount();
 
-    const queryView = renderPath("/repositories/13/search-queries/5", <QueryDetailsPage />);
+    const queryView = renderPath("/admin/repositories/13/search-queries/5", <QueryDetailsPage />);
     expect(await screen.findByText(/transactional outbox/)).toBeInTheDocument();
     expect(screen.queryByText(/Not collected on/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Run now" }));
     queryView.unmount();
 
-    const runView = renderPath("/search-runs/9", <SearchResultsPage />);
+    const runView = renderPath("/admin/search-runs/9", <SearchResultsPage />);
     expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
     runView.unmount();
 
-    const historyView = renderPath("/repositories/13/traffic/history?kind=paths&days=7", <TrafficHistoryPage />);
+    const historyView = renderPath("/admin/repositories/13/traffic/history?kind=paths&days=7", <TrafficHistoryPage />);
     expect(await screen.findByRole("heading", { name: "Path Snapshot History" })).toBeInTheDocument();
     historyView.unmount();
 
     render(
-      <MemoryRouter initialEntries={["/unknown"]}>
+      <MemoryRouter initialEntries={["/unknown/nested/not-found"]}>
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", {name:"Page not found"})).toBeInTheDocument();
   });
 
   it("keeps the rank chart when event markers fail or arrive late", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -553,13 +564,13 @@ describe("pages", () => {
       }
       return json([]);
     });
-    const rejected = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    const rejected = renderPath("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
     expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     rejected.unmount();
 
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -573,14 +584,14 @@ describe("pages", () => {
       }
       return json([]);
     });
-    const odd = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    const odd = renderPath("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
     expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     odd.unmount();
 
     const pending: ((value: unknown) => void)[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -594,7 +605,7 @@ describe("pages", () => {
       }
       return json([]);
     });
-    const late = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    const late = renderPath("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
     expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     late.unmount();
     pending.forEach((resolve) => resolve([growthEvent]));
@@ -605,7 +616,7 @@ describe("pages", () => {
     const failing: ((reason?: unknown) => void)[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -619,7 +630,7 @@ describe("pages", () => {
       }
       return json([]);
     });
-    const abandoned = renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    const abandoned = renderPath("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
     expect(await screen.findByRole("link", { name: searchHistory.query.name })).toBeInTheDocument();
     abandoned.unmount();
     failing.forEach((reject) => reject(new Error("down")));
@@ -637,7 +648,7 @@ describe("pages", () => {
     };
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
       if (url.includes("/traffic?")) {
@@ -649,7 +660,7 @@ describe("pages", () => {
       return json([]);
     });
     document.cookie = "search_visibility_queries_13=; path=/; max-age=0";
-    renderPath("/repositories/13?tab=search", <RepositoryDetailsPage />);
+    renderPath("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
     expect(await screen.findByText("2 / 50")).toBeInTheDocument();
     const header = await screen.findByRole("checkbox", { name: "Chart lines", checked: true });
     await user.click(header);

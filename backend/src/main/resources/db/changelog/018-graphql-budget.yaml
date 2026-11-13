@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-graphql-budget
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: ALTER TABLE github_budget DROP CONSTRAINT github_budget_resource_check; ALTER TABLE github_budget ADD CONSTRAINT github_budget_resource_check CHECK(resource IN ('core','search','graphql'));
