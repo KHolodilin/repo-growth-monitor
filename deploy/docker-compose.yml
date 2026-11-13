@@ -19,7 +19,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql
+      - ${POSTGRES_DATA:-pgdata}:/var/lib/postgresql
       - ./postgres/init-runtime-role.sh:/docker-entrypoint-initdb.d/01-runtime-role.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d repogrowth"]
