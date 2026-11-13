@@ -246,9 +246,10 @@ function DashboardHeader({
   }, [open, mobile]);
   const warningList = problems.map(({ row, lines }) => <div key={row.id} className="border-b py-3 text-sm last:border-0"><Link className="inline-block min-h-11 max-w-full break-words py-2 text-primary hover:underline [overflow-wrap:anywhere]" to={repositoryHref(view, row.id, row.fullName)} onClick={() => setOpen(false)}>{row.fullName}</Link>{lines.map(line => <div key={line} className="break-words text-muted-foreground">{line}</div>)}</div>);
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        {(view.heading || !view.public) && (
+    <div className={cn("space-y-3", view.headerLeading && "md:flex md:flex-wrap md:items-center md:justify-between md:gap-3 md:space-y-0")}>
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        {view.headerLeading}
+        {!view.headerLeading && (view.heading || !view.public) && (
           <h1 className="min-w-0 break-words text-2xl font-semibold [overflow-wrap:anywhere]">{view.heading ?? "Portfolio"}</h1>
         )}
         {problems.length > 0 && (

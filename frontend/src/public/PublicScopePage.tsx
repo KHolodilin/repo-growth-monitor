@@ -126,6 +126,15 @@ export function PublicScopePage() {
   if (!overview) return <p role="status" className="py-10">Loading dashboard…</p>;
 
   const heading = overview.owner.login;
+  const breadcrumb = (
+    <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap gap-2 text-sm">
+          <Link to="/" className="text-primary">
+            Home
+          </Link>
+          <span aria-hidden="true">›</span>
+          <span aria-current="page">{overview.owner.login}</span>
+        </nav>
+  );
   const href = (id: number | string) =>
     `/${encodeURIComponent(overview.owner.login)}/${encodeURIComponent(rows.find((row) => row.id === String(id))?.name ?? "")}`;
 
@@ -135,19 +144,14 @@ export function PublicScopePage() {
         public: true,
         scopeKey: scope,
         heading,
+        headerLeading: breadcrumb,
         repositoryHref: href,
         showRepositories: true,
         trafficEnabled: overview.modules.traffic,
       }}
     >
       <div className="space-y-4" key={scope}>
-        <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap gap-2 text-sm">
-          <Link to="/" className="text-primary">
-            Home
-          </Link>
-          <span aria-hidden="true">›</span>
-          <span aria-current="page">{overview.owner.login}</span>
-        </nav>
+
         {overview.freshness.state === "EMPTY" && (
           <p role="status" className="text-sm text-muted-foreground">
             No saved snapshots yet.
