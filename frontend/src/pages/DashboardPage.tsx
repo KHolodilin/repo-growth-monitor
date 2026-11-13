@@ -516,7 +516,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
   const view = useDashboardView();
   const mobile = useIsMobileChart();
   const [tokenState, setTokenState] = useState<TokenState | null>(null);
-  const sortKeys = view.public ? SORT_KEYS.filter((key) => key !== "discoverability") : SORT_KEYS;
+  const sortKeys = SORT_KEYS;
   const needsAccess = !view.public && rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
   useEffect(() => {
     if (!needsAccess) {
@@ -616,8 +616,8 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <SortHeader label="Stars" active={activeSortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
               <SortHeader label="Forks" active={activeSortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
               <SortHeader label="Growth" active={activeSortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
-              {!view.public && <SortHeader label="Disc." active={activeSortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />}
-              {!view.public && <th className="px-5 py-2 font-medium">Activity</th>}
+              <SortHeader label="Disc." active={activeSortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
+              <th className="px-5 py-2 font-medium">Activity</th>
             </tr>
           </thead>
           <tbody>
@@ -659,16 +659,12 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
                     {growth?.label ?? "—"}
                   </td>
-                  {!view.public && (
-                    <td className="px-5 text-right tabular-nums">
-                      <DiscoverabilityCell row={row} />
-                    </td>
-                  )}
-                  {!view.public && (
-                    <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
-                      {formatActivityPresentation(row.activityStatus, row.activityAt)}
-                    </td>
-                  )}
+                  <td className="px-5 text-right tabular-nums">
+                    <DiscoverabilityCell row={row} />
+                  </td>
+                  <td className={cn("whitespace-nowrap px-5", activityClass(row.activityStatus))}>
+                    {formatActivityPresentation(row.activityStatus, row.activityAt)}
+                  </td>
                 </tr>
               );
             })}
@@ -701,15 +697,11 @@ function RepositoryCard({
       label: "Growth",
       value: <span className={cn("font-medium", growthClass(growth?.direction))}>{growth?.label ?? "—"}</span>,
     },
-    ...(!view.public
-      ? [
-          { label: "Disc.", value: <DiscoverabilityCell row={row} /> },
-          {
-            label: "Activity",
-            value: <span className={activityClass(row.activityStatus)}>{formatActivityPresentation(row.activityStatus, row.activityAt)}</span>,
-          },
-        ]
-      : []),
+    { label: "Disc.", value: <DiscoverabilityCell row={row} /> },
+    {
+      label: "Activity",
+      value: <span className={activityClass(row.activityStatus)}>{formatActivityPresentation(row.activityStatus, row.activityAt)}</span>,
+    },
   ];
   return (
     <Card className="cursor-pointer p-4 hover:bg-muted/40" onClick={onOpen}>

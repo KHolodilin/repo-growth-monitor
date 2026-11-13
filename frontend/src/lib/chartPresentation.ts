@@ -252,7 +252,8 @@ export function withCollectionWarning(source: object, today = new Date().toISOSt
 function safeTooltip(tooltip: unknown, mobile: boolean): Record<string, unknown> {
   return { ...(tooltip as Record<string, unknown>), confine: true, appendToBody: false,
     ...(mobile ? { triggerOn: "click" } : {}),
-    extraCssText: "max-width: min(360px, calc(100vw - 48px)); min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
+    // max-height keeps long Referrers/Paths tooltips inside the viewport on 390px phones.
+    extraCssText: "max-width: min(360px, calc(100vw - 48px)); max-height: calc(100vh - 24px); overflow-y: auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
   };
 }
 

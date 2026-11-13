@@ -96,7 +96,10 @@ describe("competitor card", () => {
 
   it("shows the load error and ignores a cancelled request", async () => {
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/admin/repositories?")) return Promise.resolve([repository]);
+      const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       return Promise.reject(new Error("github down"));
     });
     renderCard();
@@ -104,14 +107,22 @@ describe("competitor card", () => {
     cleanup();
 
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/admin/repositories?")) return Promise.resolve([repository]);
+      const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       return Promise.reject("nope");
     });
     renderCard();
     expect(await screen.findByText("Failed to load the competitor card")).toBeInTheDocument();
     cleanup();
 
-    api.mockImplementation(() => new Promise(() => undefined));
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      return new Promise(() => undefined);
+    });
     const pending = renderCard();
     pending.unmount();
 

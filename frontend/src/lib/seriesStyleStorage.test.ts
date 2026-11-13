@@ -11,6 +11,8 @@ describe("persistent series identity allocation", () => {
     second.prepareSeriesStyles(["topic:later", "topic:new", "topic:a"]);
     expect(second.seriesStyle("topic:new")).toEqual(before);
     expect(second.seriesStyle("Other")).toEqual(second.OTHER_STYLE);
+    expect(second.seriesMarkerGlyph("Other")).toBe("◆");
+    expect(second.seriesMarkerHtml("Other")).toContain("◆");
     expect(second.seriesStyle("Unknown metric").color).toBeDefined();
     expect(second.metricColor("not a fixed metric")).toBeUndefined();
   });

@@ -41,6 +41,18 @@ function AdminOnly({ children }: { children: React.ReactNode }) {
   return children;
 }
 
+/** Admin home is the Portfolio table (as on main); anonymous keeps the public owners directory. */
+function HomePage() {
+  const { me, loading } = useAuth();
+  if (loading) {
+    return <p role="status">Checking access…</p>;
+  }
+  if (me.authenticated && me.roles.includes("ADMIN")) {
+    return <DashboardPage />;
+  }
+  return <PublicHomePage />;
+}
+
 /** Admin Portfolio (Disc./Activity) like main; anonymous keeps the public owner dashboard. */
 function OwnerPortfolioPage() {
   const { me, loading } = useAuth();
@@ -58,7 +70,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route element={<Shell />}>
-          <Route path="/" element={<PublicHomePage />} />
+          <Route path="/" element={<HomePage />} />
           <Route
             path="/admin/repositories"
             element={

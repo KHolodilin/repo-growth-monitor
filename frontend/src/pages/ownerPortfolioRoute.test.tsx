@@ -51,7 +51,7 @@ describe("owner portfolio route", () => {
     expect(screen.getByText("12")).toBeInTheDocument();
   });
 
-  it("keeps the public owner dashboard without Disc. for anonymous", async () => {
+  it("shows Disc. and Activity on the public owner dashboard for anonymous", async () => {
     loadMe.mockResolvedValue(anonymousMe);
     api.mockImplementation(async (path: string) => {
       const url = String(path);
@@ -94,7 +94,22 @@ describe("owner portfolio route", () => {
         }
         if (url.includes("/repositories?")) {
           return {
-            items: [{ id: "13", name: "outbox", visitors: 1, views: 1, clones: 0, stars: 1, forks: 0, growthPercent: 0 }],
+            items: [
+              {
+                id: "13",
+                name: "outbox",
+                visitors: 1,
+                views: 1,
+                clones: 0,
+                stars: 1,
+                forks: 0,
+                growthPercent: 0,
+                activityAt: "2026-09-23T00:00:00Z",
+                activityStatus: "ACTIVE",
+                discoverabilityPassed: 12,
+                discoverabilityTotal: 13,
+              },
+            ],
             nextCursor: null,
           };
         }
@@ -109,8 +124,9 @@ describe("owner portfolio route", () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await screen.findByRole("columnheader", { name: "Repository" })).toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Disc." })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "Activity" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "Disc." })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Disc\./ })).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
   });
 });

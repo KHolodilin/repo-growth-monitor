@@ -57,6 +57,8 @@ describe("shared observation and interaction policy", () => {
       for (const line of result.series.filter((item: any) => item.type === "line" && item.name !== "Events")) expect(line).toMatchObject({ showSymbol: true, showAllSymbol: true });
       expect(result.tooltip.confine).toBe(true);
       expect(result.tooltip.extraCssText).toContain("white-space: normal");
+      expect(result.tooltip.extraCssText).toContain("max-height: calc(100vh - 24px)");
+      expect(result.tooltip.extraCssText).toContain("overflow-y: auto");
     }
   });
   it("places a known warning on empty numeric and preframed axes without inventing values", () => {

@@ -1,7 +1,7 @@
 import type { SnapshotHistory } from "./api";
 import { OTHER_KEY, chartValue } from "./snapshotHistory";
 import type { SnapshotMetric } from "./snapshotChartPrefs";
-import { lineStyle, prepareSeriesStyles, seriesStyle } from "./seriesStyle";
+import { lineStyle, prepareSeriesStyles, seriesMarkerHtml } from "./seriesStyle";
 import { formatChartAxisDate, formatNumber } from "./utils";
 export function snapshotSeriesKey(history: SnapshotHistory, name: string) {
   return name === OTHER_KEY ? name : `${history.kind === "REFERRERS" ? "source" : "path"}:${String(history.repositoryId).startsWith("public:") ? `${history.repositoryId}:` : ""}${name}`;
@@ -44,7 +44,7 @@ export function snapshotChartOption({ history, metric, selected, displayLabel = 
         const point = observation(item.seriesName, date);
         const value = point.value === null ? "— (No observation)" : formatNumber(point.value);
         const partial = point.missing > 0 ? ` (partial: ${point.missing} sources/paths unavailable)` : "";
-        return `<div><span style="color:${seriesStyle(snapshotSeriesKey(history, item.seriesName)).color}">●</span> ${escapeHtml(displayLabel(item.seriesName))}: ${value} ${unit}${partial}</div>`;
+        return `<div>${seriesMarkerHtml(snapshotSeriesKey(history, item.seriesName))} ${escapeHtml(displayLabel(item.seriesName))}: ${value} ${unit}${partial}</div>`;
       }).join("");
       return `<div>Snapshot: ${date}</div>${rows}<div>GitHub rolling-window values; not traffic for this calendar day.</div>`;
     } },

@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrafficHistoryPage } from "./TrafficHistoryPage";
 import { repository, snapshotHistory } from "../test/fixtures";
+import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
 import { writeStoredRepoPeriod, PERIODS } from "../components/PeriodSelector";
 import { periodDates } from "../lib/searchVisibilityKpi";
 import * as downloads from "../lib/chartExport";
@@ -50,7 +51,7 @@ it.each([["1","1d"],["7","7d"],["14","30d"],["bad","90d"]])("maps legacy days=%s
 it("uses repository preference for an invalid period and preserves restricted filtering",async()=>{const user=userEvent.setup();mount("?kind=paths&period=invalid");const group=await screen.findByRole("group",{name:"History period"});expect(within(group).getByRole("button",{name:"90d"})).toHaveAttribute("aria-pressed","true");await user.click(screen.getByRole("checkbox",{name:"Show restricted pages"}));await user.click(within(group).getByRole("button",{name:"1y"}));expect(api.mock.calls.some(([url])=>String(url).includes("period=1y&includeServicePaths=true"))).toBe(true);});
 
 it("uses the saved period for an empty archive and keeps the empty state honest", async()=>{
- api.mockImplementation(async(url:string)=>url.includes("traffic-history")?{...snapshotHistory,dates:[],rows:[]}:url.endsWith("/admin/repositories/13")?repository:[]);
+ api.mockImplementation(async(url:string)=>isPublicResolve(url)?publicResolveResponse():url.includes("traffic-history")?{...snapshotHistory,dates:[],rows:[]}:url.endsWith("/admin/repositories/13")?repository:[]);
  mount(); const group=await screen.findByRole("group",{name:"History period"});
  expect(within(group).getByRole("button",{name:"90d"})).toHaveAttribute("aria-pressed","true");
  expect(screen.getByText("No snapshots for this period.")).toBeInTheDocument();

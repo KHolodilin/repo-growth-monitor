@@ -1,7 +1,23 @@
 import { api, type GrowthEvent, type Dashboard } from "./api";
 import type { DashboardViewData } from "../pages/DashboardPage";
 export type PublicOverview = { owner: { id: string; login: string; type: string }; repository?: { id: string; name: string; description?: string; pathPrefixes?: string[] }; canonicalPath: string; repositoryCount: number; modules: { traffic: boolean; referrers: boolean; paths: boolean; search: boolean; topics: boolean }; freshness: { state: string; stale?: boolean; lastSuccessfulSnapshotAt?: string } };
-export type PublicRow = { id: string; name: string; description?: string; stars?: number | null; forks?: number | null; views?: number | null; visitors?: number | null; clones?: number | null; growthPercent?: number | null; archived?: boolean; lastObservedAt?: string };
+export type PublicRow = {
+  id: string;
+  name: string;
+  description?: string;
+  stars?: number | null;
+  forks?: number | null;
+  views?: number | null;
+  visitors?: number | null;
+  clones?: number | null;
+  growthPercent?: number | null;
+  archived?: boolean;
+  lastObservedAt?: string;
+  activityAt?: string | null;
+  activityStatus?: "ACTIVE" | "LOW_ACTIVITY" | "INACTIVE" | "ARCHIVED" | "UNKNOWN" | null;
+  discoverabilityPassed?: number | null;
+  discoverabilityTotal?: number | null;
+};
 export type PublicPage<T> = { items: T[]; nextCursor?: string | null; nextDate?: string | null };
 export type PublicMetric = { value: number | null; absoluteChange: number | null; growthPercent: number | null; complete: boolean; observedValue?: number; observedRepositories?: number; expectedRepositories?: number };
 export type StatsResponse = { period: string; from: string; to: string; repositories: number; highlights?: Dashboard["highlights"]; totals: Record<"stars" | "forks" | "watchers" | "contributors", PublicMetric> };
@@ -36,8 +52,8 @@ export function adaptPublicDashboard(overview: PublicOverview, stats: StatsRespo
  return { period: stats.period, from: stats.from, to: stats.to, state: "READY", lastSyncAt: overview.freshness.lastSuccessfulSnapshotAt ?? null, partialData: null, collectionWarning: null, activeCollection: null,
  summary: { clones:trafficMetric("clones"), repositories: stats.repositories, stars: { total: stats.totals.stars.value ?? 0, change: stats.totals.stars.absoluteChange }, views: trafficMetric("views"), visitors: trafficMetric("visitors"), uniqueCloners: trafficMetric("uniqueCloners") },
  traffic: trafficRows.map(row=>({ date:row.date, views:row.views ?? null, visitors:row.visitors ?? null, clones:row.clones ?? null, uniqueCloners:row.uniqueCloners ?? null, missingRepositories: row.missingRepositories })),
- stats: { totals: stats.totals, points: statsRows.map(row=>({ date:row.date, stars:row.stars ?? null, forks:row.forks ?? null, watchers:row.watchers ?? null, contributors:row.contributors ?? null })) },
- repositories: repositories.map(row=>({ id:row.id, fullName:row.name, visitors:row.visitors ?? null, views:row.views ?? null, clones:row.clones ?? null, stars:row.stars ?? null, forks:row.forks ?? null, growthPercent:row.growthPercent??null, collectionStatus:null, jobs:[], archived:row.archived ?? false, activityAt:row.lastObservedAt, activityStatus:"UNKNOWN", discoverabilityPassed:null })), highlights:stats.highlights??null };
+ stats: { totals: stats.totals, points: statsRows.map(row=>({ date:row.date, stars:row.stars ?? null, forks:row.forks ?? null, watchers:row.watchers ?? null, contributors:row.contributors ?? null, missingRepositories: row.missingRepositories })) },
+ repositories: repositories.map(row=>({ id:row.id, fullName:row.name, visitors:row.visitors ?? null, views:row.views ?? null, clones:row.clones ?? null, stars:row.stars ?? null, forks:row.forks ?? null, growthPercent:row.growthPercent??null, collectionStatus:null, jobs:[], archived:row.archived ?? false, activityAt:row.activityAt ?? row.lastObservedAt ?? null, activityStatus:row.activityStatus ?? "UNKNOWN", discoverabilityPassed:row.discoverabilityPassed ?? null, discoverabilityTotal:row.discoverabilityTotal ?? null })), highlights:stats.highlights??null };
 }
 export function relativeRepositoryPath(raw: string, prefixes: string[]) { for (const prefix of [...prefixes].sort((a,b)=>b.length-a.length)) { const end=raw.charAt(prefix.length); if (raw.slice(0,prefix.length).toLowerCase()===prefix.toLowerCase() && (!end || "/?#".includes(end))) { const tail=raw.slice(prefix.length); return !tail ? "/" : tail.startsWith("/") ? tail : `/${tail}`; } } return raw; }
 export async function publicEvents(base: string, signal: AbortSignal): Promise<GrowthEvent[]> { const page=await api<PublicPage<{ id:string; repositoryId?:string; eventAt:string; title:string; type:string; category:string; source:string }>>(`${base}/growth-events?limit=100`,{signal}); return page.items.map(event=>({ ...event, repositoryId:event.repositoryId ?? "" })); }

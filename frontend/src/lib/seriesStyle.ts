@@ -48,3 +48,23 @@ export function lineStyle(key: string) {
   const style = seriesStyle(key);
   return { color: style.color, symbol: style.symbol, itemStyle: { color: style.color }, lineStyle: { color: style.color, type: style.line } };
 }
+
+const SYMBOL_GLYPH: Record<string, string> = {
+  circle: "●",
+  rect: "■",
+  roundRect: "▣",
+  triangle: "▲",
+  diamond: "◆",
+  pin: "▾",
+  arrow: "➤",
+};
+
+/** Tooltip/legend marker glyph matching the series symbol identity (not a hardcoded circle). */
+export function seriesMarkerGlyph(key: string): string {
+  return SYMBOL_GLYPH[seriesStyle(key).symbol] ?? "●";
+}
+
+export function seriesMarkerHtml(key: string): string {
+  const style = seriesStyle(key);
+  return `<span style="color:${style.color}">${SYMBOL_GLYPH[style.symbol] ?? "●"}</span>`;
+}

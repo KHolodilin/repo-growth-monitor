@@ -123,8 +123,10 @@ describe("remaining coverage edges", () => {
   });
 
   it("sorts an empty discoverability column and opens a repository from the row", async () => {
-    const user = userEvent.setup();
-    const base = dashboardReady.repositories[0];
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-12T12:00:00Z"));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const base = { ...dashboardReady.repositories[0], activityAt: "2026-09-12T12:00:00Z" };
     api.mockResolvedValue({
       ...dashboardReady,
       repositories: [
@@ -168,6 +170,7 @@ describe("remaining coverage edges", () => {
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
     await user.click(screen.getAllByText("1mo ago")[0]);
     expect(await screen.findByText("opened")).toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   it("polls running searches and ignores pages without an id", async () => {
