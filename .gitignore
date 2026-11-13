@@ -48,6 +48,9 @@ Thumbs.db
 .env.local
 *.pem
 
+# Local split RGM/Collector runtime (tokens, DB password, encryption keys)
+deploy/tmp/
+
 # Testcontainers
 .cache/
 
