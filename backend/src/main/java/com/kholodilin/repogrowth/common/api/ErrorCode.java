@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.common.api;
 
 public enum ErrorCode {
     VALIDATION_ERROR,
+    IDEMPOTENCY_CONFLICT,
     NOT_FOUND,
     UNAUTHORIZED,
     FORBIDDEN,

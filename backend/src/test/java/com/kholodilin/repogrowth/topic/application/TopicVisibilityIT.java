@@ -74,6 +74,7 @@ class TopicVisibilityIT extends AbstractPostgresTest {
         repositoryJdbcRepository.setTracking(repository.id(), true);
         repository = repositoryJdbcRepository.findById(repository.id()).orElseThrow();
         repositoryJdbcRepository.replaceTopics(repository.id(), List.of("spring-boot", "kafka"));
+        topicWatchSync.sync(repository.id());
     }
 
     @Test

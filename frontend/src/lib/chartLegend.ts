@@ -1,3 +1,4 @@
+import { publicContext, readPublicPreference, writePublicPreference } from "./publicPrefs";
 import { readJsonCookie, writeJsonCookie } from "./cookies";
 
 const COOKIE = "rgm-chart-legend";
@@ -79,11 +80,13 @@ function readAll(): Record<string, Record<string, boolean>> {
 }
 
 export function readChartSelection(chartId: string): Record<string, boolean> | null {
+  if (publicContext(chartId)) return readPublicPreference(chartId, "legend", (v): v is Record<string, boolean> => Boolean(v && typeof v === "object" && Object.values(v).every(item => typeof item === "boolean"))) ?? null;
   const stored = readAll()[chartId];
   return stored && Object.keys(stored).length > 0 ? stored : null;
 }
 
 export function writeChartSelection(chartId: string, selected: Record<string, boolean>) {
+  if (publicContext(chartId)) { writePublicPreference(chartId, "legend", selected); return; }
   const all = readAll();
   const cleaned: Record<string, boolean> = {};
   for (const [key, flag] of Object.entries(selected)) {

@@ -1,3 +1,4 @@
+import { useDashboardView } from "../lib/dashboardView";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 import { ChartSelection } from "./ResultCards";
 import { Fragment, useState } from "react";
@@ -14,13 +15,15 @@ const FIRST_COLUMN_WIDTH = "w-56";
 export function SnapshotHistoryTable({
   kind,
   history,
-  selected = [], onToggle,
+  selected = [], onToggle, displayLabel = (key:string)=>key,
 }: {
+  displayLabel?: (key:string)=>string;
   kind: SnapshotChartKind;
   history: SnapshotHistory;
   selected?: string[];
   onToggle?: (key: string) => void;
 }) {
+  const view=useDashboardView();
   const mobile = useIsMobileChart();
   const [date, setDate] = useState(history.dates.at(-1));
   const currentDate = date && history.dates.includes(date) ? date : history.dates.at(-1);
@@ -35,7 +38,7 @@ export function SnapshotHistoryTable({
         <h2 className="mb-3 font-medium">Snapshots</h2>
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           <div className="font-medium text-foreground">No snapshots for this period.</div>
-          <div className="mt-1">Collect the repository to store the first snapshot.</div>
+          <div className="mt-1">{view.public?"Saved snapshots will appear here when available.":"Collect the repository to store the first snapshot."}</div>
         </div>
       </Card>
     );
@@ -58,13 +61,13 @@ export function SnapshotHistoryTable({
         {history.rows.map(row => {
           const cell = row.cells.find(item => item.date === currentDate);
           return <article key={row.key} className="min-w-0 rounded-lg border p-3">
-            <div className="flex items-start gap-2">{showIcons && <ReferrerSourceIcon source={row.key} />}<div className="min-w-0 [overflow-wrap:anywhere]">{wrapPath(row.key)}{row.title && <p className="mt-1 text-xs text-muted-foreground">{row.title}</p>}</div></div>
+            <div className="flex items-start gap-2">{showIcons && <ReferrerSourceIcon source={row.key} />}<div className="min-w-0 [overflow-wrap:anywhere]">{wrapPath(displayLabel(row.key))}{row.title && row.title!==displayLabel(row.key) && <p className="mt-1 text-xs text-muted-foreground">{row.title}</p>}</div></div>
             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">{(["VISITORS", "VIEWS"] as const).map(metric => {
               const value = cell ? cellValue(cell, metric) : null;
               const delta = cell ? formatSnapshotDelta(cell, metric) : null;
               return <div key={metric}><dt className="text-xs text-muted-foreground">{metric === "VISITORS" ? "Visitors" : "Views"}</dt><dd>{value === null ? "—" : formatNumber(value)} {delta && <span className={cn("text-xs", growthClass(delta.direction))}>{delta.label}</span>}</dd></div>;
             })}</dl>
-            {onToggle && <ChartSelection name={row.key} checked={selected.includes(row.key)} onChange={() => onToggle(row.key)} />}
+            {onToggle && <ChartSelection name={displayLabel(row.key)} checked={selected.includes(row.key)} onChange={() => onToggle(row.key)} />}
           </article>;
         })}
       </div> : <div className="max-h-[70vh] overflow-auto">
@@ -107,8 +110,8 @@ export function SnapshotHistoryTable({
                   <div className={cn("flex items-start gap-2", FIRST_COLUMN_WIDTH)}>
                     {showIcons && <ReferrerSourceIcon source={row.key} />}
                     <div className="min-w-0">
-                      <div className="[overflow-wrap:anywhere]">{wrapPath(row.key)}</div>
-                      {row.title && <div className="text-xs text-muted-foreground">{row.title}</div>}
+                      <div className="[overflow-wrap:anywhere]">{wrapPath(displayLabel(row.key))}</div>
+                      {row.title && row.title!==displayLabel(row.key) && <div className="text-xs text-muted-foreground">{row.title}</div>}
                     </div>
                   </div>
                 </td>

@@ -2,20 +2,24 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { api, type CompetitorCard, type Repository, type TopicHistory } from "../lib/api";
 import { CompetitorCardView } from "./CompetitorCardPage";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 function parseScope(value: string | null): "all" | "language" {
   return value === "language" ? "language" : "all";
 }
 
-export function topicCompetitorPath(repositoryId: number, topic: string, githubRepositoryId: number, scope: "all" | "language") {
-  const path = `/repositories/${repositoryId}/topics/${encodeURIComponent(topic)}/competitors/${githubRepositoryId}`;
+export function topicCompetitorPath(repoBase: string, topic: string, githubRepositoryId: number, scope: "all" | "language") {
+  const path = `${repoBase}/topics/${encodeURIComponent(topic)}/competitors/${githubRepositoryId}`;
   return scope === "language" ? `${path}?scope=language` : path;
 }
 
 export function TopicCompetitorCardPage() {
   const params = useParams();
   const [searchParams] = useSearchParams();
-  const repositoryId = Number(params.repositoryId);
+  const { owner = "", repository: repositoryName = "" } = params;
+  const { id: resolvedId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
+  const repositoryId = Number(resolvedId);
   const topicName = params.topic ? decodeURIComponent(params.topic) : "";
   const githubRepositoryId = Number(params.githubRepositoryId);
   const scope = parseScope(searchParams.get("scope"));
@@ -30,9 +34,9 @@ export function TopicCompetitorCardPage() {
     setError(null);
     const topicPath = encodeURIComponent(topicName);
     Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
-      api<TopicHistory>(`/api/v1/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`),
-      api<CompetitorCard>(`/api/v1/repositories/${repositoryId}/topics/${topicPath}/competitors/${githubRepositoryId}?scope=${scope}`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<TopicHistory>(`/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`),
+      api<CompetitorCard>(`/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/competitors/${githubRepositoryId}?scope=${scope}`),
     ])
       .then(([repository, topicHistory, competitor]) => {
         if (cancelled) return;
@@ -48,24 +52,26 @@ export function TopicCompetitorCardPage() {
     };
   }, [repositoryId, topicName, githubRepositoryId, scope]);
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
+  if (resolveError || error) return <p className="text-sm text-destructive">{resolveError ?? error}</p>;
   if (!repo || !history || !card) return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
 
+  const base = repoPath(repo.owner.login, repo.name);
   const scopeQuery = scope === "language" ? "&scope=language" : "";
-  const topicTo = `/repositories/${repo.id}/topics/${encodeURIComponent(history.watch.topic)}${scope === "language" ? "?scope=language" : ""}`;
+  const topicTo = `${base}/topics/${encodeURIComponent(history.watch.topic)}${scope === "language" ? "?scope=language" : ""}`;
 
   return (
     <CompetitorCardView
       items={[
-        { label: "Portfolio", to: "/dashboard" },
+        { label: "Home", to: "/" },
+        { label: repo.owner.login, to: ownerPath(repo.owner.login) },
         {
-          label: repo.fullName,
+          label: repo.name,
           repoSwitcher: {
             currentId: repo.id,
-            hrefFor: (id) => `/repositories/${id}?tab=topics`,
+            hrefFor: (next) => repoHref(next.owner.login, next.name, "topics"),
           },
         },
-        { label: "Topics Visibility", to: `/repositories/${repo.id}?tab=topics${scopeQuery}` },
+        { label: "Topics Visibility", to: `${repoHref(repo.owner.login, repo.name, "topics")}${scopeQuery}` },
         { label: history.watch.topic, to: topicTo },
       ]}
       card={card}

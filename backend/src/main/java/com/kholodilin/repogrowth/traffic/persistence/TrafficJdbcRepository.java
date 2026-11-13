@@ -696,7 +696,7 @@ public class TrafficJdbcRepository {
             LocalDate fromInclusive,
             LocalDate toInclusive
     ) {
-        return jdbcClient.sql("""
+        List<Observation> observations=jdbcClient.sql("""
                         WITH predecessor AS (
                             SELECT MAX(snapshot_date) AS snapshot_date
                             FROM traffic_referrer_snapshot
@@ -723,6 +723,7 @@ public class TrafficJdbcRepository {
                         rs.getInt("unique_visitors")
                 ))
                 .list();
+        return withEmptySnapshots(observations,repositoryId,"REFERRERS",fromInclusive,toInclusive);
     }
 
     public List<Observation> pathSnapshotsForDelta(
@@ -731,7 +732,7 @@ public class TrafficJdbcRepository {
             LocalDate toInclusive,
             boolean includeService
     ) {
-        return jdbcClient.sql("""
+        List<Observation> observations=jdbcClient.sql("""
                         WITH visible AS (
                             SELECT snapshot_date, path, title, views, unique_visitors
                             FROM traffic_path_snapshot
@@ -761,6 +762,7 @@ public class TrafficJdbcRepository {
                         rs.getInt("unique_visitors")
                 ))
                 .list();
+        return withEmptySnapshots(observations,repositoryId,"POPULAR_PATHS",fromInclusive,toInclusive);
     }
 
     public Optional<LocalDate> earliestPathSnapshotDate(long repositoryId, boolean includeService) {
@@ -795,9 +797,7 @@ public class TrafficJdbcRepository {
     public ReferrerSnapshot latestReferrerSnapshot(long repositoryId) {
         List<TimedReferrer> rows = jdbcClient.sql("""
                         WITH latest AS (
-                            SELECT MAX(snapshot_date) AS snapshot_date
-                            FROM traffic_referrer_snapshot
-                            WHERE repository_id = :repositoryId
+                            SELECT MAX(snapshot_date) AS snapshot_date FROM (SELECT snapshot_date FROM traffic_referrer_snapshot WHERE repository_id=:repositoryId UNION ALL SELECT business_date FROM collector_snapshot_header WHERE repository_id=:repositoryId AND family='REFERRERS') dates
                         )
                         SELECT s.snapshot_at, s.referrer, s.views, s.unique_visitors
                         FROM traffic_referrer_snapshot s
@@ -816,7 +816,7 @@ public class TrafficJdbcRepository {
                 ))
                 .list();
         return new ReferrerSnapshot(
-                rows.isEmpty() ? null : rows.getFirst().snapshotAt(),
+                rows.isEmpty() ? latestHeader(repositoryId,"REFERRERS") : rows.getFirst().snapshotAt(),
                 rows.stream().map(TimedReferrer::row).toList()
         );
     }
@@ -830,8 +830,7 @@ public class TrafficJdbcRepository {
                               AND (:includeService OR service_path = FALSE)
                         ),
                         latest AS (
-                            SELECT MAX(snapshot_date) AS snapshot_date
-                            FROM visible
+                            SELECT MAX(snapshot_date) AS snapshot_date FROM (SELECT snapshot_date FROM visible UNION ALL SELECT business_date FROM collector_snapshot_header WHERE repository_id=:repositoryId AND family='POPULAR_PATHS') dates
                         )
                         SELECT v.snapshot_at, v.path, v.title, v.views, v.unique_visitors, v.service_path
                         FROM visible v
@@ -852,11 +851,20 @@ public class TrafficJdbcRepository {
                 ))
                 .list();
         return new PathSnapshot(
-                rows.isEmpty() ? null : rows.getFirst().snapshotAt(),
+                rows.isEmpty() ? latestHeader(repositoryId,"POPULAR_PATHS") : rows.getFirst().snapshotAt(),
                 rows.stream().map(TimedPath::row).toList()
         );
     }
 
+    private Instant latestHeader(long repositoryId,String family){
+        return jdbcClient.sql("SELECT observed_at FROM collector_snapshot_header WHERE repository_id=:id AND family=:family ORDER BY business_date DESC LIMIT 1").param("id",repositoryId).param("family",family).query((rs,n)->rs.getTimestamp(1).toInstant()).optional().orElse(null);
+    }
+    private List<Observation> withEmptySnapshots(List<Observation> rows,long repositoryId,String family,LocalDate from,LocalDate to){
+        List<Observation> result=new ArrayList<>(rows);
+        var dates=jdbcClient.sql("SELECT business_date FROM collector_snapshot_header WHERE repository_id=:id AND family=:family AND business_date<=:toDate AND (business_date>=:fromDate OR business_date=(SELECT max(business_date) FROM collector_snapshot_header WHERE repository_id=:id AND family=:family AND business_date<:fromDate))").param("id",repositoryId).param("family",family).param("fromDate",from).param("toDate",to).query(LocalDate.class).list();
+        for(var date:dates)if(result.stream().noneMatch(row->row.snapshotDate().equals(date)))result.add(new Observation(date,null,null,0,0));
+        return result;
+    }
     public record TrafficTotals(long views, long uniqueVisitors, long clones, long uniqueCloners) {
     }
 

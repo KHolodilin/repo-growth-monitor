@@ -8,3 +8,9 @@ frontend/node_modules/
 docs
 frontend/dist
 .env
+
+collector-contracts/target/
+github-collector/target/
+
+# Local combined-runtime encryption keys and service credentials
+deploy/tmp/

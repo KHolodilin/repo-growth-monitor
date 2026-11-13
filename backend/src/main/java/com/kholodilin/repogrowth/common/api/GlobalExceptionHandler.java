@@ -18,6 +18,19 @@ import java.time.Instant;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.kholodilin.idempotency.exception.IdempotencyConflictException.class)
+    public ResponseEntity<ApiError> handleIdempotencyConflict(Exception ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error(ErrorCode.IDEMPOTENCY_CONFLICT,"Idempotency key was used for different content"));
+    }
+    @ExceptionHandler({org.springframework.web.bind.MissingRequestHeaderException.class,com.kholodilin.collector.idempotency.InvalidIdempotencyKeyException.class})
+    public ResponseEntity<ApiError> handleInvalidRequest(Exception ex) {
+        return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR,"Invalid request parameters or Idempotency-Key"));
+    }
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleDenied(Exception ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error(ErrorCode.FORBIDDEN,"ADMIN role required"));
+    }
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApi(ApiException ex) {
         log.warn("API error category={} message={}", ex.code(), ex.getMessage());
@@ -55,6 +68,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(ErrorCode.NOT_FOUND, "Not found"));
     }
 
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<ApiError> handleDatabase(Exception ex){return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(error(ErrorCode.INTERNAL_ERROR,"Data temporarily unavailable"));}
+    @ExceptionHandler({org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,org.springframework.web.bind.MissingServletRequestParameterException.class})
+    public ResponseEntity<ApiError> handleParameters(Exception ex){return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR,"Invalid request parameters"));}
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
         log.error("Unhandled error path={}", request.getRequestURI(), ex);

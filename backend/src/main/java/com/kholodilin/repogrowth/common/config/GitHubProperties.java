@@ -18,6 +18,8 @@ public record GitHubProperties(
         }
     }
 
+    @Override public String toString() {return "GitHubProperties[token=REDACTED]";}
+
     public boolean tokenConfigured() {
         return token != null && !token.isBlank();
     }

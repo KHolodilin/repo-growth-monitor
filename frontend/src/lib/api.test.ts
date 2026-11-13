@@ -9,9 +9,9 @@ describe("api", () => {
       text: async () => JSON.stringify({ id: 1 }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    await expect(api<{ id: number }>("/api/v1/x")).resolves.toEqual({ id: 1 });
+    await expect(api<{ id: number }>("/api/v1/admin/x")).resolves.toEqual({ id: 1 });
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/x",
+      "/api/v1/admin/x",
       expect.objectContaining({ credentials: "include" }),
     );
 
@@ -24,7 +24,7 @@ describe("api", () => {
       }),
     );
     document.cookie = "XSRF-TOKEN=token%2Fvalue";
-    await expect(api("/api/v1/x", { method: "DELETE" })).resolves.toBeUndefined();
+    await expect(api("/api/v1/admin/x", { method: "DELETE" })).resolves.toBeUndefined();
 
     vi.stubGlobal(
       "fetch",
@@ -34,7 +34,7 @@ describe("api", () => {
         text: async () => "",
       }),
     );
-    await expect(api("/api/v1/x")).resolves.toBeUndefined();
+    await expect(api("/api/v1/admin/x")).resolves.toBeUndefined();
   });
 
   it("maps 401 and 403 to ApiError and sends CSRF", async () => {
@@ -46,7 +46,7 @@ describe("api", () => {
       json: async () => ({ message: "Authentication required" }),
     });
     vi.stubGlobal("fetch", fetchMock);
-    await expect(api("/api/v1/x", { method: "POST", body: "{}" })).rejects.toEqual(
+    await expect(api("/api/v1/admin/x", { method: "POST", body: "{}" })).rejects.toEqual(
       expect.objectContaining({ status: 401 }) as ApiError,
     );
     expect(fetchMock.mock.calls[0][1].headers.get("X-XSRF-TOKEN")).toBe("tok/val");
@@ -60,7 +60,7 @@ describe("api", () => {
         json: async () => ({ message: "" }),
       }),
     );
-    await expect(api("/api/v1/x", { method: "PUT" })).rejects.toEqual(
+    await expect(api("/api/v1/admin/x", { method: "PUT" })).rejects.toEqual(
       expect.objectContaining({ status: 403, message: "Admin role required" }) as ApiError,
     );
 
@@ -74,7 +74,7 @@ describe("api", () => {
         json: async () => ({ message: "" }),
       }),
     );
-    await expect(api("/api/v1/x", { method: "PATCH" })).rejects.toEqual(
+    await expect(api("/api/v1/admin/x", { method: "PATCH" })).rejects.toEqual(
       expect.objectContaining({ status: 401, message: "Sign in required" }) as ApiError,
     );
   });
@@ -89,7 +89,7 @@ describe("api", () => {
         json: async () => ({ message: "No token" }),
       }),
     );
-    await expect(api("/api/v1/x")).rejects.toThrow("No token");
+    await expect(api("/api/v1/admin/x")).rejects.toThrow("No token");
 
     vi.stubGlobal(
       "fetch",
@@ -102,7 +102,7 @@ describe("api", () => {
         },
       }),
     );
-    await expect(api("/api/v1/x")).rejects.toThrow("Server Error");
+    await expect(api("/api/v1/admin/x")).rejects.toThrow("Server Error");
 
     vi.stubGlobal(
       "fetch",
@@ -113,6 +113,12 @@ describe("api", () => {
         json: async () => ({}),
       }),
     );
-    await expect(api("/api/v1/x")).rejects.toThrow("Request failed");
+    await expect(api("/api/v1/admin/x")).rejects.toThrow("Request failed");
+  });
+  it("omits account cookies on public reads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => "{}" });
+    vi.stubGlobal("fetch", fetchMock);
+    await api("/api/v1/public/owners");
+    expect(fetchMock).toHaveBeenCalledWith("/api/v1/public/owners", expect.objectContaining({ credentials: "omit" }));
   });
 });

@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/repositories")
+@RequestMapping("/api/v1/admin/repositories")
 public class RepositoryController {
 
     private final RepositoryService repositoryService;
@@ -44,6 +44,7 @@ public class RepositoryController {
 
     @GetMapping
     public List<RepositoryResponse> list(@RequestParam(defaultValue = "false") boolean refresh) {
+        if(refresh)throw ApiException.validation("Use POST /api/v1/admin/repositories/refresh");
         boolean seePrivate = currentUserAccess.canSeePrivateRepositories();
         // Guests cannot trigger a GitHub refresh; they only read the stored public list.
         List<Repository> repositories = repositoryService.list(seePrivate && refresh);

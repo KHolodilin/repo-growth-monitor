@@ -9,6 +9,8 @@ import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { ServicePathToggle } from "../components/ServicePaths";
 import { SnapshotHistoryView } from "../components/SnapshotHistoryView";
 import { Skeleton } from "../components/ui";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 
 const KIND_LABEL: Record<SnapshotChartKind, string> = {
@@ -34,7 +36,8 @@ function historyPeriod(raw: string | null, days: string | null, saved: Period): 
 }
 
 export function TrafficHistoryPage() {
-  const { id } = useParams();
+  const { owner = "", repository: repositoryName = "" } = useParams();
+  const { id, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
   const [searchParams, setSearchParams] = useSearchParams();
   const kind = parseKind(searchParams.get("kind"));
   const [savedPeriod, savePeriod] = usePeriod(id);
@@ -58,9 +61,9 @@ export function TrafficHistoryPage() {
     let cancelled = false;
     setError(null);
     Promise.all([
-      api<Repository>(`/api/v1/repositories/${id}`),
+      api<Repository>(`/api/v1/admin/repositories/${id}`),
       api<SnapshotHistory>(
-        `/api/v1/repositories/${id}/traffic-history?kind=${kind}&period=${period}&includeServicePaths=${includeService}`,
+        `/api/v1/admin/repositories/${id}/traffic-history?kind=${kind}&period=${period}&includeServicePaths=${includeService}`,
       ),
     ])
       .then(([repository, data]) => {
@@ -80,8 +83,8 @@ export function TrafficHistoryPage() {
     };
   }, [id, kind, period, includeService]);
 
-  if (error) {
-    return <p className="text-red-600">{error}</p>;
+  if (resolveError || error) {
+    return <p className="text-red-600">{resolveError ?? error}</p>;
   }
   if (!repo || !history || loadedContext !== context) {
     return (
@@ -98,16 +101,16 @@ export function TrafficHistoryPage() {
       <header className="space-y-0">
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/dashboard" },
+            { label: "Home", to: "/" },
+            { label: repo.owner.login, to: ownerPath(repo.owner.login) },
             {
-              label: repo.fullName,
+              label: repo.name,
               repoSwitcher: {
                 currentId: repo.id,
-                hrefFor: (repositoryId) =>
-                  `/repositories/${repositoryId}/traffic/history?kind=${kind}&period=${period}`,
+                hrefFor: (next) => `${repoPath(next.owner.login, next.name)}/traffic/history?kind=${kind}&period=${period}`,
               },
             },
-            { label: "Traffic", to: `/repositories/${repo.id}` },
+            { label: "Traffic", to: repoHref(repo.owner.login, repo.name) },
             { label: "History" },
           ]}
         />

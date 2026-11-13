@@ -1,3 +1,4 @@
+import { useDashboardView } from "../lib/dashboardView";
 import { publishChartVisibility, readChartVisibility, subscribeChartVisibility } from "../lib/chartVisibility";
 import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { metricColor, seriesStyle } from "../lib/seriesStyle";
@@ -11,7 +12,7 @@ import { presentChartOption, type ChartAxis } from "../lib/chartPresentation";
 import { markLineEvents } from "../lib/trafficChart";
 import { useChartMode, useRegisterChartExport } from "./ChartDownloadMenu";
 
-type SeriesRef = { key: string; name: string; icon?: ReactNode };
+type SeriesRef = { key: string; name: string; label?: string; icon?: ReactNode };
 
 type Props = {
   chartId: string;
@@ -38,6 +39,7 @@ export function ChartModePlot({
 }
 
 export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, accessibleTitle, exportTitle, dataAlternative = true, style, ...rest }: Props) {
+  const view = useDashboardView();
   const descriptionId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReactECharts>(null);
@@ -83,8 +85,9 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
 
   const mergedOption = useMemo(() => ({
     ...option,
-    legend: { show: false, data: series.map(item => item.name), selected: selectedByName },
-  }), [option, selectedByName, series]);
+    ...(view.public ? { collectionExpected: false } : {}),
+    legend: { show: false, data: series.map(item => item.name), selected: selectedByName, formatter: (name: string) => series.find(item => item.name === name)?.label ?? name },
+  }), [option, selectedByName, series, view.public]);
 
   const presented = useMemo(
     () =>
@@ -142,7 +145,7 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     downloadCsv: () => downloadChartCsv(`${fileBase}.csv`, chartCsv(presented)),
   });
 
-  const shown = series.filter(item => selectedByName[item.name]).map(item => item.name);
+  const shown = series.filter(item => selectedByName[item.name]).map(item => item.label ?? item.name);
   function toggleSeries(name: string) {
     onLegendSelectChanged({ selected: { ...selectedByName, [name]: !selectedByName[name] } });
   }
@@ -150,7 +153,7 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     <div ref={wrapperRef} role="group" aria-label={accessibleTitle ?? `${chartId} chart`}>
       {!(mode.mobile && mode.mobileSeriesName) && <div role="group" aria-label={`${accessibleTitle ?? chartId} series`} className="mb-3 flex flex-wrap justify-center gap-2">
         {series.map(item => <button key={item.key} type="button" aria-pressed={selectedByName[item.name]} onClick={() => toggleSeries(item.name)} className={`inline-flex min-h-11 max-w-full min-w-0 items-center gap-1.5 rounded border px-3 py-1 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selectedByName[item.name] ? "bg-muted" : "opacity-60"}`}>
-          <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} />{item.icon}<span className="min-w-0 [overflow-wrap:anywhere]">{item.name}</span><span aria-hidden="true">{selectedByName[item.name] ? "✓" : "—"}</span>
+          <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} />{item.icon}<span className="min-w-0 [overflow-wrap:anywhere]">{item.label ?? item.name}</span><span aria-hidden="true">{selectedByName[item.name] ? "✓" : "—"}</span>
         </button>)}
       </div>}
       <p id={descriptionId} className="sr-only">{accessibleTitle ?? chartId}. Period: {mode.period ?? "all"}. Visible series: {shown.join(", ") || "none"}. Historical values are available below the chart.</p>

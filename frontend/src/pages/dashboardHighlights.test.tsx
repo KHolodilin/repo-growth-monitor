@@ -58,23 +58,23 @@ describe("portfolio highlights", () => {
     expect((await screen.findAllByText("Unique Cloners"))[0]).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "acme/outbox · outbox 22 → 14" })).toHaveAttribute(
       "href",
-      "/repositories/13?tab=search",
+      "/acme/outbox?tab=search",
     );
     expect(screen.getByRole("link", { name: "acme/kafka · kafka 4 → 11" })).toHaveAttribute(
       "href",
-      "/repositories/8?tab=search",
+      "/acme/kafka?tab=search",
     );
     expect(screen.getByRole("link", { name: "2 promotion events · acme/outbox" })).toHaveAttribute(
       "href",
-      "/repositories/13?tab=growth-events",
+      "/acme/outbox?tab=growth-events",
     );
-    expect(screen.getByRole("link", { name: /acme\/outbox ↑ 25%/ })).toHaveAttribute("href", "/repositories/13");
+    expect(screen.getByRole("link", { name: /acme\/outbox ↑ 25%/ })).toHaveAttribute("href", "/acme/outbox");
     expect(screen.getByText("12")).toHaveClass("text-emerald-700");
     expect(screen.getByText("8")).toHaveClass("text-amber-600");
     expect(screen.getByText("3")).toHaveClass("text-red-700");
     expect(screen.getByRole("link", { name: "12/13" })).toHaveAttribute(
       "href",
-      "/repositories/13?tab=overview&focus=health",
+      `/${repository.fullName}?tab=overview&focus=health`,
     );
     const dash = screen.getAllByText("—").find((node) => node.closest("td"));
     expect(dash?.className ?? "").not.toMatch(/emerald|amber|red/);
@@ -100,12 +100,12 @@ describe("portfolio highlights", () => {
     );
     expect(await screen.findByRole("link", { name: "acme/kafka · kafka 4 → 11" })).toHaveAttribute(
       "href",
-      "/repositories/8?tab=search",
+      "/acme/kafka?tab=search",
     );
     expect(screen.queryByText("No rank changes")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "1 promotion event · acme/kafka, acme/outbox" })).toHaveAttribute(
       "href",
-      "/repositories/8?tab=growth-events",
+      "/acme/kafka?tab=growth-events",
     );
     expect(screen.getByText("No visitor growth")).toBeInTheDocument();
   });
@@ -114,7 +114,7 @@ describe("portfolio highlights", () => {
     vi.mocked(Element.prototype.scrollIntoView).mockClear();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
@@ -123,9 +123,9 @@ describe("portfolio highlights", () => {
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview&focus=health"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview&focus=health"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );

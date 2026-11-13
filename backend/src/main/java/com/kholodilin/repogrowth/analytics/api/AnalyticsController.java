@@ -8,9 +8,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class AnalyticsController {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.analytics.application.AdminCollectionProgress progress;
     private final AnalyticsService analyticsService;
 
     public AnalyticsController(AnalyticsService analyticsService) {
@@ -18,8 +19,8 @@ public class AnalyticsController {
     }
 
     @GetMapping("/dashboard")
-    public DashboardResponse dashboard(@RequestParam(defaultValue = "30d") String period) {
-        return analyticsService.dashboard(period);
+    public Object dashboard(@RequestParam(defaultValue = "30d") String period) {
+        var result=analyticsService.dashboard(period);return progress==null?result:progress.apply(result);
     }
 
     @GetMapping("/portfolio")

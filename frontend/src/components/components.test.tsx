@@ -60,11 +60,11 @@ describe("components", () => {
       return dashboardReady;
     });
     const ready = render(
-      <MemoryRouter initialEntries={["/dashboard"]}>
+      <MemoryRouter initialEntries={["/admin/dashboard"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/dashboard" element={<p>dash</p>} />
-            <Route path="/repositories" element={<p>repos</p>} />
+            <Route path="/admin/dashboard" element={<p>dash</p>} />
+            <Route path="/admin/repositories" element={<p>repos</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -78,7 +78,7 @@ describe("components", () => {
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Repositories" }));
@@ -227,10 +227,10 @@ describe("components", () => {
       return portfolio;
     });
     const repo = render(
-      <MemoryRouter initialEntries={["/repositories/13/traffic/history"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13/traffic/history"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories/:id/traffic/history" element={<p>history</p>} />
+            <Route path="/admin/repositories/:id/traffic/history" element={<p>history</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -238,9 +238,9 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
-    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" });
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" });
     repo.unmount();
 
     api.mockClear();
@@ -251,10 +251,10 @@ describe("components", () => {
       return portfolio;
     });
     render(
-      <MemoryRouter initialEntries={["/repositories"]}>
+      <MemoryRouter initialEntries={["/admin/repositories"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories" element={<p>list</p>} />
+            <Route path="/admin/repositories" element={<p>list</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -262,9 +262,9 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" }),
     );
-    expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" });
+    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" });
   });
 
   it("shows job progress under the header until the run finishes", async () => {
@@ -306,10 +306,10 @@ describe("components", () => {
       };
     });
     const view = render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/repositories/:id" element={<p>repo</p>} />
+            <Route path="/admin/repositories/:id" element={<p>repo</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -321,7 +321,7 @@ describe("components", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/collect", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }));
     expect(timers.length).toBeGreaterThan(0);
     const fireTimers = async () => {
       await act(async () => {

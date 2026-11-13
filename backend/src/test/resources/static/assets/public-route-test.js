@@ -1,0 +1,1 @@
+/* Static assets must not be handled as public repository pages. */

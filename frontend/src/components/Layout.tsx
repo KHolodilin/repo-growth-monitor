@@ -21,9 +21,9 @@ export function Layout() {
   const location = useLocation();
   const [runAll, setRunAll] = useState<RunAllMenuAction | null>(null);
   const { me, loading: authLoading, logout } = useAuth();
-  const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
   const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
+  const repositoryId = repositoryIdFromPath(location.pathname, rows);
   const [collecting, setCollecting] = useState(false);
   const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function Layout() {
   const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
-    const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+    const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
     if (!dashboard?.repositories) {
       setRows([]);
       return dashboard;
@@ -94,11 +94,11 @@ export function Layout() {
     try {
       const onlyId = repositoryIdFromPath(location.pathname);
       if (onlyId != null) {
-        await api(`/api/v1/repositories/${onlyId}/collect`, { method: "POST" });
+        await api(`/api/v1/admin/repositories/${onlyId}/collect`, { method: "POST" });
       } else {
-        const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+        const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
         const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
-        await Promise.all(ids.map((id) => api(`/api/v1/repositories/${id}/collect`, { method: "POST" })));
+        await Promise.all(ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })));
         if (dashboard?.repositories) {
           setSync(dashboard.lastSyncAt);
           setRows(dashboard.repositories);
@@ -297,7 +297,7 @@ function AuthChrome({
                 )}
               </div>
               <Link
-                to="/repositories"
+                to="/admin/repositories"
                 role="menuitem"
                 className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={() => setOpen(false)}
@@ -373,10 +373,16 @@ function collectionBriefState(
   return planner.open ? "Auto-collect window open" : "Outside auto-collect window";
 }
 
-function repositoryIdFromPath(pathname: string): number | null {
-  const match = pathname.match(/^\/repositories\/(\d+)(?:\/|$)/);
-  if (!match) {
+function repositoryIdFromPath(pathname: string, rows: Dashboard["repositories"] | null = null): number | null {
+  const admin = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
+  if (admin) {
+    return Number(admin[1]);
+  }
+  const parts = pathname.match(/^\/([^/]+)\/([^/]+)(?:\/|$)/);
+  if (!parts || !rows) {
     return null;
   }
-  return Number(match[1]);
+  const fullName = `${decodeURIComponent(parts[1])}/${decodeURIComponent(parts[2])}`.toLowerCase();
+  const row = rows.find((item) => item.fullName.toLowerCase() === fullName);
+  return row?.id ?? null;
 }

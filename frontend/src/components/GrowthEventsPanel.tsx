@@ -165,7 +165,7 @@ function EventRows({
                 type="button"
                 className="text-xs font-medium text-red-700"
                 onClick={() => {
-                  void api(`/api/v1/growth-events/${event.id}`, { method: "DELETE" }).then(onChanged);
+                  void api(`/api/v1/admin/growth-events/${event.id}`, { method: "DELETE" }).then(onChanged);
                 }}
               >
                 Delete
@@ -234,9 +234,9 @@ export function EventDetailsDialog({
     let cancelled = false;
     const day = today ?? new Date().toISOString().slice(0, 10);
     Promise.all([
-      api<RepositoryTraffic>(`/api/v1/repositories/${repositoryId}/traffic?period=all`),
-      api<RepositoryStatsHistory>(`/api/v1/repositories/${repositoryId}/stats-history?period=all`),
-      api<SearchHistory[]>(`/api/v1/repositories/${repositoryId}/search-visibility`),
+      api<RepositoryTraffic>(`/api/v1/admin/repositories/${repositoryId}/traffic?period=all`),
+      api<RepositoryStatsHistory>(`/api/v1/admin/repositories/${repositoryId}/stats-history?period=all`),
+      api<SearchHistory[]>(`/api/v1/admin/repositories/${repositoryId}/search-visibility`),
     ])
       .then(([traffic, stats, queries]) => {
         if (cancelled) {
@@ -304,7 +304,7 @@ export function EventDetailsDialog({
                     type="button"
                     className="text-xs font-medium text-red-700"
                     onClick={() => {
-                      void api(`/api/v1/growth-events/${event.id}`, { method: "DELETE" }).then(() => {
+                      void api(`/api/v1/admin/growth-events/${event.id}`, { method: "DELETE" }).then(() => {
                         onChanged();
                         onClose();
                       });
@@ -404,9 +404,9 @@ function EventFormDialog({
     };
     try {
       if (event) {
-        await api(`/api/v1/growth-events/${event.id}`, { method: "PUT", body: JSON.stringify(body) });
+        await api(`/api/v1/admin/growth-events/${event.id}`, { method: "PUT", body: JSON.stringify(body) });
       } else {
-        await api(`/api/v1/repositories/${repositoryId}/growth-events`, {
+        await api(`/api/v1/admin/repositories/${repositoryId}/growth-events`, {
           method: "POST",
           body: JSON.stringify(body),
         });

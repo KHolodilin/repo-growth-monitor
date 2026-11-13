@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 @Service
 public class SearchQueryService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
     private final SearchQueryJdbcRepository queryRepository;
     private final SearchRunJdbcRepository runRepository;
     private final SearchResultJdbcRepository resultRepository;
@@ -93,8 +94,10 @@ public class SearchQueryService {
         return query.trim().replaceAll("\\s+", " ");
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void delete(long id) {
         getQuery(id);
+        if(commands!=null)commands.cancelSearch(id);
         queryRepository.delete(id);
     }
 

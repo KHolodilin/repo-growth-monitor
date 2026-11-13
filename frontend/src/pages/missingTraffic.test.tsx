@@ -21,7 +21,7 @@ describe("missing traffic", () => {
   it("opens the portfolio list and keeps the warning off the repository name", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (!String(path).includes("/dashboard")) {
+      if (!String(path).includes("/admin/dashboard")) {
         return Promise.resolve({});
       }
       return Promise.resolve({
@@ -81,7 +81,7 @@ describe("missing traffic", () => {
   it("explains a missing yesterday on the repository page without drawing it as zero", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
@@ -103,9 +103,9 @@ describe("missing traffic", () => {
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -118,7 +118,7 @@ describe("missing traffic", () => {
   it("says the collection never started after the window closed", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
@@ -130,9 +130,9 @@ describe("missing traffic", () => {
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );

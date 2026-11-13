@@ -32,7 +32,7 @@ export function RepositoryStatsPanel({
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    api<RepositoryStatsHistory>(`/api/v1/repositories/${repositoryId}/stats-history?period=${period}`)
+    api<RepositoryStatsHistory>(`/api/v1/admin/repositories/${repositoryId}/stats-history?period=${period}`)
       .then((data) => {
         if (!cancelled) {
           setHistory(data);

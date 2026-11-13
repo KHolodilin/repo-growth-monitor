@@ -27,7 +27,7 @@ function respond(url: string) {
   if (url.includes("topics/") && url.includes("/history")) return topicHistory;
   if (url.includes("topics/") && url.includes("/results")) return topicResults;
   if (url.includes("topics/") && url.includes("/series")) return [{ githubRepositoryId: 2, fullName: "big/outbox", points: [{ date: "2026-09-23", position: 1 }] }];
-  if (url.includes("/repositories/13") && !url.slice(url.indexOf("/13") + 3).startsWith("/")) return repository;
+  if (url.includes("/admin/repositories/13") && !url.slice(url.indexOf("/13") + 3).startsWith("/")) return repository;
   return [];
 }
 function router(ui: React.ReactNode) { return render(<MemoryRouter>{ui}</MemoryRouter>); }
@@ -137,11 +137,11 @@ describe("batch 178–182", () => {
   it("separates zero-query, empty selection and no-history Search states", async () => {
     let queries: typeof searchHistory[] = [];
     api.mockImplementation(async (url: string) => String(url).includes("search-visibility") ? queries : respond(String(url)));
-    const view = render(<MemoryRouter initialEntries={["/repositories/13?tab=search"]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
+    const view = render(<MemoryRouter initialEntries={["/admin/repositories/13?tab=search"]}><Routes><Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByText("No search queries configured yet.")).toBeInTheDocument();
     expect(screen.getByText("An administrator can configure search queries.")).toBeInTheDocument(); expect(screen.queryByRole("checkbox", { name: "Chart lines" })).toBeNull();
     view.unmount(); document.cookie = "search_visibility_queries_13=; path=/; max-age=0"; queries = [{ ...searchHistory, points: [] }];
-    render(<MemoryRouter initialEntries={["/repositories/13?tab=search"]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13?tab=search"]}><Routes><Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByText("No rank history for the selected queries yet.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("checkbox", { name: `Chart line for ${searchHistory.query.name}` }));
     expect(screen.getByText("Select search queries from the table to display rank history")).toBeInTheDocument();
@@ -157,7 +157,7 @@ describe("batch 178–182", () => {
   });
   it("selects Topics competitors from real histories, preserves sorting and resets on scope changes", async () => {
     const user = userEvent.setup();
-    render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     await screen.findAllByRole("article");
     const check = screen.getByRole("checkbox", { name: "Show big/outbox on the chart" });
     await user.click(check); expect(check).toBeChecked();
@@ -165,11 +165,11 @@ describe("batch 178–182", () => {
     expect(screen.getByRole("group", { name: "13:topic:7:all series" })).toHaveTextContent("big/outbox");
     expect(screen.getByRole("group", { name: "13:topic:7:all series" })).toHaveTextContent(repository.fullName);
     await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "stars"); expect(check).toBeChecked();
-    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/repositories/13/topics/outbox/competitors/2");
+    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/admin/repositories/13/topics/outbox/competitors/2");
     await user.click(check); expect(check).not.toBeChecked();
     await user.click(check); await user.click(screen.getByRole("button", { name: "Java" }));
     expect(await screen.findByRole("checkbox", { name: "Show big/outbox on the chart" })).not.toBeChecked();
-    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/repositories/13/topics/outbox/competitors/2?scope=language");
+    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/admin/repositories/13/topics/outbox/competitors/2?scope=language");
   });
   it("ignores delayed Topics replies after changing scope and explains missing competitor history", async () => {
     const user = userEvent.setup();
@@ -180,7 +180,7 @@ describe("batch 178–182", () => {
       if (url.includes("/series?scope=language")) return [];
       return respond(String(url));
     });
-    render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     await screen.findByRole("button", { name: "Java" });
     await user.click(screen.getByRole("button", { name: "Java" }));
     await screen.findAllByRole("article");
@@ -198,7 +198,7 @@ describe("batch 178–182", () => {
       if (url.includes("/series")) throw new Error("Series unavailable");
       return respond(String(url));
     });
-    const view = render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    const view = render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     const user = userEvent.setup();
     await screen.findAllByRole("article");
     const checkbox = screen.getByRole("checkbox", { name: "Show big/outbox on the chart" });
@@ -207,21 +207,21 @@ describe("batch 178–182", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("No rank history");
     view.unmount();
     api.mockImplementation(async (url: string) => { if (url.includes("/results")) throw new Error("No snapshot"); return respond(String(url)); });
-    render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByText("No topic snapshot yet.")).toBeInTheDocument();
   });
   it("handles a delayed initial Topics history after unmount and an initial load error", async () => {
     let finish: (value: unknown) => void = () => {};
     api.mockImplementation(async (url: string) => url.includes("/history") ? new Promise(resolve => { finish = resolve; }) : respond(String(url)));
-    const view = render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    const view = render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     view.unmount(); await act(async () => finish(topicHistory));
     api.mockRejectedValue(new Error("Topic unavailable"));
-    render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByText("Topic unavailable")).toBeInTheDocument();
   });
   it("keeps admin setup actionable for a repository with no queries", async () => {
     auth.me = { ...anonymousMe, authenticated: true, actions: ["MUTATE"] };
-    render(<MemoryRouter initialEntries={["/repositories/13?tab=search"]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13?tab=search"]}><Routes><Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByText("Add a search query to start tracking visibility.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add query" })).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Chart lines" })).toBeNull();
@@ -230,7 +230,7 @@ describe("batch 178–182", () => {
   it("does not show a late Topics error after navigating away", async () => {
     let fail: (error: Error) => void = () => {};
     api.mockImplementation(async (url: string) => url.includes("/history") ? new Promise((_, reject) => { fail = reject; }) : respond(String(url)));
-    const view = render(<MemoryRouter initialEntries={["/repositories/13/topics/outbox"]}><Routes><Route path="/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
+    const view = render(<MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}><Routes><Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} /></Routes></MemoryRouter>);
     view.unmount(); await act(async () => fail(new Error("Late error")));
     expect(screen.queryByText("Late error")).toBeNull();
   });
@@ -241,7 +241,7 @@ describe("batch 178–182", () => {
       if (url.endsWith("/series")) return { series: [{ githubRepositoryId: 99, fullName: repository.fullName, points: [] }, { githubRepositoryId: 1, fullName: "other/repo", points: [] }] };
       return respond(String(url));
     });
-    render(<MemoryRouter initialEntries={["/repositories/13/search-queries/1"]}><Routes><Route path="/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13/search-queries/1"]}><Routes><Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} /></Routes></MemoryRouter>);
     await screen.findAllByRole("article");
     await userEvent.click(screen.getByRole("checkbox", { name: "Show other/repo on the chart" }));
     expect(await screen.findByRole("status")).toHaveTextContent("No history for one or more selected competitors.");
@@ -255,7 +255,7 @@ describe("batch 178–182", () => {
       if (url.includes("traffic-history")) return snapshotHistory;
       return respond(String(url));
     });
-    render(<MemoryRouter initialEntries={["/repositories/13/traffic/history?kind=referrers"]}><Routes><Route path="/repositories/:id/traffic/history" element={<TrafficHistoryPage />} /></Routes></MemoryRouter>);
+    render(<MemoryRouter initialEntries={["/admin/repositories/13/traffic/history?kind=referrers"]}><Routes><Route path="/admin/repositories/:id/traffic/history" element={<TrafficHistoryPage />} /></Routes></MemoryRouter>);
     await screen.findAllByRole("article");
     expect(screen.getByRole("checkbox", { name: "Show github.com on the chart" })).toBeChecked();
     await user.click(screen.getByRole("button", { name: "Popular Paths" }));

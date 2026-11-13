@@ -1,3 +1,4 @@
+import { useDashboardView } from "../lib/dashboardView";
 import type { Period } from "./PeriodSelector";
 import { useChartVisibility } from "../lib/chartVisibility";
 import { snapshotSeriesKey } from "../lib/snapshotChart";
@@ -8,9 +9,10 @@ import { readSnapshotChartPrefs, writeSnapshotChartPrefs, type SnapshotChartKind
 import { SnapshotHistoryChart } from "./SnapshotHistoryChart";
 import { SnapshotHistoryTable } from "./SnapshotHistoryTable";
 
-export function SnapshotHistoryView({ title, kind, history, period = "all" }: { title: string; kind: SnapshotChartKind; history: SnapshotHistory; period?: Period }) {
+export function SnapshotHistoryView({ title, kind, history, period = "all", displayLabel }: { title: string; kind: SnapshotChartKind; history: SnapshotHistory; period?: Period; displayLabel?: (key:string)=>string }) {
+  const view=useDashboardView();
   const [prefs, setPrefs] = useState(() => readSnapshotChartPrefs(history.repositoryId, kind) ?? { metric: "VISITORS" as SnapshotMetric, keys: defaultTopKeys(history.rows, "VISITORS", 5) });
-  const visibility = useChartVisibility(`${history.repositoryId}:snapshot-${kind}`);
+  const visibility = useChartVisibility(view.public?`${view.scopeKey}:snapshot-${kind}`:`${history.repositoryId}:snapshot-${kind}`);
   function change(metric: SnapshotMetric, keys: string[]) {
     const next = { metric, keys };
     setPrefs(next);
@@ -21,7 +23,7 @@ export function SnapshotHistoryView({ title, kind, history, period = "all" }: { 
     change(prefs.metric, prefs.keys.includes(key) ? prefs.keys.filter(item => item !== key) : [...prefs.keys, key]);
   }
   return <>
-    <SnapshotHistoryChart period={period} title={title} kind={kind} history={history} selected={prefs.keys} metric={prefs.metric} onChange={change} />
-    <SnapshotHistoryTable kind={kind} history={history} selected={prefs.keys.filter(key => visibility.isVisible(snapshotSeriesKey(history, key)))} onToggle={toggle} />
+    <SnapshotHistoryChart period={period} title={title} kind={kind} history={history} selected={prefs.keys} metric={prefs.metric} onChange={change} displayLabel={displayLabel} />
+    <SnapshotHistoryTable kind={kind} history={history} selected={prefs.keys.filter(key => visibility.isVisible(snapshotSeriesKey(history, key)))} onToggle={toggle} displayLabel={displayLabel} />
   </>;
 }

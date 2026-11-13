@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: product-test
+      author: test
+      changes:
+        - sql:
+            sql: CREATE TABLE product_history(id INT); INSERT INTO product_history VALUES (1);

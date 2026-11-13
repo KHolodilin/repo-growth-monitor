@@ -21,6 +21,8 @@ type Series = {
 };
 type ChartOption = {
   snapshotHistory?: boolean;
+  /** Public saved data does not assert that a planner was expected to run yesterday. */
+  collectionExpected?: boolean;
   collectionDates?: string[];
   collectionSeries?: { name: string; dates: string[] }[];
   missedCollectionDates?: string[];
@@ -210,6 +212,7 @@ function toTimeline(option: ChartOption): ChartOption {
 /** Missing snapshots are metadata, never numeric zero or a fake rank. */
 export function withCollectionWarning(source: object, today = new Date().toISOString().slice(0, 10), extend = false): ChartOption {
   const option = source as ChartOption;
+  if (option.collectionExpected === false) return option;
   if (option.series?.some(item => item.name === "Collection warning")) return option;
   const dates = categoryDates(option);
   if (!dates?.length) return option;

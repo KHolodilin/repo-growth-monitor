@@ -1,0 +1,5 @@
+rgm:
+  collector:
+    enabled: false
+  planner:
+    enabled: false
