@@ -271,7 +271,7 @@ describe("repository filters", () => {
       }
       return [];
     });
-    render(
+    const details = render(
       <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
           <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
@@ -280,6 +280,7 @@ describe("repository filters", () => {
     );
     expect(await screen.findByText(/can no longer see this repository/)).toBeInTheDocument();
     expect(screen.getByText(TRAFFIC_PERMISSION)).toBeInTheDocument();
+    details.unmount();
 
     api.mockImplementation(async (path: string) => {
       if (String(path).includes("/system/status")) {
@@ -287,7 +288,7 @@ describe("repository filters", () => {
       }
       return dashboardReady;
     });
-    render(
+    const rejected = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -297,6 +298,7 @@ describe("repository filters", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(TOKEN_REJECTED)).toBeInTheDocument();
+    rejected.unmount();
 
     api.mockImplementation(async (path: string) => {
       if (String(path).includes("/system/status")) {
@@ -304,7 +306,7 @@ describe("repository filters", () => {
       }
       return dashboardReady;
     });
-    render(
+    const limited = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -314,6 +316,7 @@ describe("repository filters", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Collection continues after/)).toBeInTheDocument();
+    limited.unmount();
   });
 
   it("reports tracking failures and keeps a blocked refresh on the saved list", async () => {
@@ -434,7 +437,8 @@ describe("repository filters", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Switch repository")).toHaveTextContent(repository.name);
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toHaveTextContent(repository.name);
     pendingDetails.unmount();
     releaseDetails({ tokenState: "OK", rateLimitReset: null });
     await new Promise((resolve) => setTimeout(resolve, 0));

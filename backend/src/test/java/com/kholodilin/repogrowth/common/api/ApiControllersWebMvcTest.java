@@ -3,6 +3,7 @@ package com.kholodilin.repogrowth.common.api;
 import com.kholodilin.repogrowth.analytics.api.AnalyticsController;
 import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
@@ -134,6 +135,8 @@ class ApiControllersWebMvcTest {
     GitHubClient gitHubClient;
     @MockitoBean
     CurrentUserAccess currentUserAccess;
+    @MockitoBean
+    PublicationService publicationService;
 
     private Repository repository;
     private SearchQuery query;

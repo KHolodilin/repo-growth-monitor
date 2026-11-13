@@ -7,13 +7,26 @@ type PublicResolve = {
   redirect: boolean;
 };
 
-/** Resolve /{owner}/{repo} to the tracked repository record (admin list or published resolve). */
+/** Resolve /{owner}/{repo} via public publication first; admin list only for unpublished tracked repos. */
 export async function resolveRepository(owner: string, repository: string): Promise<Repository> {
   const fullName = `${owner}/${repository}`;
-  let listed = false;
+
+  try {
+    const resolved = await api<PublicResolve>(
+      `/api/v1/public/resolve?path=${encodeURIComponent(`/${owner}/${repository}`)}`,
+    );
+    if (resolved.repositoryId) {
+      return api<Repository>(`/api/v1/admin/repositories/${resolved.repositoryId}`);
+    }
+  } catch (err) {
+    // Not published (or unknown path): admins may still open a tracked private/unpublished repo.
+    if (!(err instanceof ApiError && err.status === 404)) {
+      throw err;
+    }
+  }
+
   try {
     const list = await api<Repository[]>("/api/v1/admin/repositories?refresh=false");
-    listed = true;
     const match = list.find(
       (row) =>
         row.fullName.toLowerCase() === fullName.toLowerCase()
@@ -23,18 +36,8 @@ export async function resolveRepository(owner: string, repository: string): Prom
       return match;
     }
   } catch {
-    // Anonymous callers cannot list admin repositories; fall through to public resolve.
+    // Anonymous callers cannot list admin repositories.
   }
 
-  if (listed) {
-    throw new ApiError(404, "Repository not found");
-  }
-
-  const resolved = await api<PublicResolve>(
-    `/api/v1/public/resolve?path=${encodeURIComponent(`/${owner}/${repository}`)}`,
-  );
-  if (!resolved.repositoryId) {
-    throw new ApiError(404, "Repository not found");
-  }
-  return api<Repository>(`/api/v1/admin/repositories/${resolved.repositoryId}`);
+  throw new ApiError(404, "Repository not found");
 }

@@ -165,11 +165,11 @@ describe("batch 178–182", () => {
     expect(screen.getByRole("group", { name: "13:topic:7:all series" })).toHaveTextContent("big/outbox");
     expect(screen.getByRole("group", { name: "13:topic:7:all series" })).toHaveTextContent(repository.fullName);
     await user.selectOptions(screen.getByRole("combobox", { name: "Sort by" }), "stars"); expect(check).toBeChecked();
-    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/admin/repositories/13/topics/outbox/competitors/2");
+    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/KHolodilin/spring-transactional-outbox-kafka/topics/outbox/competitors/2");
     await user.click(check); expect(check).not.toBeChecked();
     await user.click(check); await user.click(screen.getByRole("button", { name: "Java" }));
     expect(await screen.findByRole("checkbox", { name: "Show big/outbox on the chart" })).not.toBeChecked();
-    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/admin/repositories/13/topics/outbox/competitors/2?scope=language");
+    expect(screen.getByRole("link", { name: "big/outbox" })).toHaveAttribute("href", "/KHolodilin/spring-transactional-outbox-kafka/topics/outbox/competitors/2?scope=language");
   });
   it("ignores delayed Topics replies after changing scope and explains missing competitor history", async () => {
     const user = userEvent.setup();

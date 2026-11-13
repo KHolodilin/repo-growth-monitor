@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, topicHistory, topicResults } from "../test/fixtures";
+import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
 import { TopicCompetitorCardPage } from "./TopicCompetitorCardPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
 
@@ -57,7 +58,14 @@ function renderTopics(path: string) {
 function mockTopicApi(competitor: unknown = card) {
   api.mockImplementation((path: string) => {
     const url = String(path);
-    if (url.includes("/admin/repositories?refresh")) return Promise.resolve([repository, other]);
+    if (isPublicResolve(url)) {
+      const id = url.toLowerCase().includes("other") ? other.id : repository.id;
+      return Promise.resolve(publicResolveResponse(id));
+    }
+    if (url.includes("/admin/repositories?refresh") || url.includes("/admin/repositories?refresh=false")) {
+      return Promise.resolve([repository, other]);
+    }
+    if (url.includes("/admin/repositories?")) return Promise.resolve([repository, other]);
     if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
     if (url.endsWith("/admin/repositories/8")) return Promise.resolve(other);
     if (url.includes("/topics/") && url.includes("/history")) return Promise.resolve(topicHistory);
@@ -139,11 +147,12 @@ describe("topic competitor card", () => {
   it("shows a missing repository and ignores a cancelled request", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/")) return Promise.reject(new Error("Repository was not found in this topic"));
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
-      return Promise.resolve(null);
+      return Promise.resolve([]);
     });
     renderTopics(`${base}/topics/outbox/competitors/404`);
     expect(await screen.findByText("Repository was not found in this topic")).toBeInTheDocument();
@@ -151,6 +160,7 @@ describe("topic competitor card", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
@@ -167,6 +177,7 @@ describe("topic competitor card", () => {
     api.mockReset();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
@@ -190,12 +201,13 @@ describe("topic competitor card", () => {
     let fail: ((reason: unknown) => void) | null = null;
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/2")) return new Promise((resolve) => { settle = resolve; });
       if (url.includes("/competitors/9")) return new Promise((_, reject) => { fail = reject; });
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
-      return Promise.resolve(null);
+      return Promise.resolve([]);
     });
 
     const first = renderTopics(`${base}/topics/outbox/competitors/2`);

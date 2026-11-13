@@ -137,6 +137,7 @@ describe("remaining coverage edges", () => {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/admin/repositories/:id" element={<p>opened</p>} />
+          <Route path="/:owner/:repo" element={<p>opened</p>} />
         </Routes>
       </MemoryRouter>,
     );

@@ -41,10 +41,16 @@ function renderAt(path: string, ui: ReactNode) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/admin/repositories" element={ui} />
-        <Route element={<Layout />}><Route path="/admin/repositories/:id" element={ui} /></Route>
+        <Route element={<Layout />}>
+          <Route path="/admin/repositories/:id" element={ui} />
+          <Route path="/:owner/:repository" element={ui} />
+        </Route>
         <Route path="/admin/repositories/:id/traffic/history" element={ui} />
+        <Route path="/:owner/:repository/traffic/history" element={ui} />
         <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={ui} />
+        <Route path="/:owner/:repository/search-queries/:queryId" element={ui} />
         <Route path="/admin/repositories/:repositoryId/topics/:topic" element={ui} />
+        <Route path="/:owner/:repository/topics/:topic" element={ui} />
         <Route path="/admin/search-runs/:id" element={ui} />
       </Routes>
     </MemoryRouter>,

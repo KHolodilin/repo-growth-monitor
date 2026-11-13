@@ -16,6 +16,7 @@ import {
   topicResults,
   traffic,
 } from "../test/fixtures";
+import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
 import { DashboardPage } from "./DashboardPage";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { RepositoriesPage } from "./RepositoriesPage";
@@ -156,6 +157,9 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string, init?: RequestInit) => {
       const url = String(path);
+      if (isPublicResolve(url)) {
+        return json(publicResolveResponse());
+      }
       if (url.endsWith("/admin/repositories/13")) {
         return json(repository);
       }
@@ -233,11 +237,11 @@ describe("pages", () => {
     expect(screen.getByText("↑ 25%")).toBeInTheDocument();
     expect(screen.getByText("↓ 50%")).toBeInTheDocument();
     expect(screen.getAllByText("vs prev 7d")).toHaveLength(3);
-    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(screen.getAllByLabelText("Switch repository")[0]);
     expect(await screen.findByPlaceholderText("Search repositories")).toBeInTheDocument();
     expect(await screen.findByText("other")).toBeInTheDocument();
     await user.click(screen.getByRole("option", { name: repository.name }));
-    await user.click(screen.getByRole("button", { name: "legend" }));
+    await user.click(await screen.findByRole("button", { name: "legend" }));
     await user.click(screen.getByRole("button", { name: "mark" }));
     expect(await screen.findByText("Growth event")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit" }));
@@ -269,7 +273,7 @@ describe("pages", () => {
     expect(screen.getByText("Description").parentElement).toHaveClass("text-emerald-700");
     expect(screen.getByText("Topics", { selector: "span" }).parentElement).toHaveClass("text-muted-foreground");
     expect(collection.parentElement?.querySelector(".text-emerald-600")).not.toBeNull();
-    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(screen.getAllByLabelText("Switch repository")[0]);
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "Stats" }));
     expect(await screen.findByText("Daily totals")).toBeInTheDocument();
@@ -346,7 +350,7 @@ describe("pages", () => {
       await user.click(buttons[buttons.length - 1]);
     }
     await user.click(screen.getByRole("button", { name: "Java" }));
-    await user.click(screen.getByLabelText("Switch repository"));
+    await user.click(screen.getAllByLabelText("Switch repository")[0]);
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "All" }));
     await user.click(screen.getAllByRole("button", { name: "Run" })[0]);

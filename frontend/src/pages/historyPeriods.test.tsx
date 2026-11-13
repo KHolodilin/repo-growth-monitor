@@ -21,8 +21,9 @@ function data(url: string) {
  return {...snapshotHistory,kind:params.get("kind")==="paths"?"PATHS":"REFERRERS",dates:shown,rows:[{key:"github.com",cells:shown.map(date=>({date,visitors:2,views:20,visitorsDelta:0,viewsDelta:0,firstSeen:false}))}]};
 }
 function Probe(){return <p data-testid="history-url">{useLocation().search}</p>;}
-function mount(query=""){return render(<MemoryRouter initialEntries={[`/admin/repositories/13/traffic/history${query}`]}><Routes><Route path="/admin/repositories/:id/traffic/history" element={<><Probe/><TrafficHistoryPage/></>}/></Routes></MemoryRouter>);}
-beforeEach(()=>{vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));writeStoredRepoPeriod("13","90d");api.mockImplementation(async (url:string)=>url.includes("traffic-history")?data(url):url.endsWith("/admin/repositories/13")?repository:[]);});
+function HistoryRoutes(){return <><Probe/><TrafficHistoryPage/></>;}
+function mount(query=""){return render(<MemoryRouter initialEntries={[`/${repository.owner.login}/${repository.name}/traffic/history${query}`]}><Routes><Route path="/admin/repositories/:id/traffic/history" element={<HistoryRoutes/>}/><Route path="/:owner/:repository/traffic/history" element={<HistoryRoutes/>}/></Routes></MemoryRouter>);}
+beforeEach(()=>{vi.useFakeTimers({toFake:["Date"]});vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));writeStoredRepoPeriod("13","90d");api.mockImplementation(async (url:string)=>url.includes("/api/v1/public/resolve")?({ownerId:String(repository.owner.id),repositoryId:String(repository.id),canonicalPath:`/${repository.owner.login}/${repository.name}`,redirect:false}):url.includes("traffic-history")?data(url):url.endsWith("/admin/repositories/13")?repository:[]);});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 describe.each([false,true])("History shared periods mobile=%s",mobile=>{
  it.each(["referrers","paths"])("loads every %s period, keeps metrics and exports its snapshots",async kind=>{
@@ -66,9 +67,9 @@ it("does not apply a late response from an older period", async()=>{
 
 it("keeps kind and selected period when switching repositories", async()=>{
  const original=api.getMockImplementation()!;
- api.mockImplementation((url:string)=>url.includes("/admin/repositories?refresh")?Promise.resolve([repository]):original(url));
+ api.mockImplementation((url:string)=>url.includes("/admin/repositories?")?Promise.resolve([repository]):original(url));
  const user=userEvent.setup();mount("?kind=paths&period=1y");await screen.findByRole("group",{name:"History period"});
- await user.click(screen.getByRole("button",{name:"Switch repository"}));
+ await user.click(screen.getByLabelText("Switch repository"));
  await user.click(await screen.findByRole("option",{name:repository.name}));
  expect(screen.getByTestId("history-url")).toHaveTextContent("kind=paths&period=1y");
 });
