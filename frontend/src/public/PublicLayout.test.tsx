@@ -31,6 +31,20 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("PublicLayout", () => {
+  it("matches the admin header geometry for anonymous sessions", () => {
+    mount("/");
+    const brand = screen.getByRole("link", { name: "Repo Growth Monitor" });
+    expect(brand.className).toContain("gap-2.5");
+    expect(brand.querySelector("img")?.className).toContain("h-8");
+    expect(brand).toHaveTextContent("Repo Growth Monitor");
+    const signIn = screen.getByRole("link", { name: "Sign in" });
+    expect(signIn).toHaveAttribute("href", "/login");
+    expect(signIn.className).toContain("h-8");
+    expect(signIn.className).toContain("w-8");
+    expect(signIn.className).not.toContain("border");
+    expect(signIn.className).not.toContain("min-h-11");
+  });
+
   it("toggles About data on the public home footer", async () => {
     const user = userEvent.setup();
     mount("/");

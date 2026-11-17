@@ -49,12 +49,13 @@ public class PublicPageController {
      reads.scope(owner,repository,paths?PublicationService.Module.PATHS:PublicationService.Module.REFERRERS);
      suffix="/traffic/history";
     }else if(queryId!=null){
+     // HTML shell only needs a published parent definition. Competitor membership is enforced by
+     // the SPA/API the same way as in-app navigation; gating F5 on public_scope_verified made
+     // reload 404 while click-through still worked for the same URL.
      reads.validateDefinition(owner,repository,false,queryId);
-     if(githubId!=null)reads.competitor(false,queryId,githubId);
      suffix="/search-queries/"+queryId+(githubId==null?"":"/competitors/"+githubId);
     }else if(topic!=null){
-     long topicId=reads.validateTopic(owner,repository,decode(topic));
-     if(githubId!=null)reads.competitor(true,topicId,githubId);
+     reads.validateTopic(owner,repository,decode(topic));
      suffix="/topics/"+topic+(githubId==null?"":"/competitors/"+githubId);
     }
    }

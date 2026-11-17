@@ -4,6 +4,8 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import org.junit.jupiter.api.*;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -31,12 +33,14 @@ class PublicPageControllerTest {
   mvc.perform(get("/Alpha/project/topics/spring").accept("text/html")).andExpect(status().isOk());
   mvc.perform(get("/Alpha/project/analytics/unsupported").accept("text/html")).andExpect(status().isNotFound());
  }
- @Test void competitorHtmlValidatesDefinitionMembership()throws Exception{
+ @Test void competitorHtmlServesShellWhenParentDefinitionIsPublished()throws Exception{
   when(reads.resolve("/Alpha/project")).thenReturn(new PublicationService.Resolved(1,2L,"/Alpha/project",false));
   doNothing().when(reads).validateDefinition("Alpha","project",false,5L);
-  when(reads.competitor(false,5L,555L)).thenReturn(java.util.Map.of("githubId","555"));
+  when(reads.validateTopic("Alpha","project","spring")).thenReturn(7L);
   mvc.perform(get("/Alpha/project/search-queries/5/competitors/555").accept("text/html")).andExpect(status().isOk());
-  doThrow(ApiException.notFound("Page not found")).when(reads).competitor(false,5L,999L);
-  mvc.perform(get("/Alpha/project/search-queries/5/competitors/999").accept("text/html")).andExpect(status().isNotFound());
+  mvc.perform(get("/Alpha/project/topics/spring/competitors/999").accept("text/html")).andExpect(status().isOk());
+  verify(reads,never()).competitor(anyBoolean(),anyLong(),anyLong());
+  doThrow(ApiException.notFound("Page not found")).when(reads).validateDefinition("Alpha","project",false,99L);
+  mvc.perform(get("/Alpha/project/search-queries/99/competitors/555").accept("text/html")).andExpect(status().isNotFound());
  }
 }

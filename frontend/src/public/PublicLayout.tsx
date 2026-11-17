@@ -43,17 +43,23 @@ export function PublicLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link to="/" className="flex min-w-0 items-center gap-2 text-sm font-semibold" aria-label="Repo Growth Monitor home">
-            <LogoMark className="h-7 w-7 shrink-0" />
-            Repo Growth Monitor
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 md:px-6">
+          <Link to="/" className="flex min-w-0 items-center gap-2.5 text-slate-900" aria-label="Repo Growth Monitor">
+            <LogoMark className="h-8 w-8 shrink-0 object-contain" />
+            <span className="truncate whitespace-nowrap text-[15px] leading-none tracking-tight">
+              <span className="font-bold">Repo Growth</span> <span className="font-normal">Monitor</span>
+            </span>
           </Link>
-          <a href="/login" aria-label="Sign in" className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border">
+          <a
+            href="/login"
+            aria-label="Sign in"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
             <SignInIcon className="h-6 w-6" />
           </a>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6 md:py-8">
         <Outlet />
       </main>
       <footer className="mt-auto border-t bg-card">
