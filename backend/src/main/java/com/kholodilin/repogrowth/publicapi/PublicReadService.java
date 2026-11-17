@@ -71,19 +71,34 @@ public class PublicReadService {
  }
  private DashboardPeriod period(List<Long> ids,String raw,boolean traffic){var p=Map.of("ids",ids);String table=traffic?"traffic_daily":"repository_daily_stats",date=traffic?"traffic_date":"stat_date";var earliest=sql.queryForObject("SELECT min("+date+") FROM "+table+" WHERE repository_id IN (:ids)",p,LocalDate.class);return DashboardPeriod.of(raw,LocalDate.now(ZoneOffset.UTC),earliest);}
  public Map<String,Object> stats(String owner,String repository,String period){var ids=scope(owner,repository,PublicationService.Module.DASHBOARD);var range=period(ids,period,false);var p=new HashMap<String,Object>();p.put("ids",ids);p.put("to",range.to());p.put("baseline",range.allTime()?range.from():range.previousTo());
+ // Per-repo tip (same as admin/main): do not gate on a shared tip day.
  String latest="SELECT DISTINCT ON (repository_id) repository_id,stars,forks,watchers,contributors,contributor_logins_collected,stat_date FROM repository_daily_stats WHERE repository_id IN (:ids) AND stat_date<=:to ORDER BY repository_id,stat_date DESC";
- var current=onTipDay(sql.queryForList(latest,p));var priorParams=new HashMap<>(p);priorParams.put("to",p.get("baseline"));var previous=range.allTime()?List.<Map<String,Object>>of():onTipDay(sql.queryForList(latest,priorParams));
+ var current=sql.queryForList(latest,p);var priorParams=new HashMap<>(p);priorParams.put("to",p.get("baseline"));var previous=range.allTime()?List.<Map<String,Object>>of():sql.queryForList(latest,priorParams);
  Map<String,Object> totals=new LinkedHashMap<>();for(String metric:List.of("stars","forks","watchers")){long value=current.stream().mapToLong(row->((Number)row.get(metric)).longValue()).sum();boolean complete=current.size()==ids.size();long baseline=previous.stream().mapToLong(row->((Number)row.get(metric)).longValue()).sum();boolean comparable=!range.allTime()&&complete&&previous.size()==ids.size();totals.put(metric,new Metric(complete?value:null,value,current.size(),ids.size(),complete,comparable?value-baseline:null,comparable?GrowthMath.percent(value,baseline):null));}
- var tipDates=current.stream().map(row->row.get("stat_date")).filter(Objects::nonNull).toList();
- var contributors=tipDates.isEmpty()?Map.<String,Object>of("known",0L,"complete",0L):sql.queryForMap("SELECT count(DISTINCT lower(c.login)) AS known,count(DISTINCT s.repository_id) FILTER(WHERE s.contributor_logins_collected AND s.contributors=(SELECT count(*) FROM repository_daily_contributor_login x WHERE x.repository_id=s.repository_id AND x.stat_date=s.stat_date)) AS complete FROM repository_daily_stats s LEFT JOIN repository_daily_contributor_login c ON c.repository_id=s.repository_id AND c.stat_date=s.stat_date WHERE s.repository_id IN (:ids) AND s.stat_date IN (:tipDates)",new HashMap<>(p){{put("tipDates",tipDates);}});
- long known=((Number)contributors.get("known")).longValue(),complete=((Number)contributors.get("complete")).longValue();totals.put("contributors",new Metric(complete==ids.size()?known:null,known,complete,ids.size(),complete==ids.size(),null,null));
+ totals.put("contributors",tipContributorMetric(ids,current));
  return Map.of("period",range.value(),"from",range.from(),"to",range.to(),"repositories",ids.size(),"totals",totals,"highlights",highlights(ids,range));
  }
- /** Keep only repositories observed on the newest tip day so a stale leftover snapshot cannot inflate owner totals. */
- private List<Map<String,Object>> onTipDay(List<Map<String,Object>> rows){
-  LocalDate tip=rows.stream().map(row->localDate(row.get("stat_date"))).filter(Objects::nonNull).max(LocalDate::compareTo).orElse(null);
-  if(tip==null)return List.of();
-  return rows.stream().filter(row->tip.equals(localDate(row.get("stat_date")))).toList();
+ /** Union of tip-day logins like admin Unique Contributors; complete=false when any tip misses login rows. */
+ private Metric tipContributorMetric(List<Long> ids,List<Map<String,Object>> tipRows){
+  if(tipRows.isEmpty())return new Metric(null,0,0,ids.size(),false,null,null);
+  Set<String> tipKeys=new HashSet<>();List<LocalDate> tipDates=new ArrayList<>();
+  for(var row:tipRows){LocalDate day=localDate(row.get("stat_date"));if(row.get("repository_id")==null||day==null)continue;tipKeys.add(((Number)row.get("repository_id")).longValue()+"|"+day);if(!tipDates.contains(day))tipDates.add(day);}
+  Map<String,Set<String>> loginsByTip=new HashMap<>();
+  if(!tipDates.isEmpty()){
+   var loginRows=sql.queryForList("SELECT repository_id,stat_date,login FROM repository_daily_contributor_login WHERE repository_id IN (:ids) AND stat_date IN (:tipDates)",Map.of("ids",ids,"tipDates",tipDates));
+   for(var row:loginRows){LocalDate day=localDate(row.get("stat_date"));if(row.get("repository_id")==null||day==null||row.get("login")==null)continue;String key=((Number)row.get("repository_id")).longValue()+"|"+day;if(!tipKeys.contains(key))continue;loginsByTip.computeIfAbsent(key,ignored->new HashSet<>()).add(String.valueOf(row.get("login")).toLowerCase(Locale.ROOT));}
+  }
+  Set<String> logins=new HashSet<>();long collected=0;long complete=0;
+  for(var row:tipRows){
+   LocalDate day=localDate(row.get("stat_date"));if(row.get("repository_id")==null||day==null)continue;
+   if(!Boolean.TRUE.equals(row.get("contributor_logins_collected")))continue;
+   collected++;
+   Set<String> tipLogins=loginsByTip.getOrDefault(((Number)row.get("repository_id")).longValue()+"|"+day,Set.of());
+   logins.addAll(tipLogins);
+   if(((Number)row.get("contributors")).intValue()==tipLogins.size())complete++;
+  }
+  long known=logins.size();
+  return new Metric(collected>0?known:null,known,collected,ids.size(),complete==ids.size(),null,null);
  }
  private LocalDate localDate(Object value){if(value instanceof LocalDate local)return local;if(value instanceof java.sql.Date sql)return sql.toLocalDate();return null;}
  private Map<String,Object> highlights(List<Long> ids,DashboardPeriod range){

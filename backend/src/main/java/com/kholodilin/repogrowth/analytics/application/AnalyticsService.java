@@ -62,7 +62,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -730,18 +729,9 @@ public class AnalyticsService {
                 tracked,
                 byDate
         );
-        List<TrafficJdbcRepository.RepositoryStatDay> tip = onTipDay(
-                trafficJdbcRepository.latestTrackedDailyStatsOnOrBefore(period.to()));
-        return portfolioStats(tip, period.allTime(), points);
-    }
-
-    /** Same tip-day gate as public owner stats: do not mix a newer day with stale leftovers. */
-    private static List<TrafficJdbcRepository.RepositoryStatDay> onTipDay(List<TrafficJdbcRepository.RepositoryStatDay> rows) {
-        LocalDate tip = rows.stream().map(TrafficJdbcRepository.RepositoryStatDay::date).filter(Objects::nonNull).max(LocalDate::compareTo).orElse(null);
-        if (tip == null) {
-            return List.of();
-        }
-        return rows.stream().filter(row -> tip.equals(row.date())).toList();
+        // Per-repo latest tip (same as main): Unique Contributors needs each repo's own last
+        // login snapshot; a shared tip-day gate drops repos whose logins live on an earlier day.
+        return portfolioStats(trafficJdbcRepository.latestTrackedDailyStats(), period.allTime(), points);
     }
 
     /**

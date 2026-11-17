@@ -18,6 +18,9 @@ class DashboardPeriodTest {
         assertThat(period.to()).isEqualTo(TODAY);
         assertThat(period.previousFrom()).isEqualTo(LocalDate.of(2026, 6, 30));
         assertThat(period.previousTo()).isEqualTo(LocalDate.of(2026, 7, 29));
+        assertThat(java.time.temporal.ChronoUnit.DAYS.between(period.from(), period.to()) + 1).isEqualTo(30);
+        assertThat(java.time.temporal.ChronoUnit.DAYS.between(period.previousFrom(), period.previousTo()) + 1).isEqualTo(30);
+        assertThat(java.time.temporal.ChronoUnit.DAYS.between(period.previousFrom(), period.from()) + 1).isNotEqualTo(30);
         assertThat(period.allTime()).isFalse();
     }
 

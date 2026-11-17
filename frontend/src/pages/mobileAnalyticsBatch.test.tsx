@@ -115,17 +115,28 @@ describe("mobile analytics batch", () => {
   });
 
   it("keeps the chosen metric for an empty period, renders missing values and suppresses comparisons", () => {
-    render(<TrafficKpiCard label="Visitors" value={null} growthPercent={null} period="1d" coverage={{ observedDays: 0, expectedDays: 1 }} previousCoverage={{ observedDays: 0, expectedDays: 1 }} />);
-    expect(screen.getByText("No traffic data for selected period")).toBeInTheDocument();
+    render(<TrafficKpiCard label="Visitors" value={null} growthPercent={null} period="1d" previousCoverage={{ observedDays: 0, expectedDays: 1 }} />);
     expect(screen.getByText(/Comparison unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
     expect(screen.queryByText(/100%/)).not.toBeInTheDocument();
   });
-  it("labels partial totals and preserves true zero", () => {
+  it("does not show repository-day coverage on KPI cards and preserves true zero", () => {
     const { rerender } = render(<TrafficKpiCard label="Views" value={5} growthPercent={null} period="7d" coverage={{ observedDays: 2, expectedDays: 6 }} />);
-    expect(screen.getByText("Partial data: 2 / 6 repository-days")).toBeInTheDocument();
+    expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/repository-days/)).not.toBeInTheDocument();
     rerender(<TrafficKpiCard label="Views" value={0} growthPercent={-100} period="1d" coverage={{ observedDays: 1, expectedDays: 1 }} previousCoverage={{ observedDays: 1, expectedDays: 1 }} />);
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getByText(/100%/)).toBeInTheDocument();
+  });
+  it("colors sparklines from explicit series color and trend direction", () => {
+    const { rerender, container } = render(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={-10} period="7d" series={[1, null, 3]} preserveGaps sparklineColor="#111111" />);
+    expect(container.querySelector('polyline[stroke="#111111"]')).toBeTruthy();
+    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={-10} absoluteChange={-1} period="7d" series={[3, 1]} />);
+    expect(container.querySelector('polyline[stroke="#b91c1c"]')).toBeTruthy();
+    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={0} absoluteChange={0} period="7d" series={[2, 2]} />);
+    expect(container.querySelector('polyline[stroke="#6b7280"]')).toBeTruthy();
+    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={10} absoluteChange={1} period="7d" series={[1, 2]} />);
+    expect(container.querySelector('polyline[stroke="#047857"]')).toBeTruthy();
   });
 
   it("keeps breadcrumb navigation and complete page labels available", () => {

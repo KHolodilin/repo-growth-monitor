@@ -26,6 +26,8 @@ describe("search visibility KPIs", () => {
       "2026-10-22",
     ]);
     expect(periodDates("30d", today)).toHaveLength(30);
+    expect(periodDates("30d", today)?.[0]).toBe("2026-09-23");
+    expect(periodDates("30d", today)?.at(-1)).toBe(today);
   });
 
   it("counts queries against the limit", () => {
