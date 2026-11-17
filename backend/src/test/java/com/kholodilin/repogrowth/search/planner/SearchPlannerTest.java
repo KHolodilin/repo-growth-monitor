@@ -120,7 +120,7 @@ class SearchPlannerTest {
         Instant now = Instant.parse("2026-10-20T06:00:00Z");
         return new SearchRun(
                 9L, 5L, 13L, date, status, 1,
-                null, null, null, now, now, now, 80, 4, "SUCCESS", null, null
+                null, null, null, now, now, now, 80, 4, "SUCCESS", "best_match", null, null
         );
     }
 }

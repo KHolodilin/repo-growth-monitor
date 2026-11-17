@@ -1,5 +1,4 @@
 import type { Period } from "../components/PeriodSelector";
-import { periodDates } from "./searchVisibilityKpi";
 
 export type TopicRankSample = {
   slug: string;
@@ -15,8 +14,9 @@ export type TopicBandKpi = {
 };
 
 /**
- * Top cards count how many topics sit inside the band. The change is the last measured
- * day of the window minus the first, not whether a rank line moved toward №1.
+ * Top cards count how many topics sit inside the band. Change matches Search:
+ * current count vs the previous completed period's end — N/A when that baseline
+ * has no measurements yet (e.g. 90d/1y before history covers the prior window).
  */
 export function topicBandKpi(
   topics: TopicRankSample[],
@@ -25,23 +25,41 @@ export function topicBandKpi(
   today: string,
 ): TopicBandKpi {
   const value = currentCount(topics, band);
-  const days = periodDates(period, today) ?? eachDate(earliest(topics) ?? today, today);
-  const series = days.map((day) => countOnDay(topics, band, day));
-  if (period === "all") {
+  const window = periodWindow(period, today, topics);
+  const series = window.days.map((day) => countOnDay(topics, band, day));
+  if (value == null || window.previousTo == null) {
     return { value, absoluteChange: null, growthPercent: null, series };
   }
-  const measured = series.filter((point): point is number => point != null);
-  if (measured.length < 2) {
+  const previous = countAsOf(topics, band, window.previousTo);
+  if (previous == null) {
     return { value, absoluteChange: null, growthPercent: null, series };
   }
-  const first = measured[0];
-  const last = measured[measured.length - 1];
+  const absoluteChange = value - previous;
   return {
     value,
-    absoluteChange: last - first,
-    growthPercent: growthPercent(last, first),
+    absoluteChange,
+    growthPercent: growthPercent(value, previous),
     series,
   };
+}
+
+function periodWindow(period: Period, today: string, topics: TopicRankSample[]) {
+  if (period === "all") {
+    const first = earliest(topics) ?? today;
+    return { days: eachDate(first, today), previousTo: null as string | null };
+  }
+  if (period === "1d") {
+    const day = shiftDays(today, -1);
+    return { days: [day], previousTo: shiftDays(day, -1) };
+  }
+  const from = period === "7d"
+    ? shiftDays(today, -6)
+    : period === "90d"
+      ? shiftDays(today, -89)
+      : period === "1y"
+        ? shiftDays(shiftYears(today, -1), 1)
+        : shiftDays(today, -29);
+  return { days: eachDate(from, today), previousTo: shiftDays(from, -1) };
 }
 
 function currentCount(topics: TopicRankSample[], band: number) {
@@ -53,6 +71,24 @@ function currentCount(topics: TopicRankSample[], band: number) {
     return null;
   }
   return measured.filter((topic) => inBand(topic.currentRank, band)).length;
+}
+
+function countAsOf(topics: TopicRankSample[], band: number, asOf: string) {
+  const existing = topics.filter((topic) => {
+    const first = firstDate(topic);
+    return first != null && first <= asOf;
+  });
+  if (existing.length === 0) {
+    return null;
+  }
+  let count = 0;
+  for (const topic of existing) {
+    const point = latestOnOrBefore(topic, asOf);
+    if (point != null && inBand(point.position, band)) {
+      count += 1;
+    }
+  }
+  return count;
 }
 
 /** A missing row keeps the previous rank. A day with nothing to carry is null, not zero. */
@@ -88,6 +124,13 @@ function earliest(topics: TopicRankSample[]) {
   return dates[0] ?? null;
 }
 
+function firstDate(topic: TopicRankSample) {
+  if (topic.points.length === 0) {
+    return null;
+  }
+  return topic.points.reduce((min, point) => (point.date < min ? point.date : min), topic.points[0].date);
+}
+
 function latestOnOrBefore(topic: TopicRankSample, date: string) {
   let best: TopicRankSample["points"][number] | null = null;
   for (const point of topic.points) {
@@ -111,5 +154,11 @@ function eachDate(from: string, to: string) {
 function shiftDays(iso: string, days: number) {
   const date = new Date(`${iso}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftYears(iso: string, years: number) {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCFullYear(date.getUTCFullYear() + years);
   return date.toISOString().slice(0, 10);
 }

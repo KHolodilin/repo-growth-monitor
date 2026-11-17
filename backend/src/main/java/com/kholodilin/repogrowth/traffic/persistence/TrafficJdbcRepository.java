@@ -168,14 +168,32 @@ public class TrafficJdbcRepository {
     }
 
     public Optional<RepositoryDailyStats> latestDailyStats(long repositoryId) {
+        return latestDailyStatsOnOrBefore(repositoryId, null);
+    }
+
+    /** Tip snapshot at period end (inclusive). Null asOf keeps absolute latest. */
+    public Optional<RepositoryDailyStats> latestDailyStatsOnOrBefore(long repositoryId, LocalDate asOf) {
+        if (asOf == null) {
+            return jdbcClient.sql("""
+                            SELECT stat_date, stars, watchers, forks, contributors
+                            FROM repository_daily_stats
+                            WHERE repository_id = :repositoryId
+                            ORDER BY stat_date DESC
+                            LIMIT 1
+                            """)
+                    .param("repositoryId", repositoryId)
+                    .query(DAILY_STATS_MAPPER)
+                    .optional();
+        }
         return jdbcClient.sql("""
                         SELECT stat_date, stars, watchers, forks, contributors
                         FROM repository_daily_stats
-                        WHERE repository_id = :repositoryId
+                        WHERE repository_id = :repositoryId AND stat_date <= :asOf
                         ORDER BY stat_date DESC
                         LIMIT 1
                         """)
                 .param("repositoryId", repositoryId)
+                .param("asOf", asOf)
                 .query(DAILY_STATS_MAPPER)
                 .optional();
     }
@@ -218,6 +236,11 @@ public class TrafficJdbcRepository {
     }
 
     public List<RepositoryStatDay> latestTrackedDailyStats() {
+        return latestTrackedDailyStatsOnOrBefore(null);
+    }
+
+    /** Per-repo tip on or before asOf (period end). Null asOf = absolute latest. */
+    public List<RepositoryStatDay> latestTrackedDailyStatsOnOrBefore(LocalDate asOf) {
         return jdbcClient.sql("""
                         SELECT DISTINCT ON (s.repository_id)
                                s.repository_id,
@@ -236,8 +259,10 @@ public class TrafficJdbcRepository {
                         FROM repository_daily_stats s
                         JOIN repository r ON r.id = s.repository_id
                         WHERE r.tracking_enabled = TRUE
+                          AND (:asOf::date IS NULL OR s.stat_date <= :asOf)
                         ORDER BY s.repository_id, s.stat_date DESC
                         """)
+                .param("asOf", asOf)
                 .query((rs, rowNum) -> new RepositoryStatDay(
                         rs.getLong("repository_id"),
                         rs.getString("full_name"),

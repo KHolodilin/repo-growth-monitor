@@ -32,7 +32,6 @@ describe.each([false,true])("History shared periods mobile=%s",mobile=>{
   const user=userEvent.setup();mount(`?kind=${kind}&period=7d`);
   const group=await screen.findByRole("group",{name:"History period"}); await screen.findByTestId("history-option");
   expect(within(group).getAllByRole("button")).toHaveLength(6);
-  await user.click(screen.getAllByRole("button",{name:"Views"})[0]);
   for(const period of PERIODS){
    await user.click(within(group).getByRole("button",{name:period}));
    await waitFor(()=>expect(api.mock.calls.some(([url])=>String(url).includes(`kind=${kind}&period=${period}`))).toBe(true));
@@ -40,6 +39,9 @@ describe.each([false,true])("History shared periods mobile=%s",mobile=>{
    expect(within(group).getByRole("button",{name:period})).toHaveAttribute("aria-pressed","true");
    expect(screen.getByTestId("history-option")).toHaveTextContent("snapshot rolling window");
   }
+  // Select Views after period remounts so CSV asserts the metric that is active now.
+  await user.click(screen.getAllByRole("button",{name:"Views"})[0]);
+  await waitFor(()=>expect(screen.getByTestId("history-option").textContent).toContain("Views"));
   const csv=vi.spyOn(downloads,"downloadChartCsv").mockImplementation(()=>{});
   await user.click(screen.getByRole("button",{name:mobile?"Chart menu":"Download"}));await user.click(screen.getByRole("menuitem",{name:"CSV"}));
   expect(csv.mock.lastCall?.[1]).toContain("2026-09-01"); expect(csv.mock.lastCall?.[1]).toContain("Views");

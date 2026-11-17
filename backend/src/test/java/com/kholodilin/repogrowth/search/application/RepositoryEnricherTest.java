@@ -64,6 +64,7 @@ class RepositoryEnricherTest {
     @Test
     void fromSearchItemUsesFallbackOwnerAndUrl() {
         when(activityClassifier.classify(any())).thenReturn(ActivityStatus.ACTIVE);
+        when(repositoryJdbcRepository.findByGithubId(9L)).thenReturn(Optional.empty());
         GitHubSearchItem item = new GitHubSearchItem(
                 9L, "acme/demo", null, 3, 1, "Java", "desc", null,
                 now, now, now

@@ -50,7 +50,7 @@ public class RepositoryEnricher {
     public SearchResult fromSearchItem(long searchRunId, int position, GitHubSearchItem item) {
         String ownerLogin = item.owner() == null ? "" : item.owner().login();
         Instant activityAt = item.pushedAt();
-        return new SearchResult(
+        SearchResult snapshot = new SearchResult(
                 null,
                 searchRunId,
                 position,
@@ -70,6 +70,12 @@ public class RepositoryEnricher {
                 activityClassifier.classify(activityAt),
                 null
         );
+        // Prefer already-enriched repository metadata over placeholder zeros (watchers/contributors).
+        Repository cached = repositoryJdbcRepository.findByGithubId(item.id()).orElse(null);
+        if (cached != null && cached.enrichedAt() != null) {
+            return applyCache(snapshot, cached);
+        }
+        return snapshot;
     }
 
     public SearchResult enrich(SearchResult snapshot, GitHubSearchItem item) {

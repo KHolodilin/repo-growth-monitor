@@ -10,7 +10,14 @@ import static org.assertj.core.api.Assertions.*;
 class AssignedTaskCollectorTest {
     JsonMapper json=JsonMapper.builder().build();
     ExecutionProperties properties=new ExecutionProperties(false,null,false,null,null,null,0,0,0);
-    JobRequest job(TaskType type){return new JobRequest(1,UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),type,new RepositoryTarget("202","owner","repo"),LocalDate.now(),1,new Parameters("spring","spring",null,50,"stars","desc"),"rgm-results",Instant.now().plusSeconds(3600),new AuthorizationScope("ctx","ref"));}
+    JobRequest job(TaskType type){
+        Parameters parameters=type==TaskType.SEARCH_QUERY
+                ? new Parameters("spring",null,null,50,null,null)
+                : type==TaskType.TOPIC_WATCH
+                ? new Parameters("topic:spring","spring",null,50,"stars","desc")
+                : new Parameters("spring","spring",null,50,"stars","desc");
+        return new JobRequest(1,UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),type,new RepositoryTarget("202","owner","repo"),LocalDate.now(),1,parameters,"rgm-results",Instant.now().plusSeconds(3600),new AuthorizationScope("ctx","ref"));
+    }
     Lease lease(JobRequest job){return new Lease(1,"worker",1,json.writeValueAsString(job),job.deadlineAt(),"rgm",UUID.randomUUID(),0);}
     class Reader implements SourceReader {
         Map<String,String> data=new HashMap<>();List<String> reads=new ArrayList<>(),invalidated=new ArrayList<>(),paths=new ArrayList<>();
@@ -66,6 +73,14 @@ class AssignedTaskCollectorTest {
         System.out.printf("SOURCE WORKLOAD 100 repositories, 100 queries, 200 watches, cold absent rank confirmation: %s requests; CPU fixture duration=%dms%n",counts,(System.nanoTime()-started)/1_000_000);
     }
     @Test void explicitlyPublishedSearchRequestsOnlyPublicResultsAndRequiresProof(){
-        var reader=new Reader();reader.data.put("search","{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");var base=job(TaskType.SEARCH_QUERY);var published=new JobRequest(1,base.requestId(),base.jobId(),base.attemptId(),base.type(),base.repository(),base.businessDate(),1,new Parameters("spring",null,null,50,"stars","desc",true),base.destinationRef(),base.deadlineAt(),base.authorization());var snapshot=new AssignedTaskCollector(reader,properties).collect(lease(published),published);assertThat(snapshot.metadata()).containsEntry("publicScopeVerified","true");assertThat(reader.paths).allMatch(path->path.contains("is%3Apublic"));reader.data.put("search",reader.data.get("search").replace("false","true"));assertThat(new AssignedTaskCollector(reader,properties).collect(lease(published),published).metadata()).containsEntry("publicScopeVerified","false");
+        var reader=new Reader();reader.data.put("search","{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");var base=job(TaskType.SEARCH_QUERY);var published=new JobRequest(1,base.requestId(),base.jobId(),base.attemptId(),base.type(),base.repository(),base.businessDate(),1,new Parameters("spring",null,null,50,null,null,true),base.destinationRef(),base.deadlineAt(),base.authorization());var snapshot=new AssignedTaskCollector(reader,properties).collect(lease(published),published);assertThat(snapshot.metadata()).containsEntry("publicScopeVerified","true");assertThat(reader.paths).allMatch(path->path.contains("is%3Apublic"));reader.data.put("search",reader.data.get("search").replace("false","true"));assertThat(new AssignedTaskCollector(reader,properties).collect(lease(published),published).metadata()).containsEntry("publicScopeVerified","false");
+    }
+    @Test void searchUsesBestMatchWhileTopicsKeepExplicitSort(){
+        var searchReader=new Reader();searchReader.data.put("search","{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");
+        var search=job(TaskType.SEARCH_QUERY);new AssignedTaskCollector(searchReader,properties).collect(lease(search),search);
+        assertThat(searchReader.paths).allMatch(path->path.startsWith("/search/repositories?") && !path.contains("sort="));
+        var topicReader=new Reader();topicReader.data.put("search","{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");
+        var topic=job(TaskType.TOPIC_WATCH);new AssignedTaskCollector(topicReader,properties).collect(lease(topic),topic);
+        assertThat(topicReader.paths).allMatch(path->path.contains("sort=stars") && path.contains("order=desc"));
     }
 }

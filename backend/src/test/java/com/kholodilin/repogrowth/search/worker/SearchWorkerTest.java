@@ -98,7 +98,7 @@ class SearchWorkerTest {
         Instant now = Instant.parse("2026-09-23T06:00:00Z");
         run = new SearchRun(
                 9L, 5L, 13L, LocalDate.of(2026, 9, 23), SearchRunStatus.RUNNING, 1,
-                null, "w1", now, now, null, null, null, null, null, null, null
+                null, "w1", now, now, null, null, null, null, null, null, null, null
         );
         query = new SearchQuery(5L, 13L, "outbox", "outbox", true, 50, now, now);
         repository = new Repository(
@@ -176,7 +176,7 @@ class SearchWorkerTest {
         SearchRun lastAttempt = new SearchRun(
                 9L, 5L, 13L, LocalDate.of(2026, 9, 23), SearchRunStatus.RUNNING, 8,
                 null, "w1", Instant.parse("2026-09-23T06:00:00Z"), Instant.parse("2026-09-23T06:00:00Z"),
-                null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null
         );
         when(runRepository.claim(eq("w1"), any())).thenReturn(Optional.of(lastAttempt));
         when(repositoryLock.openConnection()).thenThrow(new IllegalStateException("db"));
@@ -196,7 +196,7 @@ class SearchWorkerTest {
         SearchRun retryRun = new SearchRun(
                 9L, 5L, 13L, LocalDate.of(2026, 9, 23), SearchRunStatus.RUNNING, 2,
                 null, "w1", Instant.parse("2026-09-23T06:00:00Z"), Instant.parse("2026-09-23T06:00:00Z"),
-                null, null, null, null, null, null, null
+                null, null, null, null, null, null, null, null
         );
         when(runRepository.claim(eq("w1"), any())).thenReturn(Optional.of(retryRun));
         when(repositoryLock.openConnection()).thenReturn(connection);
@@ -387,7 +387,7 @@ class SearchWorkerTest {
         Instant now = Instant.parse("2026-09-23T06:00:00Z");
         return new SearchRun(
                 9L, 5L, 13L, LocalDate.of(2026, 9, 23), SearchRunStatus.RUNNING, attempt,
-                null, "w1", now, now, null, null, null, position, null, errorCode, null
+                null, "w1", now, now, null, null, null, position, null, null, errorCode, null
         );
     }
 

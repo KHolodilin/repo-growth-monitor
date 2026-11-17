@@ -11,7 +11,7 @@ import { Button, Card, Skeleton } from "../components/ui";
 import { loadGitHubAccess, parseGitHubAccess, type GitHubAccess, type TokenState } from "../lib/githubAccess";
 import { checklistSchedule, collectionJobLines, DEFAULT_PLANNER } from "../lib/setupChecklist";
 import { repositoryProblemBadge, repositoryProblemLines } from "../lib/trafficGap";
-import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -50,7 +50,13 @@ export function DashboardPage() {
   const [statsSeries,setStatsSeries]=useState("Stars");
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "stats" ? "stats" : "traffic";
+  const periodParam = searchParams.get("period");
   const [period, setPeriod] = usePeriod();
+  useEffect(() => {
+    if (periodParam && (PERIODS as readonly string[]).includes(periodParam) && periodParam !== period) {
+      setPeriod(periodParam as Period);
+    }
+  }, [periodParam]);
   const requestVersion = useRef(0);
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -430,6 +430,13 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         AnalyticsService.RepositoryStatsHistory week = analyticsService.statsHistory(kafka.id(), "7d");
         assertThat(week.totals().stars().value()).isEqualTo(month.totals().stars().value());
         assertThat(week.totals().forks()).isEqualTo(month.totals().forks());
+
+        // 1d ends yesterday — do not show today's unfinished tip on the KPI card.
+        AnalyticsService.RepositoryStatsHistory day = analyticsService.statsHistory(kafka.id(), "1d");
+        assertThat(day.totals().stars().value()).isEqualTo(0);
+        assertThat(day.totals().forks().value()).isEqualTo(22);
+        assertThat(day.totals().watchers().value()).isEqualTo(0);
+        assertThat(day.totals().contributors().value()).isEqualTo(8);
     }
 
     @Test

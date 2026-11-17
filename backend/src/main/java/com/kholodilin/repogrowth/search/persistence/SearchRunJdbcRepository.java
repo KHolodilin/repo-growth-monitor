@@ -34,6 +34,7 @@ public class SearchRunJdbcRepository {
             (Integer) rs.getObject("total_count"),
             (Integer) rs.getObject("tracked_repository_position"),
             rs.getString("enrichment_status"),
+            rs.getString("sort_mode"),
             rs.getString("error_code"),
             rs.getString("error_message")
     );
@@ -148,6 +149,10 @@ public class SearchRunJdbcRepository {
     }
 
     public void markSuccess(long id, Integer totalCount, Integer position) {
+        markSuccess(id, totalCount, position, "best_match");
+    }
+
+    public void markSuccess(long id, Integer totalCount, Integer position, String sortMode) {
         jdbcClient.sql("""
                         UPDATE search_run
                         SET status = 'SUCCESS',
@@ -157,6 +162,7 @@ public class SearchRunJdbcRepository {
                             snapshot_at = NOW(),
                             total_count = :totalCount,
                             tracked_repository_position = :position,
+                            sort_mode = :sortMode,
                             error_code = NULL,
                             error_message = NULL,
                             updated_at = NOW()
@@ -165,6 +171,7 @@ public class SearchRunJdbcRepository {
                 .param("id", id)
                 .param("totalCount", totalCount)
                 .param("position", position)
+                .param("sortMode", sortMode == null || sortMode.isBlank() ? "best_match" : sortMode)
                 .update();
     }
 
@@ -250,16 +257,24 @@ public class SearchRunJdbcRepository {
     }
 
     public Optional<SearchRun> previousSnapshot(long searchQueryId, LocalDate before) {
+        return previousSnapshot(searchQueryId, before, null);
+    }
+
+    /** Previous snapshot with the same GitHub sort mode; mixed Best Match/Stars deltas are not comparable. */
+    public Optional<SearchRun> previousSnapshot(long searchQueryId, LocalDate before, String sortMode) {
+        String mode = sortMode == null || sortMode.isBlank() ? null : sortMode;
         return jdbcClient.sql("""
                         SELECT * FROM search_run
                         WHERE search_query_id = :searchQueryId
                           AND snapshot_at IS NOT NULL
                           AND business_date < :before
+                          AND (:sortMode::text IS NULL OR sort_mode = :sortMode)
                         ORDER BY business_date DESC
                         LIMIT 1
                         """)
                 .param("searchQueryId", searchQueryId)
                 .param("before", before)
+                .param("sortMode", mode)
                 .query(MAPPER)
                 .optional();
     }

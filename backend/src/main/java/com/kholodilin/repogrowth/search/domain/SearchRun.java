@@ -20,6 +20,8 @@ public record SearchRun(
         Integer totalCount,
         Integer trackedRepositoryPosition,
         String enrichmentStatus,
+        /** GitHub search sort for this snapshot: best_match or stars/forks/… */
+        String sortMode,
         String errorCode,
         String errorMessage
 ) {

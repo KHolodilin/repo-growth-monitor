@@ -78,7 +78,10 @@ public final class AssignedTaskCollector {
             }
             case SEARCH_QUERY,TOPIC_WATCH -> {
                 int limit=job.parameters().resultLimit()==null?50:job.parameters().resultLimit();String query=job.parameters().query();if(job.parameters().publicOnly())query=query+" is:public";
-                String path="/search/repositories?q="+URLEncoder.encode(query,StandardCharsets.UTF_8)+"&per_page="+limit+"&sort="+URLEncoder.encode(Objects.requireNonNullElse(job.parameters().sort(),"stars"),StandardCharsets.UTF_8)+"&order="+Objects.requireNonNullElse(job.parameters().order(),"desc");
+                // Null/blank sort = GitHub Best Match (same as main SearchWorker / UI default). Topics keep explicit sort.
+                String path="/search/repositories?q="+URLEncoder.encode(query,StandardCharsets.UTF_8)+"&per_page="+limit;
+                String sort=job.parameters().sort();
+                if(sort!=null && !sort.isBlank()) path+="&sort="+URLEncoder.encode(sort,StandardCharsets.UTF_8)+"&order="+URLEncoder.encode(Objects.requireNonNullElse(job.parameters().order(),"desc"),StandardCharsets.UTF_8);
                 JsonNode data=get(lease,job,"search",path,false);total=number(data,"total_count");
                 position=findPosition(data.path("items"),job.repository().githubId());
                 if(position==null){

@@ -210,6 +210,20 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
   });
 
+  it("applies period from the owner Portfolio URL", async () => {
+    api.mockResolvedValue(dashboardReady);
+    render(
+      <MemoryRouter initialEntries={["/?tab=stats&period=30d"]}>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("heading", { name: "Stats" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "30d" })).toHaveAttribute("aria-pressed", "true"),
+    );
+    expect(api.mock.calls.some(([url]) => String(url).includes("period=30d"))).toBe(true);
+  });
+
   it("still draws the portfolio stats chart when there are no snapshots in the period", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue({
@@ -270,6 +284,9 @@ describe("coverage gaps", () => {
         <PersistentECharts chartId="list" series={[{ key: "Views", name: "Views" }]} option={{ legend: [] }} />
       </MemoryRouter>,
     );
+    // Unenriched watchers/contributors stay unknown; enriched rows keep numeric values.
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    expect(screen.getByText("7")).toBeInTheDocument();
     for (const name of ["#", "Watchers", "Forks", "Contributors", "Activity", "Δ", "Stars", "Language"]) {
       const buttons = screen.queryAllByRole("button", { name: new RegExp(`^${name}`) });
       if (buttons[0]) {

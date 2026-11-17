@@ -46,7 +46,8 @@ export function SnapshotHistoryChart({
   const moreCount = Math.max(0, history.rows.length - selected.length);
   const enoughHistory = history.dates.length >= 1;
   const hasData = history.rows.some(row => selected.includes(row.key) && row.cells.some(cell => chartValue(cell, metric) !== null));
-  const metricControls = (
+  // Separate element trees: ChartCard mounts either desktop or mobile slot, never both.
+  const metricSwitcher = () => (
     <div className="inline-flex rounded-lg border bg-muted p-1">
       <MetricButton active={metric === "VISITORS"} onClick={() => persist("VISITORS", selected)}>
         Visitors
@@ -64,8 +65,8 @@ export function SnapshotHistoryChart({
       events={view.public ? [] : undefined}
       period={period}
       context={view.public ? context : `repository:${repositoryId}:${kind}`}
-      controls={metricControls}
-      mobileControls={metricControls}
+      controls={metricSwitcher()}
+      mobileControls={metricSwitcher()}
       mobileSeries={[]}
     >
       <p className="mb-3 text-xs text-muted-foreground">Values reported for GitHub’s rolling window at each snapshot date, not exact daily traffic. Other sums the remaining sources/paths; Visitors are not deduplicated across sources.</p>

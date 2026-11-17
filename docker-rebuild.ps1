@@ -5,8 +5,10 @@ param(
     [Parameter(Mandatory = $false)]
     [string]$ProjectDir = $PSScriptRoot,
 
+    # Empty = let Compose auto-merge docker-compose.yml + docker-compose.override.yml.
+    # Explicit -f disables the default override merge — pass every file you need.
     [Parameter(Mandatory = $false)]
-    [string[]]$ComposeFile = @("docker-compose.yml"),
+    [string[]]$ComposeFile = @(),
 
     [Parameter(Mandatory = $false)]
     [string]$EnvFile = ".env",

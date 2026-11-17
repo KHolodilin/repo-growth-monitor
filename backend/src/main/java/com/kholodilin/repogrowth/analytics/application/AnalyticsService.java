@@ -62,6 +62,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -201,9 +202,10 @@ public class AnalyticsService {
     }
 
     /**
-     * Stars, forks, watchers, and contributors are levels. The card value is the latest stored
-     * snapshot and does not follow the selected window. The change is the last point in that
-     * window minus the first. All-time, and a window with fewer than two points, has no change.
+     * Stars, forks, watchers, and contributors are levels. The card value is the tip at the period
+     * end (on or before {@code period.to()}), matching public Portfolio/owner semantics — not a
+     * newer unfinished day outside the window. The change is the last point in that window minus
+     * the first. All-time, and a window with fewer than two points, has no change.
      */
     public RepositoryStatsHistory statsHistory(long repositoryId, String periodParam) {
         requireVisible(repositoryService.get(repositoryId));
@@ -220,12 +222,12 @@ public class AnalyticsService {
                         day.contributors()
                 ))
                 .toList();
-        TrafficJdbcRepository.RepositoryDailyStats latest =
-                trafficJdbcRepository.latestDailyStats(repositoryId).orElse(null);
+        TrafficJdbcRepository.RepositoryDailyStats tip =
+                trafficJdbcRepository.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
         return new RepositoryStatsHistory(
                 repositoryId,
                 period.value(),
-                statsTotals(latest, points, period.allTime()),
+                statsTotals(tip, points, period.allTime()),
                 points
         );
     }
@@ -728,7 +730,18 @@ public class AnalyticsService {
                 tracked,
                 byDate
         );
-        return portfolioStats(trafficJdbcRepository.latestTrackedDailyStats(), period.allTime(), points);
+        List<TrafficJdbcRepository.RepositoryStatDay> tip = onTipDay(
+                trafficJdbcRepository.latestTrackedDailyStatsOnOrBefore(period.to()));
+        return portfolioStats(tip, period.allTime(), points);
+    }
+
+    /** Same tip-day gate as public owner stats: do not mix a newer day with stale leftovers. */
+    private static List<TrafficJdbcRepository.RepositoryStatDay> onTipDay(List<TrafficJdbcRepository.RepositoryStatDay> rows) {
+        LocalDate tip = rows.stream().map(TrafficJdbcRepository.RepositoryStatDay::date).filter(Objects::nonNull).max(LocalDate::compareTo).orElse(null);
+        if (tip == null) {
+            return List.of();
+        }
+        return rows.stream().filter(row -> tip.equals(row.date())).toList();
     }
 
     /**

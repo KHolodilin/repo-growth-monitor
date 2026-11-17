@@ -121,13 +121,17 @@ public class SearchQueryService {
     public SearchHistory history(long searchQueryId) {
         SearchQuery query = getQuery(searchQueryId);
         List<SearchRun> runs = runRepository.snapshots(searchQueryId);
-        Integer current = latestPosition(runs);
-        boolean hasPrevious = runs.size() >= 2;
-        Integer previous = hasPrevious ? runs.get(runs.size() - 2).trackedRepositoryPosition() : null;
+        SearchRun latestSnapshot = runs.isEmpty() ? null : runs.get(runs.size() - 1);
+        String sortMode = latestSnapshot == null ? null : latestSnapshot.sortMode();
+        // Deltas and best only within the same GitHub sort mode (Best Match vs Stars are not comparable).
+        List<SearchRun> comparable = runs.stream().filter(run -> sameSortMode(run.sortMode(), sortMode)).toList();
+        Integer current = latestPosition(comparable);
+        boolean hasPrevious = comparable.size() >= 2;
+        Integer previous = hasPrevious ? comparable.get(comparable.size() - 2).trackedRepositoryPosition() : null;
         RankChangeMath.Change change = RankChangeMath.between(hasPrevious, previous, current, query.resultLimit());
-        Integer change7 = changeSince(runs, 7);
-        Integer change30 = changeSince(runs, 30);
-        Integer best = runs.stream()
+        Integer change7 = changeSince(comparable, 7);
+        Integer change30 = changeSince(comparable, 30);
+        Integer best = comparable.stream()
                 .map(SearchRun::trackedRepositoryPosition)
                 .filter(Objects::nonNull)
                 .min(Integer::compareTo)
@@ -137,10 +141,10 @@ public class SearchQueryService {
                 .toList();
         SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
         // The row shows the newest snapshot, so it is dated by that snapshot and not by an attempt in flight.
-        Instant lastChecked = runs.isEmpty() ? null : runs.get(runs.size() - 1).snapshotAt();
+        Instant lastChecked = latestSnapshot == null ? null : latestSnapshot.snapshotAt();
         String searchStatus = latestRun == null ? null : latestRun.status().name();
         String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
-        Integer totalResults = runs.isEmpty() ? null : runs.get(runs.size() - 1).totalCount();
+        Integer totalResults = latestSnapshot == null ? null : latestSnapshot.totalCount();
         return new SearchHistory(
                 query,
                 current,
@@ -170,7 +174,7 @@ public class SearchQueryService {
                 .orElseThrow(() -> ApiException.notFound("Search run not found"));
         SearchQuery query = getQuery(run.searchQueryId());
         List<SearchResult> current = resultRepository.findByRun(searchRunId);
-        Map<Long, Integer> previousPositions = runRepository.previousSnapshot(run.searchQueryId(), run.businessDate())
+        Map<Long, Integer> previousPositions = runRepository.previousSnapshot(run.searchQueryId(), run.businessDate(), run.sortMode())
                 .map(previous -> resultRepository.findByRun(previous.id()).stream()
                         .collect(Collectors.toMap(SearchResult::githubRepositoryId, SearchResult::position, (a, b) -> a)))
                 .orElse(Map.of());
@@ -208,6 +212,12 @@ public class SearchQueryService {
             return null;
         }
         return runs.get(runs.size() - 1).trackedRepositoryPosition();
+    }
+
+    private static boolean sameSortMode(String left, String right) {
+        String a = left == null || left.isBlank() ? "stars" : left;
+        String b = right == null || right.isBlank() ? "stars" : right;
+        return a.equals(b);
     }
 
     private Integer changeSince(List<SearchRun> runs, int days) {
