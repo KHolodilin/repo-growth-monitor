@@ -333,7 +333,8 @@ describe("extra coverage", () => {
         <RepositoryStatsPanel repositoryId={13} period="30d" />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Daily totals")).toBeInTheDocument();
+    expect(await screen.findByText("View historical data")).toBeInTheDocument();
+    expect(screen.queryByText("Daily totals")).not.toBeInTheDocument();
     expect(screen.getAllByText("Stars").length).toBeGreaterThan(1);
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
     expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
@@ -365,7 +366,8 @@ describe("extra coverage", () => {
     expect(screen.getByText("— No change")).toHaveClass("text-muted-foreground");
     expect(screen.getByText("↑ +2 (+25.0%)")).toBeInTheDocument();
     expect(screen.getAllByText("vs prev 30d")).toHaveLength(4);
-    expect(screen.getByText("Daily totals")).toBeInTheDocument();
+    expect(screen.getByText("View historical data")).toBeInTheDocument();
+    expect(screen.queryByText("Daily totals")).not.toBeInTheDocument();
     expect(
       [...stats.container.querySelectorAll("polyline")].map((line) => line.getAttribute("stroke")),
     ).toEqual(statsChartOption([]).series.map(line => line.itemStyle.color));
@@ -390,7 +392,8 @@ describe("extra coverage", () => {
         <RepositoryStatsPanel repositoryId={13} period="all" />
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Daily totals")).toBeInTheDocument();
+    expect(await screen.findByText("View historical data")).toBeInTheDocument();
+    expect(screen.queryByText("Daily totals")).not.toBeInTheDocument();
     expect(screen.getAllByText("27").length).toBeGreaterThan(0);
     expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
     expect(screen.queryByText("↑ +6 (+28.6%)")).not.toBeInTheDocument();

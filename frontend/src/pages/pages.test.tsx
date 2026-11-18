@@ -276,7 +276,8 @@ describe("pages", () => {
     await user.click(screen.getAllByLabelText("Switch repository")[0]);
     await user.click(await screen.findByRole("option", { name: repository.name }));
     await user.click(screen.getByRole("button", { name: "Stats" }));
-    expect(await screen.findByText("Daily totals")).toBeInTheDocument();
+    expect(await screen.findByText("View historical data")).toBeInTheDocument();
+    expect(screen.queryByText("Daily totals")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Search Visibility" }));
     const syntax = screen.getByRole("link", { name: "Search syntax tips" });
     expect(syntax).toHaveAttribute(
