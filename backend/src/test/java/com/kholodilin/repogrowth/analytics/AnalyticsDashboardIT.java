@@ -603,4 +603,29 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(dashboard.traffic().getFirst().viewsLeaders()).extracting(DashboardResponse.TrafficLeader::fullName).containsExactly(kafka.fullName());
     }
 
+    @Test
+    void portfolioKpiOmitsIncompleteTipSoVsPrevReturns() {
+        createRepos();
+        LocalDate tip = LocalDate.now(clock).minusDays(1);
+        LocalDate from = LocalDate.now(clock).minusDays(6);
+        // Complete from..T−2 for both repos; leave tip only on kafka (Portfolio incomplete T−1).
+        for (LocalDate date = from; !date.isAfter(tip.minusDays(1)); date = date.plusDays(1)) {
+            trafficJdbcRepository.upsertDaily(kafka.id(), date, 10, 4, 1, 1);
+            trafficJdbcRepository.upsertDaily(outbox.id(), date, 20, 6, 2, 2);
+        }
+        trafficJdbcRepository.upsertDaily(kafka.id(), tip, 100, 50, 5, 5);
+        // Previous equal-length window (5 published days before from).
+        for (int day = 1; day <= 5; day++) {
+            LocalDate date = from.minusDays(day);
+            trafficJdbcRepository.upsertDaily(kafka.id(), date, 5, 2, 1, 1);
+            trafficJdbcRepository.upsertDaily(outbox.id(), date, 5, 2, 1, 1);
+        }
+        var dashboard = analyticsService.dashboard("7d");
+        // Tip dropped → 5 complete days × 2 repos; KPI matches chart window, not partial tip sum.
+        assertThat(dashboard.summary().views().coverage().expectedDays()).isEqualTo(10);
+        assertThat(dashboard.summary().views().coverage().observedDays()).isEqualTo(10);
+        assertThat(dashboard.summary().views().value()).isEqualTo(150L);
+        assertThat(dashboard.summary().views().growthPercent()).isEqualTo(200.0);
+    }
+
 }

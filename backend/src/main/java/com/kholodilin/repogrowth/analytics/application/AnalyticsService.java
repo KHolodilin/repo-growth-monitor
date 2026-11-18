@@ -179,14 +179,15 @@ public class AnalyticsService {
         GitHubOwner owner = repositoryService.owner(repository.ownerId());
         DashboardPeriod period = periodForRepository(repositoryId, periodParam);
         List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
-        TrafficTotals current = period.allTime()
-                ? trafficJdbcRepository.totalsInRange(repositoryId, period.from(), publishedEnd(period.to()))
-                : trafficJdbcRepository.totalsInRange(repositoryId, period.from(), publishedEnd(period.to()));
+        Set<Long> scope = Set.of(repositoryId);
+        LocalDate end = trafficKpiEnd(scope, period);
+        LocalDate previousFrom = period.allTime() ? null : comparisonFrom(period, end);
+        TrafficTotals current = trafficJdbcRepository.totalsInRange(repositoryId, period.from(), end);
         TrafficTotals previous = period.allTime()
                 ? new TrafficTotals(0, 0, 0, 0)
-                : trafficJdbcRepository.totalsInRange(repositoryId, comparisonFrom(period), period.previousTo());
-        TrafficCoverage coverage = coverage(Set.of(repositoryId), period.from(), period.to());
-        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(Set.of(repositoryId), comparisonFrom(period), period.previousTo());
+                : trafficJdbcRepository.totalsInRange(repositoryId, previousFrom, period.previousTo());
+        TrafficCoverage coverage = coverage(scope, period.from(), end);
+        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(scope, previousFrom, period.previousTo());
         RepositoryTrafficTotals totals = new RepositoryTrafficTotals(
                 metric(current.views(), previous.views(), period, coverage, previousCoverage),
                 metric(current.uniqueVisitors(), previous.uniqueVisitors(), period, coverage, previousCoverage),
@@ -433,16 +434,19 @@ public class AnalyticsService {
         // Owner-scoped Portfolio is a subset; never use the global portfolio totals shortcut.
         boolean fullPortfolio = currentUserAccess.canSeePrivateRepositories()
                 && tracked.size() == visibleTracked(repositoryService.tracked()).size();
-        TrafficCoverage coverage = coverage(visibleIds, period.from(), period.to());
-        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(visibleIds, comparisonFrom(period), period.previousTo());
+        // Match chart honesty: incomplete Portfolio T−1 is not part of KPI totals or vs-prev.
+        LocalDate end = trafficKpiEnd(visibleIds, period);
+        LocalDate previousFrom = period.allTime() ? null : comparisonFrom(period, end);
+        TrafficCoverage coverage = coverage(visibleIds, period.from(), end);
+        TrafficCoverage previousCoverage = period.allTime() ? null : coverage(visibleIds, previousFrom, period.previousTo());
         TrafficTotals current = fullPortfolio
-                ? trafficJdbcRepository.portfolioTotalsInRange(period.from(), publishedEnd(period.to()))
-                : sumVisibleTotals(period.from(), publishedEnd(period.to()), visibleIds);
+                ? trafficJdbcRepository.portfolioTotalsInRange(period.from(), end)
+                : sumVisibleTotals(period.from(), end, visibleIds);
         TrafficTotals previous = period.allTime()
                 ? new TrafficTotals(0, 0, 0, 0)
                 : fullPortfolio
-                ? trafficJdbcRepository.portfolioTotalsInRange(comparisonFrom(period), period.previousTo())
-                : sumVisibleTotals(comparisonFrom(period), period.previousTo(), visibleIds);
+                ? trafficJdbcRepository.portfolioTotalsInRange(previousFrom, period.previousTo())
+                : sumVisibleTotals(previousFrom, period.previousTo(), visibleIds);
         long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
         Long starsChange = period.allTime() ? null : trafficJdbcRepository.starsChangeSince(period.from());
         List<TrafficPoint> traffic = series(period, tracked);
@@ -1066,9 +1070,30 @@ public class AnalyticsService {
         return to.isBefore(yesterday) ? to : yesterday;
     }
 
+    /**
+     * KPI/chart window end: published days only, and drop incomplete Portfolio T−1
+     * (same rule as {@code withoutIncompletePortfolioTipDay} on the frontend).
+     * Keep 1d as-is so a single missing tip stays an honest incomplete day.
+     */
+    private LocalDate trafficKpiEnd(Set<Long> ids, DashboardPeriod period) {
+        LocalDate end = publishedEnd(period.to());
+        if (period.allTime() || "1d".equals(period.value()) || ids.isEmpty() || end.isBefore(period.from())) {
+            return end;
+        }
+        if (trafficJdbcRepository.observedDays(ids, end, end) < ids.size()) {
+            LocalDate prior = end.minusDays(1);
+            return prior.isBefore(period.from()) ? end : prior;
+        }
+        return end;
+    }
+
     /** Compare equal-sized published-day windows rather than six days against seven. */
     private LocalDate comparisonFrom(DashboardPeriod period) {
-        long days = java.time.temporal.ChronoUnit.DAYS.between(period.from(), publishedEnd(period.to())) + 1;
+        return comparisonFrom(period, publishedEnd(period.to()));
+    }
+
+    private LocalDate comparisonFrom(DashboardPeriod period, LocalDate end) {
+        long days = java.time.temporal.ChronoUnit.DAYS.between(period.from(), end) + 1;
         return period.previousTo().minusDays(Math.max(0, days - 1));
     }
 

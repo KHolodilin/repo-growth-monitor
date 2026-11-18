@@ -55,6 +55,17 @@ class PublicApiIT extends AbstractPostgresTest {
   mvc.perform(get("/api/v1/public/owners/Alpha/traffic?period=30d")).andExpect(status().isOk())
     .andExpect(jsonPath("$.coverage.expectedRepositoryDays").value(58));
  }
+ @Test void publicTrafficKpiOmitsIncompleteTipLikePortfolioChart()throws Exception{
+  // Tip only on repo a → multi-day KPI must drop T−1 and keep vs-prev on the complete window.
+  jdbc.update("DELETE FROM traffic_daily WHERE repository_id=? AND traffic_date=CURRENT_DATE-1",b);
+  for(int day=2;day<=6;day++){jdbc.update("INSERT INTO traffic_daily(repository_id,traffic_date,views,unique_visitors,clones,unique_cloners) VALUES (?,CURRENT_DATE-?,10,1,0,0),(?,CURRENT_DATE-?,20,1,0,0) ON CONFLICT DO NOTHING",a,day,b,day);}
+  for(int day=7;day<=11;day++){jdbc.update("INSERT INTO traffic_daily(repository_id,traffic_date,views,unique_visitors,clones,unique_cloners) VALUES (?,CURRENT_DATE-?,5,1,0,0),(?,CURRENT_DATE-?,5,1,0,0) ON CONFLICT DO NOTHING",a,day,b,day);}
+  mvc.perform(get("/api/v1/public/owners/Alpha/traffic?period=7d")).andExpect(status().isOk())
+    .andExpect(jsonPath("$.coverage.expectedRepositoryDays").value(10))
+    .andExpect(jsonPath("$.coverage.observedRepositoryDays").value(10))
+    .andExpect(jsonPath("$.totals.views.value").value(150))
+    .andExpect(jsonPath("$.totals.views.growthPercent").value(200.0));
+ }
  @Test void callersSeeIdenticalSafeResponsesWithoutCookiesOrWrites()throws Exception{String url="/api/v1/public/owners/Alpha/stats";var anonymous=mvc.perform(get(url)).andExpect(status().isOk()).andExpect(cookie().doesNotExist("JSESSIONID")).andExpect(cookie().doesNotExist("XSRF-TOKEN")).andReturn().getResponse().getContentAsString();assertThat(mvc.perform(get(url).with(as("admin"))).andReturn().getResponse().getContentAsString()).isEqualTo(anonymous);assertThat(mvc.perform(get(url).with(as("user"))).andReturn().getResponse().getContentAsString()).isEqualTo(anonymous);mvc.perform(head(url)).andExpect(status().isOk()).andExpect(content().string(""));assertThat(jdbc.queryForObject("SELECT count(*) FROM collection_request",Long.class)).isZero();}
  @Test void moduleFlagsAndParentChecksApplyToDirectIds()throws Exception{mvc.perform(get("/api/v1/public/search-runs/"+run+"/results")).andExpect(status().isOk()).andExpect(jsonPath("$.items[0].githubId").value("555"));jdbc.update("UPDATE search_query SET public_enabled=false WHERE id=?",query);for(String tail:List.of("/history","/series","/competitors/555"))mvc.perform(get("/api/v1/public/search-queries/"+query+tail)).andExpect(status().isNotFound());mvc.perform(get("/api/v1/public/search-runs/"+run+"/results")).andExpect(status().isNotFound());jdbc.update("UPDATE repository SET public_topics_enabled=false WHERE id=?",a);mvc.perform(get("/api/v1/public/topic-runs/"+topicRun+"/results")).andExpect(status().isNotFound());mvc.perform(get("/api/v1/public/topic-watches/"+watch+"/history")).andExpect(status().isNotFound());}
  @Test void unknownPrivateUnpublishedAndRevokedReturnSame404()throws Exception{for(String path:List.of("private","unpublished","missing"))mvc.perform(get("/api/v1/public/repositories/Alpha/"+path+"/stats").with(as("admin"))).andExpect(status().isNotFound());jdbc.update("UPDATE repository SET public_dashboard_enabled=false WHERE id=?",a);mvc.perform(get("/api/v1/public/repositories/Alpha/one/stats")).andExpect(status().isNotFound());}
