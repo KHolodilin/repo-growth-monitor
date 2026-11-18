@@ -2,32 +2,42 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AuthProvider } from "../lib/AuthContext";
+import { anonymousMe } from "../lib/auth";
 import { useDashboardView } from "../lib/dashboardView";
 import { PublicLayout } from "./PublicLayout";
 
-const { api } = vi.hoisted(() => ({ api: vi.fn() }));
+const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
 vi.mock("../lib/api", async (original) => ({
   ...(await original<typeof import("../lib/api")>()),
   api,
+}));
+vi.mock("../lib/auth", async (original) => ({
+  ...(await original<typeof import("../lib/auth")>()),
+  loadMe,
 }));
 
 function mount(path: string) {
   cleanup();
   return render(
     <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route element={<PublicLayout />}>
-          <Route path="/" element={<p>home</p>} />
-          <Route path="/:owner/:repository" element={<p>repo</p>} />
-          <Route path="/admin/*" element={<p>admin</p>} />
-        </Route>
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<p>home</p>} />
+            <Route path="/:owner/:repository" element={<p>repo</p>} />
+            <Route path="/admin/*" element={<p>admin</p>} />
+          </Route>
+        </Routes>
+      </AuthProvider>
     </MemoryRouter>,
   );
 }
 
 beforeEach(() => {
   api.mockReset();
+  loadMe.mockReset();
+  loadMe.mockResolvedValue(anonymousMe);
 });
 afterEach(() => cleanup());
 
@@ -46,22 +56,38 @@ describe("PublicLayout", () => {
     expect(signIn.className).not.toContain("min-h-11");
   });
 
-  it("disables collection-incomplete markers for every anonymous route", () => {
+  it("hides collection-incomplete markers for anonymous and keeps them for signed-in users", async () => {
     api.mockResolvedValue({ freshness: {} });
     function Probe() {
       const view = useDashboardView();
       return <p>{`public=${String(view.public)} expected=${String(view.collectionExpected)}`}</p>;
     }
-    render(
-      <MemoryRouter initialEntries={["/Alpha/project"]}>
-        <Routes>
-          <Route element={<PublicLayout />}>
-            <Route path="/:owner/:repository" element={<Probe />} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("public=true expected=false")).toBeInTheDocument();
+    function mountProbe() {
+      return render(
+        <MemoryRouter initialEntries={["/Alpha/project"]}>
+          <AuthProvider>
+            <Routes>
+              <Route element={<PublicLayout />}>
+                <Route path="/:owner/:repository" element={<Probe />} />
+              </Route>
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>,
+      );
+    }
+    mountProbe();
+    expect(await screen.findByText("public=true expected=false")).toBeInTheDocument();
+
+    cleanup();
+    loadMe.mockResolvedValue({
+      ...anonymousMe,
+      authenticated: true,
+      userId: "1",
+      displayName: "User",
+      roles: ["USER"],
+    });
+    mountProbe();
+    expect(await screen.findByText("public=true expected=true")).toBeInTheDocument();
   });
 
   it("toggles About data on the public home footer", async () => {

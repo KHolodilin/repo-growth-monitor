@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { LogoMark, SignInIcon } from "../components/icons";
 import { api } from "../lib/api";
+import { useAuth } from "../lib/AuthContext";
 import { DashboardViewContext } from "../lib/dashboardView";
 import { publicBase, type PublicOverview } from "../lib/publicDashboard";
 import { formatSyncTime } from "../lib/utils";
@@ -10,10 +11,13 @@ const PROJECT_GITHUB = "https://github.com/KHolodilin/repo-growth-monitor";
 
 export function PublicLayout() {
   const location = useLocation();
+  const { me } = useAuth();
   const homePage = location.pathname === "/";
   const [syncAt, setSyncAt] = useState<string | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const syncTime = formatSyncTime(syncAt);
+  // Anonymous never sees collection-incomplete markers; signed-in users keep them.
+  const collectionExpected = me.authenticated;
 
   useEffect(() => {
     if (homePage) {
@@ -42,7 +46,7 @@ export function PublicLayout() {
   }, [homePage, location.pathname]);
 
   return (
-    <DashboardViewContext.Provider value={{ public: true, collectionExpected: false }}>
+    <DashboardViewContext.Provider value={{ public: true, collectionExpected }}>
       <div className="flex min-h-screen flex-col bg-background text-foreground">
         <header className="border-b bg-card">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 md:px-6">

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, type GrowthEvent } from "../lib/api";
 import { DashboardPresentation, type DashboardViewData } from "../pages/DashboardPage";
-import { DashboardViewContext } from "../lib/dashboardView";
+import { DashboardViewContext, useDashboardView } from "../lib/dashboardView";
 import { PERIODS, type Period } from "../components/PeriodSelector";
 import { readPublicPreference, writePublicPreference } from "../lib/publicPrefs";
 import {
@@ -25,6 +25,7 @@ export function PublicScopePage() {
   const { owner = "" } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const layoutView = useDashboardView();
   const [params, setParams] = useSearchParams();
   const [overview, setOverview] = useState<PublicOverview | null>(null);
   const [model, setModel] = useState<DashboardViewData | null>(null);
@@ -141,9 +142,9 @@ export function PublicScopePage() {
   return (
     <DashboardViewContext.Provider
       value={{
+        ...layoutView,
         public: true,
-        // Anonymous public charts never show collection-incomplete / in-progress markers.
-        collectionExpected: false,
+        // Keep layout auth policy: anonymous hides collection !; signed-in keeps it.
         scopeKey: scope,
         heading,
         headerLeading: breadcrumb,
