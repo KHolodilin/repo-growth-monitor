@@ -141,6 +141,19 @@ describe("TrafficKpiCard", () => {
 
     rerender(
       <TrafficKpiCard
+        label="Views"
+        value={289}
+        growthPercent={null}
+        period="7d"
+        coverage={{ observedDays: 52, expectedDays: 60 }}
+        series={[10, 20]}
+      />,
+    );
+    expect(screen.getByText("289")).toBeInTheDocument();
+    expect(screen.getByText("Partial data: 52 / 60 repository-days")).toBeInTheDocument();
+
+    rerender(
+      <TrafficKpiCard
         label="Unique Contributors"
         value={14}
         growthPercent={null}

@@ -16,6 +16,7 @@ export function TrafficKpiCard({
   className,
   preserveGaps = false,
   missingHistory = false,
+  coverage,
   previousCoverage,
 }: {
   label: string;
@@ -30,7 +31,7 @@ export function TrafficKpiCard({
   /** Keep nulls as breaks instead of connecting the measured days. */
   preserveGaps?: boolean;
   missingHistory?: boolean;
-  /** Kept for call-site compatibility; repository-day coverage is not shown on KPI cards. */
+  /** Repository-day coverage; incomplete windows show Partial data under the total. */
   coverage?: TrafficCoverage | null;
   previousCoverage?: TrafficCoverage | null;
 }) {
@@ -49,6 +50,13 @@ export function TrafficKpiCard({
         {note && <div className="text-xs">{note}</div>}
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{missingHistory && value == null ? "N/A" : formatNumber(value)}</div>
+      {coverage && coverage.observedDays < coverage.expectedDays && (
+        <div className="mt-1 text-xs text-muted-foreground">
+          {coverage.observedDays === 0
+            ? "No traffic data for selected period"
+            : `Partial data: ${coverage.observedDays} / ${coverage.expectedDays} repository-days`}
+        </div>
+      )}
       {period !== "all" && previousCoverage && (!previousCoverage.expectedDays || previousCoverage.observedDays < previousCoverage.expectedDays) && <div className="mt-1 text-xs text-muted-foreground">Comparison unavailable: incomplete previous period</div>}
       {period !== "all" && (
         <div className="mt-1 flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
