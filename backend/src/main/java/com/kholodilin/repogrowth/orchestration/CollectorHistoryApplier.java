@@ -116,7 +116,7 @@ public class CollectorHistoryApplier {
         eventState.upsert(id,GrowthEventDetections.snapshot(previous,observation,job.repository().owner()));
     }
     private void rank(long task,long repository,JobRequest job,Snapshot snapshot,String target){
-        long targetId=Long.parseLong(target.substring(target.indexOf(':')+1));boolean topic=job.type()==TaskType.TOPIC_WATCH;
+        long targetId=CollectionRequestService.targetId(target);boolean topic=job.type()==TaskType.TOPIC_WATCH;
         String table=topic?"topic_run":"search_run",column=topic?"topic_watch_id":"search_query_id";
         // Existing history remains a daily compatibility view; no run rows are moved/deleted.
         jdbc.update("INSERT INTO "+table+"("+column+",repository_id,business_date,status) VALUES (?,?,?,'READY') ON CONFLICT DO NOTHING",targetId,repository,job.businessDate());
@@ -130,7 +130,7 @@ public class CollectorHistoryApplier {
     }
     private void legacy(long task,long repository,JobRequest job,ResultDelivery result){
         boolean rank=job.type()==TaskType.SEARCH_QUERY || job.type()==TaskType.TOPIC_WATCH;
-        if(rank){long target=Long.parseLong(jdbc.queryForObject("SELECT target_key FROM collection_task WHERE id=?",String.class,task).split(":")[1]);String table=job.type()==TaskType.SEARCH_QUERY?"search_run":"topic_run",column=job.type()==TaskType.SEARCH_QUERY?"search_query_id":"topic_watch_id";
+        if(rank){long target=CollectionRequestService.targetId(jdbc.queryForObject("SELECT target_key FROM collection_task WHERE id=?",String.class,task));String table=job.type()==TaskType.SEARCH_QUERY?"search_run":"topic_run",column=job.type()==TaskType.SEARCH_QUERY?"search_query_id":"topic_watch_id";
             jdbc.update("INSERT INTO "+table+"("+column+",repository_id,business_date,status,error_code,error_message,completed_at) VALUES (?,?,?,'FAILED',?,?,clock_timestamp()) ON CONFLICT("+column+",business_date) DO UPDATE SET status='FAILED',error_code=excluded.error_code,error_message=excluded.error_message,completed_at=excluded.completed_at",target,repository,job.businessDate(),result.failure().code().name(),result.failure().message());return;}
         long run=jdbc.queryForObject("INSERT INTO collection_run(repository_id,business_date,status,planned_jobs) VALUES (?,?,'RUNNING',5) ON CONFLICT(repository_id,business_date) DO UPDATE SET planned_jobs=greatest(collection_run.planned_jobs,5) RETURNING id",Long.class,repository,job.businessDate());
         String type=job.type()==TaskType.STATS?"REPOSITORY_STATS":job.type().name(),state=result.status()==JobState.SUCCEEDED?"SUCCESS":"FAILED";

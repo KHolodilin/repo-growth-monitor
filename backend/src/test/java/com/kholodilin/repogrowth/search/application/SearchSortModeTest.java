@@ -26,6 +26,18 @@ class SearchSortModeTest {
         assertThat(SearchQueryService.chartSortMode(List.of(tip), tip)).isEqualTo("best_match");
     }
 
+    @Test
+    void datedSearchTargetKeysKeepQueryIdParseable() {
+        assertThat(com.kholodilin.repogrowth.orchestration.CollectionRequestService.targetId("query:12")).isEqualTo(12L);
+        assertThat(com.kholodilin.repogrowth.orchestration.CollectionRequestService.targetId("query:12@2026-11-17")).isEqualTo(12L);
+        assertThat(com.kholodilin.repogrowth.orchestration.CollectionRequestService.searchTargetKey(
+                12L, LocalDate.parse("2026-11-17"), LocalDate.parse("2026-11-18")))
+                .isEqualTo("query:12@2026-11-17");
+        assertThat(com.kholodilin.repogrowth.orchestration.CollectionRequestService.searchTargetKey(
+                12L, LocalDate.parse("2026-11-18"), LocalDate.parse("2026-11-18")))
+                .isEqualTo("query:12");
+    }
+
     private static SearchRun run(String sortMode) {
         return new SearchRun(
                 1L, 1L, 1L, LocalDate.parse("2026-11-18"), SearchRunStatus.SUCCESS,

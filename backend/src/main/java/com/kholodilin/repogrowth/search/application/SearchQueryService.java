@@ -17,9 +17,11 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -162,7 +164,7 @@ public class SearchQueryService {
                 searchStatus,
                 enrichmentStatus,
                 totalResults,
-                runRepository.missedDates(searchQueryId)
+                chartMissedDates(searchQueryId, sortMode, runs)
         );
     }
 
@@ -238,6 +240,24 @@ public class SearchQueryService {
         }
         boolean hasStars = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), "stars"));
         return hasStars ? "stars" : latest;
+    }
+
+    /**
+     * Planner MISSED days plus tip days that only have an incompatible GitHub sort mode.
+     * Preferring stars must not leave a silent empty tip after Best Match overwrote the series.
+     */
+    private List<LocalDate> chartMissedDates(long searchQueryId, String sortMode, List<SearchRun> runs) {
+        LinkedHashSet<LocalDate> missed = new LinkedHashSet<>(runRepository.missedDates(searchQueryId));
+        Set<LocalDate> comparableDates = runs.stream()
+                .filter(run -> sameSortMode(run.sortMode(), sortMode))
+                .map(SearchRun::businessDate)
+                .collect(Collectors.toSet());
+        for (SearchRun run : runs) {
+            if (!comparableDates.contains(run.businessDate())) {
+                missed.add(run.businessDate());
+            }
+        }
+        return List.copyOf(missed);
     }
 
     private Integer changeSince(List<SearchRun> runs, int days) {

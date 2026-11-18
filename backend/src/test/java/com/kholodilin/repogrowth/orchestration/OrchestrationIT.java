@@ -112,6 +112,34 @@ class OrchestrationIT extends AbstractPostgresTest {
         service.scheduled(day,"09:00"); assertThat(count("collection_request")).isEqualTo(2);
         assertThat(service.manual(repositoryId,day).coalesced()).isFalse(); assertThat(count("collection_request")).isEqualTo(3);
     }
+    @Test void searchRepairForPriorDayKeepsItsOwnBusinessDateWhileTodayIsActive() {
+        var active=service.manual(repositoryId,day);
+        LocalDate prior=day.minusDays(1);
+        long queryId=jdbc.queryForObject("SELECT id FROM search_query WHERE repository_id=? AND enabled",Long.class,repositoryId);
+        jdbc.update("""
+                INSERT INTO search_run(search_query_id,repository_id,business_date,status,snapshot_at,total_count,tracked_repository_position,sort_mode)
+                VALUES (?,?,?,'SUCCESS',clock_timestamp(),10,1,'stars'),
+                       (?,?,?,'SUCCESS',clock_timestamp(),10,2,'best_match')
+                """,queryId,repositoryId,prior.minusDays(1),queryId,repositoryId,prior);
+        var repair=service.searchAllCommand(repositoryId,day);
+        assertThat(repair.requestId()).isEqualTo(active.requestId());
+        assertThat(count("collection_request")).isEqualTo(1);
+        String targetKey=jdbc.queryForObject("""
+                SELECT target_key FROM collection_task
+                WHERE request_id=(SELECT id FROM collection_request WHERE public_id=?)
+                  AND task_type='SEARCH_QUERY' AND target_key LIKE ?
+                ORDER BY id DESC LIMIT 1
+                """,String.class,active.requestId(),"query:"+queryId+"@%");
+        assertThat(targetKey).isEqualTo("query:"+queryId+"@"+prior);
+        String payloadDate=jdbc.queryForObject("""
+                SELECT d.payload->>'businessDate' FROM collector_dispatch d
+                JOIN collection_attempt a ON a.public_id=d.attempt_id
+                JOIN collection_task t ON t.id=a.task_id
+                WHERE t.request_id=(SELECT id FROM collection_request WHERE public_id=?)
+                  AND t.target_key=?
+                """,String.class,active.requestId(),targetKey);
+        assertThat(payloadDate).isEqualTo(prior.toString());
+    }
     @Test void creationFailureRollsBackInvocationTasksNodesAndOutbox() {
         jdbc.update("UPDATE search_query SET result_limit=101 WHERE enabled");
         assertThatThrownBy(()->service.manual(repositoryId,day)).isInstanceOf(IllegalArgumentException.class);

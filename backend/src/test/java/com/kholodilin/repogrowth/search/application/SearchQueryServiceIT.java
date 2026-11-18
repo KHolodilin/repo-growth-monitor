@@ -124,6 +124,7 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
         assertThat(history.bestRank()).isEqualTo(1);
         assertThat(history.currentRank()).isEqualTo(5);
         assertThat(history.points()).extracting(SearchQueryService.RankPoint::position).containsExactly(1, 5);
+        assertThat(history.missedDates()).containsExactly(today);
     }
 
     @Test
