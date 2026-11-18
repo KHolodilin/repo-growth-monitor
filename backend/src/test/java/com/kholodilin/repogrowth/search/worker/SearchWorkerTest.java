@@ -147,13 +147,13 @@ class SearchWorkerTest {
         when(repositoryLock.tryLock(connection, 13L)).thenReturn(true);
         when(queryRepository.findById(5L)).thenReturn(Optional.of(query));
         when(repositoryJdbcRepository.findById(13L)).thenReturn(Optional.of(repository));
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, List.of(item)));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, List.of(item)));
         when(repositoryEnricher.fromSearchItem(eq(9L), eq(1), eq(item))).thenReturn(stored);
         when(resultRepository.findByRun(9L)).thenReturn(List.of(stored));
         when(repositoryEnricher.enrich(stored, item)).thenReturn(stored);
 
         assertThat(worker.poll("w1")).isTrue();
-        verify(runRepository).markSuccess(9L, 80, 1);
+        verify(runRepository).markSuccess(9L, 80, 1, "stars");
         verify(runRepository).markEnrichment(9L, "SUCCESS");
         verify(repositoryLock).unlock(connection, 13L);
     }
@@ -165,7 +165,7 @@ class SearchWorkerTest {
         when(repositoryLock.tryLock(connection, 13L)).thenReturn(true);
         when(queryRepository.findById(5L)).thenReturn(Optional.of(query));
         when(repositoryJdbcRepository.findById(13L)).thenReturn(Optional.of(repository));
-        when(gitHubClient.searchRepositories("outbox", 50)).thenThrow(GitHubException.rateLimit(null, "slow"));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenThrow(GitHubException.rateLimit(null, "slow"));
 
         assertThat(worker.poll("w1")).isTrue();
         verify(runRepository).markRetry(eq(9L), any(), eq("GITHUB_RATE_LIMIT_EXCEEDED"), eq("slow"));
@@ -232,13 +232,13 @@ class SearchWorkerTest {
         when(repositoryLock.tryLock(connection, 13L)).thenReturn(true);
         when(queryRepository.findById(5L)).thenReturn(Optional.of(limited));
         when(repositoryJdbcRepository.findById(13L)).thenReturn(Optional.of(repository));
-        when(gitHubClient.searchRepositories("outbox", 1)).thenReturn(new GitHubSearchResponse(80, List.of(first, extra)));
+        when(gitHubClient.searchRepositories("outbox", 1, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, List.of(first, extra)));
         when(repositoryEnricher.fromSearchItem(eq(9L), eq(1), eq(first))).thenReturn(stored);
         when(resultRepository.findByRun(9L)).thenReturn(List.of(stored, leftover));
         when(repositoryEnricher.enrich(stored, first)).thenThrow(new IllegalStateException("enrich"));
 
         assertThat(worker.poll("w1")).isTrue();
-        verify(runRepository).markSuccess(9L, 80, 1);
+        verify(runRepository).markSuccess(9L, 80, 1, "stars");
         verify(runRepository).markEnrichment(9L, "PARTIAL");
     }
 
@@ -249,7 +249,7 @@ class SearchWorkerTest {
         when(repositoryLock.tryLock(connection, 13L)).thenReturn(true);
         when(queryRepository.findById(5L)).thenReturn(Optional.of(query));
         when(repositoryJdbcRepository.findById(13L)).thenReturn(Optional.of(repository));
-        when(gitHubClient.searchRepositories("outbox", 50)).thenThrow(GitHubException.auth(401, "no"));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenThrow(GitHubException.auth(401, "no"));
 
         assertThat(worker.poll("w1")).isTrue();
         verify(runRepository).markFailed(9L, "GITHUB_AUTH_ERROR", "no");
@@ -276,28 +276,28 @@ class SearchWorkerTest {
     @Test
     void pollRetriesWhenTheResultListIsShorterThanTheDepth() throws Exception {
         claimRun(run);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, List.of(other(100L))));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, List.of(other(100L))));
 
         assertThat(worker.poll("w1")).isTrue();
         verify(runRepository).markRetry(eq(9L), any(), eq("SEARCH_RESULTS_INCOMPLETE"), eq("Search results were shorter than the requested depth"));
-        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any(), any());
     }
 
     @Test
     void pollFailsAShortResultListAfterTheRetryBudget() throws Exception {
         SearchRun lastAttempt = runWith(8, null);
         claimRun(lastAttempt);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, List.of()));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, List.of()));
 
         assertThat(worker.poll("w1")).isTrue();
         verify(runRepository).markFailed(9L, "SEARCH_RESULTS_INCOMPLETE", "Search results were shorter than the requested depth");
-        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any(), any());
     }
 
     @Test
     void pollConfirmsOnceWhenARankedRepositoryDisappearsFromAFullList() throws Exception {
         claimRun(run);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, others(50)));
         when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, 1)));
 
         assertThat(worker.poll("w1")).isTrue();
@@ -307,57 +307,57 @@ class SearchWorkerTest {
                 eq("SEARCH_RANK_UNCONFIRMED"),
                 eq("Tracked repository was inside the depth and is missing from a full result list")
         );
-        verify(runRepository, never()).markSuccess(anyLong(), any(), any());
+        verify(runRepository, never()).markSuccess(anyLong(), any(), any(), any());
     }
 
     @Test
     void pollStoresANullPositionAfterTheMissingRankIsConfirmed() throws Exception {
         SearchRun confirmation = runWith(2, null, "SEARCH_RANK_UNCONFIRMED");
         claimRun(confirmation);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, others(50)));
         when(resultRepository.findByRun(9L)).thenReturn(List.of());
         stubStoredResults();
 
         assertThat(worker.poll("w1")).isTrue();
-        verify(runRepository).markSuccess(9L, 80, null);
+        verify(runRepository).markSuccess(9L, 80, null, "stars");
         verify(runRepository, never()).markRetry(anyLong(), any(), any(), any());
     }
 
     @Test
     void pollStoresANullPositionWhenThePreviousRankIsOutsideTheLimit() throws Exception {
         claimRun(run);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(51)));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, others(51)));
         when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, 51)));
         when(resultRepository.findByRun(9L)).thenReturn(List.of());
         stubStoredResults();
 
         assertThat(worker.poll("w1")).isTrue();
-        verify(runRepository).markSuccess(9L, 80, null);
+        verify(runRepository).markSuccess(9L, 80, null, "stars");
         verify(runRepository, never()).markRetry(anyLong(), any(), any(), any());
     }
 
     @Test
     void pollStoresANullPositionWhenNothingWasMeasuredBefore() throws Exception {
         claimRun(run);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(80, others(50)));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(80, others(50)));
         when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.empty());
         when(resultRepository.findByRun(9L)).thenReturn(List.of());
         stubStoredResults();
 
         assertThat(worker.poll("w1")).isTrue();
-        verify(runRepository).markSuccess(9L, 80, null);
+        verify(runRepository).markSuccess(9L, 80, null, "stars");
     }
 
     @Test
     void pollStoresANullPositionWhenTheFullListHasNoPreviousRank() throws Exception {
         claimRun(run);
-        when(gitHubClient.searchRepositories("outbox", 50)).thenReturn(new GitHubSearchResponse(20, others(20)));
+        when(gitHubClient.searchRepositories("outbox", 50, "stars", "desc")).thenReturn(new GitHubSearchResponse(20, others(20)));
         when(runRepository.previousSnapshot(5L, LocalDate.of(2026, 9, 23))).thenReturn(Optional.of(runWith(1, null)));
         when(resultRepository.findByRun(9L)).thenReturn(List.of());
         stubStoredResults();
 
         assertThat(worker.poll("w1")).isTrue();
-        verify(runRepository).markSuccess(9L, 20, null);
+        verify(runRepository).markSuccess(9L, 20, null, "stars");
     }
 
     private void claimRun(SearchRun claimed) throws Exception {

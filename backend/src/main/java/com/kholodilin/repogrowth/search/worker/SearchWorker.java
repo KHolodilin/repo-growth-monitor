@@ -94,7 +94,8 @@ public class SearchWorker {
             try {
                 SearchQuery query = queryRepository.findById(run.searchQueryId()).orElseThrow();
                 Repository repository = repositoryJdbcRepository.findById(run.repositoryId()).orElseThrow();
-                GitHubSearchResponse response = gitHubClient.searchRepositories(query.query(), query.resultLimit());
+                // Rank History prefers stars; null sort is GitHub Best Match and blanks the tip.
+                GitHubSearchResponse response = gitHubClient.searchRepositories(query.query(), query.resultLimit(), "stars", "desc");
                 List<GitHubSearchItem> items = response.itemsOrEmpty();
                 Integer position = trackedPosition(items, repository.githubId(), query.resultLimit());
                 if (position == null && items.size() < expectedResultCount(query.resultLimit(), response.totalCount())) {
@@ -117,7 +118,7 @@ public class SearchWorker {
                 Integer trackedPosition = position;
                 transactionTemplate.executeWithoutResult(status -> {
                     resultRepository.replaceAll(run.id(), results);
-                    runRepository.markSuccess(run.id(), response.totalCount(), trackedPosition);
+                    runRepository.markSuccess(run.id(), response.totalCount(), trackedPosition, "stars");
                 });
                 enrichResults(run.id(), items);
                 log.info("Search run succeeded queryId={} position={}", query.id(), trackedPosition);

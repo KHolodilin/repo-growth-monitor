@@ -109,15 +109,44 @@ public class SearchQueryService {
 
     public long runNow(long searchQueryId) {
         SearchQuery query = getQuery(searchQueryId);
-        return searchPlanner.planQuery(query.id(), query.repositoryId(), planningWindow.businessDate());
+        LocalDate date = planningWindow.businessDate();
+        long runId = searchPlanner.planQuery(query.id(), query.repositoryId(), date);
+        // Preferring stars empties tip days that only have Best Match — requeue them for stars.
+        requeueIncompatibleSortTips(query.repositoryId(), date);
+        return runId;
     }
 
     public List<Long> runAll(long repositoryId) {
         repositoryService.get(repositoryId);
         LocalDate date = planningWindow.businessDate();
-        return list(repositoryId).stream()
+        List<Long> ids = list(repositoryId).stream()
                 .map(query -> searchPlanner.planQuery(query.id(), query.repositoryId(), date))
                 .toList();
+        requeueIncompatibleSortTips(repositoryId, date);
+        return ids;
+    }
+
+    private void requeueIncompatibleSortTips(long repositoryId, LocalDate asOf) {
+        LocalDate from = asOf.minusDays(14);
+        for (SearchQuery query : list(repositoryId)) {
+            if (!query.enabled()) {
+                continue;
+            }
+            List<SearchRun> runs = runRepository.snapshots(query.id());
+            boolean hasStars = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), "stars"));
+            if (!hasStars) {
+                continue;
+            }
+            for (SearchRun run : runs) {
+                if (run.businessDate().isBefore(from) || run.businessDate().isAfter(asOf)) {
+                    continue;
+                }
+                if (sameSortMode(run.sortMode(), "stars")) {
+                    continue;
+                }
+                searchPlanner.planQuery(query.id(), query.repositoryId(), run.businessDate());
+            }
+        }
     }
 
     public SearchHistory history(long searchQueryId) {

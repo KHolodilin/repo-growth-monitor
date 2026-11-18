@@ -149,7 +149,7 @@ public class SearchRunJdbcRepository {
     }
 
     public void markSuccess(long id, Integer totalCount, Integer position) {
-        markSuccess(id, totalCount, position, "best_match");
+        markSuccess(id, totalCount, position, "stars");
     }
 
     public void markSuccess(long id, Integer totalCount, Integer position, String sortMode) {
@@ -171,7 +171,7 @@ public class SearchRunJdbcRepository {
                 .param("id", id)
                 .param("totalCount", totalCount)
                 .param("position", position)
-                .param("sortMode", sortMode == null || sortMode.isBlank() ? "best_match" : sortMode)
+                .param("sortMode", sortMode == null || sortMode.isBlank() ? "stars" : sortMode)
                 .update();
     }
 
