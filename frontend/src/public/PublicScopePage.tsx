@@ -142,6 +142,8 @@ export function PublicScopePage() {
     <DashboardViewContext.Provider
       value={{
         public: true,
+        // Anonymous public charts never show collection-incomplete / in-progress markers.
+        collectionExpected: false,
         scopeKey: scope,
         heading,
         headerLeading: breadcrumb,

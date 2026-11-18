@@ -120,11 +120,11 @@ describe("mobile analytics batch", () => {
     expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
     expect(screen.queryByText(/100%/)).not.toBeInTheDocument();
   });
-  it("shows repository-day coverage on incomplete KPI cards and preserves true zero", () => {
+  it("keeps coverage off KPI cards and preserves true zero", () => {
     const { rerender } = render(<TrafficKpiCard label="Views" value={5} growthPercent={null} period="7d" coverage={{ observedDays: 2, expectedDays: 6 }} />);
-    expect(screen.getByText("Partial data: 2 / 6 repository-days")).toBeInTheDocument();
-    rerender(<TrafficKpiCard label="Views" value={0} growthPercent={-100} period="1d" coverage={{ observedDays: 1, expectedDays: 1 }} previousCoverage={{ observedDays: 1, expectedDays: 1 }} />);
     expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/repository-days/)).not.toBeInTheDocument();
+    rerender(<TrafficKpiCard label="Views" value={0} growthPercent={-100} period="1d" coverage={{ observedDays: 1, expectedDays: 1 }} previousCoverage={{ observedDays: 1, expectedDays: 1 }} />);
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getByText(/100%/)).toBeInTheDocument();
   });

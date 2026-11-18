@@ -83,11 +83,12 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     }
   }, [mode.mobile, mode.mobileSeriesName, persistSelection, series, chartId]);
 
+  const collectionExpected = view.collectionExpected ?? !view.public;
   const mergedOption = useMemo(() => ({
     ...option,
-    ...(view.public ? { collectionExpected: false } : {}),
+    ...(collectionExpected === false ? { collectionExpected: false } : {}),
     legend: { show: false, data: series.map(item => item.name), selected: selectedByName, formatter: (name: string) => series.find(item => item.name === name)?.label ?? name },
-  }), [option, selectedByName, series, view.public]);
+  }), [option, selectedByName, series, collectionExpected]);
 
   const presented = useMemo(
     () =>

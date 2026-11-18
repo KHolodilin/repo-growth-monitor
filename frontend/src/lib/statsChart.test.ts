@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { statsChartOption } from "./statsChart";
 
 describe("statsChart", () => {
@@ -97,4 +97,18 @@ describe("statsChart", () => {
     expect(namedFormatter({ name: "2026-09-23", seriesName: "Other", data: 1 })).toContain("Other - 1");
     expect(namedFormatter([{ axisValue: "2026-09-24", seriesName: "Stars", data: 21 }])).toContain("Stars - 21");
   });
+
+  it("omits incomplete portfolio T−1 while keeping earlier partial days", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-18T12:00:00Z"));
+    const option = statsChartOption([
+      { date: "2026-11-15", stars: 20, forks: 2, watchers: 1, contributors: 3, missingRepositories: 1 },
+      { date: "2026-11-16", stars: 21, forks: 2, watchers: 1, contributors: 3, missingRepositories: 0 },
+      { date: "2026-11-17", stars: 18, forks: 2, watchers: 1, contributors: 3, missingRepositories: 2 },
+    ]);
+    expect(option.xAxis.data).toEqual(["2026-11-15", "2026-11-16"]);
+    expect(option.series.find((series) => series.name === "Stars")?.data).toEqual([20, 21]);
+    vi.useRealTimers();
+  });
 });
+

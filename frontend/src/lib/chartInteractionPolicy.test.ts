@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { presentChartOption, withCollectionWarning } from "./chartPresentation";
 import { rankHistoryOption } from "./rankChart";
 import { trafficChartOption } from "./trafficChart";
@@ -12,6 +12,24 @@ const mode = { axis: "calendar" as const, events: [], mobile: true };
 const rank = (points: { date: string; position: number | null }[] = [{ date: "2026-11-03", position: 1 }], missedDates = [yesterday], expected = true) => rankHistoryOption({ dates: ["2026-11-03", yesterday], series: [{ name: "ours", points, missedDates, expected, limit: 50 }] });
 const marker = (option: any) => option.series.find((item: any) => item.name === "Collection warning");
 describe("shared observation and interaction policy", () => {
+  it("puts a T-1 ! on portfolio Traffic/Stats when yesterday has no snapshot", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(`${today}T12:00:00Z`));
+    try {
+      for (const source of [
+        dashboardTrafficOption([{ date: "2026-11-03", views: 10, visitors: 2, clones: 1, uniqueCloners: 1 }]),
+        statsChartOption([{ date: "2026-11-03", stars: 10, forks: 2, watchers: 1, contributors: 3 }]),
+      ]) {
+        const option: any = presentChartOption(source, { axis: "calendar", events: [], period: "7d" });
+        expect(option.xAxis.data).toContain(yesterday);
+        expect(marker(option).markPoint.label.formatter).toBe("!");
+        expect(marker(option).markPoint.tooltip.formatter()).toContain("No stored snapshot");
+        expect(marker(presentChartOption({ ...source, collectionExpected: false }, { axis: "calendar", events: [], period: "7d" }))).toBeUndefined();
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("removes missed dots but retains observed not-found ranks and connects real observations", () => {
     const option = rank([{ date: "2026-11-03", position: 1 }, { date: "2026-11-05", position: null }]);
     expect(option.series).toHaveLength(2);

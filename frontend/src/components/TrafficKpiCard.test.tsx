@@ -150,7 +150,7 @@ describe("TrafficKpiCard", () => {
       />,
     );
     expect(screen.getByText("289")).toBeInTheDocument();
-    expect(screen.getByText("Partial data: 52 / 60 repository-days")).toBeInTheDocument();
+    expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
 
     rerender(
       <TrafficKpiCard

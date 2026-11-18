@@ -95,6 +95,32 @@ describe("accessible chart controls and compact summaries", () => {
     render(<><ChartDataAlternative option={{}} title="Empty" />{Array.from({ length: 170 }, (_, i) => <SeriesSwatch key={i} style={seriesStyle(`test:large-${i}`)} />)}</>);
     await user.click(screen.getByText("View historical data")); expect(screen.getByText("No observations for this period.")).toBeVisible();
   });
+  it("sorts historical rows by date descending by default and toggles columns", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChartDataAlternative
+        title="Traffic"
+        option={{
+          xAxis: { data: ["2026-11-15", "2026-11-16", "2026-11-17"] },
+          series: [
+            { name: "Views", type: "line", data: [10, 30, 20] },
+            { name: "Visitors", type: "line", data: [1, 3, 2] },
+          ],
+        }}
+      />,
+    );
+    await user.click(screen.getByText("View historical data"));
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("2026-11-17");
+    expect(rows[2]).toHaveTextContent("2026-11-15");
+    await user.click(screen.getByRole("button", { name: /Views/ }));
+    const byViews = screen.getAllByRole("row").slice(1);
+    expect(byViews[0]).toHaveTextContent("2026-11-15");
+    expect(byViews[2]).toHaveTextContent("2026-11-16");
+    await user.click(screen.getByRole("button", { name: /Views/ }));
+    const byViewsDesc = screen.getAllByRole("row").slice(1);
+    expect(byViewsDesc[0]).toHaveTextContent("2026-11-16");
+  });
   it("keeps dynamic mobile selector marks tied to keys rather than their reordered labels", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
     const user = userEvent.setup();

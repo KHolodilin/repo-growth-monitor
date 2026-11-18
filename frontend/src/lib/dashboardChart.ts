@@ -1,4 +1,5 @@
 import { lineStyle, metricColor } from "./seriesStyle";
+import { withoutIncompletePortfolioTipDay } from "./portfolioTipDay";
 import { partialDayTooltip } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
@@ -66,10 +67,11 @@ function tooltipItems(raw: unknown): TooltipItem[] | null {
 }
 
 export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
-  const byDate = new Map(traffic.map((point) => [point.date, point]));
+  const points = withoutIncompletePortfolioTipDay(traffic);
+  const byDate = new Map(points.map((point) => [point.date, point]));
   return {
-    collectionDates: traffic.filter(point => point.views != null || point.visitors != null || point.clones != null).map(point => point.date),
-    partialCollectionDates: traffic.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
+    collectionDates: points.filter(point => point.views != null || point.visitors != null || point.clones != null).map(point => point.date),
+    partialCollectionDates: points.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
     tooltip: {
       trigger: "item" as const,
       triggerOn: "click" as const,
@@ -102,8 +104,8 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
     grid: { left: 48, right: 72, top: 40, bottom: 40, containLabel: false },
     xAxis: {
       type: "category" as const,
-      data: traffic.map((point) => point.date),
-      boundaryGap: traffic.length < 2,
+      data: points.map((point) => point.date),
+      boundaryGap: points.length < 2,
       axisLabel: {
         hideOverlap: true,
         showMinLabel: true,
@@ -115,10 +117,10 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
     },
     yAxis: { type: "value" as const },
     series: [
-      ...metricSeries(traffic, "views", "Views", metricColor("Views")!),
-      ...metricSeries(traffic, "visitors", "Visitors", metricColor("Visitors")!),
-      ...metricSeries(traffic, "clones", "Clones", metricColor("Clones")!),
-      ...metricSeries(traffic, "uniqueCloners", "Unique Cloners", metricColor("Unique Cloners")!),
+      ...metricSeries(points, "views", "Views", metricColor("Views")!),
+      ...metricSeries(points, "visitors", "Visitors", metricColor("Visitors")!),
+      ...metricSeries(points, "clones", "Clones", metricColor("Clones")!),
+      ...metricSeries(points, "uniqueCloners", "Unique Cloners", metricColor("Unique Cloners")!),
     ],
   };
 }
