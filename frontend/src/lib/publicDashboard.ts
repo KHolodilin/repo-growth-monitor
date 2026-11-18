@@ -26,7 +26,27 @@ export type TrafficResponse = {
   coverage?: { observedRepositoryDays: number; expectedRepositoryDays: number };
   previousCoverage?: { observedRepositoryDays: number; expectedRepositoryDays: number };
 };
-export type HistoryRow = { date: string; stars?: number | null; forks?: number | null; watchers?: number | null; contributors?: number | null; views?: number | null; visitors?: number | null; clones?: number | null; uniqueCloners?: number | null; missingRepositories?: number; complete?: boolean };
+export type HistoryLeader = { fullName: string; value: number };
+export type HistoryRow = {
+  date: string;
+  stars?: number | null;
+  forks?: number | null;
+  watchers?: number | null;
+  contributors?: number | null;
+  views?: number | null;
+  visitors?: number | null;
+  clones?: number | null;
+  uniqueCloners?: number | null;
+  missingRepositories?: number;
+  complete?: boolean;
+  viewsLeaders?: HistoryLeader[] | null;
+  visitorsLeaders?: HistoryLeader[] | null;
+  clonesLeaders?: HistoryLeader[] | null;
+  starsLeaders?: HistoryLeader[] | null;
+  forksLeaders?: HistoryLeader[] | null;
+  watchersLeaders?: HistoryLeader[] | null;
+  contributorsLeaders?: HistoryLeader[] | null;
+};
 export function publicBase(owner: string, repository?: string) { return `/api/v1/public/${repository ? `repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}` : `owners/${encodeURIComponent(owner)}`}`; }
 export function publicScope(overview: PublicOverview) { return overview.repository ? `public:repository:${overview.repository.id}` : `public:owner:${overview.owner.id}`; }
 export async function historyRows(url: string, signal: AbortSignal): Promise<HistoryRow[]> { const rows: HistoryRow[] = []; let before: string | undefined; for (let page=0;page<20;page++) { const response = await api<PublicPage<HistoryRow>>(`${url}&limit=100${before ? `&before=${encodeURIComponent(before)}` : ""}`, { signal }); rows.push(...response.items); if (!response.nextDate) return rows.sort((a,b)=>a.date.localeCompare(b.date)); before=response.nextDate; } throw new Error("This archive is too large for one chart. Choose a shorter period."); }
@@ -60,8 +80,8 @@ export function adaptPublicDashboard(overview: PublicOverview, stats: StatsRespo
  };
  return { period: stats.period, from: stats.from, to: stats.to, state: "READY", lastSyncAt: overview.freshness.lastSuccessfulSnapshotAt ?? null, partialData: null, collectionWarning: null, activeCollection: null,
  summary: { clones:trafficMetric("clones"), repositories: stats.repositories, stars: { total: stats.totals.stars.value ?? 0, change: stats.totals.stars.absoluteChange }, views: trafficMetric("views"), visitors: trafficMetric("visitors"), uniqueCloners: trafficMetric("uniqueCloners") },
- traffic: trafficRows.map(row=>({ date:row.date, views:row.views ?? null, visitors:row.visitors ?? null, clones:row.clones ?? null, uniqueCloners:row.uniqueCloners ?? null, missingRepositories: row.missingRepositories })),
- stats: { totals: statsTotals, points: statsRows.map(row=>({ date:row.date, stars:row.stars ?? null, forks:row.forks ?? null, watchers:row.watchers ?? null, contributors:row.contributors ?? null, missingRepositories: row.missingRepositories })) },
+ traffic: trafficRows.map(row=>({ date:row.date, views:row.views ?? null, visitors:row.visitors ?? null, clones:row.clones ?? null, uniqueCloners:row.uniqueCloners ?? null, missingRepositories: row.missingRepositories, viewsLeaders: row.viewsLeaders ?? null, visitorsLeaders: row.visitorsLeaders ?? null, clonesLeaders: row.clonesLeaders ?? null })),
+ stats: { totals: statsTotals, points: statsRows.map(row=>({ date:row.date, stars:row.stars ?? null, forks:row.forks ?? null, watchers:row.watchers ?? null, contributors:row.contributors ?? null, missingRepositories: row.missingRepositories, starsLeaders: row.starsLeaders ?? null, forksLeaders: row.forksLeaders ?? null, watchersLeaders: row.watchersLeaders ?? null, contributorsLeaders: row.contributorsLeaders ?? null })) },
  repositories: repositories.map(row=>({ id:row.id, fullName:row.name, visitors:row.visitors ?? null, views:row.views ?? null, clones:row.clones ?? null, stars:row.stars ?? null, forks:row.forks ?? null, growthPercent:row.growthPercent??null, collectionStatus:null, jobs:[], archived:row.archived ?? false, activityAt:row.activityAt ?? row.lastObservedAt ?? null, activityStatus:row.activityStatus ?? "UNKNOWN", discoverabilityPassed:row.discoverabilityPassed ?? null, discoverabilityTotal:row.discoverabilityTotal ?? null })), highlights:stats.highlights??null };
 }
 export function relativeRepositoryPath(raw: string, prefixes: string[]) { for (const prefix of [...prefixes].sort((a,b)=>b.length-a.length)) { const end=raw.charAt(prefix.length); if (raw.slice(0,prefix.length).toLowerCase()===prefix.toLowerCase() && (!end || "/?#".includes(end))) { const tail=raw.slice(prefix.length); return !tail ? "/" : tail.startsWith("/") ? tail : `/${tail}`; } } return raw; }

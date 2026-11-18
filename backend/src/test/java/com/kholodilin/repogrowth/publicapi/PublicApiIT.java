@@ -25,6 +25,7 @@ class PublicApiIT extends AbstractPostgresTest {
  @BeforeEach void seed(){jdbc.execute("TRUNCATE publication_audit,collection_history_mapping,collector_snapshot_header,collection_request_command,idempotency_records,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node,github_owner_alias,repository_path_alias");jdbc.execute("TRUNCATE repository,github_owner CASCADE");catalog.syncMissingUsers();owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES(101,'Alpha','ORGANIZATION') RETURNING id",Long.class);a=repo(201,"one",true,"PUBLIC",owner);b=repo(202,"two",true,"PUBLIC",owner);hidden=repo(203,"private",true,"PRIVATE",owner);repo(204,"unpublished",false,"PUBLIC",owner);long ownerB=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES(102,'Beta','USER') RETURNING id",Long.class);other=repo(205,"other",true,"PUBLIC",ownerB);
   for(long id:List.of(a,b,hidden,other)){int stars=id==a?10:id==b?20:999;for(int day:List.of(1,60))jdbc.update("INSERT INTO repository_daily_stats(repository_id,stat_date,stars,watchers,forks,open_issues,contributors,contributor_logins_collected) VALUES (?,CURRENT_DATE-?, ?,1,1,0,2,true)",id,day,day==1?stars:1);for(String login:id==a?List.of("Shared","Alice"):List.of("shared","Bob"))jdbc.update("INSERT INTO repository_daily_contributor_login(repository_id,stat_date,login) VALUES (?,CURRENT_DATE-1,?)",id,login);jdbc.update("INSERT INTO traffic_daily(repository_id,traffic_date,views,unique_visitors,clones,unique_cloners) VALUES (?,CURRENT_DATE-1,?,1,0,0)",id,id==a?100:id==b?200:999);}
   query=jdbc.queryForObject("INSERT INTO search_query(repository_id,name,query,enabled,result_limit,public_enabled) VALUES (?,'rank','spring',true,50,true) RETURNING id",Long.class,a);watch=jdbc.queryForObject("INSERT INTO topic_watch(repository_id,topic,result_limit) VALUES (?,'spring',50) RETURNING id",Long.class,a);
+  jdbc.update("INSERT INTO search_run(repository_id,search_query_id,business_date,status,snapshot_at,total_count,tracked_repository_position) VALUES (?,?,CURRENT_DATE-7,'SUCCESS',clock_timestamp(),1,45)",a,query);
   run=jdbc.queryForObject("INSERT INTO search_run(repository_id,search_query_id,business_date,status,snapshot_at,total_count,tracked_repository_position,error_message) VALUES (?,?,CURRENT_DATE,'SUCCESS',clock_timestamp(),1,1,'DO NOT LEAK') RETURNING id",Long.class,a,query);
   topicRun=jdbc.queryForObject("INSERT INTO topic_run(repository_id,topic_watch_id,business_date,status,snapshot_at,total_count,tracked_repository_position) VALUES (?,?,CURRENT_DATE,'SUCCESS',clock_timestamp(),1,1) RETURNING id",Long.class,a,watch);
   jdbc.update("UPDATE search_run SET public_scope_verified=true WHERE id=?",run);jdbc.update("UPDATE topic_run SET public_scope_verified=true WHERE id=?",topicRun);
@@ -63,6 +64,21 @@ class PublicApiIT extends AbstractPostgresTest {
      .andExpect(status().isOk())
      .andExpect(jsonPath("$.items[0].date").value(org.hamcrest.Matchers.matchesPattern("[0-9]{4}-[0-9]{2}-[0-9]{2}")));
   }
+  mvc.perform(get("/api/v1/public/owners/Alpha/traffic-history?period=all&limit=1"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.items[0].viewsLeaders[0].fullName").value("x/two"))
+    .andExpect(jsonPath("$.items[0].viewsLeaders[0].value").value(200))
+    .andExpect(jsonPath("$.items[0].visitorsLeaders").isArray())
+    .andExpect(jsonPath("$.items[0].clonesLeaders").isArray());
+  mvc.perform(get("/api/v1/public/owners/Alpha/stats-history?period=all&limit=1"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.items[0].starsLeaders[0].fullName").value("x/two"))
+    .andExpect(jsonPath("$.items[0].starsLeaders[0].value").value(20));
+  mvc.perform(get("/api/v1/public/owners/Alpha/stats?period=7d"))
+    .andExpect(status().isOk())
+    .andExpect(jsonPath("$.highlights.rankRise.fullName").value("x/one"))
+    .andExpect(jsonPath("$.highlights.rankRise.fromRank").value(45))
+    .andExpect(jsonPath("$.highlights.rankRise.toRank").value(1));
   jdbc.update("INSERT INTO traffic_path_snapshot(repository_id,snapshot_date,snapshot_at,path,title,views,unique_visitors,service_path) VALUES (?,CURRENT_DATE-1,clock_timestamp(),'/safe','safe',1,1,false)",a);
   mvc.perform(get("/api/v1/public/repositories/Alpha/one/path-history?period=7d&limit=1"))
     .andExpect(status().isOk())
