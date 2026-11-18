@@ -49,6 +49,8 @@ describe("owner portfolio route", () => {
     expect(screen.getByRole("columnheader", { name: "Activity" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Disc\./ })).toBeInTheDocument();
     expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "KHolodilin" })).toBeInTheDocument();
+    expect(api.mock.calls.some(([path]) => String(path).includes("/admin/dashboard?") && String(path).includes("owner=KHolodilin"))).toBe(true);
   });
 
   it("shows Disc. and Activity on the public owner dashboard for anonymous", async () => {

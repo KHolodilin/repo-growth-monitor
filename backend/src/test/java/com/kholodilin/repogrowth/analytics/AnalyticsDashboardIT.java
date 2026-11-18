@@ -532,7 +532,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
         assertThat(week.stats().totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(160, 10, 6.7));
         assertThat(week.stats().totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, 0, 0.0));
         assertThat(week.stats().totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, 0, 0.0));
-        assertThat(week.stats().totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(2, null, null));
+        assertThat(week.stats().totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(2, null, null, false));
         assertThat(week.stats().points().get(3).contributors()).isEqualTo(2);
 
         DashboardResponse day = analyticsService.dashboard("1d");

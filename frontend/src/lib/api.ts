@@ -276,6 +276,8 @@ export type StatsMetricTotal = {
   value: number | null;
   absoluteChange: number | null;
   growthPercent: number | null;
+  /** False when Unique Contributors is an observed-only union across incomplete tip login sets. */
+  complete?: boolean | null;
 };
 
 export type RepositoryStatsHistory = {
@@ -339,6 +341,8 @@ export type SearchHistory = {
   change7d: number | null;
   change30d: number | null;
   bestRank: number | null;
+  /** GitHub sort used for Current/Best Rank and chart points (`stars` or `best_match`). */
+  sortMode?: string | null;
   points: { date: string; position: number | null; searchRunId: number }[];
   lastChecked?: string | null;
   searchStatus?: string | null;

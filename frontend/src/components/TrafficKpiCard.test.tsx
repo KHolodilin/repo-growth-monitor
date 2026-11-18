@@ -141,6 +141,20 @@ describe("TrafficKpiCard", () => {
 
     rerender(
       <TrafficKpiCard
+        label="Unique Contributors"
+        value={14}
+        growthPercent={null}
+        absoluteChange={null}
+        period="30d"
+        series={[null, 14]}
+        note="Observed unique logins from repositories with collected tips"
+      />,
+    );
+    expect(screen.getByText("14")).toBeInTheDocument();
+    expect(screen.getByText("Observed unique logins from repositories with collected tips")).toBeInTheDocument();
+
+    rerender(
+      <TrafficKpiCard
         label="Stars"
         value={27}
         growthPercent={28.6}

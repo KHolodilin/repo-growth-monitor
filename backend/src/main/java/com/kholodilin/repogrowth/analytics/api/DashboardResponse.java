@@ -149,7 +149,10 @@ public record DashboardResponse(
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record StatsTotal(Integer value, Integer absoluteChange, Double growthPercent) {
+    public record StatsTotal(Integer value, Integer absoluteChange, Double growthPercent, Boolean complete) {
+        public StatsTotal(Integer value, Integer absoluteChange, Double growthPercent) {
+            this(value, absoluteChange, growthPercent, null);
+        }
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)

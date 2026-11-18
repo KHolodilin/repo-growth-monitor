@@ -1,6 +1,6 @@
 import { RepositoryWarningSheet } from "../components/RepositoryWarningSheet";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, type Dashboard as ApiDashboard, type GrowthEvent, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { statsChartOption } from "../lib/statsChart";
@@ -20,7 +20,7 @@ import { useTableSort } from "../lib/tableSortPrefs";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 
 import { readPublicPreference, writePublicPreference } from "../lib/publicPrefs";
-import { useDashboardView, repositoryHref } from "../lib/dashboardView";
+import { DashboardViewContext, useDashboardView, repositoryHref } from "../lib/dashboardView";
 type Dashboard = Omit<ApiDashboard, "repositories" | "summary"> & { summary: ApiDashboard["summary"] & { clones?: ApiDashboard["summary"]["views"] }; repositories: (Omit<ApiDashboard["repositories"][number], "id" | "stars" | "forks"> & { id: number | string; stars: number | null; forks: number | null })[] };
 export type DashboardViewData = Dashboard;
 
@@ -46,6 +46,8 @@ const PORTFOLIO_STATS = [
 ] as const;
 
 export function DashboardPage() {
+  const { owner: ownerRoute } = useParams();
+  const owner = ownerRoute?.trim() || null;
   const [trafficSeries,setTrafficSeries]=useState("Visitors");
   const [statsSeries,setStatsSeries]=useState("Stars");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -65,7 +67,8 @@ export function DashboardPage() {
 
   async function load() {
     const version = ++requestVersion.current;
-    const dashboard = await api<Dashboard>(`/api/v1/admin/dashboard?period=${period}`);
+    const ownerQuery = owner ? `&owner=${encodeURIComponent(owner)}` : "";
+    const dashboard = await api<Dashboard>(`/api/v1/admin/dashboard?period=${period}${ownerQuery}`);
     if (version === requestVersion.current) setData(dashboard);
     return dashboard;
   }
@@ -90,7 +93,7 @@ export function DashboardPage() {
       cancelled = true;
       requestVersion.current++;
     };
-  }, [period]);
+  }, [period, owner]);
 
   const trackedIds = data?.repositories.map((row) => Number(row.id)) ?? [];
   const portfolioEvents = useTrackedEvents(trackedIds, period);
@@ -103,7 +106,7 @@ export function DashboardPage() {
       void load().catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [collectingFirst, period]);
+  }, [collectingFirst, period, owner]);
 
   useEffect(() => {
     function onCollected() {
@@ -111,7 +114,7 @@ export function DashboardPage() {
     }
     window.addEventListener("repos-collected", onCollected);
     return () => window.removeEventListener("repos-collected", onCollected);
-  }, [period]);
+  }, [period, owner]);
 
   function setTab(next: "traffic" | "stats") {
     const params = new URLSearchParams(searchParams);
@@ -123,17 +126,27 @@ export function DashboardPage() {
     setSearchParams(params, { replace: true });
   }
 
-  if (error) {
-    return <p className="text-red-600">{error}</p>;
-  }
-  if (loading || !data) {
-    return <DashboardSkeleton period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />;
-  }
-  if (data.state === "NO_REPOSITORIES") {
-    return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
-  }
+  const body = (() => {
+    if (error) {
+      return <p className="text-red-600">{error}</p>;
+    }
+    if (loading || !data) {
+      return <DashboardSkeleton period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} />;
+    }
+    if (data.state === "NO_REPOSITORIES") {
+      return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
+    }
+    return <DashboardPresentation data={data} period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} events={portfolioEvents} mobileSelection={{traffic:trafficSeries,stats:statsSeries,onTraffic:setTrafficSeries,onStats:setStatsSeries}} />;
+  })();
 
-  return <DashboardPresentation data={data} period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} events={portfolioEvents} mobileSelection={{traffic:trafficSeries,stats:statsSeries,onTraffic:setTrafficSeries,onStats:setStatsSeries}} />;
+  if (!owner) {
+    return body;
+  }
+  return (
+    <DashboardViewContext.Provider value={{ heading: owner, scopeKey: `admin-owner:${owner}` }}>
+      {body}
+    </DashboardViewContext.Provider>
+  );
 }
 
 export function DashboardPresentation({ data, period, onPeriod, tab, onTab, events = [], mobileSelection }: { data: Dashboard; period: Period; onPeriod: (period: Period) => void; tab: "traffic" | "stats"; onTab: (tab: "traffic" | "stats") => void; events?: GrowthEvent[]; mobileSelection?: {traffic:string;stats:string;onTraffic:(name:string)=>void;onStats:(name:string)=>void} }) {
@@ -181,6 +194,12 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
         <div className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
           {PORTFOLIO_STATS.map((card) => {
             const total = data.stats.totals[card.key];
+            const contributorSeries = data.stats.points.map((point) => point.contributors);
+            const contributorsEmpty =
+              card.key === "contributors" &&
+              total.value == null &&
+              contributorSeries.every((point) => point == null);
+            const contributorsPartial = card.key === "contributors" && total.complete === false;
             return (
               <TrafficKpiCard
                 key={card.key}
@@ -190,7 +209,14 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
                 absoluteChange={total.absoluteChange}
                 period={period}
                 series={data.stats.points.map((point) => point[card.key])}
-
+                missingHistory={contributorsEmpty}
+                note={
+                  contributorsPartial
+                    ? "Observed unique logins from repositories with collected tips"
+                    : contributorsEmpty
+                      ? "No contributor login snapshots in this period"
+                      : undefined
+                }
               />
             );
           })}

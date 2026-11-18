@@ -19,8 +19,12 @@ public class AnalyticsController {
     }
 
     @GetMapping("/dashboard")
-    public Object dashboard(@RequestParam(defaultValue = "30d") String period) {
-        var result=analyticsService.dashboard(period);return progress==null?result:progress.apply(result);
+    public Object dashboard(
+            @RequestParam(defaultValue = "30d") String period,
+            @RequestParam(required = false) String owner
+    ) {
+        var result = analyticsService.dashboard(period, owner);
+        return progress == null ? result : progress.apply(result);
     }
 
     @GetMapping("/portfolio")

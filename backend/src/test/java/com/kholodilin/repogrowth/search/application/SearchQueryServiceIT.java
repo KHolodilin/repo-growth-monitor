@@ -103,7 +103,31 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
         assertThat(during.totalResults()).isEqualTo(443);
         assertThat(during.bestRank()).isEqualTo(2);
         assertThat(during.points()).hasSize(3);
+        assertThat(during.sortMode()).isEqualTo("stars");
         assertThat(during.lastChecked()).isEqualTo(before.lastChecked());
+    }
+
+    @Test
+    void bestRankAndChartUseTheSameSortMode() {
+        SearchQuery query = searchQueryService.create(kafka.id(), null, "mixed sort modes", true, 50);
+        LocalDate today = planningWindow.businessDate();
+        storeSnapshot(query.id(), today.minusDays(2), 1, 100); // DB default stars
+        storeSnapshot(query.id(), today.minusDays(1), 5, 110);
+        long bestMatchRun = runId(query.id(), today.minusDays(1));
+        jdbcClient.sql("UPDATE search_run SET sort_mode = 'best_match' WHERE id = :id")
+                .param("id", bestMatchRun)
+                .update();
+        storeSnapshot(query.id(), today, 3, 120);
+        long latest = runId(query.id(), today);
+        jdbcClient.sql("UPDATE search_run SET sort_mode = 'best_match' WHERE id = :id")
+                .param("id", latest)
+                .update();
+
+        SearchQueryService.SearchHistory history = searchQueryService.history(query.id());
+        assertThat(history.sortMode()).isEqualTo("best_match");
+        assertThat(history.bestRank()).isEqualTo(3);
+        assertThat(history.currentRank()).isEqualTo(3);
+        assertThat(history.points()).extracting(SearchQueryService.RankPoint::position).containsExactly(5, 3);
     }
 
     @Test

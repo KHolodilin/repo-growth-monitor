@@ -181,7 +181,7 @@ export function QueryDetailsPage() {
 
       <div role="group" aria-label="History period" className="flex justify-end"><PeriodSelector fitMobile period={period} onPeriod={setPeriod} /></div>
 
-      <RankSummary current={history.currentRank} best={history.bestRank} limit={history.query.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
+      <RankSummary current={history.currentRank} best={history.bestRank} limit={history.query.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} sortMode={history.sortMode} />
 
       <ChartCard
         title={SEARCH_METRICS[metric].title}

@@ -203,10 +203,10 @@ class DashboardPartialDataTest {
                 false,
                 points
         );
-        assertThat(stats.totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(156,  -44, -29.3));
-        assertThat(stats.totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, -1, -33.3));
-        assertThat(stats.totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, -1, -20.0));
-        assertThat(stats.totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(null, null, null));
+        assertThat(stats.totals().stars()).isEqualTo(new DashboardResponse.StatsTotal(156,  -44, -29.3, null));
+        assertThat(stats.totals().forks()).isEqualTo(new DashboardResponse.StatsTotal(3, -1, -33.3, null));
+        assertThat(stats.totals().watchers()).isEqualTo(new DashboardResponse.StatsTotal(5, -1, -20.0, null));
+        assertThat(stats.totals().contributors()).isEqualTo(new DashboardResponse.StatsTotal(null, null, null, null));
 
         PortfolioStats all = AnalyticsService.portfolioStats(List.of(), true, points);
         assertThat(all.totals().stars().value()).isNull();
@@ -239,6 +239,13 @@ class DashboardPartialDataTest {
         PortfolioStats stats = AnalyticsService.portfolioStats(List.of(later, right), false, points);
         assertThat(stats.totals().contributors().value()).isEqualTo(3);
         assertThat(stats.totals().contributors().absoluteChange()).isEqualTo(-2);
+        assertThat(stats.totals().contributors().complete()).isFalse();
+        assertThat(AnalyticsService.contributorsComplete(List.of(later, right), 2)).isFalse();
+        assertThat(AnalyticsService.contributorsComplete(List.of(later, right), 1)).isFalse();
+        assertThat(AnalyticsService.contributorsComplete(List.of(
+                new RepositoryStatDay(1, "owner/1", day, 1, 0, 0, 1, List.of("alice")),
+                new RepositoryStatDay(2, "owner/2", day, 1, 0, 0, 1, List.of("bob"))
+        ), 2)).isTrue();
         assertThat(AnalyticsService.uniqueContributorCount(List.of(stat(1, day, 1, 0, 0, 1)))).isNull();
         assertThat(AnalyticsService.uniqueContributorCount(List.of(
                 new RepositoryStatDay(1, "owner/1", day, 1, 0, 0, 0, List.of())

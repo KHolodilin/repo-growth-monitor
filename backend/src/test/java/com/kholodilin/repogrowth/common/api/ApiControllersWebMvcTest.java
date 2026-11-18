@@ -190,7 +190,7 @@ class ApiControllersWebMvcTest {
         );
         SearchQueryService.SearchRunResults results = new SearchQueryService.SearchRunResults(searchRun, query, List.of());
         when(searchQueryService.history(5L)).thenReturn(new SearchQueryService.SearchHistory(
-                query, 4, null, 1, 2, 2, List.of(), now, "SUCCESS", "SUCCESS", 80, List.of()
+                query, 4, null, 1, 2, 2, "stars", List.of(), now, "SUCCESS", "SUCCESS", 80, List.of()
         ));
         when(searchQueryService.visibility(13L)).thenReturn(List.of());
         when(searchQueryService.latestResults(5L)).thenReturn(results);

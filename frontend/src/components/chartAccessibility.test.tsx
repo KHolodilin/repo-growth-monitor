@@ -84,8 +84,11 @@ describe("accessible chart controls and compact summaries", () => {
     const view = render(<RankSummary current={null} best={1} limit={50} change7d={0} change30d={null} total={123456789} />);
     expect(screen.getByLabelText("Rank summary")).toBeInTheDocument(); expect(screen.getByText(">50")).toBeInTheDocument(); expect(screen.getByText("No change")).toBeInTheDocument(); expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.getByText("Current Rank").compareDocumentPosition(screen.getByText("Best Rank")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    view.rerender(<RankSummary current={4} best={2} limit={50} change7d={3} change30d={-2} total={null} />);
+    view.rerender(<RankSummary current={4} best={2} limit={50} change7d={3} change30d={-2} total={null} sortMode="best_match" />);
     expect(screen.getByText("↑3")).toBeInTheDocument(); expect(screen.getByText("↓2")).toBeInTheDocument(); expect(screen.getByText("Total Results")).toBeInTheDocument();
+    expect(screen.getByText("Best Rank (Best Match)")).toBeInTheDocument();
+    view.rerender(<RankSummary current={4} best={2} limit={50} change7d={3} change30d={-2} total={null} sortMode="stars" />);
+    expect(screen.getByText("Best Rank (Stars)")).toBeInTheDocument();
   });
   it("offers an empty historical alternative and readable pattern/marker swatches", async () => {
     const user = userEvent.setup(); prepareSeriesStyles(Array.from({ length: 170 }, (_, i) => `test:large-${i}`));

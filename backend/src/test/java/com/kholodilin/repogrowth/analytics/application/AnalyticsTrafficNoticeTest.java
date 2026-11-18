@@ -108,7 +108,7 @@ class AnalyticsTrafficNoticeTest {
         when(traffic.starsChangeSince(any())).thenReturn(0L);
         when(traffic.dailyByRepository(any(), any())).thenReturn(List.of());
         when(traffic.trackedDailyStats(any(), any())).thenReturn(List.of());
-        when(traffic.latestTrackedDailyStats()).thenReturn(List.of());
+        when(traffic.latestTrackedDailyStatsOnOrBefore(any())).thenReturn(List.of());
         when(traffic.trackedTrafficDays(any(), any())).thenReturn(List.of(
                 new StoredTrafficDay(13L, TODAY.minusDays(6)),
                 new StoredTrafficDay(13L, TODAY.minusDays(5)),

@@ -102,6 +102,7 @@ export const searchHistory: SearchHistory = {
   change7d: 1,
   change30d: 3,
   bestRank: 2,
+  sortMode: "stars",
   points: [{ date: "2026-09-23", position: 4, searchRunId: 9 }],
   lastChecked: "2026-09-23T06:10:00Z",
   searchStatus: "SUCCESS",

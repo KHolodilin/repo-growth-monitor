@@ -115,6 +115,10 @@ public class AnalyticsService {
     }
 
     public DashboardResponse dashboard(String periodParam) {
+        return dashboard(periodParam, null);
+    }
+
+    public DashboardResponse dashboard(String periodParam, String ownerLogin) {
         LocalDate today = LocalDate.now(clock);
         DashboardPeriod period = DashboardPeriod.of(
                 periodParam,
@@ -122,6 +126,13 @@ public class AnalyticsService {
                 trafficJdbcRepository.earliestTrackedTrafficDate().orElse(null)
         );
         List<Repository> tracked = visibleTracked(repositoryService.tracked());
+        if (ownerLogin != null && !ownerLogin.isBlank()) {
+            String needle = ownerLogin.trim().toLowerCase(Locale.ROOT) + "/";
+            tracked = tracked.stream()
+                    .filter(repository -> repository.fullName() != null
+                            && repository.fullName().toLowerCase(Locale.ROOT).startsWith(needle))
+                    .toList();
+        }
         if (tracked.isEmpty()) {
             return empty(period, DashboardState.NO_REPOSITORIES, 0, 0);
         }
@@ -419,7 +430,9 @@ public class AnalyticsService {
 
     private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
         Set<Long> visibleIds = tracked.stream().map(Repository::id).collect(Collectors.toSet());
-        boolean fullPortfolio = currentUserAccess.canSeePrivateRepositories();
+        // Owner-scoped Portfolio is a subset; never use the global portfolio totals shortcut.
+        boolean fullPortfolio = currentUserAccess.canSeePrivateRepositories()
+                && tracked.size() == visibleTracked(repositoryService.tracked()).size();
         TrafficCoverage coverage = coverage(visibleIds, period.from(), period.to());
         TrafficCoverage previousCoverage = period.allTime() ? null : coverage(visibleIds, comparisonFrom(period), period.previousTo());
         TrafficTotals current = fullPortfolio
@@ -473,7 +486,7 @@ public class AnalyticsService {
                 traffic,
                 rows,
                 highlightsService.build(period, rows),
-                portfolioStats(period, tracked.size())
+                portfolioStats(period, tracked)
         );
     }
 
@@ -717,21 +730,29 @@ public class AnalyticsService {
         return points;
     }
 
-    private PortfolioStats portfolioStats(DashboardPeriod period, int tracked) {
+    private PortfolioStats portfolioStats(DashboardPeriod period, List<Repository> tracked) {
+        Set<Long> visibleIds = tracked.stream().map(Repository::id).collect(Collectors.toSet());
+        int trackedCount = tracked.size();
         Map<LocalDate, List<RepositoryStatDay>> byDate = new TreeMap<>();
         for (RepositoryStatDay row : trafficJdbcRepository.trackedDailyStats(period.from(), period.to())) {
+            if (!visibleIds.contains(row.repositoryId())) {
+                continue;
+            }
             byDate.computeIfAbsent(row.date(), date -> new ArrayList<>()).add(row);
         }
         List<StatsPoint> points = portfolioStatsSeries(
                 period.from(),
                 period.to(),
                 LocalDate.now(clock),
-                tracked,
+                trackedCount,
                 byDate
         );
-        // Per-repo latest tip (same as main): Unique Contributors needs each repo's own last
-        // login snapshot; a shared tip-day gate drops repos whose logins live on an earlier day.
-        return portfolioStats(trafficJdbcRepository.latestTrackedDailyStats(), period.allTime(), points);
+        // Per-repo tip on or before the period end (same honesty as public owner Stats / 1d).
+        // Absolute latest() would pull today's unfinished tip into a 1d window that ends yesterday.
+        List<RepositoryStatDay> latest = trafficJdbcRepository.latestTrackedDailyStatsOnOrBefore(period.to()).stream()
+                .filter(row -> visibleIds.contains(row.repositoryId()))
+                .toList();
+        return portfolioStats(latest, period.allTime(), trackedCount, points);
     }
 
     /**
@@ -797,6 +818,10 @@ public class AnalyticsService {
     }
 
     static PortfolioStats portfolioStats(List<RepositoryStatDay> latest, boolean allTime, List<StatsPoint> points) {
+        return portfolioStats(latest, allTime, latest.size(), points);
+    }
+
+    static PortfolioStats portfolioStats(List<RepositoryStatDay> latest, boolean allTime, int tracked, List<StatsPoint> points) {
         List<StatsPoint> present = points.stream().filter(point -> point.stars() != null).toList();
         List<StatsPoint> uniquePresent = points.stream().filter(point -> point.contributors() != null).toList();
         boolean comparable = !allTime && present.size() >= 2;
@@ -805,20 +830,39 @@ public class AnalyticsService {
         StatsPoint last = comparable ? present.getLast() : null;
         StatsPoint uniqueFirst = uniqueComparable ? uniquePresent.getFirst() : null;
         StatsPoint uniqueLast = uniqueComparable ? uniquePresent.getLast() : null;
+        Integer unique = uniqueContributorCount(latest);
+        boolean uniqueComplete = unique != null && contributorsComplete(latest, tracked);
         return new PortfolioStats(
                 new DashboardResponse.StatsTotals(
                         portfolioLevel(sum(latest, RepositoryStatDay::stars), comparable, pointValue(first == null ? null : first.stars()), pointValue(last == null ? null : last.stars())),
                         portfolioLevel(sum(latest, RepositoryStatDay::forks), comparable, pointValue(first == null ? null : first.forks()), pointValue(last == null ? null : last.forks())),
                         portfolioLevel(sum(latest, RepositoryStatDay::watchers), comparable, pointValue(first == null ? null : first.watchers()), pointValue(last == null ? null : last.watchers())),
                         portfolioLevel(
-                                uniqueContributorCount(latest),
+                                unique,
                                 uniqueComparable,
                                 pointValue(uniqueFirst == null ? null : uniqueFirst.contributors()),
-                                pointValue(uniqueLast == null ? null : uniqueLast.contributors())
+                                pointValue(uniqueLast == null ? null : uniqueLast.contributors()),
+                                unique == null ? null : uniqueComplete
                         )
                 ),
                 points
         );
+    }
+
+    /** Every tracked tip must carry a collected login set; otherwise the union is observed-only. */
+    static boolean contributorsComplete(List<RepositoryStatDay> latest, int tracked) {
+        if (latest.size() < tracked) {
+            return false;
+        }
+        for (RepositoryStatDay row : latest) {
+            if (row.contributorLogins() == null) {
+                return false;
+            }
+            if (row.contributors() != row.contributorLogins().size()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static Integer uniqueContributorCount(List<RepositoryStatDay> rows) {
@@ -860,10 +904,20 @@ public class AnalyticsService {
     }
 
     private static StatsTotal portfolioLevel(Integer latest, boolean comparable, int baseline, int current) {
+        return portfolioLevel(latest, comparable, baseline, current, null);
+    }
+
+    private static StatsTotal portfolioLevel(
+            Integer latest,
+            boolean comparable,
+            int baseline,
+            int current,
+            Boolean complete
+    ) {
         if (!comparable) {
-            return new StatsTotal(latest, null, null);
+            return new StatsTotal(latest, null, null, complete);
         }
-        return new StatsTotal(latest, current - baseline, GrowthMath.percent(current, baseline));
+        return new StatsTotal(latest, current - baseline, GrowthMath.percent(current, baseline), complete);
     }
 
     /** Up to three tracked repositories with the largest positive share. Equal shares keep the earlier name. */

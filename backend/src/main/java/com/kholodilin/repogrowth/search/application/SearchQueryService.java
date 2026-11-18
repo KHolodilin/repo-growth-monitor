@@ -136,7 +136,8 @@ public class SearchQueryService {
                 .filter(Objects::nonNull)
                 .min(Integer::compareTo)
                 .orElse(null);
-        List<RankPoint> points = runs.stream()
+        // Chart must use the same sort mode as Best/Current Rank — Best Match vs Stars are not comparable.
+        List<RankPoint> points = comparable.stream()
                 .map(run -> new RankPoint(run.businessDate(), run.trackedRepositoryPosition(), run.id()))
                 .toList();
         SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
@@ -152,6 +153,7 @@ public class SearchQueryService {
                 change7,
                 change30,
                 best,
+                normalizeSortMode(sortMode),
                 points,
                 lastChecked,
                 searchStatus,
@@ -215,9 +217,12 @@ public class SearchQueryService {
     }
 
     private static boolean sameSortMode(String left, String right) {
-        String a = left == null || left.isBlank() ? "stars" : left;
-        String b = right == null || right.isBlank() ? "stars" : right;
-        return a.equals(b);
+        return normalizeSortMode(left).equals(normalizeSortMode(right));
+    }
+
+    /** Blank/null matches DB default {@code stars} (changelog 025). */
+    static String normalizeSortMode(String sortMode) {
+        return sortMode == null || sortMode.isBlank() ? "stars" : sortMode;
     }
 
     private Integer changeSince(List<SearchRun> runs, int days) {
@@ -248,6 +253,7 @@ public class SearchQueryService {
             Integer change7d,
             Integer change30d,
             Integer bestRank,
+            String sortMode,
             List<RankPoint> points,
             Instant lastChecked,
             String searchStatus,
