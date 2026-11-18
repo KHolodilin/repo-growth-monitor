@@ -66,8 +66,8 @@ public class CollectionRequestService {
         return seeds.stream().map(id->create(id,date,null,true)).toList();
     }
     private Created create(long repositoryId,LocalDate date,String triggerKey){return create(repositoryId,date,triggerKey,false);}
-    public Created searchCommand(long id,LocalDate date){var query=queries.findById(id).orElseThrow(()->ApiException.notFound("Search query not found"));return create(query.repositoryId(),date,null,false,List.of(new Spec(TaskType.SEARCH_QUERY,"query:"+id,new Parameters(query.query(),null,null,query.resultLimit(),null,null,searchPublic(query.id())))));}
-    public Created searchAllCommand(long id,LocalDate date){var specs=queries.findByRepository(id).stream().filter(q->q.enabled()).map(q->new Spec(TaskType.SEARCH_QUERY,"query:"+q.id(),new Parameters(q.query(),null,null,q.resultLimit(),null,null,searchPublic(q.id())))).toList();if(specs.isEmpty())throw ApiException.validation("No enabled search queries");return create(id,date,null,false,specs);}
+    public Created searchCommand(long id,LocalDate date){var query=queries.findById(id).orElseThrow(()->ApiException.notFound("Search query not found"));return create(query.repositoryId(),date,null,false,List.of(new Spec(TaskType.SEARCH_QUERY,"query:"+id,searchParameters(query))));}
+    public Created searchAllCommand(long id,LocalDate date){var specs=queries.findByRepository(id).stream().filter(q->q.enabled()).map(q->new Spec(TaskType.SEARCH_QUERY,"query:"+q.id(),searchParameters(q))).toList();if(specs.isEmpty())throw ApiException.validation("No enabled search queries");return create(id,date,null,false,specs);}
     public Created topicCommand(long id,LocalDate date){var watch=watches.findById(id).orElseThrow(()->ApiException.notFound("Topic watch not found"));return create(watch.repositoryId(),date,null,false,List.of(new Spec(TaskType.TOPIC_WATCH,"watch:"+id,new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder(),topicsPublic(watch.repositoryId())))));}
     public Created topicsCommand(long id,String scope,LocalDate date){if(!Set.of("all","language").contains(scope))throw ApiException.validation("Topic scope must be all or language");watchSync.sync(id);var specs=watches.findEnabledByRepository(id,scope.equals("all")).stream().map(w->new Spec(TaskType.TOPIC_WATCH,"watch:"+w.id(),new Parameters(w.searchQuery(),w.topic(),w.language(),w.resultLimit(),w.sort(),w.sortOrder(),topicsPublic(w.repositoryId())))).toList();if(specs.isEmpty())throw ApiException.validation("No enabled topic watches");return create(id,date,null,false,specs);}
     private Created create(long repositoryId,LocalDate date,String triggerKey,boolean refresh){return create(repositoryId,date,triggerKey,refresh,null);}
@@ -86,7 +86,7 @@ public class CollectionRequestService {
                     if(!state.equals("ACTIVE")){if(triggerKey!=null)return response(request,(UUID)existing.getFirst().get("public_id"),true);return create(repositoryId,date,triggerKey,false,null);}
                     watchSync.sync(repositoryId);
                     for(var type:List.of(TaskType.STATS,TaskType.TRAFFIC,TaskType.REFERRERS,TaskType.POPULAR_PATHS,TaskType.GROWTH_EVENTS))append(request,repositoryId,new Spec(type,"repository",Parameters.repository()));
-                    for(var query:queries.findByRepository(repositoryId))if(query.enabled())append(request,repositoryId,new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),new Parameters(query.query(),null,null,query.resultLimit(),null,null,searchPublic(query.id()))));
+                    for(var query:queries.findByRepository(repositoryId))if(query.enabled())append(request,repositoryId,new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),searchParameters(query)));
                     for(var watch:watches.findByRepository(repositoryId))if(watch.enabled())append(request,repositoryId,new Spec(TaskType.TOPIC_WATCH,"watch:"+watch.id(),new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder(),topicsPublic(watch.repositoryId()))));
                 }
                 if(requested!=null){
@@ -126,7 +126,7 @@ public class CollectionRequestService {
             for(var setting:eventSettings.ensureDefaults(repositoryId)) growthSettings.put(setting.eventType(),setting.enabled());
             List<Spec> specs=new ArrayList<>();
             for(var type:List.of(TaskType.STATS,TaskType.TRAFFIC,TaskType.REFERRERS,TaskType.POPULAR_PATHS,TaskType.GROWTH_EVENTS)) specs.add(new Spec(type,"repository",Parameters.repository()));
-            for(var query:queries.findByRepository(repositoryId)) if(query.enabled()) specs.add(new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),new Parameters(query.query(),null,null,query.resultLimit(),null,null,searchPublic(query.id()))));
+            for(var query:queries.findByRepository(repositoryId)) if(query.enabled()) specs.add(new Spec(TaskType.SEARCH_QUERY,"query:"+query.id(),searchParameters(query)));
             for(var watch:watches.findByRepository(repositoryId)) if(watch.enabled()) specs.add(new Spec(TaskType.TOPIC_WATCH,"watch:"+watch.id(),new Parameters(watch.searchQuery(),watch.topic(),watch.language(),watch.resultLimit(),watch.sort(),watch.sortOrder(),topicsPublic(watch.repositoryId()))));
             if(refresh){specs.clear();specs.add(new Spec(TaskType.DISCOVER_REPOSITORIES,"repository",Parameters.repository()));}
             if(requested!=null){specs.clear();specs.addAll(requested);}
@@ -172,6 +172,10 @@ public class CollectionRequestService {
     }
     private boolean searchPublic(long id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT public_enabled FROM search_query WHERE id=?",Boolean.class,id));}
     private boolean topicsPublic(long id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT public_topics_enabled FROM repository WHERE id=?",Boolean.class,id));}
+    /** Rank History is stars-sorted; null sort became GitHub Best Match and blanked the chart. */
+    private Parameters searchParameters(com.kholodilin.repogrowth.search.domain.SearchQuery query){
+        return new Parameters(query.query(),null,null,query.resultLimit(),"stars","desc",searchPublic(query.id()));
+    }
     private static long revision(String snapshot) {
         try {return ByteBuffer.wrap(MessageDigest.getInstance("SHA-256").digest(snapshot.getBytes(StandardCharsets.UTF_8))).getLong() & Long.MAX_VALUE;}
         catch(NoSuchAlgorithmException impossible) {throw new IllegalStateException(impossible);}

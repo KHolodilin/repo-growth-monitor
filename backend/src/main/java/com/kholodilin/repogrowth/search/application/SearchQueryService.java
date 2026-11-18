@@ -122,7 +122,9 @@ public class SearchQueryService {
         SearchQuery query = getQuery(searchQueryId);
         List<SearchRun> runs = runRepository.snapshots(searchQueryId);
         SearchRun latestSnapshot = runs.isEmpty() ? null : runs.get(runs.size() - 1);
-        String sortMode = latestSnapshot == null ? null : latestSnapshot.sortMode();
+        // Keep Rank History on stars when that series exists — null-sort SEARCH_QUERY briefly wrote
+        // Best Match tips and emptied the 7d chart. Best Match only when there is no stars history.
+        String sortMode = chartSortMode(runs, latestSnapshot);
         // Deltas and best only within the same GitHub sort mode (Best Match vs Stars are not comparable).
         List<SearchRun> comparable = runs.stream().filter(run -> sameSortMode(run.sortMode(), sortMode)).toList();
         Integer current = latestPosition(comparable);
@@ -141,11 +143,12 @@ public class SearchQueryService {
                 .map(run -> new RankPoint(run.businessDate(), run.trackedRepositoryPosition(), run.id()))
                 .toList();
         SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
-        // The row shows the newest snapshot, so it is dated by that snapshot and not by an attempt in flight.
-        Instant lastChecked = latestSnapshot == null ? null : latestSnapshot.snapshotAt();
+        SearchRun latestComparable = comparable.isEmpty() ? null : comparable.get(comparable.size() - 1);
+        // Date the row by the snapshot that backs Current Rank, not an incompatible Best Match tip.
+        Instant lastChecked = latestComparable == null ? null : latestComparable.snapshotAt();
         String searchStatus = latestRun == null ? null : latestRun.status().name();
         String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
-        Integer totalResults = latestSnapshot == null ? null : latestSnapshot.totalCount();
+        Integer totalResults = latestComparable == null ? null : latestComparable.totalCount();
         return new SearchHistory(
                 query,
                 current,
@@ -223,6 +226,18 @@ public class SearchQueryService {
     /** Blank/null matches DB default {@code stars} (changelog 025). */
     static String normalizeSortMode(String sortMode) {
         return sortMode == null || sortMode.isBlank() ? "stars" : sortMode;
+    }
+
+    static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot) {
+        if (latestSnapshot == null) {
+            return "stars";
+        }
+        String latest = normalizeSortMode(latestSnapshot.sortMode());
+        if ("stars".equals(latest)) {
+            return "stars";
+        }
+        boolean hasStars = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), "stars"));
+        return hasStars ? "stars" : latest;
     }
 
     private Integer changeSince(List<SearchRun> runs, int days) {
