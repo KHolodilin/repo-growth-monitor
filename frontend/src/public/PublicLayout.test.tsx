@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useDashboardView } from "../lib/dashboardView";
 import { PublicLayout } from "./PublicLayout";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
@@ -43,6 +44,24 @@ describe("PublicLayout", () => {
     expect(signIn.className).toContain("w-8");
     expect(signIn.className).not.toContain("border");
     expect(signIn.className).not.toContain("min-h-11");
+  });
+
+  it("disables collection-incomplete markers for every anonymous route", () => {
+    api.mockResolvedValue({ freshness: {} });
+    function Probe() {
+      const view = useDashboardView();
+      return <p>{`public=${String(view.public)} expected=${String(view.collectionExpected)}`}</p>;
+    }
+    render(
+      <MemoryRouter initialEntries={["/Alpha/project"]}>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/:owner/:repository" element={<Probe />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("public=true expected=false")).toBeInTheDocument();
   });
 
   it("toggles About data on the public home footer", async () => {

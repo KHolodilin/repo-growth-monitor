@@ -160,11 +160,10 @@ describe("TrafficKpiCard", () => {
         absoluteChange={null}
         period="30d"
         series={[null, 14]}
-        note="Observed unique logins from repositories with collected tips"
       />,
     );
     expect(screen.getByText("14")).toBeInTheDocument();
-    expect(screen.getByText("Observed unique logins from repositories with collected tips")).toBeInTheDocument();
+    expect(screen.queryByText(/Observed unique logins/)).not.toBeInTheDocument();
 
     rerender(
       <TrafficKpiCard

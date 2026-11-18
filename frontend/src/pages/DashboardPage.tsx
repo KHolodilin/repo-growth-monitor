@@ -199,7 +199,6 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
               card.key === "contributors" &&
               total.value == null &&
               contributorSeries.every((point) => point == null);
-            const contributorsPartial = card.key === "contributors" && total.complete === false;
             return (
               <TrafficKpiCard
                 key={card.key}
@@ -210,13 +209,6 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
                 period={period}
                 series={data.stats.points.map((point) => point[card.key])}
                 missingHistory={contributorsEmpty}
-                note={
-                  contributorsPartial
-                    ? "Observed unique logins from repositories with collected tips"
-                    : contributorsEmpty
-                      ? "No contributor login snapshots in this period"
-                      : undefined
-                }
               />
             );
           })}
