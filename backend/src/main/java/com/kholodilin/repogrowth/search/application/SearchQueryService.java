@@ -35,6 +35,7 @@ public class SearchQueryService {
     private final PlanningWindow planningWindow;
     private final RepositoryService repositoryService;
     private final SearchProperties searchProperties;
+    private final com.kholodilin.collector.search.SearchProperties rankSort;
 
     public SearchQueryService(
             SearchQueryJdbcRepository queryRepository,
@@ -43,7 +44,8 @@ public class SearchQueryService {
             SearchPlanner searchPlanner,
             PlanningWindow planningWindow,
             RepositoryService repositoryService,
-            SearchProperties searchProperties
+            SearchProperties searchProperties,
+            com.kholodilin.collector.search.SearchProperties rankSort
     ) {
         this.queryRepository = queryRepository;
         this.runRepository = runRepository;
@@ -52,6 +54,7 @@ public class SearchQueryService {
         this.planningWindow = planningWindow;
         this.repositoryService = repositoryService;
         this.searchProperties = searchProperties;
+        this.rankSort = rankSort == null ? new com.kholodilin.collector.search.SearchProperties(null, null) : rankSort;
     }
 
     public List<SearchQuery> list(long repositoryId) {
@@ -111,7 +114,6 @@ public class SearchQueryService {
         SearchQuery query = getQuery(searchQueryId);
         LocalDate date = planningWindow.businessDate();
         long runId = searchPlanner.planQuery(query.id(), query.repositoryId(), date);
-        // Preferring stars empties tip days that only have Best Match — requeue them for stars.
         requeueIncompatibleSortTips(query.repositoryId(), date);
         return runId;
     }
@@ -127,21 +129,25 @@ public class SearchQueryService {
     }
 
     private void requeueIncompatibleSortTips(long repositoryId, LocalDate asOf) {
+        String preferred = rankSort.sortModeLabel();
+        if (!"stars".equals(preferred)) {
+            return;
+        }
         LocalDate from = asOf.minusDays(14);
         for (SearchQuery query : list(repositoryId)) {
             if (!query.enabled()) {
                 continue;
             }
             List<SearchRun> runs = runRepository.snapshots(query.id());
-            boolean hasStars = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), "stars"));
-            if (!hasStars) {
+            boolean hasPreferred = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), preferred));
+            if (!hasPreferred) {
                 continue;
             }
             for (SearchRun run : runs) {
                 if (run.businessDate().isBefore(from) || run.businessDate().isAfter(asOf)) {
                     continue;
                 }
-                if (sameSortMode(run.sortMode(), "stars")) {
+                if (sameSortMode(run.sortMode(), preferred)) {
                     continue;
                 }
                 searchPlanner.planQuery(query.id(), query.repositoryId(), run.businessDate());
@@ -153,9 +159,7 @@ public class SearchQueryService {
         SearchQuery query = getQuery(searchQueryId);
         List<SearchRun> runs = runRepository.snapshots(searchQueryId);
         SearchRun latestSnapshot = runs.isEmpty() ? null : runs.get(runs.size() - 1);
-        // Keep Rank History on stars when that series exists — null-sort SEARCH_QUERY briefly wrote
-        // Best Match tips and emptied the 7d chart. Best Match only when there is no stars history.
-        String sortMode = chartSortMode(runs, latestSnapshot);
+        String sortMode = chartSortMode(runs, latestSnapshot, rankSort.sortModeLabel());
         // Deltas and best only within the same GitHub sort mode (Best Match vs Stars are not comparable).
         List<SearchRun> comparable = runs.stream().filter(run -> sameSortMode(run.sortMode(), sortMode)).toList();
         Integer current = latestPosition(comparable);
@@ -254,21 +258,29 @@ public class SearchQueryService {
         return normalizeSortMode(left).equals(normalizeSortMode(right));
     }
 
-    /** Blank/null matches DB default {@code stars} (changelog 025). */
+    /** Blank/null uses the configured preferred mode ({@code collector.search.rank-sort}). */
     static String normalizeSortMode(String sortMode) {
-        return sortMode == null || sortMode.isBlank() ? "stars" : sortMode;
+        return normalizeSortMode(sortMode, "best_match");
+    }
+
+    static String normalizeSortMode(String sortMode, String preferred) {
+        return sortMode == null || sortMode.isBlank() ? preferred : sortMode;
     }
 
     static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot) {
+        return chartSortMode(runs, latestSnapshot, "best_match");
+    }
+
+    static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot, String preferred) {
         if (latestSnapshot == null) {
-            return "stars";
+            return preferred;
         }
-        String latest = normalizeSortMode(latestSnapshot.sortMode());
-        if ("stars".equals(latest)) {
-            return "stars";
+        String latest = normalizeSortMode(latestSnapshot.sortMode(), preferred);
+        if (preferred.equals(latest)) {
+            return preferred;
         }
-        boolean hasStars = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), "stars"));
-        return hasStars ? "stars" : latest;
+        boolean hasPreferred = runs.stream().anyMatch(run -> preferred.equals(normalizeSortMode(run.sortMode(), preferred)));
+        return hasPreferred ? preferred : latest;
     }
 
     /**

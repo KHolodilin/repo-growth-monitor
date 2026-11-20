@@ -1,4 +1,4 @@
-# Independent collector storage is opt-in until dispatch/execution is implemented.
+# Legacy combined-process collector profile. Prefer the standalone github-collector boot JAR.
 rgm:
   web:
     enabled: false
@@ -24,10 +24,11 @@ management:
           include: readinessState
 
 collector:
-  storage:
-    enabled: ${COLLECTOR_STORAGE_ENABLED:false}
-  datasource:
-    url: ${COLLECTOR_DATASOURCE_URL:}
-    username: ${COLLECTOR_DATASOURCE_USERNAME:}
-    password: ${COLLECTOR_DATASOURCE_PASSWORD:}
-    maximum-pool-size: ${COLLECTOR_DATASOURCE_POOL_SIZE:5}
+  runtime:
+    enabled: ${COLLECTOR_RUNTIME_ENABLED:true}
+  capacity:
+    max-jobs: ${COLLECTOR_CAPACITY_MAX_JOBS:100}
+    max-in-flight: ${COLLECTOR_CAPACITY_MAX_IN_FLIGHT:4}
+    max-queue-bytes: ${COLLECTOR_CAPACITY_MAX_QUEUE_BYTES:67108864}
+    max-request-bytes: ${COLLECTOR_CAPACITY_MAX_REQUEST_BYTES:262144}
+    near-capacity-ratio: ${COLLECTOR_CAPACITY_NEAR_RATIO:0.8}

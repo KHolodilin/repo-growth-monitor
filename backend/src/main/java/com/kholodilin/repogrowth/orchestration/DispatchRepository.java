@@ -54,11 +54,17 @@ public class DispatchRepository {
             jdbc.update("UPDATE collector_dispatch SET state='ACKED',locked_by=NULL,locked_until=NULL,acknowledged_at=clock_timestamp(),last_error=NULL WHERE id=?",claim.id()); return true;
         }));
     }
-    public boolean failed(Claim claim,String error,boolean retryable) {
+    public boolean failed(Claim claim, DispatchError error, boolean retryable) {
+        return failed(claim, error, retryable, null);
+    }
+    public boolean failed(Claim claim, DispatchError error, boolean retryable, Duration retryAfter) {
         // Persist bounded categories only, never exception bodies, credentials or response contents.
-        if(!Set.of("TRANSPORT","HTTP_RETRY","HTTP_REJECTED","INVALID_ACCEPTANCE","UNTRUSTED_NODE").contains(error)) throw new IllegalArgumentException("Unknown dispatch error");
-        long delay=Math.min(300_000L,properties.retryDelay().toMillis() * (1L << Math.min(claim.sendCount()-1,6)));
-        return jdbc.update("UPDATE collector_dispatch SET state=?,last_error=?,next_attempt_at=clock_timestamp()+(? * interval '1 millisecond'),locked_by=NULL,locked_until=NULL WHERE id=? AND state='SENDING' AND generation=? AND locked_by=? AND locked_until>clock_timestamp()",retryable?"RETRY":"BLOCKED",error,delay,claim.id(),claim.generation(),claim.owner())==1;
+        Objects.requireNonNull(error, "error");
+        long backoff = Math.min(300_000L, properties.retryDelay().toMillis() * (1L << Math.min(claim.sendCount() - 1, 6)));
+        long delay = retryAfter == null ? backoff : Math.min(300_000L, Math.max(backoff, retryAfter.toMillis()));
+        return jdbc.update(
+                "UPDATE collector_dispatch SET state=?,last_error=?,next_attempt_at=clock_timestamp()+(? * interval '1 millisecond'),locked_by=NULL,locked_until=NULL WHERE id=? AND state='SENDING' AND generation=? AND locked_by=? AND locked_until>clock_timestamp()",
+                retryable ? "RETRY" : "BLOCKED", error.name(), delay, claim.id(), claim.generation(), claim.owner()) == 1;
     }
     public boolean expired(Claim claim) {
         return Boolean.TRUE.equals(tx.execute(status -> {
@@ -66,7 +72,7 @@ public class DispatchRepository {
             // A callback receipt wins even if the dispatch response was lost. Only pending work expires.
             jdbc.update("UPDATE collection_attempt SET state='FAILED',completed_at=clock_timestamp() WHERE public_id=? AND state IN ('ASSIGNED','ACCEPTED')",claim.request().attemptId());
             jdbc.update("UPDATE collection_task SET state='FAILED',completed_at=clock_timestamp() WHERE public_id=? AND current_attempt_id=? AND state IN ('READY','ACCEPTED')",claim.request().jobId(),claim.request().attemptId());
-            jdbc.update("UPDATE collector_dispatch SET state='EXPIRED',locked_by=NULL,locked_until=NULL,last_error='DEADLINE_EXCEEDED' WHERE id=?",claim.id());
+            jdbc.update("UPDATE collector_dispatch SET state='EXPIRED',locked_by=NULL,locked_until=NULL,last_error=? WHERE id=?", OrchestrationStates.LAST_ERROR_DEADLINE, claim.id());
             jdbc.update("""
                 UPDATE collection_request r SET state=CASE WHEN EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state='FAILED') THEN 'FAILED' ELSE 'SUCCEEDED' END,completed_at=clock_timestamp()
                 WHERE r.public_id=? AND r.state='ACTIVE' AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))

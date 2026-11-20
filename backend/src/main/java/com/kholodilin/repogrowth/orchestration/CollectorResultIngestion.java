@@ -47,7 +47,7 @@ public class CollectorResultIngestion {
             var old=receipts.getFirst();if(!hash.equals(old.get("payload_hash")) || !result.eventId().equals(old.get("event_id")) || !result.attemptId().equals(old.get("attempt_id")))throw conflict(result);
             return new Applied(result.eventId(),(String)old.get("outcome"));
         }
-        boolean current=result.attemptId().equals(task.get("current_attempt_id")) && Set.of("READY","ACCEPTED","RUNNING","RETRY").contains(task.get("state"));
+        boolean current=result.attemptId().equals(task.get("current_attempt_id")) && OrchestrationStates.OPEN_TASK.contains(task.get("state"));
         String outcome=current?"APPLIED":"IGNORED";
         if(current){
             history.apply(task,job,result);

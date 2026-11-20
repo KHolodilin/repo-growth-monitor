@@ -1,12 +1,8 @@
-# Copy to a host-private path and point SPRING_CONFIG_ADDITIONAL_LOCATION at it for the collector service.
-# Replace tokens/passwords; never commit real secrets.
+# Copy to a host-private path and point SPRING_CONFIG_ADDITIONAL_LOCATION at it.
+# Replace tokens; never commit real secrets. No collector Postgres.
 collector:
-  storage:
+  runtime:
     enabled: true
-  datasource:
-    url: jdbc:postgresql://postgres:5432/collector
-    username: collector
-    password: "COLLECTOR_DB_PASSWORD"
   http:
     enabled: true
     clients:
@@ -30,3 +26,27 @@ collector:
       - ref: rgm-results
         origin: rgm
         endpoint: https://rgm.example/internal/v1/collector-results
+    retry:
+      max-attempts: 12
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2
+  search:
+    rank-sort: best_match
+  github:
+    pacing:
+      concurrency: 1
+      core-interval: 1200ms
+      search-interval: 3000ms
+    retry:
+      max-attempts: 5
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2
+  capacity:
+    max-jobs: 100
+    max-in-flight: 4
+    max-queue-bytes: 67108864
+    max-request-bytes: 262144

@@ -108,10 +108,10 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
     }
 
     @Test
-    void bestRankAndChartPreferStarsHistoryOverStrayBestMatchTips() {
+    void bestRankAndChartPreferConfiguredBestMatchWhenPresent() {
         SearchQuery query = searchQueryService.create(kafka.id(), null, "mixed sort modes", true, 50);
         LocalDate today = planningWindow.businessDate();
-        storeSnapshot(query.id(), today.minusDays(2), 1, 100); // DB default stars
+        storeSnapshot(query.id(), today.minusDays(2), 1, 100); // legacy blank/stars rows
         storeSnapshot(query.id(), today.minusDays(1), 5, 110);
         storeSnapshot(query.id(), today, 3, 120);
         long latest = runId(query.id(), today);
@@ -120,11 +120,10 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
                 .update();
 
         SearchQueryService.SearchHistory history = searchQueryService.history(query.id());
-        assertThat(history.sortMode()).isEqualTo("stars");
-        assertThat(history.bestRank()).isEqualTo(1);
-        assertThat(history.currentRank()).isEqualTo(5);
-        assertThat(history.points()).extracting(SearchQueryService.RankPoint::position).containsExactly(1, 5);
-        assertThat(history.missedDates()).containsExactly(today);
+        assertThat(history.sortMode()).isEqualTo("best_match");
+        assertThat(history.bestRank()).isEqualTo(3);
+        assertThat(history.currentRank()).isEqualTo(3);
+        assertThat(history.points()).extracting(SearchQueryService.RankPoint::position).containsExactly(3);
     }
 
     @Test

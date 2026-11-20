@@ -43,7 +43,7 @@ public class CollectorNodeMonitor {
     }
     private void reconcile(Map<String,Object> attempt){
         UUID id=(UUID)attempt.get("public_id"),job=(UUID)attempt.get("job_id");String node=(String)attempt.get("node_key"),endpoint=(String)attempt.get("endpoint");
-        boolean failed=false;boolean terminalKnown=Set.of("SUCCEEDED","FAILED","RESULT_UNAVAILABLE").contains(Objects.toString(attempt.get("last_collector_state"),""));
+        boolean failed=false;boolean terminalKnown=OrchestrationStates.TERMINAL_COLLECTOR.contains(Objects.toString(attempt.get("last_collector_state"),""));
         if(eligible(node)){
             try{
                 var observed=client.status(node,endpoint,(UUID)attempt.get("collector_job_id"),id);

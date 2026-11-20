@@ -44,23 +44,21 @@ services:
       postgres:
         condition: service_healthy
 
-  # Same image, collector role only: queue acceptance, GitHub execution, delivery.
+  # Standalone github-collector boot JAR (in-memory queue; no collector Postgres).
   collector:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.collector
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
-      SPRING_PROFILES_ACTIVE: collector,collector-http
       SERVER_PORT: "8080"
-      MANAGEMENT_PORT: "8081"
+      MANAGEMENT_SERVER_PORT: "8081"
       GITHUB_API_BASE_URL: https://api.github.com
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
-      # Product DB/auth/planner stay out of this role; collector storage comes from runtime YAML + env.
-      COLLECTOR_STORAGE_ENABLED: "true"
-      COLLECTOR_DATASOURCE_URL: jdbc:postgresql://postgres:5432/collector
-      COLLECTOR_DATASOURCE_USERNAME: collector
+      COLLECTOR_RUNTIME_ENABLED: "true"
+      SERVER_SHUTDOWN: graceful
     depends_on:
-      postgres:
-        condition: service_healthy
       repo-growth-monitor:
         condition: service_started
 

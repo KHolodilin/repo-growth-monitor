@@ -31,6 +31,14 @@ class CollectorProtocolTest {
         assertThatThrownBy(() -> new RepositoryTarget("0", "owner", "repo")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new RepositoryTarget("1", " ", "repo")).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void jobStateMarksOnlySucceededFailedCancelledAsTerminal() {
+        assertThat(JobState.SUCCEEDED.isTerminal()).isTrue();
+        assertThat(JobState.FAILED.isTerminal()).isTrue();
+        assertThat(JobState.CANCELLED.isTerminal()).isTrue();
+        assertThat(JobState.ACCEPTED.isTerminal()).isFalse();
+        assertThat(JobState.RUNNING.isTerminal()).isFalse();
+        assertThat(JobState.RETRY.isTerminal()).isFalse();
+    }
     @Test void acceptedStatusAndCredentialLeaseRoundTripWithoutLoggingSecrets() {
         var accepted = new JobAccepted(1,id,id,id,JobState.ACCEPTED,at);
         assertThat(mapper.readValue(mapper.writeValueAsString(accepted), JobAccepted.class)).isEqualTo(accepted);

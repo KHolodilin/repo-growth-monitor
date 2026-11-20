@@ -36,7 +36,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties={"rgm.orchestration.enabled=true","rgm.orchestration.allow-http=true","rgm.orchestration.retry-delay=1ms"})
+@SpringBootTest(properties={"rgm.orchestration.enabled=true","rgm.orchestration.allow-http=true","rgm.orchestration.retry-delay=1ms","collector.search.rank-sort=stars"})
 @AutoConfigureMockMvc
 class OrchestrationIT extends AbstractPostgresTest {
     static WireMockServer server=new WireMockServer(wireMockConfig().dynamicPort());
@@ -190,8 +190,8 @@ class OrchestrationIT extends AbstractPostgresTest {
         jdbc.update("UPDATE collector_dispatch SET locked_until=clock_timestamp()-interval '1 second'");
         var claim=dispatch.claim("recovered").orElseThrow();
         assertThatThrownBy(()->dispatch.acknowledge(claim,new JobAccepted(1,UUID.randomUUID(),UUID.randomUUID(),claim.request().attemptId(),JobState.ACCEPTED,Instant.now()))).hasMessageContaining("identity mismatch");
-        assertThat(dispatch.failed(claim,"TRANSPORT",true)).isTrue();
-        assertThat(dispatch.failed(claim,"TRANSPORT",true)).isFalse();
+        assertThat(dispatch.failed(claim, DispatchError.TRANSPORT, true)).isTrue();
+        assertThat(dispatch.failed(claim, DispatchError.TRANSPORT, true)).isFalse();
         assertThatThrownBy(()->new TransactionTemplate(tm).execute(s->dispatcher.dispatchOne())).hasMessageContaining("outside a transaction");
     }
     @Test void schedulerUsesNewServiceAndLegacyPathsAreBlocked() {

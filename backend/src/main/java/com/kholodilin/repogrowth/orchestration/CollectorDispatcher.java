@@ -1,8 +1,9 @@
 package com.kholodilin.repogrowth.orchestration;
 
-import java.time.Instant;
+import java.time.*;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -24,11 +25,25 @@ public class CollectorDispatcher {
         try {repository.acknowledge(claim,transport.send(claim));}
         catch(RestClientResponseException error) {
             int code=error.getStatusCode().value(); boolean retry=code==408 || code==429 || code>=500;
-            repository.failed(claim,retry?"HTTP_RETRY":"HTTP_REJECTED",retry);
+            repository.failed(claim, retry ? DispatchError.HTTP_RETRY : DispatchError.HTTP_REJECTED, retry, retry ? retryAfter(error) : null);
         }
-        catch(RestClientException error) {repository.failed(claim,"TRANSPORT",true);}
-        catch(IllegalArgumentException error) {repository.failed(claim,"INVALID_ACCEPTANCE",false);}
-        catch(IllegalStateException error) {repository.failed(claim,"UNTRUSTED_NODE",false);}
+        catch(RestClientException error) {repository.failed(claim, DispatchError.TRANSPORT, true, null);}
+        catch(IllegalArgumentException error) {repository.failed(claim, DispatchError.INVALID_ACCEPTANCE, false, null);}
+        catch(IllegalStateException error) {repository.failed(claim, DispatchError.UNTRUSTED_NODE, false, null);}
         return true;
+    }
+    static Duration retryAfter(RestClientResponseException error) {
+        String header=error.getResponseHeaders()==null?null:error.getResponseHeaders().getFirst(HttpHeaders.RETRY_AFTER);
+        if(header==null || header.isBlank()) return null;
+        try {
+            long seconds=Long.parseLong(header.trim());
+            if(seconds<0) return null;
+            return Duration.ofSeconds(Math.min(seconds,3600));
+        } catch(NumberFormatException ignored) {
+            try {
+                Duration until=Duration.between(Instant.now(),ZonedDateTime.parse(header.trim()).toInstant());
+                return until.isNegative()?Duration.ZERO:until;
+            } catch(RuntimeException parse) { return null; }
+        }
     }
 }

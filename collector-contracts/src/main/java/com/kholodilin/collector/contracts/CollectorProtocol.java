@@ -55,7 +55,15 @@ public final class CollectorProtocol {
         /** Finished with a terminal failure; no successful snapshot. */
         FAILED,
         /** Cancelled before a terminal result (for example definition deleted). */
-        CANCELLED
+        CANCELLED;
+
+        /**
+         * Terminal outcomes: no further execution on this attempt.
+         * {@link #SUCCEEDED}, {@link #FAILED} and {@link #CANCELLED} only.
+         */
+        public boolean isTerminal() {
+            return this == SUCCEEDED || this == FAILED || this == CANCELLED;
+        }
     }
 
     /** Stable machine-readable failure reasons on the wire. */

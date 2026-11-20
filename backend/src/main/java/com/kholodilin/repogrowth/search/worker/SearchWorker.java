@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.search.worker;
 
+import com.kholodilin.collector.search.SearchProperties;
 import com.kholodilin.repogrowth.collection.worker.RepositoryLock;
 import com.kholodilin.repogrowth.collection.worker.RetryPolicy;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
@@ -44,6 +45,7 @@ public class SearchWorker {
     private final CollectionProperties collectionProperties;
     private final TransactionTemplate transactionTemplate;
     private final RepositoryEnricher repositoryEnricher;
+    private final SearchProperties rankSort;
 
     public SearchWorker(
             SearchRunJdbcRepository runRepository,
@@ -55,7 +57,8 @@ public class SearchWorker {
             RetryPolicy retryPolicy,
             CollectionProperties collectionProperties,
             TransactionTemplate transactionTemplate,
-            RepositoryEnricher repositoryEnricher
+            RepositoryEnricher repositoryEnricher,
+            SearchProperties rankSort
     ) {
         this.runRepository = runRepository;
         this.queryRepository = queryRepository;
@@ -67,6 +70,7 @@ public class SearchWorker {
         this.collectionProperties = collectionProperties;
         this.transactionTemplate = transactionTemplate;
         this.repositoryEnricher = repositoryEnricher;
+        this.rankSort = rankSort == null ? new SearchProperties(null, null) : rankSort;
     }
 
     public boolean poll(String workerId) {
@@ -94,8 +98,8 @@ public class SearchWorker {
             try {
                 SearchQuery query = queryRepository.findById(run.searchQueryId()).orElseThrow();
                 Repository repository = repositoryJdbcRepository.findById(run.repositoryId()).orElseThrow();
-                // Rank History prefers stars; null sort is GitHub Best Match and blanks the tip.
-                GitHubSearchResponse response = gitHubClient.searchRepositories(query.query(), query.resultLimit(), "stars", "desc");
+                String sortMode = rankSort.sortModeLabel();
+                GitHubSearchResponse response = gitHubClient.searchRepositories(query.query(), query.resultLimit(), rankSort.githubSort(), rankSort.githubOrder());
                 List<GitHubSearchItem> items = response.itemsOrEmpty();
                 Integer position = trackedPosition(items, repository.githubId(), query.resultLimit());
                 if (position == null && items.size() < expectedResultCount(query.resultLimit(), response.totalCount())) {
@@ -118,7 +122,7 @@ public class SearchWorker {
                 Integer trackedPosition = position;
                 transactionTemplate.executeWithoutResult(status -> {
                     resultRepository.replaceAll(run.id(), results);
-                    runRepository.markSuccess(run.id(), response.totalCount(), trackedPosition, "stars");
+                    runRepository.markSuccess(run.id(), response.totalCount(), trackedPosition, sortMode);
                 });
                 enrichResults(run.id(), items);
                 log.info("Search run succeeded queryId={} position={}", query.id(), trackedPosition);

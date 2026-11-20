@@ -3,7 +3,7 @@ spring:
   main:
     web-application-type: servlet
 collector:
-  storage:
+  runtime:
     enabled: true
   http:
     enabled: true

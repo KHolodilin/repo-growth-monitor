@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration(proxyBeanMethods=false)
-@EnableConfigurationProperties({OrchestrationProperties.class,RecoveryProperties.class})
+@EnableConfigurationProperties({OrchestrationProperties.class,RecoveryProperties.class,com.kholodilin.collector.search.SearchProperties.class})
 public class OrchestrationConfiguration {
     @org.springframework.context.annotation.Bean
     @ConditionalOnProperty(name="rgm.orchestration.recovery.enabled",havingValue="true")

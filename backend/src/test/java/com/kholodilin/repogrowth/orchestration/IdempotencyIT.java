@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.orchestration;
 
 import com.kholodilin.collector.acceptance.CollectorAcceptanceService;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import com.kholodilin.collector.queue.InMemoryJobQueue;
 import com.kholodilin.collector.queue.JobQueue;
 import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.exception.MissingTransactionException;
@@ -21,19 +22,18 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.test.context.*;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 import tools.jackson.databind.json.JsonMapper;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties={"rgm.orchestration.enabled=true","collector.storage.enabled=true","collector.http.enabled=true",
+@SpringBootTest(properties={"rgm.orchestration.enabled=true","collector.runtime.enabled=true","collector.http.enabled=true",
+    "collector.capacity.max-jobs=100","collector.capacity.max-queue-bytes=10485760","collector.capacity.max-request-bytes=65536",
     "collector.http.clients[0].origin=rgm-a","collector.http.clients[0].token="+IdempotencyIT.TOKEN_A,
     "collector.http.clients[1].origin=rgm-b","collector.http.clients[1].token="+IdempotencyIT.TOKEN_B,
     "rgm.orchestration.nodes[0].key=collector","rgm.orchestration.nodes[0].pool=default",
@@ -41,14 +41,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class IdempotencyIT extends AbstractPostgresTest {
     static final String TOKEN_A="test-service-a-01234567890123456789", TOKEN_B="test-service-b-01234567890123456789";
-    static PostgreSQLContainer collector=new PostgreSQLContainer("postgres:18.6");
-    static {collector.start();}
-    @DynamicPropertySource static void collectorProperties(DynamicPropertyRegistry registry) {
-        registry.add("collector.datasource.url",collector::getJdbcUrl);
-        registry.add("collector.datasource.username",collector::getUsername);
-        registry.add("collector.datasource.password",collector::getPassword);
-    }
-    @AfterAll static void stopCollector() {collector.stop();}
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired JdbcClient jdbcClient;
@@ -60,15 +52,13 @@ class IdempotencyIT extends AbstractPostgresTest {
     @Autowired JobQueue queue;
     @Autowired @Qualifier("rgmIdempotency") IdempotencyService rgmIdempotency;
     @Autowired @Qualifier("collectorIdempotency") IdempotencyService collectorIdempotency;
-    @Autowired @Qualifier("collectorTransactionManager") PlatformTransactionManager collectorTm;
+    @Autowired @Qualifier("collectorIdempotencyStore") com.kholodilin.idempotency.spi.PersistenceStore collectorStore;
     @Autowired PlatformTransactionManager tm;
-    @Autowired @Qualifier("collectorDataSource") DataSource collectorDs;
     @Autowired DataSource productDs;
-    JdbcTemplate cj;
     long repositoryId,otherId,adminId;
     @BeforeEach void reset() {
-        cj=new JdbcTemplate(collectorDs);
-        cj.execute("TRUNCATE collector_observation,idempotency_records,collector_job_identity,collector_job,collector_execution,collector_result,collector_delivery,collector_job_history RESTART IDENTITY");
+        ((InMemoryJobQueue)queue).clear();
+        if(collectorStore instanceof com.kholodilin.collector.idempotency.InMemoryPersistenceStore memory) memory.clear();
         jdbc.execute("TRUNCATE collection_history_mapping,collector_snapshot_header,idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient); catalog.syncMissingUsers(); adminId=users.findByIssuerAndSub(MockUserCatalog.ISSUER,"admin").orElseThrow().id();
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
@@ -90,23 +80,22 @@ class IdempotencyIT extends AbstractPostgresTest {
     @Test void collectorReplaysStableAcceptedIdsAndScopesByAuthenticatedOrigin() throws Exception {
         var job=job();String first=submit(job,TOKEN_A,201);assertThat(submit(job,TOKEN_A,201)).isEqualTo(first);
         assertThat(json.readTree(submit(job,TOKEN_B,201)).get("collectorJobId").asText()).isNotEqualTo(json.readTree(first).get("collectorJobId").asText());
-        assertThat(cj.queryForObject("SELECT count(*) FROM collector_job",Long.class)).isEqualTo(2);
+        assertThat(((InMemoryJobQueue)queue).size()).isEqualTo(2);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM idempotency_records",Long.class)).isZero();
-        assertThat(cj.queryForList("SELECT DISTINCT operation FROM idempotency_records",String.class)).containsExactly("ACCEPT_COLLECTOR_JOB");
     }
-    @Test void changedCollectorPayloadConflictsBeforeAndAfterRetentionCleanup() throws Exception {
+    @Test void changedCollectorPayloadConflicts() throws Exception {
         var job=job();submit(job,TOKEN_A,201);
         var changed=new JobRequest(1,job.requestId(),job.jobId(),job.attemptId(),job.type(),new RepositoryTarget("202","KHolodilin","renamed"),job.businessDate(),2,job.parameters(),job.destinationRef(),job.deadlineAt());
         submit(changed,TOKEN_A,409);
         var otherAttempt=new JobRequest(1,job.requestId(),job.jobId(),UUID.randomUUID(),job.type(),job.repository(),job.businessDate(),1,job.parameters(),job.destinationRef(),job.deadlineAt());
         mvc.perform(post("/internal/v1/jobs").header("Authorization","Bearer "+TOKEN_A).header("Idempotency-Key",job.attemptId().toString()).contentType("application/json").content(json.writeValueAsString(otherAttempt))).andExpect(status().isConflict());
-        expire(cj,collectorDs);submit(changed,TOKEN_A,409);
-        assertThat(cj.queryForObject("SELECT count(*) FROM collector_job",Long.class)).isEqualTo(1);
+        assertThat(((InMemoryJobQueue)queue).size()).isEqualTo(1);
     }
-    @Test void replayAfterArchiveAndCleanupCannotStartAnotherExecution() throws Exception {
+    @Test void replayAfterArchiveCannotStartAnotherExecution() throws Exception {
         var job=job();String accepted=submit(job,TOKEN_A,201);var lease=queue.claim("worker",Duration.ofMinutes(1)).orElseThrow();
-        queue.complete(lease,"SUCCEEDED",UUID.randomUUID(),UUID.randomUUID(),"{}");queue.acknowledge(queue.claimDelivery("sender",Duration.ofMinutes(1)).orElseThrow());
-        assertThat(queue.archive(lease.id(),lease.generation())).isTrue();expire(cj,collectorDs);
+        queue.complete(lease, JobState.SUCCEEDED, UUID.randomUUID(), UUID.randomUUID(), "{}");
+        queue.acknowledge(queue.claimDelivery("sender", Duration.ofMinutes(1)).orElseThrow());
+        assertThat(queue.archive(lease.id(),lease.generation())).isTrue();
         assertThat(submit(job,TOKEN_A,201)).isEqualTo(accepted);assertThat(queue.claim("worker",Duration.ofMinutes(1))).isEmpty();
     }
     @Test void authorizationAndValidationHappenBeforeCollectorReplay() throws Exception {
@@ -115,7 +104,7 @@ class IdempotencyIT extends AbstractPostgresTest {
         mvc.perform(post("/internal/v1/jobs").contentType("application/json").content("not-json")).andExpect(status().isUnauthorized());
         mvc.perform(post("/internal/v1/jobs").with(user("admin")).with(csrf()).contentType("application/json").content(json.writeValueAsString(job))).andExpect(status().isUnauthorized());
         mvc.perform(post("/internal/v1/jobs").header("Authorization","Bearer "+TOKEN_A).header("Idempotency-Key","wrong").contentType("application/json").content(json.writeValueAsString(job))).andExpect(status().isBadRequest());
-        assertThat(cj.queryForObject("SELECT count(*) FROM collector_job",Long.class)).isEqualTo(1);
+        assertThat(((InMemoryJobQueue)queue).size()).isEqualTo(1);
     }
     @Test void concurrentDuplicatesUseTheStarterInBothStores() throws Exception {
         var job=job();
@@ -125,7 +114,7 @@ class IdempotencyIT extends AbstractPostgresTest {
             List<Callable<CollectionRequestService.Created>> productTasks=new ArrayList<>();for(int i=0;i<10;i++) productTasks.add(()->requests.create(adminId,"manual-key",repositoryId,LocalDate.now()));
             Set<UUID> requestIds=new HashSet<>();for(var f:pool.invokeAll(productTasks)) requestIds.add(f.get().requestId());assertThat(requestIds).hasSize(1);
         }
-        assertThat(cj.queryForObject("SELECT count(*) FROM idempotency_records",Long.class)).isEqualTo(1);
+        assertThat(((InMemoryJobQueue)queue).size()).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM idempotency_records",Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM collection_task",Long.class)).isEqualTo(5);
     }
@@ -159,16 +148,12 @@ class IdempotencyIT extends AbstractPostgresTest {
             assertThat(a.requestId()).isNotEqualTo(b.requestId());assertThat(jdbc.queryForObject("SELECT count(*) FROM idempotency_records",Long.class)).isEqualTo(2);
         } finally {users.revokeAdmin(other.id());}
     }
-    @Test void owningDatasourceIsRequiredEvenWhenSomeTransactionAndAnotherBoundConnectionExist() {
-        assertThatThrownBy(()->new TransactionTemplate(tm).execute(s->{
-            cj.queryForObject("SELECT 1",Integer.class); // Connection can be bound to synchronization without owning a transaction.
-            return collectorIdempotency.operation("TEST").key("same").request("x").execute(String.class,()->ExecutionResult.success("bad"));
-        })).isInstanceOf(MissingTransactionException.class);
-        assertThatThrownBy(()->new TransactionTemplate(collectorTm).execute(s->rgmIdempotency.operation("TEST").key("same").request("x").execute(String.class,()->ExecutionResult.success("bad")))).isInstanceOf(MissingTransactionException.class);
+    @Test void productIdempotencyRequiresOwningDatasourceTransaction() {
+        assertThatThrownBy(()->rgmIdempotency.operation("TEST").key("same").request("x").execute(String.class,()->ExecutionResult.success("bad")))
+            .isInstanceOf(MissingTransactionException.class);
         new TransactionTemplate(tm).execute(s->rgmIdempotency.operation("TEST").key("same").request("x").execute(String.class,()->ExecutionResult.success("product")));
-        new TransactionTemplate(collectorTm).execute(s->collectorIdempotency.operation("TEST").key("same").request("x").execute(String.class,()->ExecutionResult.success("collector")));
+        assertThat(collectorIdempotency.operation("TEST").key("same").request("x").execute(String.class,()->ExecutionResult.success("collector")).valueOrThrow()).isEqualTo("collector");
         assertThat(jdbc.queryForObject("SELECT result_payload::text FROM idempotency_records",String.class)).contains("product");
-        assertThat(cj.queryForObject("SELECT result_payload::text FROM idempotency_records",String.class)).contains("collector");
     }
     @Test void productActionFailureRollsBackReplayRecordAndAllBusinessWrites() {
         jdbc.update("INSERT INTO search_query(repository_id,name,query,enabled,result_limit) VALUES (?,'bad','stars:>10',true,101)",repositoryId);
@@ -176,13 +161,17 @@ class IdempotencyIT extends AbstractPostgresTest {
         for(String table:List.of("idempotency_records","collection_request_command","collection_request","collection_task","collector_dispatch")) assertThat(jdbc.queryForObject("SELECT count(*) FROM "+table,Long.class)).isZero();
         jdbc.update("UPDATE search_query SET result_limit=50");assertThat(requests.create(adminId,"rollback",repositoryId,LocalDate.now()).taskIds()).hasSize(6);
     }
-    @Test void collectorActionFailureRollsBackAcceptanceAndCanRetry() throws Exception {
-        var job=job();
-        cj.execute("CREATE FUNCTION reject_acceptance() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test crash'; END $$");
-        cj.execute("CREATE TRIGGER acceptance_crash BEFORE INSERT ON collector_job FOR EACH ROW EXECUTE FUNCTION reject_acceptance()");
-        try {submit(job,TOKEN_A,503);assertThat(cj.queryForObject("SELECT count(*) FROM idempotency_records",Long.class)).isZero();assertThat(cj.queryForObject("SELECT count(*) FROM collector_job_identity",Long.class)).isZero();}
-        finally {cj.execute("DROP TRIGGER acceptance_crash ON collector_job");cj.execute("DROP FUNCTION reject_acceptance()");}
-        submit(job,TOKEN_A,201);
+    @Test void capacityRejectReturns503WithRetryAfter() throws Exception {
+        InMemoryJobQueue memory=(InMemoryJobQueue)queue;
+        while(memory.size()<100) {
+            var fill=job();
+            acceptance.accept("rgm-a",fill.attemptId().toString(),fill);
+        }
+        var overflow=job();
+        mvc.perform(post("/internal/v1/jobs").header("Authorization","Bearer "+TOKEN_A).header("Idempotency-Key",overflow.attemptId().toString()).contentType("application/json").content(json.writeValueAsString(overflow)))
+            .andExpect(status().isServiceUnavailable())
+            .andExpect(header().string("Retry-After","30"))
+            .andExpect(jsonPath("$.code").value("CAPACITY"));
     }
     void expire(JdbcTemplate jdbc,DataSource ds) {
         jdbc.update("UPDATE idempotency_records SET expires_at=clock_timestamp()-interval '1 second'");

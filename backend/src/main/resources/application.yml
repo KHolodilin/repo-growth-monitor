@@ -1,6 +1,8 @@
 spring:
   application:
     name: repo-growth-monitor
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: jdbc:postgresql://localhost:5432/repogrowth
     username: postgres
@@ -12,8 +14,6 @@ spring:
     password: ${LIQUIBASE_PASSWORD:${spring.datasource.password}}
   jackson:
     default-property-inclusion: non_null
-  lifecycle:
-    timeout-per-shutdown-phase: 30s
 
 server:
   port: 8080
@@ -140,3 +140,11 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+
+# Collector runtime stays off in the product web process; use the standalone boot JAR.
+collector:
+  runtime:
+    enabled: false
+  search:
+    rank-sort: best_match
+    rank-sort-order: desc

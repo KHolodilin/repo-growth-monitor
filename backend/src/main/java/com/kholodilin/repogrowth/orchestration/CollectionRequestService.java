@@ -1,7 +1,8 @@
 package com.kholodilin.repogrowth.orchestration;
 
-import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.collector.contracts.CollectorProtocol;
+import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import com.kholodilin.collector.search.SearchProperties;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
@@ -47,10 +48,12 @@ public class CollectionRequestService {
     private final JsonMapper json;
     private final TopicWatchSync watchSync;
     private final GrowthEventSettingJdbcRepository eventSettings;
+    private final SearchProperties search;
     public CollectionRequestService(JdbcTemplate jdbc,PlatformTransactionManager tm,OrchestrationProperties properties,
-            RepositoryJdbcRepository repositories,SearchQueryJdbcRepository queries,TopicWatchJdbcRepository watches,JsonMapper json,TopicWatchSync watchSync,GrowthEventSettingJdbcRepository eventSettings) {
+            RepositoryJdbcRepository repositories,SearchQueryJdbcRepository queries,TopicWatchJdbcRepository watches,JsonMapper json,TopicWatchSync watchSync,GrowthEventSettingJdbcRepository eventSettings,SearchProperties search) {
         this.jdbc=jdbc;this.tx=new TransactionTemplate(tm);this.properties=properties;
         this.watchSync=watchSync;this.eventSettings=eventSettings;this.repositories=repositories;this.queries=queries;this.watches=watches;this.json=json;
+        this.search=search==null?new SearchProperties(null,null):search;
     }
     public Created manual(long repositoryId,LocalDate date) {
         Created created=create(repositoryId,date,null);
@@ -195,6 +198,8 @@ public class CollectionRequestService {
      * Attaches onto the single ACTIVE request with {@code query:{id}@{date}} keys so calendar tips refill.
      */
     private void repairIncompatibleSearchSortTips(long repositoryId,LocalDate asOf){
+        // Only when Rank History prefers stars; best_match must not force a stars refill.
+        if(!"stars".equals(search.sortModeLabel())) return;
         tx.executeWithoutResult(status->{
             jdbc.queryForObject("SELECT pg_advisory_xact_lock(?)",Object.class,repositoryId);
             var active=jdbc.queryForList("SELECT id,business_date FROM collection_request WHERE repository_id=? AND state='ACTIVE' ORDER BY id DESC LIMIT 1",repositoryId);
@@ -260,7 +265,7 @@ public class CollectionRequestService {
     public void cancelSearch(long query){tx.executeWithoutResult(status->{
         var requests=jdbc.queryForList("SELECT DISTINCT request_id FROM collection_task WHERE task_type='SEARCH_QUERY' AND (target_key=? OR target_key LIKE ?) ORDER BY request_id",Long.class,"query:"+query,"query:"+query+"@%");
         for(long request:requests){jdbc.queryForList("SELECT id FROM collection_request WHERE id=? FOR UPDATE",Long.class,request);var tasks=jdbc.queryForList("SELECT id,current_attempt_id FROM collection_task WHERE request_id=? AND task_type='SEARCH_QUERY' AND (target_key=? OR target_key LIKE ?) AND state IN ('READY','ACCEPTED','RUNNING','RETRY') FOR UPDATE",request,"query:"+query,"query:"+query+"@%");
-            for(var task:tasks){jdbc.update("UPDATE collection_task SET state='CANCELLED',completed_at=clock_timestamp() WHERE id=?",task.get("id"));jdbc.update("UPDATE collection_attempt SET state='CANCELLED',completed_at=clock_timestamp() WHERE public_id=?",task.get("current_attempt_id"));jdbc.update("UPDATE collector_dispatch SET state='BLOCKED',last_error='DEFINITION_DELETED',locked_by=NULL,locked_until=NULL WHERE attempt_id=?",task.get("current_attempt_id"));}
+            for(var task:tasks){jdbc.update("UPDATE collection_task SET state='CANCELLED',completed_at=clock_timestamp() WHERE id=?",task.get("id"));jdbc.update("UPDATE collection_attempt SET state='CANCELLED',completed_at=clock_timestamp() WHERE public_id=?",task.get("current_attempt_id"));jdbc.update("UPDATE collector_dispatch SET state='BLOCKED',last_error=?,locked_by=NULL,locked_until=NULL WHERE attempt_id=?",OrchestrationStates.LAST_ERROR_DEFINITION_DELETED,task.get("current_attempt_id"));}
             jdbc.update("UPDATE collection_request r SET state='CANCELLED',completed_at=clock_timestamp() WHERE r.id=? AND r.state='ACTIVE' AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))",request);
         }
     });}
@@ -269,9 +274,9 @@ public class CollectionRequestService {
     }
     private boolean searchPublic(long id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT public_enabled FROM search_query WHERE id=?",Boolean.class,id));}
     private boolean topicsPublic(long id){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT public_topics_enabled FROM repository WHERE id=?",Boolean.class,id));}
-    /** Rank History is stars-sorted; null sort became GitHub Best Match and blanked the chart. */
+    /** Freeze the node-configured search sort into the assignment so Rank History matches collection. */
     private Parameters searchParameters(com.kholodilin.repogrowth.search.domain.SearchQuery query){
-        return new Parameters(query.query(),null,null,query.resultLimit(),"stars","desc",searchPublic(query.id()));
+        return new Parameters(query.query(),null,null,query.resultLimit(),search.githubSort(),search.githubOrder(),searchPublic(query.id()));
     }
     private static long revision(String snapshot) {
         try {return ByteBuffer.wrap(MessageDigest.getInstance("SHA-256").digest(snapshot.getBytes(StandardCharsets.UTF_8))).getLong() & Long.MAX_VALUE;}
