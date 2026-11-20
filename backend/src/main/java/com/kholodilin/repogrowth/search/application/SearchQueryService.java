@@ -35,7 +35,7 @@ public class SearchQueryService {
     private final PlanningWindow planningWindow;
     private final RepositoryService repositoryService;
     private final SearchProperties searchProperties;
-    private final com.kholodilin.collector.search.SearchProperties rankSort;
+    private final com.kholodilin.collector.configuration.SearchProperties rankSort;
 
     public SearchQueryService(
             SearchQueryJdbcRepository queryRepository,
@@ -45,7 +45,7 @@ public class SearchQueryService {
             PlanningWindow planningWindow,
             RepositoryService repositoryService,
             SearchProperties searchProperties,
-            com.kholodilin.collector.search.SearchProperties rankSort
+            com.kholodilin.collector.configuration.SearchProperties rankSort
     ) {
         this.queryRepository = queryRepository;
         this.runRepository = runRepository;
@@ -54,7 +54,7 @@ public class SearchQueryService {
         this.planningWindow = planningWindow;
         this.repositoryService = repositoryService;
         this.searchProperties = searchProperties;
-        this.rankSort = rankSort == null ? new com.kholodilin.collector.search.SearchProperties(null, null) : rankSort;
+        this.rankSort = rankSort == null ? new com.kholodilin.collector.configuration.SearchProperties(null, null) : rankSort;
     }
 
     public List<SearchQuery> list(long repositoryId) {

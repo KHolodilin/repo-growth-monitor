@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth;
 
 import com.kholodilin.bootstrap.CollectorRuntimeConfiguration;
-import com.kholodilin.collector.CollectorModuleConfiguration;
+import com.kholodilin.collector.configuration.CollectorModuleConfiguration;
 import com.kholodilin.repogrowth.collection.worker.CollectionWorkerPool;
 import com.kholodilin.repogrowth.search.worker.SearchWorkerPool;
 import com.kholodilin.repogrowth.common.config.PlannerScheduling;

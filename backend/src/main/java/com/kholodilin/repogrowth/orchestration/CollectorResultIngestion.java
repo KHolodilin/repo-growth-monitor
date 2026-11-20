@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.orchestration;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.idempotency.ScopedIdempotency;
+import com.kholodilin.collector.repository.ScopedIdempotency;
 import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.jackson.CanonicalJsonFingerprintStrategy;
 import com.kholodilin.idempotency.exception.IdempotencyConflictException;

@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleIdempotencyConflict(Exception ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error(ErrorCode.IDEMPOTENCY_CONFLICT,"Idempotency key was used for different content"));
     }
-    @ExceptionHandler({org.springframework.web.bind.MissingRequestHeaderException.class,com.kholodilin.collector.idempotency.InvalidIdempotencyKeyException.class})
+    @ExceptionHandler({org.springframework.web.bind.MissingRequestHeaderException.class,com.kholodilin.collector.repository.InvalidIdempotencyKeyException.class})
     public ResponseEntity<ApiError> handleInvalidRequest(Exception ex) {
         return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR,"Invalid request parameters or Idempotency-Key"));
     }

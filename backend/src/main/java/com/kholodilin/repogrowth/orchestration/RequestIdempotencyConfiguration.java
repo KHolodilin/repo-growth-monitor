@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.orchestration;
 
 import javax.sql.DataSource;
-import com.kholodilin.collector.idempotency.ScopedIdempotency;
+import com.kholodilin.repogrowth.orchestration.idempotency.RgmJdbcIdempotency;
 import com.kholodilin.idempotency.IdempotencyService;
 import com.kholodilin.idempotency.jdbc.JdbcPersistenceStore;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -16,9 +16,9 @@ import java.time.Duration;
 public class RequestIdempotencyConfiguration {
     @Bean(name="rgmIdempotencyStore",defaultCandidate=false)
     @DependsOnDatabaseInitialization
-    JdbcPersistenceStore rgmIdempotencyStore(DataSource ds) {return ScopedIdempotency.validatedStore(ds);}
+    JdbcPersistenceStore rgmIdempotencyStore(DataSource ds) {return RgmJdbcIdempotency.validatedStore(ds);}
     @Bean(name="rgmIdempotency",defaultCandidate=false)
     IdempotencyService rgmIdempotency(DataSource ds,@Qualifier("rgmIdempotencyStore") JdbcPersistenceStore store,Environment env) {
-        return ScopedIdempotency.service(ds,store,env.getProperty("rgm.orchestration.idempotency-retention",Duration.class,Duration.ofDays(7)));
+        return RgmJdbcIdempotency.service(ds,store,env.getProperty("rgm.orchestration.idempotency-retention",Duration.class,Duration.ofDays(7)));
     }
 }

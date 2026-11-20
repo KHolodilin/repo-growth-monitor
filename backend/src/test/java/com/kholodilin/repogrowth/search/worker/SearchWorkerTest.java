@@ -94,7 +94,7 @@ class SearchWorkerTest {
                 properties,
                 transactionTemplate,
                 repositoryEnricher,
-                new com.kholodilin.collector.search.SearchProperties("stars", "desc")
+                new com.kholodilin.collector.configuration.SearchProperties("stars", "desc")
         );
         Instant now = Instant.parse("2026-09-23T06:00:00Z");
         run = new SearchRun(
@@ -269,7 +269,7 @@ class SearchWorkerTest {
                 new CollectionProperties(1, null, new CollectionProperties.Planner(true, LocalTime.of(10, 0), LocalTime.of(18, 0), Duration.ofMinutes(5), Duration.ofHours(3))),
                 transactionTemplate,
                 repositoryEnricher,
-                new com.kholodilin.collector.search.SearchProperties("stars", "desc")
+                new com.kholodilin.collector.configuration.SearchProperties("stars", "desc")
         );
         when(runRepository.claim(eq("w1"), any())).thenReturn(Optional.empty());
         assertThat(worker.poll("w1")).isFalse();

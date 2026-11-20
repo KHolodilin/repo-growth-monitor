@@ -44,7 +44,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter;
         CollectionProperties.class,
         SearchProperties.class,
         TrafficProperties.class,
-        com.kholodilin.collector.search.SearchProperties.class
+        com.kholodilin.collector.configuration.SearchProperties.class
 })
 public class RepoGrowthMonitorApplication {
 

@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.orchestration;
 
-import com.kholodilin.collector.acceptance.CollectorJobController;
+import com.kholodilin.collector.controller.CollectorJobController;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.queue.JobQueue;
+import com.kholodilin.collector.repository.JobQueue;
 import com.kholodilin.repogrowth.auth.application.UserAccountService;
 import java.time.*;
 import java.util.UUID;

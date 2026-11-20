@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.orchestration;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.delivery.ResultDeliveryWorker;
-import com.kholodilin.collector.execution.AssignedJobExecutor;
-import com.kholodilin.collector.queue.JobQueue;
+import com.kholodilin.collector.service.ResultDeliveryService;
+import com.kholodilin.collector.service.JobExecutionService;
+import com.kholodilin.collector.repository.JobQueue;
 import java.time.*;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CollectorExecutionRoleIT {
     @Autowired ApplicationContext context;@Autowired JobQueue queue;@Autowired MockMvc mvc;@Autowired JsonMapper json;
     @Test void standaloneCollectorExecutesAndKeepsUndeliveredResultsWithoutAnyProductDatasource()throws Exception{
-        assertThat(context.getBean(AssignedJobExecutor.class)).isNotNull();assertThat(context.getBean(ResultDeliveryWorker.class)).isNotNull();assertThat(context.containsBean("dataSource")).isFalse();
+        assertThat(context.getBean(JobExecutionService.class)).isNotNull();assertThat(context.getBean(ResultDeliveryService.class)).isNotNull();assertThat(context.containsBean("dataSource")).isFalse();
         var job=new JobRequest(1,UUID.randomUUID(),UUID.randomUUID(),UUID.randomUUID(),TaskType.STATS,new RepositoryTarget("202","owner","repo"),LocalDate.now(),1,Parameters.repository(),"results",Instant.now().minusSeconds(1),new AuthorizationScope("ctx","main"));
         var accepted=queue.accept(new JobQueue.Submission("rgm",job.jobId(),job.attemptId(),json.writeValueAsString(job),"results",job.deadlineAt()));
         long deadline=System.nanoTime()+Duration.ofSeconds(10).toNanos();while(queue.result(accepted.publicId(),"rgm").isEmpty() && System.nanoTime()<deadline)Thread.sleep(50);

@@ -2,7 +2,7 @@ package com.kholodilin.repogrowth.orchestration;
 
 import com.kholodilin.collector.contracts.CollectorProtocol;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.search.SearchProperties;
+import com.kholodilin.collector.configuration.SearchProperties;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;

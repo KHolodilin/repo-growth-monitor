@@ -1,9 +1,10 @@
 package com.kholodilin.repogrowth.orchestration;
 
-import com.kholodilin.collector.acceptance.CollectorAcceptanceService;
+import com.kholodilin.collector.service.CollectorAcceptanceService;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.queue.InMemoryJobQueue;
-import com.kholodilin.collector.queue.JobQueue;
+import com.kholodilin.collector.repository.InMemoryJobQueue;
+import com.kholodilin.collector.model.LocalJobState;
+import com.kholodilin.collector.repository.JobQueue;
 import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.exception.MissingTransactionException;
 import com.kholodilin.idempotency.jdbc.JdbcIdempotencyPersistenceCleanup;
@@ -58,7 +59,7 @@ class IdempotencyIT extends AbstractPostgresTest {
     long repositoryId,otherId,adminId;
     @BeforeEach void reset() {
         ((InMemoryJobQueue)queue).clear();
-        if(collectorStore instanceof com.kholodilin.collector.idempotency.InMemoryPersistenceStore memory) memory.clear();
+        if(collectorStore instanceof com.kholodilin.collector.repository.InMemoryPersistenceStore memory) memory.clear();
         jdbc.execute("TRUNCATE collection_history_mapping,collector_snapshot_header,idempotency_records,collection_request_command,collector_result_receipt,collector_dispatch,collection_attempt,collection_task,collection_request,collector_node RESTART IDENTITY");
         wipeRepositoryData(jdbcClient); catalog.syncMissingUsers(); adminId=users.findByIssuerAndSub(MockUserCatalog.ISSUER,"admin").orElseThrow().id();
         long owner=jdbc.queryForObject("INSERT INTO github_owner(github_id,login,owner_type) VALUES (101,'KHolodilin','USER') RETURNING id",Long.class);
@@ -93,7 +94,7 @@ class IdempotencyIT extends AbstractPostgresTest {
     }
     @Test void replayAfterArchiveCannotStartAnotherExecution() throws Exception {
         var job=job();String accepted=submit(job,TOKEN_A,201);var lease=queue.claim("worker",Duration.ofMinutes(1)).orElseThrow();
-        queue.complete(lease, JobState.SUCCEEDED, UUID.randomUUID(), UUID.randomUUID(), "{}");
+        queue.complete(lease, LocalJobState.SUCCEEDED, UUID.randomUUID(), UUID.randomUUID(), "{}");
         queue.acknowledge(queue.claimDelivery("sender", Duration.ofMinutes(1)).orElseThrow());
         assertThat(queue.archive(lease.id(),lease.generation())).isTrue();
         assertThat(submit(job,TOKEN_A,201)).isEqualTo(accepted);assertThat(queue.claim("worker",Duration.ofMinutes(1))).isEmpty();

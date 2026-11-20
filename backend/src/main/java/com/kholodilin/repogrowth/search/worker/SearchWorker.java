@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.search.worker;
 
-import com.kholodilin.collector.search.SearchProperties;
+import com.kholodilin.collector.configuration.SearchProperties;
 import com.kholodilin.repogrowth.collection.worker.RepositoryLock;
 import com.kholodilin.repogrowth.collection.worker.RetryPolicy;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;

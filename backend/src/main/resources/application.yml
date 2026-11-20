@@ -1,6 +1,8 @@
 spring:
   application:
     name: repo-growth-monitor
+  banner:
+    location: classpath:banner.txt
   lifecycle:
     timeout-per-shutdown-phase: 30s
   datasource:
@@ -17,6 +19,7 @@ spring:
 
 server:
   port: 8080
+  shutdown: graceful
   forward-headers-strategy: framework
   servlet:
     session:
@@ -122,6 +125,9 @@ management:
       enabled: false
     logfile:
       enabled: false
+  info:
+    env:
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}

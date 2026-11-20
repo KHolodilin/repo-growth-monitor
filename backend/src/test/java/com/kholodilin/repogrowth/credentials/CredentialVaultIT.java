@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.credentials;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.credentials.*;
+import com.kholodilin.collector.integration.credentials.CredentialCache;
+import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import com.kholodilin.repogrowth.auth.application.UserAccountService;
 import com.kholodilin.repogrowth.auth.mock.MockUserCatalog;
@@ -86,7 +87,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
         var moved=new JobRequest(1,original.requestId(),original.jobId(),attempt,original.type(),original.repository(),original.businessDate(),original.configurationRevision(),original.parameters(),original.destinationRef(),original.deadlineAt(),original.authorization());
         jdbc.update("INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,'https://node-b.example',?::jsonb,?)",attempt,json.writeValueAsString(moved),java.sql.Timestamp.from(moved.deadlineAt()));
         resolve(credentialRequest(original),NODE_A,403);resolve(credentialRequest(moved),NODE_A,403);resolve(credentialRequest(moved),NODE_B,200);
-        var properties=new CollectorCredentialProperties(false,null,100,1000,null,null,null,false,List.of());
+        var properties=new CredentialSettings(Duration.ofHours(2),100,1000,Duration.ofSeconds(5),Duration.ofSeconds(3),Duration.ofSeconds(10),List.of());
         var b=new CredentialCache((origin,request)->vault.resolve("node-b",request),properties,Clock.systemUTC(),com.github.benmanes.caffeine.cache.Ticker.systemTicker());
         assertThat(b.mappingSize()).isZero();assertThat(b.get("rgm",moved).token()).isEqualTo("github-secret-v1");
     }
