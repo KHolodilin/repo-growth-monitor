@@ -60,4 +60,6 @@ backups/
 .tools/
 
 backend/m2-cache/
+.m2-docker/
+tmp/
 
