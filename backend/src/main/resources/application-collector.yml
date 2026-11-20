@@ -7,6 +7,8 @@ rgm:
   planner:
     enabled: false
 spring:
+  banner:
+    location: classpath:banner-collector.txt
   main:
     web-application-type: none
   liquibase:

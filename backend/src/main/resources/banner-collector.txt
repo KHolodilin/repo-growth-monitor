@@ -1,0 +1,13 @@
+    ██╗  ██╗██╗  ██╗
+    ██║ ██╔╝██║  ██║
+    █████╔╝ ███████║
+    ██╔═██╗ ██╔══██║
+    ██║  ██╗██║  ██║
+    ╚═╝  ╚═╝╚═╝  ╚═╝
+
+                     KHOLODILIN LABS
+
+    ══════════════════════════════════════════════════════════════════
+      Repo Growth Monitor · Collector  ${application.version}
+      Job Queue · GitHub Execution · Credential Lease · Result Delivery
+    ══════════════════════════════════════════════════════════════════
