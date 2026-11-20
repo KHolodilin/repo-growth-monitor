@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- SPI marks nullable; implementation rejects null with requireNonNull. -->
+  <Match>
+    <Class name="com.kholodilin.collector.idempotency.InMemoryPersistenceStore"/>
+    <Bug pattern="NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE"/>
+  </Match>
+  <!-- Counter updates run only while ReentrantLock is held; volatile is for unlocked readers. -->
+  <Match>
+    <Class name="~com\.kholodilin\.collector\.queue\.InMemoryJobQueue(\$.*)?"/>
+    <Bug pattern="VO_VOLATILE_INCREMENT"/>
+  </Match>
+  <!-- Lifecycle fields retained for queue snapshots / future diagnostics. -->
+  <Match>
+    <Class name="~com\.kholodilin\.collector\.queue\.InMemoryJobQueue(\$.*)?"/>
+    <Bug pattern="URF_UNREAD_FIELD"/>
+  </Match>
+</FindBugsFilter>

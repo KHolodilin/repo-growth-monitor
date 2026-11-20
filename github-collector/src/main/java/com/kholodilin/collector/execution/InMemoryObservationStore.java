@@ -12,6 +12,7 @@ public final class InMemoryObservationStore implements ObservationStore {
   private final ConcurrentHashMap<Long, ConcurrentHashMap<String, Entry>> byJob =
       new ConcurrentHashMap<>();
   private final ConcurrentHashMap<Long, Instant> first = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Long, Object> locks = new ConcurrentHashMap<>();
 
   public InMemoryObservationStore(int maximum) {
     if (maximum < 256)
@@ -42,7 +43,8 @@ public final class InMemoryObservationStore implements ObservationStore {
     int bytes = payload.getBytes(StandardCharsets.UTF_8).length;
     ConcurrentHashMap<String, Entry> map =
         byJob.computeIfAbsent(lease.id(), id -> new ConcurrentHashMap<>());
-    synchronized (map) {
+    Object lock = locks.computeIfAbsent(lease.id(), id -> new Object());
+    synchronized (lock) {
       long existing =
           map.entrySet().stream()
               .filter(e -> !e.getKey().equals(observationKey))
@@ -63,6 +65,7 @@ public final class InMemoryObservationStore implements ObservationStore {
     if (map.isEmpty()) {
       byJob.remove(lease.id(), map);
       first.remove(lease.id());
+      locks.remove(lease.id());
     }
   }
 

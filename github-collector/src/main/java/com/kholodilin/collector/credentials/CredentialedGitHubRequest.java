@@ -1,11 +1,13 @@
 package com.kholodilin.collector.credentials;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Execution primitive for #215. A real limiter gate must be supplied by #214; there is no bypass
  * bean.
  */
+@RequiredArgsConstructor
 public final class CredentialedGitHubRequest {
   public record QuotaKey(String origin, String credentialRef, String quotaIdentity) {
     public QuotaKey(String origin, String credentialRef) {
@@ -54,11 +56,6 @@ public final class CredentialedGitHubRequest {
   private final CredentialCache cache;
   private final RequestGate gate;
 
-  public CredentialedGitHubRequest(CredentialCache cache, RequestGate gate) {
-    this.cache = cache;
-    this.gate = gate;
-  }
-
   public <T> T execute(String origin, JobRequest job, Call<T> call) {
     CredentialLease lease = cache.get(origin, job);
     try {
@@ -76,7 +73,7 @@ public final class CredentialedGitHubRequest {
   }
 
   private <T> T invoke(String origin, CredentialLease lease, Call<T> call) {
-    try (Permit permit =
+    try (Permit _ =
         gate.acquire(new QuotaKey(origin, lease.credentialRef(), lease.quotaIdentity()))) {
       return call.execute(lease.token());
     } catch (Failure error) {

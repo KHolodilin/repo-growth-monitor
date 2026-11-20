@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.collector.credentials.CredentialedGitHubRequest;
+import com.kholodilin.collector.github.GitHubClientProperties;
 import com.kholodilin.collector.queue.JobQueue;
 import java.time.*;
 import java.util.*;
@@ -65,7 +66,9 @@ class AssignedJobExecutorTest {
                 null,
                 Map.of(),
                 List.of()));
-    try (var executor = new AssignedJobExecutor(queue, collector, properties)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, properties, new GitHubClientProperties(null, null), json)) {
       assertThat(executor.poll("worker")).isTrue();
     }
     var payload = ArgumentCaptor.forClass(String.class);
@@ -80,7 +83,9 @@ class AssignedJobExecutorTest {
   void quotaWaitingDoesNotSpendTechnicalRetryBudget() {
     Instant next = Instant.now().plusSeconds(60);
     when(collector.collect(lease, job)).thenThrow(new CredentialedGitHubRequest.Failure(429, next));
-    try (var executor = new AssignedJobExecutor(queue, collector, properties)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, properties, new GitHubClientProperties(null, null), json)) {
       executor.poll("worker");
     }
     verify(queue).retry(lease, next, false);
@@ -90,7 +95,9 @@ class AssignedJobExecutorTest {
   @Test
   void permanentPermissionFailureDoesNotRepeatGitHubCollection() {
     when(collector.collect(lease, job)).thenThrow(new CredentialedGitHubRequest.Failure(403));
-    try (var executor = new AssignedJobExecutor(queue, collector, properties)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, properties, new GitHubClientProperties(null, null), json)) {
       executor.poll("worker");
     }
     verify(queue)
@@ -101,7 +108,9 @@ class AssignedJobExecutorTest {
   @Test
   void technicalFailuresUseBoundedRetriesAndSanitizedPayloads() {
     when(collector.collect(lease, job)).thenThrow(new RuntimeException("secret-must-not-be-saved"));
-    try (var executor = new AssignedJobExecutor(queue, collector, properties)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, properties, new GitHubClientProperties(null, null), json)) {
       executor.poll("worker");
     }
     verify(queue).retry(eq(lease), any(), eq(true));
@@ -118,7 +127,9 @@ class AssignedJobExecutorTest {
     when(queue.claim(anyString(), any())).thenReturn(Optional.of(exhausted));
     when(collector.collect(exhausted, job))
         .thenThrow(new RuntimeException("secret-must-not-be-saved"));
-    try (var executor = new AssignedJobExecutor(queue, collector, properties)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, properties, new GitHubClientProperties(null, null), json)) {
       executor.poll("worker");
     }
     var payload = ArgumentCaptor.forClass(String.class);
@@ -153,7 +164,9 @@ class AssignedJobExecutorTest {
               Map.of(),
               List.of());
         });
-    try (var executor = new AssignedJobExecutor(queue, collector, shortLease)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, shortLease, new GitHubClientProperties(null, null), json)) {
       executor.poll("worker");
     }
     verify(queue, atLeast(2)).renew(lease, shortLease.lease());
@@ -183,7 +196,9 @@ class AssignedJobExecutorTest {
               Map.of(),
               List.of());
         });
-    try (var executor = new AssignedJobExecutor(queue, collector, shortLease)) {
+    try (var executor =
+        new AssignedJobExecutor(
+            queue, collector, shortLease, new GitHubClientProperties(null, null), json)) {
       executor.poll("worker");
     }
     verify(queue, never()).complete(any(), any(), any(), any(), anyString());

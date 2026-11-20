@@ -87,7 +87,7 @@ class AssignedTaskCollectorTest {
     reader.data.put("contributors:1", "[]");
     reader.data.put("contributor-count", "{\"total\":0}");
     var job = job(TaskType.STATS);
-    var snapshot = new AssignedTaskCollector(reader, properties).collect(lease(job), job);
+    var snapshot = new AssignedTaskCollector(reader, properties, json).collect(lease(job), job);
     assertThat(snapshot.metrics())
         .containsEntry(Metric.STARS, 0L)
         .containsEntry(Metric.CONTRIBUTORS, 0L);
@@ -105,7 +105,10 @@ class AssignedTaskCollectorTest {
     reader.data.put("clones", "{\"clones\":[]}");
     var job = job(TaskType.TRAFFIC);
     var day =
-        new AssignedTaskCollector(reader, properties).collect(lease(job), job).traffic().getFirst();
+        new AssignedTaskCollector(reader, properties, json)
+            .collect(lease(job), job)
+            .traffic()
+            .getFirst();
     assertThat(day.views()).isZero();
     assertThat(day.clones()).isNull();
   }
@@ -121,7 +124,7 @@ class AssignedTaskCollectorTest {
               : "[{\"path\":\"/owner/repo/issues\",\"title\":\"Issues\",\"count\":12,\"uniques\":7}]");
       var job = job(type);
       var source =
-          new AssignedTaskCollector(reader, properties)
+          new AssignedTaskCollector(reader, properties, json)
               .collect(lease(job), job)
               .sources()
               .getFirst();
@@ -140,7 +143,7 @@ class AssignedTaskCollectorTest {
     reader.data.put("pulls:1", "[]");
     reader.data.put("releases:1", "[]");
     var job = job(TaskType.GROWTH_EVENTS);
-    var snapshot = new AssignedTaskCollector(reader, properties).collect(lease(job), job);
+    var snapshot = new AssignedTaskCollector(reader, properties, json).collect(lease(job), job);
     assertThat(snapshot.metadata())
         .containsKeys("repository", "issues", "pulls", "releases", "contributors");
     assertThat(snapshot.events()).isEmpty();
@@ -153,7 +156,7 @@ class AssignedTaskCollectorTest {
       reader.data.put("search", "{\"total_count\":0,\"incomplete_results\":false,\"items\":[]}");
       reader.data.put("search-confirmation", reader.data.get("search"));
       var job = job(type);
-      var snapshot = new AssignedTaskCollector(reader, properties).collect(lease(job), job);
+      var snapshot = new AssignedTaskCollector(reader, properties, json).collect(lease(job), job);
       assertThat(snapshot.totalResults()).isZero();
       assertThat(snapshot.trackedPosition()).isNull();
       assertThat(reader.reads).containsExactly("search", "search-confirmation");
@@ -166,7 +169,8 @@ class AssignedTaskCollectorTest {
     var reader = new Reader();
     reader.data.put("search", "{\"total_count\":50,\"incomplete_results\":true,\"items\":[]}");
     var job = job(TaskType.SEARCH_QUERY);
-    assertThatThrownBy(() -> new AssignedTaskCollector(reader, properties).collect(lease(job), job))
+    assertThatThrownBy(
+            () -> new AssignedTaskCollector(reader, properties, json).collect(lease(job), job))
         .isInstanceOf(AssignedTaskCollector.Incomplete.class);
     assertThat(reader.invalidated).containsExactly("search");
   }
@@ -178,7 +182,7 @@ class AssignedTaskCollectorTest {
         "accessible-repositories:1",
         "[{\"id\":1,\"owner\":{\"login\":\"owner\"}},{\"id\":2,\"owner\":{\"login\":\"another\"}}]");
     var job = job(TaskType.DISCOVER_REPOSITORIES);
-    var snapshot = new AssignedTaskCollector(reader, properties).collect(lease(job), job);
+    var snapshot = new AssignedTaskCollector(reader, properties, json).collect(lease(job), job);
     assertThat(json.readTree(snapshot.metadata().get("repositories"))).hasSize(1);
     assertThat(reader.reads).containsExactly("accessible-repositories:1");
   }
@@ -230,7 +234,9 @@ class AssignedTaskCollectorTest {
             };
         var job = job(type);
         assertThat(
-                new AssignedTaskCollector(reader, properties).collect(lease(job), job).complete())
+                new AssignedTaskCollector(reader, properties, json)
+                    .collect(lease(job), job)
+                    .complete())
             .isTrue();
       }
     assertThat(counts).containsEntry("search", 600).containsEntry("graphql", 200);
@@ -262,12 +268,12 @@ class AssignedTaskCollectorTest {
             base.deadlineAt(),
             base.authorization());
     var snapshot =
-        new AssignedTaskCollector(reader, properties).collect(lease(published), published);
+        new AssignedTaskCollector(reader, properties, json).collect(lease(published), published);
     assertThat(snapshot.metadata()).containsEntry("publicScopeVerified", "true");
     assertThat(reader.paths).allMatch(path -> path.contains("is%3Apublic"));
     reader.data.put("search", reader.data.get("search").replace("false", "true"));
     assertThat(
-            new AssignedTaskCollector(reader, properties)
+            new AssignedTaskCollector(reader, properties, json)
                 .collect(lease(published), published)
                 .metadata())
         .containsEntry("publicScopeVerified", "false");
@@ -280,7 +286,7 @@ class AssignedTaskCollectorTest {
         "search",
         "{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");
     var search = job(TaskType.SEARCH_QUERY);
-    new AssignedTaskCollector(searchReader, properties).collect(lease(search), search);
+    new AssignedTaskCollector(searchReader, properties, json).collect(lease(search), search);
     assertThat(searchReader.paths)
         .allMatch(path -> path.startsWith("/search/repositories?") && !path.contains("sort="));
     var topicReader = new Reader();
@@ -288,7 +294,7 @@ class AssignedTaskCollectorTest {
         "search",
         "{\"total_count\":1,\"items\":[{\"id\":202,\"private\":false,\"full_name\":\"owner/repo\",\"stargazers_count\":1,\"forks_count\":0}]}");
     var topic = job(TaskType.TOPIC_WATCH);
-    new AssignedTaskCollector(topicReader, properties).collect(lease(topic), topic);
+    new AssignedTaskCollector(topicReader, properties, json).collect(lease(topic), topic);
     assertThat(topicReader.paths)
         .allMatch(path -> path.contains("sort=stars") && path.contains("order=desc"));
   }

@@ -60,7 +60,10 @@ class HttpCredentialResolverTest {
               null,
               true,
               List.of(new CollectorCredentialProperties.Origin("rgm", endpoint, serviceToken)));
-      assertThat(new HttpCredentialResolver(properties).resolve("rgm", request)).isEqualTo(lease);
+      assertThat(
+              new HttpCredentialResolver(properties, HttpCredentialResolver.restClient(properties))
+                  .resolve("rgm", request))
+          .isEqualTo(lease);
       assertThat(auth).hasValue("Bearer " + serviceToken);
       var redirect =
           new CollectorCredentialProperties(
@@ -75,12 +78,16 @@ class HttpCredentialResolverTest {
               List.of(
                   new CollectorCredentialProperties.Origin(
                       "rgm", URI.create(endpoint + "/redirect"), serviceToken)));
-      assertThatThrownBy(() -> new HttpCredentialResolver(redirect).resolve("rgm", request))
+      assertThatThrownBy(() ->
+              new HttpCredentialResolver(redirect, HttpCredentialResolver.restClient(redirect))
+                  .resolve("rgm", request))
           .isInstanceOf(CredentialUnavailableException.class)
           .hasNoCause()
           .hasMessageNotContaining(serviceToken);
       assertThat(leaks).hasValue(0);
-      assertThatThrownBy(() -> new HttpCredentialResolver(properties).resolve("untrusted", request))
+      assertThatThrownBy(() ->
+              new HttpCredentialResolver(properties, HttpCredentialResolver.restClient(properties))
+                  .resolve("untrusted", request))
           .isInstanceOf(CredentialUnavailableException.class);
     } finally {
       server.stop(0);

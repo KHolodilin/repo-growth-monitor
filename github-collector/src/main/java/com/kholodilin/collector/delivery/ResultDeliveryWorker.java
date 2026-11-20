@@ -6,6 +6,7 @@ import com.kholodilin.collector.queue.JobQueue;
 import com.kholodilin.collector.support.RetryBackoff;
 import java.io.IOException;
 import java.time.*;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -15,21 +16,24 @@ import org.springframework.web.client.RestClient;
  * Only terminal immutable results are delivered; retrying transport never calls a source collector.
  */
 @Slf4j
+@RequiredArgsConstructor
 public final class ResultDeliveryWorker {
   private final JobQueue queue;
   private final DeliveryProperties properties;
   private final CollectorCredentialProperties credentials;
   private final RestClient client;
 
-  public ResultDeliveryWorker(
-      JobQueue queue, DeliveryProperties properties, CollectorCredentialProperties credentials) {
-    this.queue = queue;
-    this.properties = properties;
-    this.credentials = credentials;
+  static void requireLeaseExceedsTimeouts(
+      DeliveryProperties properties, CollectorCredentialProperties credentials) {
     if (properties
             .lease()
             .compareTo(credentials.connectTimeout().plus(credentials.readTimeout()).plusSeconds(5))
-        <= 0) throw new IllegalArgumentException("Delivery lease must exceed callback timeouts");
+        <= 0) {
+      throw new IllegalArgumentException("Delivery lease must exceed callback timeouts");
+    }
+  }
+
+  static RestClient restClient(CollectorCredentialProperties credentials) {
     var factory =
         new SimpleClientHttpRequestFactory() {
           @Override
@@ -41,7 +45,7 @@ public final class ResultDeliveryWorker {
         };
     factory.setConnectTimeout(credentials.connectTimeout());
     factory.setReadTimeout(credentials.readTimeout());
-    client = RestClient.builder().requestFactory(factory).build();
+    return RestClient.builder().requestFactory(factory).build();
   }
 
   public boolean poll(String owner) {

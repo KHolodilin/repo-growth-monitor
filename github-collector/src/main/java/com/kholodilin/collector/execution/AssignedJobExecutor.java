@@ -11,17 +11,19 @@ import java.time.*;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
+@RequiredArgsConstructor
 public final class AssignedJobExecutor implements AutoCloseable {
   private final JobQueue queue;
   private final AssignedTaskCollector collector;
   private final ExecutionProperties properties;
-  private final GitHubClientProperties.Retry retry;
-  private final JsonMapper json = JsonMapper.builder().build();
+  private final GitHubClientProperties github;
+  private final JsonMapper json;
   private final ScheduledExecutorService heartbeats =
       Executors.newScheduledThreadPool(
           1,
@@ -30,22 +32,6 @@ public final class AssignedJobExecutor implements AutoCloseable {
             t.setDaemon(true);
             return t;
           });
-
-  public AssignedJobExecutor(
-      JobQueue queue, AssignedTaskCollector collector, ExecutionProperties properties) {
-    this(queue, collector, properties, new GitHubClientProperties(null, null).retry());
-  }
-
-  public AssignedJobExecutor(
-      JobQueue queue,
-      AssignedTaskCollector collector,
-      ExecutionProperties properties,
-      GitHubClientProperties.Retry retry) {
-    this.queue = queue;
-    this.collector = collector;
-    this.properties = properties;
-    this.retry = retry;
-  }
 
   public boolean poll(String owner) {
     var pending = queue.claim(owner, properties.lease());
@@ -81,7 +67,6 @@ public final class AssignedJobExecutor implements AutoCloseable {
         finish(
             lease,
             job,
-            null,
             new Failure(ErrorCode.DEADLINE_EXCEEDED, false, "Assignment deadline exceeded", null),
             live);
         return true;
@@ -118,7 +103,6 @@ public final class AssignedJobExecutor implements AutoCloseable {
         finish(
             lease,
             job,
-            null,
             new Failure(
                 ErrorCode.INVALID_REQUEST,
                 false,
@@ -129,7 +113,6 @@ public final class AssignedJobExecutor implements AutoCloseable {
         finish(
             lease,
             job,
-            null,
             new Failure(
                 error.status() == 401
                     ? ErrorCode.AUTHENTICATION_FAILED
@@ -145,7 +128,6 @@ public final class AssignedJobExecutor implements AutoCloseable {
       finish(
           lease,
           job,
-          null,
           new Failure(
               ErrorCode.INVALID_REQUEST,
               false,
@@ -171,12 +153,12 @@ public final class AssignedJobExecutor implements AutoCloseable {
 
   private void retryOrFail(JobQueue.Lease lease, JobRequest job, AtomicBoolean live) {
     if (!live.get()) return;
+    var retry = github.retry();
     int failures = lease.failures() + 1;
     if (failures >= Math.min(properties.maximumFailures(), retry.maxAttempts()))
       finish(
           lease,
           job,
-          null,
           new Failure(
               ErrorCode.SOURCE_UNAVAILABLE, false, "Collection failed after bounded retries", null),
           live);
@@ -194,11 +176,7 @@ public final class AssignedJobExecutor implements AutoCloseable {
   }
 
   private void finish(
-      JobQueue.Lease lease,
-      JobRequest job,
-      Snapshot snapshot,
-      Failure failure,
-      AtomicBoolean live) {
+      JobQueue.Lease lease, JobRequest job, Failure failure, AtomicBoolean live) {
     if (!live.get()) return;
     log.info("Collect failed type={} code={}", job.type(), failure.code());
     var delivery =

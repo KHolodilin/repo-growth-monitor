@@ -1,6 +1,7 @@
 package com.kholodilin.collector.credentials;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
@@ -9,12 +10,12 @@ import org.springframework.web.client.RestClient;
  * Only configured HTTPS authorities are used. Response/exception bodies must not escape this
  * boundary.
  */
+@RequiredArgsConstructor
 public final class HttpCredentialResolver implements CredentialResolver {
   private final CollectorCredentialProperties properties;
   private final RestClient client;
 
-  public HttpCredentialResolver(CollectorCredentialProperties properties) {
-    this.properties = properties;
+  static RestClient restClient(CollectorCredentialProperties properties) {
     var factory =
         new SimpleClientHttpRequestFactory() {
           @Override
@@ -26,7 +27,7 @@ public final class HttpCredentialResolver implements CredentialResolver {
         };
     factory.setConnectTimeout(properties.connectTimeout());
     factory.setReadTimeout(properties.readTimeout());
-    client = RestClient.builder().requestFactory(factory).build();
+    return RestClient.builder().requestFactory(factory).build();
   }
 
   @Override

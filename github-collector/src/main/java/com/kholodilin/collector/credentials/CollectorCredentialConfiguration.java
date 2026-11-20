@@ -12,7 +12,7 @@ import org.springframework.context.annotation.*;
 public class CollectorCredentialConfiguration {
   @Bean
   CredentialResolver credentialResolver(CollectorCredentialProperties properties) {
-    return new HttpCredentialResolver(properties);
+    return new HttpCredentialResolver(properties, HttpCredentialResolver.restClient(properties));
   }
 
   @Bean

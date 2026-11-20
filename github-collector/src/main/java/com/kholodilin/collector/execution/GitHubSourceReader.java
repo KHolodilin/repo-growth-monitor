@@ -5,12 +5,14 @@ import com.kholodilin.collector.credentials.*;
 import com.kholodilin.collector.queue.JobQueue;
 import java.io.IOException;
 import java.net.URI;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 
+@RequiredArgsConstructor
 public final class GitHubSourceReader implements SourceReader {
   private final ObservationStore observations;
   private final CredentialCache cache;
@@ -18,19 +20,9 @@ public final class GitHubSourceReader implements SourceReader {
   private final ExecutionProperties properties;
   private final LocalGitHubPacer pacer;
   private final RestClient client;
-  private final JsonMapper json = JsonMapper.builder().build();
+  private final JsonMapper json;
 
-  public GitHubSourceReader(
-      ObservationStore observations,
-      CredentialCache cache,
-      CollectorCredentialProperties credentials,
-      ExecutionProperties properties,
-      LocalGitHubPacer pacer) {
-    this.observations = observations;
-    this.cache = cache;
-    this.credentials = credentials;
-    this.properties = properties;
-    this.pacer = pacer;
+  static RestClient restClient(ExecutionProperties properties) {
     var factory =
         new SimpleClientHttpRequestFactory() {
           @Override
@@ -42,7 +34,7 @@ public final class GitHubSourceReader implements SourceReader {
         };
     factory.setConnectTimeout(properties.requestTimeout());
     factory.setReadTimeout(properties.requestTimeout());
-    client = RestClient.builder().requestFactory(factory).build();
+    return RestClient.builder().requestFactory(factory).build();
   }
 
   @Override

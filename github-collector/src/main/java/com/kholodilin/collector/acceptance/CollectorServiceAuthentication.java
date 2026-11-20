@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -14,12 +15,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * Runs before JSON decoding and every replay. Cookies and caller-provided origin headers are
  * ignored.
  */
+@RequiredArgsConstructor
 final class CollectorServiceAuthentication extends OncePerRequestFilter {
   private final CollectorHttpProperties properties;
-
-  CollectorServiceAuthentication(CollectorHttpProperties properties) {
-    this.properties = properties;
-  }
 
   @Override
   protected void doFilterInternal(

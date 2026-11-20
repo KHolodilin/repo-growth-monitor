@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.*;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(
@@ -35,13 +36,22 @@ public class CollectorExecutionConfiguration {
       CredentialCache cache,
       CollectorCredentialProperties credentials,
       ExecutionProperties properties,
-      LocalGitHubPacer pacer) {
-    return new GitHubSourceReader(store, cache, credentials, properties, pacer);
+      LocalGitHubPacer pacer,
+      JsonMapper json) {
+    return new GitHubSourceReader(
+        store,
+        cache,
+        credentials,
+        properties,
+        pacer,
+        GitHubSourceReader.restClient(properties),
+        json);
   }
 
   @Bean
-  AssignedTaskCollector assignedTaskCollector(SourceReader source, ExecutionProperties properties) {
-    return new AssignedTaskCollector(source, properties);
+  AssignedTaskCollector assignedTaskCollector(
+      SourceReader source, ExecutionProperties properties, JsonMapper json) {
+    return new AssignedTaskCollector(source, properties, json);
   }
 
   @Bean(destroyMethod = "close")
@@ -49,8 +59,9 @@ public class CollectorExecutionConfiguration {
       JobQueue queue,
       AssignedTaskCollector collector,
       ExecutionProperties properties,
-      GitHubClientProperties github) {
-    return new AssignedJobExecutor(queue, collector, properties, github.retry());
+      GitHubClientProperties github,
+      JsonMapper json) {
+    return new AssignedJobExecutor(queue, collector, properties, github, json);
   }
 
   @Bean

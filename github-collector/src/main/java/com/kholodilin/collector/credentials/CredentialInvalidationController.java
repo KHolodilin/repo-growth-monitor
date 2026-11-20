@@ -1,19 +1,17 @@
 package com.kholodilin.collector.credentials;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 /** Uses the RGM-origin bearer chain installed by Collector HTTP configuration. */
 @RestController
+@RequiredArgsConstructor
 public class CredentialInvalidationController {
   public record Invalidation(String context) {}
 
   private final CredentialCache cache;
-
-  public CredentialInvalidationController(CredentialCache cache) {
-    this.cache = cache;
-  }
 
   @PostMapping("/internal/v1/credentials/invalidate")
   public ResponseEntity<Void> invalidate(

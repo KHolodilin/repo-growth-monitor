@@ -21,7 +21,9 @@ public class CollectorDeliveryConfiguration {
   @Bean
   ResultDeliveryWorker resultDeliveryWorker(
       JobQueue queue, DeliveryProperties properties, CollectorCredentialProperties credentials) {
-    return new ResultDeliveryWorker(queue, properties, credentials);
+    ResultDeliveryWorker.requireLeaseExceedsTimeouts(properties, credentials);
+    return new ResultDeliveryWorker(
+        queue, properties, credentials, ResultDeliveryWorker.restClient(credentials));
   }
 
   @Bean

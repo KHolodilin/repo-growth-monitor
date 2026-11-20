@@ -207,7 +207,8 @@ public final class GitHubRequestLimiter implements CredentialedGitHubRequest.Req
         try {
           post("report", report, Void.class);
         } catch (RuntimeException unavailable) {
-          /* Durable permit expiry remains conservative; no fresh local budget is minted. */
+          // Durable permit expiry remains conservative; no fresh local budget is minted.
+          Objects.requireNonNull(unavailable);
         }
       } finally {
         active.remove();

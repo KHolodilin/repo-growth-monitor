@@ -6,20 +6,17 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.util.UriUtils;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 
 /** Produces observations only. Product interpretation/history never enters the Collector module. */
+@RequiredArgsConstructor
 public final class AssignedTaskCollector {
   private final SourceReader source;
   private final ExecutionProperties properties;
-  private final JsonMapper json = JsonMapper.builder().build();
-
-  public AssignedTaskCollector(SourceReader source, ExecutionProperties properties) {
-    this.source = source;
-    this.properties = properties;
-  }
+  private final JsonMapper json;
 
   public static final class Incomplete extends RuntimeException {
     public Incomplete() {

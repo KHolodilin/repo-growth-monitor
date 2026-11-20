@@ -1,30 +1,23 @@
 package com.kholodilin.collector.acceptance;
 
+import com.kholodilin.collector.execution.AssignedJobExecutor;
 import com.kholodilin.collector.queue.JobQueue;
 import java.util.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.json.JsonMapper;
 
 @RestController
+@RequiredArgsConstructor
 public final class CollectorRecoveryController {
   public record Confirmation(UUID eventId) {}
 
   private final JobQueue queue;
-  private final JsonMapper json = JsonMapper.builder().build();
-  private final org.springframework.beans.factory.ObjectProvider<
-          com.kholodilin.collector.execution.AssignedJobExecutor>
-      executor;
-
-  public CollectorRecoveryController(
-      JobQueue queue,
-      org.springframework.beans.factory.ObjectProvider<
-              com.kholodilin.collector.execution.AssignedJobExecutor>
-          executor) {
-    this.queue = queue;
-    this.executor = executor;
-  }
+  private final JsonMapper json;
+  private final ObjectProvider<AssignedJobExecutor> executor;
 
   @GetMapping("/internal/v1/status")
   public Map<String, Object> status(Authentication auth) {

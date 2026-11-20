@@ -125,14 +125,17 @@ class GitHubSourceReaderTest {
     var pacer = mock(LocalGitHubPacer.class);
     when(pacer.tryAcquire(anyString(), anyString()))
         .thenAnswer(invocation -> Optional.of((CredentialedGitHubRequest.Permit) () -> {}));
+    var execution =
+        new ExecutionProperties(false, endpoint, true, null, null, Duration.ofSeconds(1), 0, 0, 0);
     reader =
         new GitHubSourceReader(
             observations,
             cache,
             credentials,
-            new ExecutionProperties(
-                false, endpoint, true, null, null, Duration.ofSeconds(1), 0, 0, 0),
-            pacer);
+            execution,
+            pacer,
+            GitHubSourceReader.restClient(execution),
+            json);
   }
 
   void respond(HttpExchange exchange, int status, String text) throws java.io.IOException {
