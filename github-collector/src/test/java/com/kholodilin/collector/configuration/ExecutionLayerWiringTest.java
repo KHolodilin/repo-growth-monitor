@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.kholodilin.collector.integration.credentials.CredentialCache;
-import com.kholodilin.collector.integration.github.AssignedGithubSupport;
+import com.kholodilin.collector.integration.github.AssignedGithubClient;
 import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.collector.repository.ObservationStore;
-import com.kholodilin.collector.service.AssignedTaskCollectionService;
 import com.kholodilin.collector.service.JobExecutionService;
 import com.kholodilin.collector.service.ObservationCheckpoint;
+import com.kholodilin.collector.service.collection.AssignedTaskCollectionService;
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.time.Duration;
@@ -58,22 +58,17 @@ class ExecutionLayerWiringTest {
     runner.run(context -> {
       assertThat(context).hasNotFailed();
       assertThat(context).hasSingleBean(GitHubSourceReader.class);
-      assertThat(context).hasSingleBean(AssignedGithubSupport.class);
+      assertThat(context).hasSingleBean(AssignedGithubClient.class);
       assertThat(context).hasSingleBean(ObservationStore.class);
       assertThat(context).hasSingleBean(ObservationCheckpoint.class);
       assertThat(context).hasSingleBean(AssignedTaskCollectionService.class);
       assertThat(context).hasSingleBean(JobExecutionService.class);
-      assertThat(
-              java.util.Arrays.stream(context.getBeanDefinitionNames())
-                  .noneMatch(name ->
-                      name.equals("checkpointingSourceReader") || name.equals("sourceReader")))
-          .isTrue();
     });
   }
 
   @Test
-  void integrationGithubSupportConstructorStaysOutsideServiceAndRepository() {
-    Constructor<?> ctor = AssignedGithubSupport.class.getDeclaredConstructors()[0];
+  void integrationGithubClientConstructorStaysOutsideServiceAndRepository() {
+    Constructor<?> ctor = AssignedGithubClient.class.getDeclaredConstructors()[0];
     for (Class<?> type : ctor.getParameterTypes()) {
       assertThat(type.getName())
           .doesNotStartWith("com.kholodilin.collector.service.")
@@ -82,15 +77,14 @@ class ExecutionLayerWiringTest {
   }
 
   @Test
-  void observationCheckpointIsOwnedByServiceAndCallsGithubReader() {
+  void observationCheckpointIsOwnedByServiceWithoutGithubReader() {
     Constructor<?> ctor = ObservationCheckpoint.class.getDeclaredConstructors()[0];
     List<String> params =
         java.util.Arrays.stream(ctor.getParameterTypes()).map(Class::getName).toList();
     assertThat(params)
-        .contains(
-            ObservationStore.class.getName(),
-            GitHubSourceReader.class.getName(),
-            JsonMapper.class.getName());
+        .contains(ObservationStore.class.getName(), JsonMapper.class.getName())
+        .doesNotContain(GitHubSourceReader.class.getName())
+        .doesNotContain(AssignedGithubClient.class.getName());
     assertThat(params)
         .noneMatch(name -> name.equals(AssignedTaskCollectionService.class.getName()));
   }

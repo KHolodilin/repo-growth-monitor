@@ -50,15 +50,6 @@ logging:
     root: INFO
     com.kholodilin.collector: INFO
 
-# Product RGM UI/planner stay off this classpath.
-rgm:
-  web:
-    enabled: false
-  collector:
-    enabled: true
-  planner:
-    enabled: false
-
 collector:
   runtime:
     enabled: true
@@ -72,10 +63,8 @@ collector:
     rank-sort-order: desc   # used only when rank-sort=stars
   capacity:
     max-jobs: 100
-    max-in-flight: 4
     max-queue-bytes: 67108864   # 64 MiB approximate payload budget
     max-request-bytes: 262144   # 256 KiB
-    near-capacity-ratio: 0.8
   github:
     pacing:
       concurrency: 1

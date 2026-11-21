@@ -14,26 +14,15 @@ public record CapacityProperties(
      * Maximum jobs retained in memory across ready/running/terminal-awaiting-delivery. Default 100.
      */
     int maxJobs,
-    /** Soft concurrency ceiling for RUNNING leases (metrics / gating). Default 4. */
-    int maxInFlight,
     /** Approximate total payload bytes retained across queued jobs and results. Default 64 MiB. */
     long maxQueueBytes,
     /** Maximum single submission / JobRequest payload accepted. Default 256 KiB. */
-    long maxRequestBytes,
-    /** Fraction of jobs or bytes at which near-capacity metrics/health detail fire. Default 0.8. */
-    double nearCapacityRatio) {
+    long maxRequestBytes) {
   public CapacityProperties {
     maxJobs = maxJobs == 0 ? 100 : maxJobs;
-    maxInFlight = maxInFlight == 0 ? 4 : maxInFlight;
     maxQueueBytes = maxQueueBytes == 0 ? 64L * 1024 * 1024 : maxQueueBytes;
     maxRequestBytes = maxRequestBytes == 0 ? 256L * 1024 : maxRequestBytes;
-    nearCapacityRatio = nearCapacityRatio == 0 ? 0.8 : nearCapacityRatio;
-    if (maxJobs < 1
-        || maxInFlight < 1
-        || maxQueueBytes < 1024
-        || maxRequestBytes < 256
-        || nearCapacityRatio <= 0
-        || nearCapacityRatio > 1)
+    if (maxJobs < 1 || maxQueueBytes < 1024 || maxRequestBytes < 256)
       throw new IllegalArgumentException("Invalid collector capacity policy");
   }
 }

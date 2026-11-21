@@ -1,40 +1,31 @@
 package com.kholodilin.collector.service;
 
-import com.kholodilin.collector.contracts.CollectorProtocol.JobRequest;
-import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.model.CollectionContext;
 import com.kholodilin.collector.repository.ObservationStore;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Service-owned per-observation checkpoints: reuse, persist and invalidate before GitHub HTTP on a
- * miss.
+ * Service-owned per-observation checkpoints. Serializes typed values with Jackson; does not call
+ * GitHub or parse GitHub JSON.
  */
 @RequiredArgsConstructor
 public final class ObservationCheckpoint {
   private final ObservationStore observations;
-  private final GitHubSourceReader github;
   private final JsonMapper json;
 
-  public JsonNode read(
-      CollectionContext context,
-      JobRequest job,
-      String key,
-      String method,
-      String path,
-      String body,
-      boolean optional) {
+  public <T> T get(CollectionContext context, String key, Class<T> type, Supplier<T> load) {
     Objects.requireNonNull(context);
+    Objects.requireNonNull(type);
+    Objects.requireNonNull(load);
     var stored = observations.find(context.observationJobId(), key);
-    if (stored.isPresent()) return json.readTree(stored.get());
-    JsonNode observation =
-        github.fetch(context.trustedOrigin(), job, key, method, path, body, optional);
-    observations.save(context.observationJobId(), key, json.writeValueAsString(observation));
-    return observation;
+    if (stored.isPresent()) return json.readValue(stored.get(), type);
+    T value = Objects.requireNonNull(load.get(), "observation");
+    observations.save(context.observationJobId(), key, json.writeValueAsString(value));
+    return value;
   }
 
   public void invalidate(CollectionContext context, String key) {

@@ -34,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties={"rgm.orchestration.enabled=true","collector.runtime.enabled=true","collector.http.enabled=true",
+    "collector.http.deny-other-routes=false",
     "collector.capacity.max-jobs=100","collector.capacity.max-queue-bytes=10485760","collector.capacity.max-request-bytes=65536",
     "collector.http.clients[0].origin=rgm-a","collector.http.clients[0].token="+IdempotencyIT.TOKEN_A,
     "collector.http.clients[1].origin=rgm-b","collector.http.clients[1].token="+IdempotencyIT.TOKEN_B,

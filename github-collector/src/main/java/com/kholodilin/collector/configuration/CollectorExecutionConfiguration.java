@@ -1,7 +1,7 @@
 package com.kholodilin.collector.configuration;
 
 import com.kholodilin.collector.integration.credentials.CredentialCache;
-import com.kholodilin.collector.integration.github.AssignedGithubSupport;
+import com.kholodilin.collector.integration.github.AssignedGithubClient;
 import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.integration.github.LocalGitHubPacer;
 import com.kholodilin.collector.model.CredentialSettings;
@@ -9,9 +9,9 @@ import com.kholodilin.collector.model.ExecutionSettings;
 import com.kholodilin.collector.repository.InMemoryObservationStore;
 import com.kholodilin.collector.repository.JobQueue;
 import com.kholodilin.collector.repository.ObservationStore;
-import com.kholodilin.collector.service.AssignedTaskCollectionService;
 import com.kholodilin.collector.service.JobExecutionService;
 import com.kholodilin.collector.service.ObservationCheckpoint;
+import com.kholodilin.collector.service.collection.AssignedTaskCollectionService;
 import java.util.concurrent.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -56,19 +56,19 @@ public class CollectorExecutionConfiguration {
   }
 
   @Bean
-  AssignedGithubSupport assignedGithubSupport(ExecutionSettings settings, JsonMapper json) {
-    return new AssignedGithubSupport(settings, json);
+  AssignedGithubClient assignedGithubClient(
+      GitHubSourceReader source, ExecutionSettings settings, JsonMapper json) {
+    return new AssignedGithubClient(source, settings, json);
   }
 
   @Bean
-  ObservationCheckpoint observationCheckpoint(
-      ObservationStore store, GitHubSourceReader github, JsonMapper json) {
-    return new ObservationCheckpoint(store, github, json);
+  ObservationCheckpoint observationCheckpoint(ObservationStore store, JsonMapper json) {
+    return new ObservationCheckpoint(store, json);
   }
 
   @Bean
   AssignedTaskCollectionService assignedTaskCollectionService(
-      ObservationCheckpoint checkpoint, AssignedGithubSupport github) {
+      ObservationCheckpoint checkpoint, AssignedGithubClient github) {
     return new AssignedTaskCollectionService(checkpoint, github);
   }
 

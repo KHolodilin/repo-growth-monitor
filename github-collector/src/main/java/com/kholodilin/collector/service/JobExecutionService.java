@@ -14,6 +14,7 @@ import com.kholodilin.collector.model.PayloadTooLarge;
 import com.kholodilin.collector.model.RetryBackoff;
 import com.kholodilin.collector.model.RetrySettings;
 import com.kholodilin.collector.repository.JobQueue;
+import com.kholodilin.collector.service.collection.AssignedTaskCollectionService;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.UUID;

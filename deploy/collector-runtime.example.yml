@@ -55,7 +55,5 @@ collector:
       jitter: 0.2
   capacity:
     max-jobs: 100
-    max-in-flight: 4
     max-queue-bytes: 67108864
     max-request-bytes: 262144
-    near-capacity-ratio: 0.8

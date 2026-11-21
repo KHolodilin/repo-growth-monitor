@@ -42,13 +42,15 @@ class CollectorArchitectureTest {
                   && c.getSimpleName().equals("GitHubCollectorApplication"));
 
   private static final DescribedPredicate<JavaClass> COLLECTOR_CONTRACTS =
-          DescribedPredicate.describe(
-                  "collector-contracts dependency",
-                  c -> {
-                    String contracts = ROOT + ".contracts";
-                    return c.getPackageName().equals(contracts)
-                            || c.getPackageName().startsWith(contracts + ".");
-                  });
+      DescribedPredicate.describe(
+          "collector-contracts dependency",
+          c -> {
+            String contracts = ROOT + ".contracts";
+            return c.getPackageName().equals(contracts)
+                || c.getPackageName().startsWith(contracts + ".");
+          });
+
+  private static final String COLLECTION_SERVICE = ROOT + ".service.collection..";
 
   @ArchTest
   static final ArchRule layers =
@@ -94,7 +96,7 @@ class CollectorArchitectureTest {
           // Logging is a narrow side layer: only the layers that correlate logs may use it.
           .whereLayer("Logging")
           .mayOnlyBeAccessedByLayers("Controller", "Service", "Security", "Configuration")
-              .ensureAllClassesAreContainedInArchitectureIgnoring(COLLECTOR_CONTRACTS);
+          .ensureAllClassesAreContainedInArchitectureIgnoring(COLLECTOR_CONTRACTS);
 
   @ArchTest
   static final ArchRule integrationDoesNotDependOnRepository =
@@ -179,6 +181,26 @@ class CollectorArchitectureTest {
               "jakarta.servlet..")
           .because(
               "services decide on semantic outcomes, not on HTTP, security or bound properties");
+
+  /**
+   * Collection orchestration consumes typed integration results. Jackson may still serialize
+   * checkpoints ({@code JsonMapper}); GitHub {@code JsonNode} trees stay in integration.
+   */
+  @ArchTest
+  static final ArchRule collectionServicesDoNotDependOnJsonNode =
+      noClasses()
+          .that()
+          .resideInAPackage(COLLECTION_SERVICE)
+          .should()
+          .dependOnClassesThat(
+              DescribedPredicate.describe(
+                  "Jackson JsonNode types",
+                  c ->
+                      c.getName().equals("tools.jackson.databind.JsonNode")
+                          || c.getName().startsWith("tools.jackson.databind.node.")
+                          || c.getName().equals("com.fasterxml.jackson.databind.JsonNode")
+                          || c.getName().startsWith("com.fasterxml.jackson.databind.node.")))
+          .because("collection services consume typed observations instead of parsing GitHub JSON");
 
   @ArchTest
   static final ArchRule repositoryKnowsNoWebTypes =

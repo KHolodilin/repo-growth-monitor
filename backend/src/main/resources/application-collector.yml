@@ -36,10 +36,8 @@ collector:
     rank-sort-order: desc
   capacity:
     max-jobs: ${COLLECTOR_CAPACITY_MAX_JOBS:100}
-    max-in-flight: ${COLLECTOR_CAPACITY_MAX_IN_FLIGHT:4}
     max-queue-bytes: ${COLLECTOR_CAPACITY_MAX_QUEUE_BYTES:67108864}
     max-request-bytes: ${COLLECTOR_CAPACITY_MAX_REQUEST_BYTES:262144}
-    near-capacity-ratio: ${COLLECTOR_CAPACITY_NEAR_RATIO:0.8}
   github:
     pacing:
       concurrency: 1

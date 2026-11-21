@@ -45,9 +45,16 @@ public class CollectorHttpConfiguration {
         .build();
   }
 
+  /**
+   * Standalone default: only {@code /internal/v1/**}. Opt out with {@code
+   * collector.http.deny-other-routes=false} when collector HTTP is embedded beside the product UI.
+   */
   @Bean
   @Order(1)
-  @ConditionalOnProperty(name = "rgm.web.enabled", havingValue = "false")
+  @ConditionalOnProperty(
+      name = "collector.http.deny-other-routes",
+      havingValue = "true",
+      matchIfMissing = true)
   SecurityFilterChain collectorDenyOtherRoutes(HttpSecurity http) throws Exception {
     return http.csrf(c -> c.disable())
         .sessionManagement(c -> c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

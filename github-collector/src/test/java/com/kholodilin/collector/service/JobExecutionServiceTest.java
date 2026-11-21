@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.collector.model.*;
 import com.kholodilin.collector.repository.JobQueue;
+import com.kholodilin.collector.service.collection.AssignedTaskCollectionService;
 import java.net.URI;
 import java.time.*;
 import java.util.*;
