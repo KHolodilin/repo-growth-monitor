@@ -2,6 +2,7 @@ package com.kholodilin.collector.configuration;
 
 import com.kholodilin.collector.integration.credentials.CredentialCache;
 import com.kholodilin.collector.integration.github.AssignedGithubClient;
+import com.kholodilin.collector.integration.github.GitHubObservationMapper;
 import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.integration.github.LocalGitHubPacer;
 import com.kholodilin.collector.model.CredentialSettings;
@@ -59,9 +60,17 @@ public class CollectorExecutionConfiguration {
   }
 
   @Bean
+  GitHubObservationMapper gitHubObservationMapper(JsonMapper json) {
+    return new GitHubObservationMapper(json);
+  }
+
+  @Bean
   AssignedGithubClient assignedGithubClient(
-      GitHubSourceReader source, ExecutionSettings settings, JsonMapper json) {
-    return new AssignedGithubClient(source, settings, json);
+      GitHubSourceReader source,
+      ExecutionSettings settings,
+      GitHubObservationMapper observations,
+      JsonMapper json) {
+    return new AssignedGithubClient(source, settings, observations, json);
   }
 
   @Bean

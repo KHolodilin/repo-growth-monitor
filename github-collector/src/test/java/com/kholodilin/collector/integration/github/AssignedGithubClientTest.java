@@ -12,6 +12,7 @@ import java.time.*;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
 class AssignedGithubClientTest {
@@ -26,7 +27,8 @@ class AssignedGithubClientTest {
           5,
           5 * 1024 * 1024);
   GitHubSourceReader source = mock(GitHubSourceReader.class);
-  AssignedGithubClient client = new AssignedGithubClient(source, settings, json);
+  GitHubObservationMapper observations = new GitHubObservationMapper(json);
+  AssignedGithubClient client = new AssignedGithubClient(source, settings, observations, json);
   JobRequest job =
       new JobRequest(
           1,
@@ -47,7 +49,7 @@ class AssignedGithubClientTest {
   }
 
   @Test
-  void repositoryMapsGitHubFieldsToTypedObservation() {
+  void repositoryBuildsRepoPathAndReturnsTypedObservation() {
     when(source.fetch(
             eq("rgm"), eq(job), eq("repository"), eq("GET"), anyString(), isNull(), eq(false)))
         .thenReturn(
@@ -56,6 +58,11 @@ class AssignedGithubClientTest {
 
     RepositoryObservation remote = client.repository("rgm", job);
 
+    ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+    verify(source)
+        .fetch(
+            eq("rgm"), eq(job), eq("repository"), eq("GET"), path.capture(), isNull(), eq(false));
+    assertThat(path.getValue()).isEqualTo("/repos/owner/repo");
     assertThat(remote.stars()).isEqualTo(3);
     assertThat(remote.forks()).isEqualTo(1);
     assertThat(remote.watchers()).isEqualTo(2);
@@ -78,7 +85,7 @@ class AssignedGithubClientTest {
   }
 
   @Test
-  void searchObservationTracksPositionAndPublicScope() {
+  void searchObservationBuildsQueryAndTracksPosition() {
     JobRequest search =
         new JobRequest(
             1,
@@ -100,6 +107,11 @@ class AssignedGithubClientTest {
 
     SearchObservation data = client.search("rgm", search, "search");
 
+    ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+    verify(source)
+        .fetch(eq("rgm"), eq(search), eq("search"), eq("GET"), path.capture(), isNull(), eq(false));
+    assertThat(path.getValue()).contains("/search/repositories?q=");
+    assertThat(path.getValue()).contains("is%3Apublic");
     assertThat(data.totalCount()).isEqualTo(1);
     assertThat(data.trackedPosition()).isEqualTo(1);
     assertThat(data.allPublic()).isTrue();
@@ -107,9 +119,9 @@ class AssignedGithubClientTest {
   }
 
   @Test
-  void contributorPageReportsContinuationFromFullPage() {
+  void contributorPageUsesClientPageSizeForRequestAndHasNext() {
     StringBuilder page = new StringBuilder("[");
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < AssignedGithubClient.PAGE_SIZE; i++) {
       if (i > 0) page.append(',');
       page.append("{\"login\":\"u").append(i).append("\"}");
     }
@@ -120,7 +132,18 @@ class AssignedGithubClientTest {
 
     ContributorPage slice = client.contributorsPage("rgm", job, 1);
 
-    assertThat(slice.items()).hasSize(100);
+    ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+    verify(source)
+        .fetch(
+            eq("rgm"),
+            eq(job),
+            eq("contributors:1"),
+            eq("GET"),
+            path.capture(),
+            isNull(),
+            eq(false));
+    assertThat(path.getValue()).contains("per_page=" + AssignedGithubClient.PAGE_SIZE + "&page=1");
+    assertThat(slice.items()).hasSize(AssignedGithubClient.PAGE_SIZE);
     assertThat(slice.hasNext()).isTrue();
   }
 
@@ -137,9 +160,54 @@ class AssignedGithubClientTest {
   }
 
   @Test
+  void optionalReadmeUsesOptionalFetch() {
+    when(source.fetch(eq("rgm"), eq(job), eq("readme"), eq("GET"), anyString(), isNull(), eq(true)))
+        .thenReturn(json.readTree("null"));
+
+    assertThat(client.readme("rgm", job).present()).isFalse();
+
+    when(source.fetch(eq("rgm"), eq(job), eq("readme"), eq("GET"), anyString(), isNull(), eq(true)))
+        .thenReturn(json.readTree("{\"name\":\"README.md\"}"));
+    OpaqueDocument present = client.readme("rgm", job);
+    assertThat(present.present()).isTrue();
+    assertThat(present.name()).isEqualTo("README.md");
+  }
+
+  @Test
+  void socialPreviewPostsGraphqlBody() {
+    when(source.fetch(
+            eq("rgm"),
+            eq(job),
+            eq("social-preview"),
+            eq("POST"),
+            eq("/graphql"),
+            anyString(),
+            eq(true)))
+        .thenReturn(
+            json.readTree(
+                "{\"data\":{\"repository\":{\"usesCustomOpenGraphImage\":false,\"openGraphImageUrl\":null}}}"));
+
+    SocialPreview preview = client.socialPreview("rgm", job);
+
+    ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+    verify(source)
+        .fetch(
+            eq("rgm"),
+            eq(job),
+            eq("social-preview"),
+            eq("POST"),
+            eq("/graphql"),
+            body.capture(),
+            eq(true));
+    assertThat(body.getValue()).contains("\"owner\":\"owner\"");
+    assertThat(body.getValue()).contains("\"name\":\"repo\"");
+    assertThat(preview.usable()).isTrue();
+  }
+
+  @Test
   void repositoryArrayPageReportsContinuationFromFullPageOnly() {
     StringBuilder full = new StringBuilder("[");
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < AssignedGithubClient.PAGE_SIZE; i++) {
       if (i > 0) full.append(',');
       full.append("{\"id\":").append(i).append(",\"owner\":{\"login\":\"owner\"}}");
     }
@@ -165,5 +233,33 @@ class AssignedGithubClientTest {
             eq(false)))
         .thenReturn(json.readTree("[{\"id\":1,\"owner\":{\"login\":\"owner\"}}]"));
     assertThat(client.accessibleRepositoriesPage("rgm", job, 2).hasNext()).isFalse();
+  }
+
+  @Test
+  void contentExistsUsesSourcePresenceMarker() {
+    when(source.fetch(
+            eq("rgm"),
+            eq(job),
+            eq("security:.github/SECURITY.md"),
+            eq("GET"),
+            anyString(),
+            isNull(),
+            eq(true)))
+        .thenReturn(json.readTree("{\"exists\":true}"));
+
+    assertThat(
+            client.contentExists("rgm", job, "security:.github/SECURITY.md", ".github/SECURITY.md"))
+        .isTrue();
+
+    when(source.fetch(
+            eq("rgm"),
+            eq(job),
+            eq("security:SECURITY.md"),
+            eq("GET"),
+            anyString(),
+            isNull(),
+            eq(true)))
+        .thenReturn(json.readTree("null"));
+    assertThat(client.contentExists("rgm", job, "security:SECURITY.md", "SECURITY.md")).isFalse();
   }
 }

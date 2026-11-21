@@ -3,6 +3,7 @@ package com.kholodilin.collector.repository;
 import static org.assertj.core.api.Assertions.*;
 
 import com.kholodilin.idempotency.model.*;
+import com.kholodilin.idempotency.spi.PersistenceStore;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,7 +12,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class InMemoryPersistenceStoreTest {
-  InMemoryPersistenceStore store = new InMemoryPersistenceStore();
+  /** Exercise the SPI contract, not only the concrete class. */
+  PersistenceStore store = new InMemoryPersistenceStore();
+
   IdempotencyKey key = new IdempotencyKey("ACCEPT_COLLECTOR_JOB", "scoped-key");
   Instant created = Instant.parse("2027-01-01T00:00:00Z");
   Instant expires = Instant.parse("2027-01-08T00:00:00Z");
@@ -43,6 +46,45 @@ class InMemoryPersistenceStoreTest {
         .containsExactly(IdempotencyStatus.REJECTED, "CAPACITY");
     assertThatThrownBy(() -> store.reject(key, "X", "{}", Instant.now()))
         .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void acquirePreservesNullExpiresAtFromSpiContract() {
+    assertThat(store.acquire(key, "hash-null-exp", created, null)).isTrue();
+    assertThat(store.find(key))
+        .get()
+        .extracting(IdempotencyRecord::expiresAt, IdempotencyRecord::status)
+        .containsExactly(null, IdempotencyStatus.PROCESSING);
+  }
+
+  @Test
+  void completePreservesNullResultTypeAndPayloadFromSpiContract() {
+    assertThat(store.acquire(key, "hash-null-complete", created, expires)).isTrue();
+    Instant done = Instant.parse("2027-01-01T00:03:00Z");
+    store.complete(key, null, null, done);
+    assertThat(store.find(key))
+        .get()
+        .extracting(
+            IdempotencyRecord::status,
+            IdempotencyRecord::resultType,
+            IdempotencyRecord::resultPayload,
+            IdempotencyRecord::completedAt)
+        .containsExactly(IdempotencyStatus.COMPLETED, null, null, done);
+  }
+
+  @Test
+  void rejectPreservesNullDetailsPayloadFromSpiContract() {
+    assertThat(store.acquire(key, "hash-null-reject", created, expires)).isTrue();
+    Instant done = Instant.parse("2027-01-01T00:04:00Z");
+    store.reject(key, "CAPACITY", null, done);
+    assertThat(store.find(key))
+        .get()
+        .extracting(
+            IdempotencyRecord::status,
+            IdempotencyRecord::errorCode,
+            IdempotencyRecord::resultPayload,
+            IdempotencyRecord::completedAt)
+        .containsExactly(IdempotencyStatus.REJECTED, "CAPACITY", null, done);
   }
 
   @Test

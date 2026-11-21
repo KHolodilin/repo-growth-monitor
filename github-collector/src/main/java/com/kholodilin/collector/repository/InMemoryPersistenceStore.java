@@ -36,7 +36,7 @@ public final class InMemoryPersistenceStore implements PersistenceStore {
     Objects.requireNonNull(key);
     Objects.requireNonNull(requestHash);
     Objects.requireNonNull(createdAt);
-    Objects.requireNonNull(expiresAt);
+    // expiresAt is @Nullable on PersistenceStore (idempotency-core 1.2.0); record keeps null.
     Object monitor = monitors.computeIfAbsent(key, ignored -> new Object());
     synchronized (monitor) {
       while (true) {
@@ -76,9 +76,8 @@ public final class InMemoryPersistenceStore implements PersistenceStore {
   public void complete(
       IdempotencyKey key, String resultType, String resultPayload, Instant completedAt) {
     Objects.requireNonNull(key);
-    Objects.requireNonNull(resultType);
-    Objects.requireNonNull(resultPayload);
     Objects.requireNonNull(completedAt);
+    // resultType and resultPayload are @Nullable on PersistenceStore; record keeps nulls.
     finish(
         key,
         existing -> {
@@ -96,6 +95,7 @@ public final class InMemoryPersistenceStore implements PersistenceStore {
     Objects.requireNonNull(key);
     Objects.requireNonNull(errorCode);
     Objects.requireNonNull(completedAt);
+    // resultPayload maps to SPI detailsPayload (@Nullable); record keeps null.
     finish(
         key,
         existing -> {

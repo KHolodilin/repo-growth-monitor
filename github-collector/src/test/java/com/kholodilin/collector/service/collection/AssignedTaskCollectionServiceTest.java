@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.collector.integration.github.AssignedGithubClient;
+import com.kholodilin.collector.integration.github.GitHubObservationMapper;
 import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.model.CollectionContext;
 import com.kholodilin.collector.model.ExecutionSettings;
@@ -33,7 +34,8 @@ class AssignedTaskCollectionServiceTest {
           5,
           5 * 1024 * 1024);
   GitHubSourceReader reader = mock(GitHubSourceReader.class);
-  AssignedGithubClient github = new AssignedGithubClient(reader, properties, json);
+  AssignedGithubClient github =
+      new AssignedGithubClient(reader, properties, new GitHubObservationMapper(json), json);
   Map<String, String> fixtures = new ConcurrentHashMap<>();
   List<String> fetchedKeys = Collections.synchronizedList(new ArrayList<>());
   InMemoryObservationStore store;
@@ -297,7 +299,8 @@ class AssignedTaskCollectionServiceTest {
             maximumPages,
             5 * 1024 * 1024);
     return new AssignedTaskCollectionService(
-        checkpoint, new AssignedGithubClient(reader, settings, json));
+        checkpoint,
+        new AssignedGithubClient(reader, settings, new GitHubObservationMapper(json), json));
   }
 
   @Test

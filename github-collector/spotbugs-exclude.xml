@@ -1,18 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <FindBugsFilter>
-  <!-- SPI marks nullable; implementation rejects null with requireNonNull. -->
+  <!-- generation++ under this.lock in claim; volatile for unlocked readers of Job state. -->
   <Match>
-    <Class name="com.kholodilin.collector.repository.InMemoryPersistenceStore"/>
-    <Bug pattern="NP_PARAMETER_MUST_BE_NONNULL_BUT_MARKED_AS_NULLABLE"/>
-  </Match>
-  <!-- Counter updates run only while ReentrantLock is held; volatile is for unlocked readers. -->
-  <Match>
-    <Class name="~com\.kholodilin\.collector\.repository\.InMemoryJobQueue(\$.*)?"/>
+    <Class name="com.kholodilin.collector.repository.InMemoryJobQueue"/>
+    <Method
+        name="claim"
+        params="java.lang.String,java.time.Duration"
+        returns="java.util.Optional"/>
     <Bug pattern="VO_VOLATILE_INCREMENT"/>
   </Match>
-  <!-- Lifecycle fields retained for queue snapshots / future diagnostics. -->
+
+  <!-- failures++ under this.lock in the 3-arg retry overload when countFailure is true. -->
   <Match>
-    <Class name="~com\.kholodilin\.collector\.repository\.InMemoryJobQueue(\$.*)?"/>
-    <Bug pattern="URF_UNREAD_FIELD"/>
+    <Class name="com.kholodilin.collector.repository.InMemoryJobQueue"/>
+    <Method
+        name="retry"
+        params="com.kholodilin.collector.repository.JobQueue$Lease,java.time.Instant,boolean"
+        returns="boolean"/>
+    <Bug pattern="VO_VOLATILE_INCREMENT"/>
+  </Match>
+
+  <!-- deliveryGeneration++ under this.lock when claiming a delivery lease. -->
+  <Match>
+    <Class name="com.kholodilin.collector.repository.InMemoryJobQueue"/>
+    <Method
+        name="claimDelivery"
+        params="java.lang.String,java.time.Duration"
+        returns="java.util.Optional"/>
+    <Bug pattern="VO_VOLATILE_INCREMENT"/>
+  </Match>
+
+  <!-- deliveryGeneration++ under this.lock when requeueing a delivery. -->
+  <Match>
+    <Class name="com.kholodilin.collector.repository.InMemoryJobQueue"/>
+    <Method
+        name="requeueDelivery"
+        params="java.util.UUID,java.lang.String"
+        returns="boolean"/>
+    <Bug pattern="VO_VOLATILE_INCREMENT"/>
   </Match>
 </FindBugsFilter>

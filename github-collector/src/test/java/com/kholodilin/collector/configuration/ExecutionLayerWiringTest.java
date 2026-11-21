@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import com.kholodilin.collector.integration.credentials.CredentialCache;
 import com.kholodilin.collector.integration.github.AssignedGithubClient;
+import com.kholodilin.collector.integration.github.GitHubObservationMapper;
 import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.collector.repository.ObservationStore;
@@ -58,6 +59,7 @@ class ExecutionLayerWiringTest {
     runner.run(context -> {
       assertThat(context).hasNotFailed();
       assertThat(context).hasSingleBean(GitHubSourceReader.class);
+      assertThat(context).hasSingleBean(GitHubObservationMapper.class);
       assertThat(context).hasSingleBean(AssignedGithubClient.class);
       assertThat(context).hasSingleBean(ObservationStore.class);
       assertThat(context).hasSingleBean(ObservationCheckpoint.class);

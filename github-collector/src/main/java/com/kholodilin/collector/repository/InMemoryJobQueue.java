@@ -56,7 +56,6 @@ public final class InMemoryJobQueue implements JobQueue {
     volatile LocalJobState state;
     volatile long generation;
     volatile int failures;
-    volatile int executionNo;
     volatile String lockedBy;
     volatile Instant lockedUntil;
     volatile Instant nextAttemptAt;
@@ -70,8 +69,6 @@ public final class InMemoryJobQueue implements JobQueue {
     volatile String deliveryLockedBy;
     volatile Instant deliveryLockedUntil;
     volatile Instant deliveryNextAttemptAt;
-    volatile DeliveryError deliveryError;
-    volatile Instant deliveredAt;
     volatile Instant archivedAt;
     volatile int payloadBytes;
 
@@ -226,7 +223,6 @@ public final class InMemoryJobQueue implements JobQueue {
         return Optional.empty();
       }
       job.state = LocalJobState.RUNNING;
-      job.executionNo++;
       job.generation++;
       job.lockedBy = worker;
       job.lockedUntil = now.plusMillis(ms);
@@ -415,7 +411,6 @@ public final class InMemoryJobQueue implements JobQueue {
         return false;
       }
       job.deliveryState = DeliveryState.DELIVERED;
-      job.deliveredAt = now;
       job.deliveryLockedBy = null;
       job.deliveryLockedUntil = null;
       return true;
@@ -454,7 +449,6 @@ public final class InMemoryJobQueue implements JobQueue {
         return false;
       }
       job.deliveryState = DeliveryState.DEAD;
-      job.deliveryError = error;
       job.deliveryLockedBy = null;
       job.deliveryLockedUntil = null;
       return true;
@@ -555,7 +549,6 @@ public final class InMemoryJobQueue implements JobQueue {
         return false;
       }
       job.deliveryState = DeliveryState.DELIVERED;
-      job.deliveredAt = clock.instant();
       job.deliveryLockedBy = null;
       job.deliveryLockedUntil = null;
       return true;
@@ -584,7 +577,6 @@ public final class InMemoryJobQueue implements JobQueue {
       job.deliveryLockedUntil = null;
       job.deliveryGeneration++;
       job.deliveryNextAttemptAt = Instant.EPOCH;
-      job.deliveryError = null;
       return true;
     } finally {
       lock.unlock();
