@@ -7,12 +7,10 @@ import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
 import com.kholodilin.repogrowth.search.domain.SearchRun;
-import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchResultJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
-import org.springframework.stereotype.Service;
-
+import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -23,334 +21,361 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
 
 @Service
 public class SearchQueryService {
 
-    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
-    private final SearchQueryJdbcRepository queryRepository;
-    private final SearchRunJdbcRepository runRepository;
-    private final SearchResultJdbcRepository resultRepository;
-    private final SearchPlanner searchPlanner;
-    private final PlanningWindow planningWindow;
-    private final RepositoryService repositoryService;
-    private final SearchProperties searchProperties;
-    private final com.kholodilin.collector.configuration.SearchProperties rankSort;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
 
-    public SearchQueryService(
-            SearchQueryJdbcRepository queryRepository,
-            SearchRunJdbcRepository runRepository,
-            SearchResultJdbcRepository resultRepository,
-            SearchPlanner searchPlanner,
-            PlanningWindow planningWindow,
-            RepositoryService repositoryService,
-            SearchProperties searchProperties,
-            com.kholodilin.collector.configuration.SearchProperties rankSort
-    ) {
-        this.queryRepository = queryRepository;
-        this.runRepository = runRepository;
-        this.resultRepository = resultRepository;
-        this.searchPlanner = searchPlanner;
-        this.planningWindow = planningWindow;
-        this.repositoryService = repositoryService;
-        this.searchProperties = searchProperties;
-        this.rankSort = rankSort == null ? new com.kholodilin.collector.configuration.SearchProperties(null, null) : rankSort;
+  private final SearchQueryJdbcRepository queryRepository;
+  private final SearchRunJdbcRepository runRepository;
+  private final SearchResultJdbcRepository resultRepository;
+  private final SearchPlanner searchPlanner;
+  private final PlanningWindow planningWindow;
+  private final RepositoryService repositoryService;
+  private final SearchProperties searchProperties;
+  private final com.kholodilin.collector.configuration.SearchProperties rankSort;
+
+  public SearchQueryService(
+      SearchQueryJdbcRepository queryRepository,
+      SearchRunJdbcRepository runRepository,
+      SearchResultJdbcRepository resultRepository,
+      SearchPlanner searchPlanner,
+      PlanningWindow planningWindow,
+      RepositoryService repositoryService,
+      SearchProperties searchProperties,
+      com.kholodilin.collector.configuration.SearchProperties rankSort) {
+    this.queryRepository = queryRepository;
+    this.runRepository = runRepository;
+    this.resultRepository = resultRepository;
+    this.searchPlanner = searchPlanner;
+    this.planningWindow = planningWindow;
+    this.repositoryService = repositoryService;
+    this.searchProperties = searchProperties;
+    this.rankSort =
+        rankSort == null
+            ? new com.kholodilin.collector.configuration.SearchProperties(null, null)
+            : rankSort;
+  }
+
+  public List<SearchQuery> list(long repositoryId) {
+    repositoryService.get(repositoryId);
+    return queryRepository.findByRepository(repositoryId);
+  }
+
+  public SearchQuery create(
+      long repositoryId, String name, String query, Boolean enabled, Integer resultLimit) {
+    repositoryService.get(repositoryId);
+    String normalized = normalizeQuery(query);
+    ensureUnique(repositoryId, normalized, null);
+    int limit = resultLimit == null ? searchProperties.defaultResultLimit() : resultLimit;
+    boolean on = enabled == null || enabled;
+    String label = name == null || name.isBlank() ? normalized : name.trim();
+    return queryRepository.insert(repositoryId, label, normalized, on, limit);
+  }
+
+  public SearchQuery update(
+      long id, String name, String query, Boolean enabled, Integer resultLimit) {
+    SearchQuery existing = getQuery(id);
+    String nextQuery = query == null ? existing.query() : normalizeQuery(query);
+    ensureUnique(existing.repositoryId(), nextQuery, existing.id());
+    return queryRepository.update(
+        id,
+        name == null ? existing.name() : name,
+        nextQuery,
+        enabled == null ? existing.enabled() : enabled,
+        resultLimit == null ? existing.resultLimit() : resultLimit);
+  }
+
+  private void ensureUnique(long repositoryId, String normalizedQuery, Long excludeId) {
+    queryRepository
+        .findNormalized(repositoryId, normalizedQuery.toLowerCase(), excludeId)
+        .ifPresent(ignored -> {
+          throw ApiException.validation("This search query is already tracked for the repository");
+        });
+  }
+
+  static String normalizeQuery(String query) {
+    if (query == null || query.isBlank()) {
+      throw ApiException.validation("Search query must not be blank");
     }
+    return query.trim().replaceAll("\\s+", " ");
+  }
 
-    public List<SearchQuery> list(long repositoryId) {
-        repositoryService.get(repositoryId);
-        return queryRepository.findByRepository(repositoryId);
+  @org.springframework.transaction.annotation.Transactional
+  public void delete(long id) {
+    getQuery(id);
+    if (commands != null) commands.cancelSearch(id);
+    queryRepository.delete(id);
+  }
+
+  public SearchQuery getQuery(long id) {
+    return queryRepository
+        .findById(id)
+        .orElseThrow(() -> ApiException.notFound("Search query not found"));
+  }
+
+  public long runNow(long searchQueryId) {
+    SearchQuery query = getQuery(searchQueryId);
+    LocalDate date = planningWindow.businessDate();
+    long runId = searchPlanner.planQuery(query.id(), query.repositoryId(), date);
+    requeueIncompatibleSortTips(query.repositoryId(), date);
+    return runId;
+  }
+
+  public List<Long> runAll(long repositoryId) {
+    repositoryService.get(repositoryId);
+    LocalDate date = planningWindow.businessDate();
+    List<Long> ids =
+        list(repositoryId).stream()
+            .map(query -> searchPlanner.planQuery(query.id(), query.repositoryId(), date))
+            .toList();
+    requeueIncompatibleSortTips(repositoryId, date);
+    return ids;
+  }
+
+  private void requeueIncompatibleSortTips(long repositoryId, LocalDate asOf) {
+    String preferred = rankSort.sortModeLabel();
+    if (!"stars".equals(preferred)) {
+      return;
     }
-
-    public SearchQuery create(long repositoryId, String name, String query, Boolean enabled, Integer resultLimit) {
-        repositoryService.get(repositoryId);
-        String normalized = normalizeQuery(query);
-        ensureUnique(repositoryId, normalized, null);
-        int limit = resultLimit == null ? searchProperties.defaultResultLimit() : resultLimit;
-        boolean on = enabled == null || enabled;
-        String label = name == null || name.isBlank() ? normalized : name.trim();
-        return queryRepository.insert(repositoryId, label, normalized, on, limit);
-    }
-
-    public SearchQuery update(long id, String name, String query, Boolean enabled, Integer resultLimit) {
-        SearchQuery existing = getQuery(id);
-        String nextQuery = query == null ? existing.query() : normalizeQuery(query);
-        ensureUnique(existing.repositoryId(), nextQuery, existing.id());
-        return queryRepository.update(
-                id,
-                name == null ? existing.name() : name,
-                nextQuery,
-                enabled == null ? existing.enabled() : enabled,
-                resultLimit == null ? existing.resultLimit() : resultLimit
-        );
-    }
-
-    private void ensureUnique(long repositoryId, String normalizedQuery, Long excludeId) {
-        queryRepository.findNormalized(repositoryId, normalizedQuery.toLowerCase(), excludeId)
-                .ifPresent(ignored -> {
-                    throw ApiException.validation("This search query is already tracked for the repository");
-                });
-    }
-
-    static String normalizeQuery(String query) {
-        if (query == null || query.isBlank()) {
-            throw ApiException.validation("Search query must not be blank");
+    LocalDate from = asOf.minusDays(14);
+    for (SearchQuery query : list(repositoryId)) {
+      if (!query.enabled()) {
+        continue;
+      }
+      List<SearchRun> runs = runRepository.snapshots(query.id());
+      boolean hasPreferred = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), preferred));
+      if (!hasPreferred) {
+        continue;
+      }
+      for (SearchRun run : runs) {
+        if (run.businessDate().isBefore(from) || run.businessDate().isAfter(asOf)) {
+          continue;
         }
-        return query.trim().replaceAll("\\s+", " ");
-    }
-
-    @org.springframework.transaction.annotation.Transactional
-    public void delete(long id) {
-        getQuery(id);
-        if(commands!=null)commands.cancelSearch(id);
-        queryRepository.delete(id);
-    }
-
-    public SearchQuery getQuery(long id) {
-        return queryRepository.findById(id).orElseThrow(() -> ApiException.notFound("Search query not found"));
-    }
-
-    public long runNow(long searchQueryId) {
-        SearchQuery query = getQuery(searchQueryId);
-        LocalDate date = planningWindow.businessDate();
-        long runId = searchPlanner.planQuery(query.id(), query.repositoryId(), date);
-        requeueIncompatibleSortTips(query.repositoryId(), date);
-        return runId;
-    }
-
-    public List<Long> runAll(long repositoryId) {
-        repositoryService.get(repositoryId);
-        LocalDate date = planningWindow.businessDate();
-        List<Long> ids = list(repositoryId).stream()
-                .map(query -> searchPlanner.planQuery(query.id(), query.repositoryId(), date))
-                .toList();
-        requeueIncompatibleSortTips(repositoryId, date);
-        return ids;
-    }
-
-    private void requeueIncompatibleSortTips(long repositoryId, LocalDate asOf) {
-        String preferred = rankSort.sortModeLabel();
-        if (!"stars".equals(preferred)) {
-            return;
+        if (sameSortMode(run.sortMode(), preferred)) {
+          continue;
         }
-        LocalDate from = asOf.minusDays(14);
-        for (SearchQuery query : list(repositoryId)) {
-            if (!query.enabled()) {
-                continue;
-            }
-            List<SearchRun> runs = runRepository.snapshots(query.id());
-            boolean hasPreferred = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), preferred));
-            if (!hasPreferred) {
-                continue;
-            }
-            for (SearchRun run : runs) {
-                if (run.businessDate().isBefore(from) || run.businessDate().isAfter(asOf)) {
-                    continue;
-                }
-                if (sameSortMode(run.sortMode(), preferred)) {
-                    continue;
-                }
-                searchPlanner.planQuery(query.id(), query.repositoryId(), run.businessDate());
-            }
-        }
+        searchPlanner.planQuery(query.id(), query.repositoryId(), run.businessDate());
+      }
     }
+  }
 
-    public SearchHistory history(long searchQueryId) {
-        SearchQuery query = getQuery(searchQueryId);
-        List<SearchRun> runs = runRepository.snapshots(searchQueryId);
-        SearchRun latestSnapshot = runs.isEmpty() ? null : runs.get(runs.size() - 1);
-        String sortMode = chartSortMode(runs, latestSnapshot, rankSort.sortModeLabel());
-        // Deltas and best only within the same GitHub sort mode (Best Match vs Stars are not comparable).
-        List<SearchRun> comparable = runs.stream().filter(run -> sameSortMode(run.sortMode(), sortMode)).toList();
-        Integer current = latestPosition(comparable);
-        boolean hasPrevious = comparable.size() >= 2;
-        Integer previous = hasPrevious ? comparable.get(comparable.size() - 2).trackedRepositoryPosition() : null;
-        RankChangeMath.Change change = RankChangeMath.between(hasPrevious, previous, current, query.resultLimit());
-        Integer change7 = changeSince(comparable, 7);
-        Integer change30 = changeSince(comparable, 30);
-        Integer best = comparable.stream()
-                .map(SearchRun::trackedRepositoryPosition)
-                .filter(Objects::nonNull)
-                .min(Integer::compareTo)
-                .orElse(null);
-        // Chart must use the same sort mode as Best/Current Rank — Best Match vs Stars are not comparable.
-        List<RankPoint> points = comparable.stream()
-                .map(run -> new RankPoint(run.businessDate(), run.trackedRepositoryPosition(), run.id()))
-                .toList();
-        SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
-        SearchRun latestComparable = comparable.isEmpty() ? null : comparable.get(comparable.size() - 1);
-        // Date the row by the snapshot that backs Current Rank, not an incompatible Best Match tip.
-        Instant lastChecked = latestComparable == null ? null : latestComparable.snapshotAt();
-        String searchStatus = latestRun == null ? null : latestRun.status().name();
-        String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
-        Integer totalResults = latestComparable == null ? null : latestComparable.totalCount();
-        return new SearchHistory(
-                query,
-                current,
-                change,
-                change7,
-                change30,
-                best,
-                normalizeSortMode(sortMode),
-                points,
-                lastChecked,
-                searchStatus,
-                enrichmentStatus,
-                totalResults,
-                chartMissedDates(searchQueryId, sortMode, runs)
-        );
-    }
+  public SearchHistory history(long searchQueryId) {
+    SearchQuery query = getQuery(searchQueryId);
+    List<SearchRun> runs = runRepository.snapshots(searchQueryId);
+    SearchRun latestSnapshot = runs.isEmpty() ? null : runs.get(runs.size() - 1);
+    String sortMode = chartSortMode(runs, latestSnapshot, rankSort.sortModeLabel());
+    // Deltas and best only within the same GitHub sort mode (Best Match vs Stars are not
+    // comparable).
+    List<SearchRun> comparable =
+        runs.stream().filter(run -> sameSortMode(run.sortMode(), sortMode)).toList();
+    Integer current = latestPosition(comparable);
+    boolean hasPrevious = comparable.size() >= 2;
+    Integer previous =
+        hasPrevious ? comparable.get(comparable.size() - 2).trackedRepositoryPosition() : null;
+    RankChangeMath.Change change =
+        RankChangeMath.between(hasPrevious, previous, current, query.resultLimit());
+    Integer change7 = changeSince(comparable, 7);
+    Integer change30 = changeSince(comparable, 30);
+    Integer best =
+        comparable.stream()
+            .map(SearchRun::trackedRepositoryPosition)
+            .filter(Objects::nonNull)
+            .min(Integer::compareTo)
+            .orElse(null);
+    // Chart must use the same sort mode as Best/Current Rank — Best Match vs Stars are not
+    // comparable.
+    List<RankPoint> points =
+        comparable.stream()
+            .map(
+                run -> new RankPoint(run.businessDate(), run.trackedRepositoryPosition(), run.id()))
+            .toList();
+    SearchRun latestRun = runRepository.latest(searchQueryId).orElse(null);
+    SearchRun latestComparable =
+        comparable.isEmpty() ? null : comparable.get(comparable.size() - 1);
+    // Date the row by the snapshot that backs Current Rank, not an incompatible Best Match tip.
+    Instant lastChecked = latestComparable == null ? null : latestComparable.snapshotAt();
+    String searchStatus = latestRun == null ? null : latestRun.status().name();
+    String enrichmentStatus = latestRun == null ? null : latestRun.enrichmentStatus();
+    Integer totalResults = latestComparable == null ? null : latestComparable.totalCount();
+    return new SearchHistory(
+        query,
+        current,
+        change,
+        change7,
+        change30,
+        best,
+        normalizeSortMode(sortMode),
+        points,
+        lastChecked,
+        searchStatus,
+        enrichmentStatus,
+        totalResults,
+        chartMissedDates(searchQueryId, sortMode, runs));
+  }
 
-    public SearchRunResults latestResults(long searchQueryId) {
-        getQuery(searchQueryId);
-        SearchRun run = runRepository.latestSnapshot(searchQueryId)
-                .or(() -> runRepository.latest(searchQueryId))
-                .orElseThrow(() -> ApiException.notFound("Search results not found"));
-        return results(run.id());
-    }
+  public SearchRunResults latestResults(long searchQueryId) {
+    getQuery(searchQueryId);
+    SearchRun run =
+        runRepository
+            .latestSnapshot(searchQueryId)
+            .or(() -> runRepository.latest(searchQueryId))
+            .orElseThrow(() -> ApiException.notFound("Search results not found"));
+    return results(run.id());
+  }
 
-    public SearchRunResults results(long searchRunId) {
-        SearchRun run = runRepository.findById(searchRunId)
-                .orElseThrow(() -> ApiException.notFound("Search run not found"));
-        SearchQuery query = getQuery(run.searchQueryId());
-        List<SearchResult> current = resultRepository.findByRun(searchRunId);
-        Map<Long, Integer> previousPositions = runRepository.previousSnapshot(run.searchQueryId(), run.businessDate(), run.sortMode())
-                .map(previous -> resultRepository.findByRun(previous.id()).stream()
-                        .collect(Collectors.toMap(SearchResult::githubRepositoryId, SearchResult::position, (a, b) -> a)))
-                .orElse(Map.of());
-        List<SearchResultRow> rows = new ArrayList<>();
-        for (SearchResult result : current) {
-            Integer previous = previousPositions.get(result.githubRepositoryId());
-            Integer delta = previous == null ? null : previous - result.position();
-            rows.add(new SearchResultRow(result, delta));
-        }
-        return new SearchRunResults(run, query, rows);
+  public SearchRunResults results(long searchRunId) {
+    SearchRun run =
+        runRepository
+            .findById(searchRunId)
+            .orElseThrow(() -> ApiException.notFound("Search run not found"));
+    SearchQuery query = getQuery(run.searchQueryId());
+    List<SearchResult> current = resultRepository.findByRun(searchRunId);
+    Map<Long, Integer> previousPositions =
+        runRepository
+            .previousSnapshot(run.searchQueryId(), run.businessDate(), run.sortMode())
+            .map(previous ->
+                resultRepository.findByRun(previous.id()).stream()
+                    .collect(
+                        Collectors.toMap(
+                            SearchResult::githubRepositoryId, SearchResult::position, (a, b) -> a)))
+            .orElse(Map.of());
+    List<SearchResultRow> rows = new ArrayList<>();
+    for (SearchResult result : current) {
+      Integer previous = previousPositions.get(result.githubRepositoryId());
+      Integer delta = previous == null ? null : previous - result.position();
+      rows.add(new SearchResultRow(result, delta));
     }
+    return new SearchRunResults(run, query, rows);
+  }
 
-    public SearchSeries series(long searchQueryId) {
-        getQuery(searchQueryId);
-        Map<Long, String> names = new LinkedHashMap<>();
-        Map<Long, List<SeriesPoint>> points = new LinkedHashMap<>();
-        for (SearchResultJdbcRepository.SnapshotValue row : resultRepository.findSnapshots(searchQueryId)) {
-            names.put(row.githubRepositoryId(), row.fullName());
-            points.computeIfAbsent(row.githubRepositoryId(), ignored -> new ArrayList<>())
-                    .add(new SeriesPoint(row.date(), row.position(), row.stars(), row.forks()));
-        }
-        List<SeriesLine> lines = new ArrayList<>();
-        for (Map.Entry<Long, String> entry : names.entrySet()) {
-            lines.add(new SeriesLine(entry.getKey(), entry.getValue(), points.get(entry.getKey())));
-        }
-        return new SearchSeries(lines);
+  public SearchSeries series(long searchQueryId) {
+    getQuery(searchQueryId);
+    Map<Long, String> names = new LinkedHashMap<>();
+    Map<Long, List<SeriesPoint>> points = new LinkedHashMap<>();
+    for (SearchResultJdbcRepository.SnapshotValue row :
+        resultRepository.findSnapshots(searchQueryId)) {
+      names.put(row.githubRepositoryId(), row.fullName());
+      points
+          .computeIfAbsent(row.githubRepositoryId(), ignored -> new ArrayList<>())
+          .add(new SeriesPoint(row.date(), row.position(), row.stars(), row.forks()));
     }
+    List<SeriesLine> lines = new ArrayList<>();
+    for (Map.Entry<Long, String> entry : names.entrySet()) {
+      lines.add(new SeriesLine(entry.getKey(), entry.getValue(), points.get(entry.getKey())));
+    }
+    return new SearchSeries(lines);
+  }
 
-    public List<SearchHistory> visibility(long repositoryId) {
-        return list(repositoryId).stream().map(query -> history(query.id())).toList();
-    }
+  public List<SearchHistory> visibility(long repositoryId) {
+    return list(repositoryId).stream().map(query -> history(query.id())).toList();
+  }
 
-    private Integer latestPosition(List<SearchRun> runs) {
-        if (runs.isEmpty()) {
-            return null;
-        }
-        return runs.get(runs.size() - 1).trackedRepositoryPosition();
+  private Integer latestPosition(List<SearchRun> runs) {
+    if (runs.isEmpty()) {
+      return null;
     }
+    return runs.get(runs.size() - 1).trackedRepositoryPosition();
+  }
 
-    private static boolean sameSortMode(String left, String right) {
-        return normalizeSortMode(left).equals(normalizeSortMode(right));
-    }
+  private static boolean sameSortMode(String left, String right) {
+    return normalizeSortMode(left).equals(normalizeSortMode(right));
+  }
 
-    /** Blank/null uses the configured preferred mode ({@code collector.search.rank-sort}). */
-    static String normalizeSortMode(String sortMode) {
-        return normalizeSortMode(sortMode, "best_match");
-    }
+  /** Blank/null uses the configured preferred mode ({@code collector.search.rank-sort}). */
+  static String normalizeSortMode(String sortMode) {
+    return normalizeSortMode(sortMode, "best_match");
+  }
 
-    static String normalizeSortMode(String sortMode, String preferred) {
-        return sortMode == null || sortMode.isBlank() ? preferred : sortMode;
-    }
+  static String normalizeSortMode(String sortMode, String preferred) {
+    return sortMode == null || sortMode.isBlank() ? preferred : sortMode;
+  }
 
-    static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot) {
-        return chartSortMode(runs, latestSnapshot, "best_match");
-    }
+  static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot) {
+    return chartSortMode(runs, latestSnapshot, "best_match");
+  }
 
-    static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot, String preferred) {
-        if (latestSnapshot == null) {
-            return preferred;
-        }
-        String latest = normalizeSortMode(latestSnapshot.sortMode(), preferred);
-        if (preferred.equals(latest)) {
-            return preferred;
-        }
-        boolean hasPreferred = runs.stream().anyMatch(run -> preferred.equals(normalizeSortMode(run.sortMode(), preferred)));
-        return hasPreferred ? preferred : latest;
+  static String chartSortMode(List<SearchRun> runs, SearchRun latestSnapshot, String preferred) {
+    if (latestSnapshot == null) {
+      return preferred;
     }
+    String latest = normalizeSortMode(latestSnapshot.sortMode(), preferred);
+    if (preferred.equals(latest)) {
+      return preferred;
+    }
+    boolean hasPreferred =
+        runs.stream()
+            .anyMatch(run -> preferred.equals(normalizeSortMode(run.sortMode(), preferred)));
+    return hasPreferred ? preferred : latest;
+  }
 
-    /**
-     * Planner MISSED days plus tip days that only have an incompatible GitHub sort mode.
-     * Preferring stars must not leave a silent empty tip after Best Match overwrote the series.
-     */
-    private List<LocalDate> chartMissedDates(long searchQueryId, String sortMode, List<SearchRun> runs) {
-        LinkedHashSet<LocalDate> missed = new LinkedHashSet<>(runRepository.missedDates(searchQueryId));
-        Set<LocalDate> comparableDates = runs.stream()
-                .filter(run -> sameSortMode(run.sortMode(), sortMode))
-                .map(SearchRun::businessDate)
-                .collect(Collectors.toSet());
-        for (SearchRun run : runs) {
-            if (!comparableDates.contains(run.businessDate())) {
-                missed.add(run.businessDate());
-            }
-        }
-        return List.copyOf(missed);
+  /**
+   * Planner MISSED days plus tip days that only have an incompatible GitHub sort mode. Preferring
+   * stars must not leave a silent empty tip after Best Match overwrote the series.
+   */
+  private List<LocalDate> chartMissedDates(
+      long searchQueryId, String sortMode, List<SearchRun> runs) {
+    LinkedHashSet<LocalDate> missed = new LinkedHashSet<>(runRepository.missedDates(searchQueryId));
+    Set<LocalDate> comparableDates =
+        runs.stream()
+            .filter(run -> sameSortMode(run.sortMode(), sortMode))
+            .map(SearchRun::businessDate)
+            .collect(Collectors.toSet());
+    for (SearchRun run : runs) {
+      if (!comparableDates.contains(run.businessDate())) {
+        missed.add(run.businessDate());
+      }
     }
+    return List.copyOf(missed);
+  }
 
-    private Integer changeSince(List<SearchRun> runs, int days) {
-        if (runs.isEmpty()) {
-            return null;
-        }
-        SearchRun latest = runs.get(runs.size() - 1);
-        LocalDate target = latest.businessDate().minusDays(days);
-        SearchRun baseline = null;
-        for (SearchRun run : runs) {
-            if (!run.businessDate().isAfter(target)) {
-                baseline = run;
-            }
-        }
-        if (baseline == null || baseline.trackedRepositoryPosition() == null || latest.trackedRepositoryPosition() == null) {
-            return null;
-        }
-        return baseline.trackedRepositoryPosition() - latest.trackedRepositoryPosition();
+  private Integer changeSince(List<SearchRun> runs, int days) {
+    if (runs.isEmpty()) {
+      return null;
     }
+    SearchRun latest = runs.get(runs.size() - 1);
+    LocalDate target = latest.businessDate().minusDays(days);
+    SearchRun baseline = null;
+    for (SearchRun run : runs) {
+      if (!run.businessDate().isAfter(target)) {
+        baseline = run;
+      }
+    }
+    if (baseline == null
+        || baseline.trackedRepositoryPosition() == null
+        || latest.trackedRepositoryPosition() == null) {
+      return null;
+    }
+    return baseline.trackedRepositoryPosition() - latest.trackedRepositoryPosition();
+  }
 
-    public record RankPoint(LocalDate date, Integer position, long searchRunId) {
-    }
+  public record RankPoint(LocalDate date, Integer position, long searchRunId) {}
 
-    public record SearchHistory(
-            SearchQuery query,
-            Integer currentRank,
-            RankChangeMath.Change change,
-            Integer change7d,
-            Integer change30d,
-            Integer bestRank,
-            String sortMode,
-            List<RankPoint> points,
-            Instant lastChecked,
-            String searchStatus,
-            String enrichmentStatus,
-            Integer totalResults,
-            List<LocalDate> missedDates
-    ) {
-    }
+  public record SearchHistory(
+      SearchQuery query,
+      Integer currentRank,
+      RankChangeMath.Change change,
+      Integer change7d,
+      Integer change30d,
+      Integer bestRank,
+      String sortMode,
+      List<RankPoint> points,
+      Instant lastChecked,
+      String searchStatus,
+      String enrichmentStatus,
+      Integer totalResults,
+      List<LocalDate> missedDates) {}
 
-    public record SearchResultRow(SearchResult result, Integer positionDelta) {
-    }
+  public record SearchResultRow(SearchResult result, Integer positionDelta) {}
 
-    public record SearchRunResults(SearchRun run, SearchQuery query, List<SearchResultRow> rows) {
-    }
+  public record SearchRunResults(SearchRun run, SearchQuery query, List<SearchResultRow> rows) {}
 
-    public record SeriesPoint(LocalDate date, int position, int stars, int forks) {
-    }
+  public record SeriesPoint(LocalDate date, int position, int stars, int forks) {}
 
-    public record SeriesLine(long githubRepositoryId, String fullName, List<SeriesPoint> points) {
-    }
+  public record SeriesLine(long githubRepositoryId, String fullName, List<SeriesPoint> points) {}
 
-    public record SearchSeries(List<SeriesLine> series) {
-    }
+  public record SearchSeries(List<SeriesLine> series) {}
 }

@@ -1,12 +1,12 @@
 package com.kholodilin.repogrowth.auth.security;
 
+import java.io.Serializable;
 import org.springframework.security.core.AuthenticatedPrincipal;
 
-import java.io.Serializable;
-
-public record AppUserPrincipal(long userId, String displayName) implements AuthenticatedPrincipal, Serializable {
-    @Override
-    public String getName() {
-        return displayName;
-    }
+public record AppUserPrincipal(long userId, String displayName)
+    implements AuthenticatedPrincipal, Serializable {
+  @Override
+  public String getName() {
+    return displayName;
+  }
 }

@@ -4,41 +4,33 @@ import java.time.Instant;
 import java.util.List;
 
 public record RepositoryResponse(
-        long id,
-        long githubId,
-        String name,
-        String fullName,
-        String description,
-        String visibility,
-        String defaultBranch,
-        String language,
-        boolean fork,
-        boolean archived,
-        int stars,
-        int watchers,
-        int forks,
-        int contributors,
-        int openIssues,
-        boolean trackingEnabled,
-        boolean accessible,
-        boolean trafficPermissionMissing,
-        Instant githubCreatedAt,
-        Instant githubUpdatedAt,
-        Instant lastCommitAt,
-        String githubUrl,
-        String activityStatus,
-        Instant lastActivityAt,
-        List<String> topics,
-        RepositoryHealthResponse health,
-        OwnerResponse owner
-) {
-    public record OwnerResponse(
-            long id,
-            long githubId,
-            String login,
-            String ownerType,
-            String avatarUrl,
-            String htmlUrl
-    ) {
-    }
+    long id,
+    long githubId,
+    String name,
+    String fullName,
+    String description,
+    String visibility,
+    String defaultBranch,
+    String language,
+    boolean fork,
+    boolean archived,
+    int stars,
+    int watchers,
+    int forks,
+    int contributors,
+    int openIssues,
+    boolean trackingEnabled,
+    boolean accessible,
+    boolean trafficPermissionMissing,
+    Instant githubCreatedAt,
+    Instant githubUpdatedAt,
+    Instant lastCommitAt,
+    String githubUrl,
+    String activityStatus,
+    Instant lastActivityAt,
+    List<String> topics,
+    RepositoryHealthResponse health,
+    OwnerResponse owner) {
+  public record OwnerResponse(
+      long id, long githubId, String login, String ownerType, String avatarUrl, String htmlUrl) {}
 }

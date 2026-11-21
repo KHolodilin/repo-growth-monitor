@@ -40,7 +40,8 @@ class PublicApiProtectionTest {
     var request = new MockHttpServletRequest("HEAD", "/api/v1/public/owners/a");
     request.setRemoteAddr("192.0.2.2");
     var response = new MockHttpServletResponse();
-    filter.doFilter(request, response, (req, res) -> res.getOutputStream().write("body".getBytes()));
+    filter.doFilter(
+        request, response, (req, res) -> res.getOutputStream().write("body".getBytes()));
     assertThat(response.getContentAsString()).isEmpty();
     assertThat(response.getCookies()).isEmpty();
   }

@@ -1,10 +1,23 @@
 package com.kholodilin.repogrowth.github.client;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.absent;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.post;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -12,548 +25,698 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.net.http.HttpClient;
-import java.time.Duration;
-
-import static com.github.tomakehurst.wiremock.client.WireMock.absent;
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
-import static com.github.tomakehurst.wiremock.client.WireMock.get;
-import static com.github.tomakehurst.wiremock.client.WireMock.post;
-import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class GitHubClientWireMockTest {
 
-    @RegisterExtension
-    static WireMockExtension wireMock = WireMockExtension.newInstance()
-            .options(wireMockConfig().dynamicPort())
+  @RegisterExtension
+  static WireMockExtension wireMock =
+      WireMockExtension.newInstance().options(wireMockConfig().dynamicPort()).build();
+
+  private GitHubClient client;
+
+  @BeforeEach
+  void setUp() {
+    GitHubProperties properties =
+        new GitHubProperties(
+            "test-token",
+            wireMock.baseUrl(),
+            Duration.ofSeconds(2),
+            Duration.ofSeconds(2),
+            wireMock.baseUrl());
+    HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+    factory.setReadTimeout(Duration.ofSeconds(2));
+    RestClient restClient =
+        RestClient.builder()
+            .baseUrl(wireMock.baseUrl())
+            .requestFactory(factory)
+            .defaultHeader("Authorization", "Bearer test-token")
+            .defaultHeader("Accept", "application/vnd.github+json")
+            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
             .build();
+    client =
+        new GitHubClient(
+            restClient,
+            JsonMapper.builder().build(),
+            properties,
+            new AppMetrics(new SimpleMeterRegistry()));
+  }
 
-    private GitHubClient client;
+  private GitHubClient clientFor(Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
+    return clientForToken("test-token", connectTimeout, readTimeout, webBaseUrl);
+  }
 
-    @BeforeEach
-    void setUp() {
-        GitHubProperties properties = new GitHubProperties(
-                "test-token",
-                wireMock.baseUrl(),
-                Duration.ofSeconds(2),
-                Duration.ofSeconds(2),
-                wireMock.baseUrl()
-        );
-        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-        factory.setReadTimeout(Duration.ofSeconds(2));
-        RestClient restClient = RestClient.builder()
-                .baseUrl(wireMock.baseUrl())
-                .requestFactory(factory)
-                .defaultHeader("Authorization", "Bearer test-token")
-                .defaultHeader("Accept", "application/vnd.github+json")
-                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-                .build();
-        client = new GitHubClient(restClient, JsonMapper.builder().build(), properties, new AppMetrics(new SimpleMeterRegistry()));
-    }
+  private GitHubClient clientForToken(String token) {
+    return clientForToken(token, Duration.ofSeconds(2), Duration.ofSeconds(2), wireMock.baseUrl());
+  }
 
-    private GitHubClient clientFor(Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
-        return clientForToken("test-token", connectTimeout, readTimeout, webBaseUrl);
-    }
+  private GitHubClient clientForToken(
+      String token, Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
+    GitHubProperties properties =
+        new GitHubProperties(token, wireMock.baseUrl(), connectTimeout, readTimeout, webBaseUrl);
+    HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+    factory.setReadTimeout(Duration.ofSeconds(2));
+    RestClient restClient =
+        RestClient.builder()
+            .baseUrl(wireMock.baseUrl())
+            .requestFactory(factory)
+            .defaultHeader("Authorization", "Bearer test-token")
+            .build();
+    return new GitHubClient(
+        restClient,
+        JsonMapper.builder().build(),
+        properties,
+        new AppMetrics(new SimpleMeterRegistry()));
+  }
 
-    private GitHubClient clientForToken(String token) {
-        return clientForToken(token, Duration.ofSeconds(2), Duration.ofSeconds(2), wireMock.baseUrl());
-    }
+  @Test
+  void listsRepositoriesWithPagination() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/user/repos"))
+            .withQueryParam("page", equalTo("1"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withHeader(
+                        "Link", "<" + wireMock.baseUrl() + "/user/repos?page=2>; rel=\"next\"")
+                    .withBody(
+                        "[{\"id\":1,\"name\":\"a\",\"full_name\":\"acme/a\",\"private\":false,\"fork\":false,\"archived\":false,\"stargazers_count\":1,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":10,\"login\":\"acme\",\"type\":\"User\"}}]")));
+    wireMock.stubFor(
+        get(urlPathEqualTo("/user/repos"))
+            .withQueryParam("page", equalTo("2"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        "[{\"id\":2,\"name\":\"b\",\"full_name\":\"acme/b\",\"private\":true,\"fork\":false,\"archived\":false,\"stargazers_count\":2,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":10,\"login\":\"acme\",\"type\":\"Organization\"}}]")));
 
-    private GitHubClient clientForToken(String token, Duration connectTimeout, Duration readTimeout, String webBaseUrl) {
-        GitHubProperties properties = new GitHubProperties(
-                token,
-                wireMock.baseUrl(),
-                connectTimeout,
-                readTimeout,
-                webBaseUrl
-        );
-        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-        factory.setReadTimeout(Duration.ofSeconds(2));
-        RestClient restClient = RestClient.builder()
-                .baseUrl(wireMock.baseUrl())
-                .requestFactory(factory)
-                .defaultHeader("Authorization", "Bearer test-token")
-                .build();
-        return new GitHubClient(restClient, JsonMapper.builder().build(), properties, new AppMetrics(new SimpleMeterRegistry()));
-    }
+    // first request has no page param
+    wireMock.stubFor(
+        get("/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=full_name")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withHeader(
+                        "Link", "<" + wireMock.baseUrl() + "/user/repos?page=2>; rel=\"next\"")
+                    .withBody(
+                        "[{\"id\":1,\"name\":\"a\",\"full_name\":\"acme/a\",\"private\":false,\"fork\":false,\"archived\":false,\"stargazers_count\":1,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":10,\"login\":\"acme\",\"type\":\"User\"}}]")));
+    wireMock.stubFor(
+        get("/user/repos?page=2")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        "[{\"id\":2,\"name\":\"b\",\"full_name\":\"acme/b\",\"private\":true,\"fork\":false,\"archived\":false,\"stargazers_count\":2,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":11,\"login\":\"acme\",\"type\":\"Organization\"}}]")));
 
-    @Test
-    void listsRepositoriesWithPagination() {
-        wireMock.stubFor(get(urlPathEqualTo("/user/repos"))
-                .withQueryParam("page", equalTo("1"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withHeader("Link", "<" + wireMock.baseUrl() + "/user/repos?page=2>; rel=\"next\"")
-                        .withBody("[{\"id\":1,\"name\":\"a\",\"full_name\":\"acme/a\",\"private\":false,\"fork\":false,\"archived\":false,\"stargazers_count\":1,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":10,\"login\":\"acme\",\"type\":\"User\"}}]")));
-        wireMock.stubFor(get(urlPathEqualTo("/user/repos"))
-                .withQueryParam("page", equalTo("2"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("[{\"id\":2,\"name\":\"b\",\"full_name\":\"acme/b\",\"private\":true,\"fork\":false,\"archived\":false,\"stargazers_count\":2,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":10,\"login\":\"acme\",\"type\":\"Organization\"}}]")));
+    var repos = client.listAccessibleRepositories();
+    assertThat(repos).hasSize(2);
+    assertThat(repos.get(0).fullName()).isEqualTo("acme/a");
+    assertThat(repos.get(1).resolvedVisibility()).isEqualTo("PRIVATE");
+  }
 
-        // first request has no page param
-        wireMock.stubFor(get("/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=full_name")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withHeader("Link", "<" + wireMock.baseUrl() + "/user/repos?page=2>; rel=\"next\"")
-                        .withBody("[{\"id\":1,\"name\":\"a\",\"full_name\":\"acme/a\",\"private\":false,\"fork\":false,\"archived\":false,\"stargazers_count\":1,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":10,\"login\":\"acme\",\"type\":\"User\"}}]")));
-        wireMock.stubFor(get("/user/repos?page=2")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("[{\"id\":2,\"name\":\"b\",\"full_name\":\"acme/b\",\"private\":true,\"fork\":false,\"archived\":false,\"stargazers_count\":2,\"forks_count\":0,\"open_issues_count\":0,\"owner\":{\"id\":11,\"login\":\"acme\",\"type\":\"Organization\"}}]")));
+  @Test
+  void readsRepositoryTopics() {
+    wireMock.stubFor(
+        get("/repos/acme/kafka-starter")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"id":1002,"name":"kafka-starter","full_name":"acme/kafka-starter","private":true,"fork":false,"archived":false,"stargazers_count":41,"forks_count":6,"open_issues_count":2,"topics":["spring-boot","kafka","outbox"],"owner":{"id":42,"login":"acme","type":"User"}}
+                        """)));
+    var repo = client.getRepository("acme", "kafka-starter");
+    assertThat(repo.topicsOrEmpty()).containsExactly("kafka", "outbox", "spring-boot");
+  }
 
-        var repos = client.listAccessibleRepositories();
-        assertThat(repos).hasSize(2);
-        assertThat(repos.get(0).fullName()).isEqualTo("acme/a");
-        assertThat(repos.get(1).resolvedVisibility()).isEqualTo("PRIVATE");
-    }
+  @Test
+  void emptyReferrers() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/popular/referrers")
+            .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
+    assertThat(client.getReferrers("acme", "a")).isEmpty();
+  }
 
-    @Test
-    void readsRepositoryTopics() {
-        wireMock.stubFor(get("/repos/acme/kafka-starter")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"id":1002,"name":"kafka-starter","full_name":"acme/kafka-starter","private":true,"fork":false,"archived":false,"stargazers_count":41,"forks_count":6,"open_issues_count":2,"topics":["spring-boot","kafka","outbox"],"owner":{"id":42,"login":"acme","type":"User"}}
-                                """)));
-        var repo = client.getRepository("acme", "kafka-starter");
-        assertThat(repo.topicsOrEmpty()).containsExactly("kafka", "outbox", "spring-boot");
-    }
+  @Test
+  void probesAConfiguredTokenOnce() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/user"))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"login\":\"acme\"}")));
+    assertThat(client.tokenStatus().state()).isEqualTo("OK");
+    assertThat(client.tokenStatus().state()).isEqualTo("OK");
+    wireMock.verify(1, getRequestedFor(urlPathEqualTo("/user")));
+  }
 
-    @Test
-    void emptyReferrers() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/popular/referrers")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
-        assertThat(client.getReferrers("acme", "a")).isEmpty();
-    }
+  @Test
+  void unauthorized() {
+    wireMock.stubFor(
+        get("/repos/acme/a")
+            .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a"))
+        .isInstanceOf(GitHubException.class)
+        .extracting(ex -> ((GitHubException) ex).retryable())
+        .isEqualTo(false);
+    assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
+    assertThat(client.tokenRejected()).isTrue();
+  }
 
-    @Test
-    void probesAConfiguredTokenOnce() {
-        wireMock.stubFor(get(urlPathEqualTo("/user"))
-                .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json").withBody("{\"login\":\"acme\"}")));
-        assertThat(client.tokenStatus().state()).isEqualTo("OK");
-        assertThat(client.tokenStatus().state()).isEqualTo("OK");
-        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/user")));
-    }
+  @Test
+  void forbiddenWithoutRateLimitIsNotRetryable() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/views")
+            .willReturn(
+                aResponse()
+                    .withStatus(403)
+                    .withHeader("X-RateLimit-Remaining", "10")
+                    .withBody("{\"message\":\"forbidden\"}")));
+    assertThatThrownBy(() -> client.getViews("acme", "a"))
+        .isInstanceOf(GitHubException.class)
+        .extracting(ex -> ((GitHubException) ex).retryable())
+        .isEqualTo(false);
+  }
 
-    @Test
-    void unauthorized() {
-        wireMock.stubFor(get("/repos/acme/a")
-                .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a"))
-                .isInstanceOf(GitHubException.class)
-                .extracting(ex -> ((GitHubException) ex).retryable())
-                .isEqualTo(false);
-        assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
-        assertThat(client.tokenRejected()).isTrue();
-    }
+  @Test
+  void rateLimit() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/views")
+            .willReturn(
+                aResponse()
+                    .withStatus(403)
+                    .withHeader("X-RateLimit-Remaining", "0")
+                    .withHeader("X-RateLimit-Reset", "2000000000")
+                    .withBody("{\"message\":\"API rate limit exceeded\"}")));
+    assertThatThrownBy(() -> client.getViews("acme", "a"))
+        .isInstanceOf(GitHubException.class)
+        .satisfies(ex -> {
+          GitHubException github = (GitHubException) ex;
+          assertThat(github.retryable()).isTrue();
+          assertThat(github.rateLimitReset()).isNotNull();
+        });
+    assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
+    assertThat(client.tokenStatus().rateLimitReset()).isNotNull();
+  }
 
-    @Test
-    void forbiddenWithoutRateLimitIsNotRetryable() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/views")
-                .willReturn(aResponse().withStatus(403).withHeader("X-RateLimit-Remaining", "10").withBody("{\"message\":\"forbidden\"}")));
-        assertThatThrownBy(() -> client.getViews("acme", "a"))
-                .isInstanceOf(GitHubException.class)
-                .extracting(ex -> ((GitHubException) ex).retryable())
-                .isEqualTo(false);
-    }
+  @Test
+  void probeFailureIsRemembered() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/user"))
+            .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
+    assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
+    assertThat(client.tokenRejected()).isTrue();
+  }
 
-    @Test
-    void rateLimit() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/views")
-                .willReturn(aResponse()
-                        .withStatus(403)
-                        .withHeader("X-RateLimit-Remaining", "0")
-                        .withHeader("X-RateLimit-Reset", "2000000000")
-                        .withBody("{\"message\":\"API rate limit exceeded\"}")));
-        assertThatThrownBy(() -> client.getViews("acme", "a"))
-                .isInstanceOf(GitHubException.class)
-                .satisfies(ex -> {
-                    GitHubException github = (GitHubException) ex;
-                    assertThat(github.retryable()).isTrue();
-                    assertThat(github.rateLimitReset()).isNotNull();
-                });
-        assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
-        assertThat(client.tokenStatus().rateLimitReset()).isNotNull();
-    }
+  @Test
+  void rateLimitMessageWithoutARemainingHeader() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/views")
+            .willReturn(
+                aResponse()
+                    .withStatus(403)
+                    .withHeader("X-RateLimit-Remaining", "10")
+                    .withHeader("X-RateLimit-Reset", "2000000000")
+                    .withBody("{\"message\":\"secondary rate limit\"}")));
+    assertThatThrownBy(() -> client.getViews("acme", "a")).isInstanceOf(GitHubException.class);
+    assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
+  }
 
-    @Test
-    void probeFailureIsRemembered() {
-        wireMock.stubFor(get(urlPathEqualTo("/user"))
-                .willReturn(aResponse().withStatus(401).withBody("{\"message\":\"Bad credentials\"}")));
-        assertThat(client.tokenStatus().state()).isEqualTo("REJECTED");
-        assertThat(client.tokenRejected()).isTrue();
-    }
+  @Test
+  void expiredTooManyRequestsReturnsToOk() {
+    wireMock.stubFor(
+        get("/repos/acme/a")
+            .willReturn(
+                aResponse()
+                    .withStatus(429)
+                    .withHeader("X-RateLimit-Reset", "1")
+                    .withBody("{\"message\":\"slow\"}")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a")).isInstanceOf(GitHubException.class);
+    assertThat(client.tokenStatus().state()).isEqualTo("OK");
+  }
 
-    @Test
-    void rateLimitMessageWithoutARemainingHeader() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/views")
-                .willReturn(aResponse()
-                        .withStatus(403)
-                        .withHeader("X-RateLimit-Remaining", "10")
-                        .withHeader("X-RateLimit-Reset", "2000000000")
-                        .withBody("{\"message\":\"secondary rate limit\"}")));
-        assertThatThrownBy(() -> client.getViews("acme", "a")).isInstanceOf(GitHubException.class);
-        assertThat(client.tokenStatus().state()).isEqualTo("RATE_LIMITED");
-    }
+  @Test
+  void notFound() {
+    wireMock.stubFor(
+        get("/repos/acme/missing").willReturn(aResponse().withStatus(404).withBody("{}")));
+    assertThatThrownBy(() -> client.getRepository("acme", "missing"))
+        .isInstanceOf(GitHubException.class);
+  }
 
-    @Test
-    void expiredTooManyRequestsReturnsToOk() {
-        wireMock.stubFor(get("/repos/acme/a")
-                .willReturn(aResponse()
-                        .withStatus(429)
-                        .withHeader("X-RateLimit-Reset", "1")
-                        .withBody("{\"message\":\"slow\"}")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a")).isInstanceOf(GitHubException.class);
-        assertThat(client.tokenStatus().state()).isEqualTo("OK");
-    }
+  @Test
+  void unprocessableSearchQuery() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/search/repositories"))
+            .willReturn(
+                aResponse().withStatus(422).withBody("{\"message\":\"Validation Failed\"}")));
+    assertThatThrownBy(() -> client.searchRepositories("bad:", 10))
+        .isInstanceOf(GitHubException.class)
+        .hasMessage("Invalid GitHub search query");
+  }
 
-    @Test
-    void notFound() {
-        wireMock.stubFor(get("/repos/acme/missing").willReturn(aResponse().withStatus(404).withBody("{}")));
-        assertThatThrownBy(() -> client.getRepository("acme", "missing")).isInstanceOf(GitHubException.class);
-    }
+  @Test
+  void unprocessableRepositoryKeepsGitHubMessage() {
+    wireMock.stubFor(
+        get("/repos/acme/a")
+            .willReturn(
+                aResponse().withStatus(422).withBody("{\"message\":\"Validation Failed\"}")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a"))
+        .isInstanceOf(GitHubException.class)
+        .hasMessage("Validation Failed");
+  }
 
-    @Test
-    void unprocessableSearchQuery() {
-        wireMock.stubFor(get(urlPathEqualTo("/search/repositories"))
-                .willReturn(aResponse().withStatus(422).withBody("{\"message\":\"Validation Failed\"}")));
-        assertThatThrownBy(() -> client.searchRepositories("bad:", 10))
-                .isInstanceOf(GitHubException.class)
-                .hasMessage("Invalid GitHub search query");
-    }
+  @Test
+  void unprocessableRepositoryWithoutAMessage() {
+    wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a"))
+        .hasMessage("GitHub rejected the request");
+    wireMock.stubFor(
+        get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("not-json")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a"))
+        .hasMessage("GitHub rejected the request");
+    wireMock.stubFor(
+        get("/repos/acme/a")
+            .willReturn(aResponse().withStatus(422).withBody("{\"message\":\"  \"}")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a"))
+        .hasMessage("GitHub rejected the request");
+  }
 
-    @Test
-    void unprocessableRepositoryKeepsGitHubMessage() {
-        wireMock.stubFor(get("/repos/acme/a")
-                .willReturn(aResponse().withStatus(422).withBody("{\"message\":\"Validation Failed\"}")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a"))
-                .isInstanceOf(GitHubException.class)
-                .hasMessage("Validation Failed");
-    }
+  @Test
+  void searchesRepositoriesWithSortAndOrder() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/search/repositories"))
+            .withQueryParam("q", equalTo("topic:spring-boot"))
+            .withQueryParam("sort", equalTo("stars"))
+            .withQueryParam("order", equalTo("desc"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"total_count":1,"items":[{"id":1,"full_name":"acme/a","stargazers_count":9,"forks_count":1}]}
+                        """)));
+    assertThat(client.searchRepositories("topic:spring-boot", 10, "stars", "desc").totalCount())
+        .isEqualTo(1);
+  }
 
-    @Test
-    void unprocessableRepositoryWithoutAMessage() {
-        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a")).hasMessage("GitHub rejected the request");
-        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("not-json")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a")).hasMessage("GitHub rejected the request");
-        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(422).withBody("{\"message\":\"  \"}")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a")).hasMessage("GitHub rejected the request");
-    }
+  @Test
+  void serverErrorIsRetryable() {
+    wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(500).withBody("oops")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a"))
+        .isInstanceOf(GitHubException.class)
+        .extracting(ex -> ((GitHubException) ex).retryable())
+        .isEqualTo(true);
+  }
 
-    @Test
-    void searchesRepositoriesWithSortAndOrder() {
-        wireMock.stubFor(get(urlPathEqualTo("/search/repositories"))
-                .withQueryParam("q", equalTo("topic:spring-boot"))
-                .withQueryParam("sort", equalTo("stars"))
-                .withQueryParam("order", equalTo("desc"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"total_count":1,"items":[{"id":1,"full_name":"acme/a","stargazers_count":9,"forks_count":1}]}
-                                """)));
-        assertThat(client.searchRepositories("topic:spring-boot", 10, "stars", "desc").totalCount()).isEqualTo(1);
-    }
+  @Test
+  void malformedPayload() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/views")
+            .willReturn(
+                aResponse().withHeader("Content-Type", "application/json").withBody("{not-json")));
+    assertThatThrownBy(() -> client.getViews("acme", "a")).isInstanceOf(GitHubException.class);
+  }
 
-    @Test
-    void serverErrorIsRetryable() {
-        wireMock.stubFor(get("/repos/acme/a").willReturn(aResponse().withStatus(500).withBody("oops")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a"))
-                .isInstanceOf(GitHubException.class)
-                .extracting(ex -> ((GitHubException) ex).retryable())
-                .isEqualTo(true);
-    }
+  @Test
+  void timeout() {
+    wireMock.stubFor(
+        get("/repos/acme/a")
+            .willReturn(aResponse().withFixedDelay(5000).withStatus(200).withBody("{}")));
+    assertThatThrownBy(() -> client.getRepository("acme", "a")).isInstanceOf(GitHubException.class);
+  }
 
-    @Test
-    void malformedPayload() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/views")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("{not-json")));
-        assertThatThrownBy(() -> client.getViews("acme", "a")).isInstanceOf(GitHubException.class);
-    }
-
-    @Test
-    void timeout() {
-        wireMock.stubFor(get("/repos/acme/a")
-                .willReturn(aResponse().withFixedDelay(5000).withStatus(200).withBody("{}")));
-        assertThatThrownBy(() -> client.getRepository("acme", "a")).isInstanceOf(GitHubException.class);
-    }
-
-    @Test
-    void trafficViews() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/views")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
+  @Test
+  void trafficViews() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/views")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
                         {"count":8,"uniques":3,"views":[{"timestamp":"2026-08-20T00:00:00Z","count":8,"uniques":3}]}
                         """)));
-        var views = client.getViews("acme", "a");
-        assertThat(views.days()).hasSize(1);
-        assertThat(views.days().get(0).date().toString()).isEqualTo("2026-08-20");
-    }
+    var views = client.getViews("acme", "a");
+    assertThat(views.days()).hasSize(1);
+    assertThat(views.days().get(0).date().toString()).isEqualTo("2026-08-20");
+  }
 
-    @Test
-    void countsContributorsFromRepositorySidebar() {
-        wireMock.stubFor(get(urlPathEqualTo("/acme/a/_sidebar"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"contributors":{"contributorCount":11,"contributors":[{"login":"magro"}]}}
-                                """)));
-        assertThat(client.countContributors("acme", "a")).isEqualTo(11);
-        wireMock.verify(getRequestedFor(urlPathEqualTo("/acme/a/_sidebar"))
-                .withHeader("Accept", equalTo("*/*"))
-                .withHeader("X-Requested-With", equalTo("XMLHttpRequest"))
-                .withoutHeader("Authorization")
-                .withoutHeader("X-GitHub-Api-Version"));
-    }
+  @Test
+  void countsContributorsFromRepositorySidebar() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/acme/a/_sidebar"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"contributors":{"contributorCount":11,"contributors":[{"login":"magro"}]}}
+                        """)));
+    assertThat(client.countContributors("acme", "a")).isEqualTo(11);
+    wireMock.verify(
+        getRequestedFor(urlPathEqualTo("/acme/a/_sidebar"))
+            .withHeader("Accept", equalTo("*/*"))
+            .withHeader("X-Requested-With", equalTo("XMLHttpRequest"))
+            .withoutHeader("Authorization")
+            .withoutHeader("X-GitHub-Api-Version"));
+  }
 
-    @Test
-    void countsContributorsWhenWebBaseUrlHasTrailingSlash() {
-        GitHubClient slashClient = clientFor(null, null, wireMock.baseUrl() + "/");
-        wireMock.stubFor(get(urlPathEqualTo("/acme/a/_sidebar"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"contributors":{"contributorCount":11,"contributors":[]}}
-                                """)));
-        assertThat(slashClient.countContributors("acme", "a")).isEqualTo(11);
-    }
+  @Test
+  void countsContributorsWhenWebBaseUrlHasTrailingSlash() {
+    GitHubClient slashClient = clientFor(null, null, wireMock.baseUrl() + "/");
+    wireMock.stubFor(
+        get(urlPathEqualTo("/acme/a/_sidebar"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"contributors":{"contributorCount":11,"contributors":[]}}
+                        """)));
+    assertThat(slashClient.countContributors("acme", "a")).isEqualTo(11);
+  }
 
-    @Test
-    void fallsBackWhenSidebarOmitsContributorCount() {
-        wireMock.stubFor(get(urlPathEqualTo("/acme/a/_sidebar"))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"contributors\":null}")));
-        wireMock.stubFor(get("/repos/acme/a/contributors?per_page=1&anon=true")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withHeader("Link", "<" + wireMock.baseUrl() + "/repos/acme/a/contributors?per_page=1&page=9>; rel=\"last\"")
-                        .withBody("[{\"login\":\"a\"}]")));
-        assertThat(client.countContributors("acme", "a")).isEqualTo(9);
-    }
+  @Test
+  void fallsBackWhenSidebarOmitsContributorCount() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/acme/a/_sidebar"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"contributors\":null}")));
+    wireMock.stubFor(
+        get("/repos/acme/a/contributors?per_page=1&anon=true")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withHeader(
+                        "Link",
+                        "<"
+                            + wireMock.baseUrl()
+                            + "/repos/acme/a/contributors?per_page=1&page=9>; rel=\"last\"")
+                    .withBody("[{\"login\":\"a\"}]")));
+    assertThat(client.countContributors("acme", "a")).isEqualTo(9);
+  }
 
-    @Test
-    void defaultsBlankWebBaseUrl() {
-        GitHubProperties blank = new GitHubProperties("test-token", wireMock.baseUrl(), null, null, " ");
-        GitHubProperties missing = new GitHubProperties("test-token", wireMock.baseUrl(), null, null, null);
-        assertThat(blank.webBaseUrl()).isEqualTo("https://github.com");
-        assertThat(missing.webBaseUrl()).isEqualTo("https://github.com");
-        clientFor(null, null, " ");
-        GitHubClient unconfigured = clientForToken(" ");
-        assertThat(unconfigured.tokenStatus().state()).isEqualTo("MISSING");
-        assertThat(unconfigured.tokenRejected()).isFalse();
-    }
+  @Test
+  void defaultsBlankWebBaseUrl() {
+    GitHubProperties blank =
+        new GitHubProperties("test-token", wireMock.baseUrl(), null, null, " ");
+    GitHubProperties missing =
+        new GitHubProperties("test-token", wireMock.baseUrl(), null, null, null);
+    assertThat(blank.webBaseUrl()).isEqualTo("https://github.com");
+    assertThat(missing.webBaseUrl()).isEqualTo("https://github.com");
+    clientFor(null, null, " ");
+    GitHubClient unconfigured = clientForToken(" ");
+    assertThat(unconfigured.tokenStatus().state()).isEqualTo("MISSING");
+    assertThat(unconfigured.tokenRejected()).isFalse();
+  }
 
-    @Test
-    void countsContributorsFromLastPageLink() {
-        wireMock.stubFor(get("/repos/acme/a/contributors?per_page=1&anon=true")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withHeader("Link", "<" + wireMock.baseUrl() + "/repos/acme/a/contributors?per_page=1&page=18>; rel=\"last\"")
-                        .withBody("[{\"login\":\"a\"}]")));
-        assertThat(client.countContributors("acme", "a")).isEqualTo(18);
-    }
+  @Test
+  void countsContributorsFromLastPageLink() {
+    wireMock.stubFor(
+        get("/repos/acme/a/contributors?per_page=1&anon=true")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withHeader(
+                        "Link",
+                        "<"
+                            + wireMock.baseUrl()
+                            + "/repos/acme/a/contributors?per_page=1&page=18>; rel=\"last\"")
+                    .withBody("[{\"login\":\"a\"}]")));
+    assertThat(client.countContributors("acme", "a")).isEqualTo(18);
+  }
 
-    @Test
-    void readsLatestCommitTimestamp() {
-        wireMock.stubFor(get("/repos/acme/a/commits?per_page=1")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"sha":"abc","commit":{"author":{"date":"2026-08-27T10:00:00Z"},"committer":{"date":"2026-08-28T07:54:00Z"}}}]
-                                """)));
-        assertThat(client.latestCommitAt("acme", "a")).contains(java.time.Instant.parse("2026-08-28T07:54:00Z"));
-    }
+  @Test
+  void readsLatestCommitTimestamp() {
+    wireMock.stubFor(
+        get("/repos/acme/a/commits?per_page=1")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"sha":"abc","commit":{"author":{"date":"2026-08-27T10:00:00Z"},"committer":{"date":"2026-08-28T07:54:00Z"}}}]
+                        """)));
+    assertThat(client.latestCommitAt("acme", "a"))
+        .contains(java.time.Instant.parse("2026-08-28T07:54:00Z"));
+  }
 
-    @Test
-    void readsLatestCommitTimestampForPath() {
-        wireMock.stubFor(get("/repos/acme/a/commits?per_page=1&path=README.md")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"sha":"def","commit":{"author":{"date":"2026-09-21T18:00:00Z"},"committer":{"date":"2026-09-21T18:05:00Z"}}}]
-                                """)));
-        assertThat(client.latestCommitAt("acme", "a", "README.md"))
-                .contains(java.time.Instant.parse("2026-09-21T18:05:00Z"));
-    }
+  @Test
+  void readsLatestCommitTimestampForPath() {
+    wireMock.stubFor(
+        get("/repos/acme/a/commits?per_page=1&path=README.md")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"sha":"def","commit":{"author":{"date":"2026-09-21T18:00:00Z"},"committer":{"date":"2026-09-21T18:05:00Z"}}}]
+                        """)));
+    assertThat(client.latestCommitAt("acme", "a", "README.md"))
+        .contains(java.time.Instant.parse("2026-09-21T18:05:00Z"));
+  }
 
-    @Test
-    void detectsIssueTemplatesDirectory() {
-        wireMock.stubFor(get("/repos/acme/a/contents/.github/ISSUE_TEMPLATE")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("[{\"name\":\"bug_report.yml\",\"type\":\"file\"}]")));
-        assertThat(client.hasIssueTemplates("acme", "a")).isTrue();
-    }
+  @Test
+  void detectsIssueTemplatesDirectory() {
+    wireMock.stubFor(
+        get("/repos/acme/a/contents/.github/ISSUE_TEMPLATE")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("[{\"name\":\"bug_report.yml\",\"type\":\"file\"}]")));
+    assertThat(client.hasIssueTemplates("acme", "a")).isTrue();
+  }
 
-    @Test
-    void listsIssuesPullsReleasesAndContributors() {
-        wireMock.stubFor(get("/repos/acme/a/issues?state=all&per_page=100&sort=created&direction=desc")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"id":11,"number":1,"title":"Help wanted","state":"open","html_url":"https://github.com/acme/a/issues/1","created_at":"2026-08-20T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[{"name":"good first issue"}]}]
-                                """)));
-        wireMock.stubFor(get("/repos/acme/a/pulls?state=all&per_page=100&sort=created&direction=desc")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"id":22,"number":2,"title":"Fix","state":"closed","html_url":"https://github.com/acme/a/pull/2","created_at":"2026-08-21T00:00:00Z","merged_at":"2026-08-22T00:00:00Z","user":{"id":2,"login":"alice","type":"User"}}]
-                                """)));
-        wireMock.stubFor(get("/repos/acme/a/releases?per_page=100")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"id":33,"draft":false,"tag_name":"v1.0.0","name":"1.0.0","html_url":"https://github.com/acme/a/releases/tag/v1.0.0","published_at":"2026-08-23T00:00:00Z"}]
-                                """)));
-        wireMock.stubFor(get("/repos/acme/a/contributors?per_page=100&anon=true")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"login":"alice","type":"User"}]
-                                """)));
-        wireMock.stubFor(get("/repos/acme/a/readme")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"sha":"abc","content":"IyBkZW1v","encoding":"base64","name":"README.md"}
-                                """)));
+  @Test
+  void listsIssuesPullsReleasesAndContributors() {
+    wireMock.stubFor(
+        get("/repos/acme/a/issues?state=all&per_page=100&sort=created&direction=desc")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"id":11,"number":1,"title":"Help wanted","state":"open","html_url":"https://github.com/acme/a/issues/1","created_at":"2026-08-20T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[{"name":"good first issue"}]}]
+                        """)));
+    wireMock.stubFor(
+        get("/repos/acme/a/pulls?state=all&per_page=100&sort=created&direction=desc")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"id":22,"number":2,"title":"Fix","state":"closed","html_url":"https://github.com/acme/a/pull/2","created_at":"2026-08-21T00:00:00Z","merged_at":"2026-08-22T00:00:00Z","user":{"id":2,"login":"alice","type":"User"}}]
+                        """)));
+    wireMock.stubFor(
+        get("/repos/acme/a/releases?per_page=100")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"id":33,"draft":false,"tag_name":"v1.0.0","name":"1.0.0","html_url":"https://github.com/acme/a/releases/tag/v1.0.0","published_at":"2026-08-23T00:00:00Z"}]
+                        """)));
+    wireMock.stubFor(
+        get("/repos/acme/a/contributors?per_page=100&anon=true")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"login":"alice","type":"User"}]
+                        """)));
+    wireMock.stubFor(
+        get("/repos/acme/a/readme")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"sha":"abc","content":"IyBkZW1v","encoding":"base64","name":"README.md"}
+                        """)));
 
-        assertThat(client.listIssues("acme", "a")).hasSize(1);
-        assertThat(client.listIssues("acme", "a").getFirst().hasGoodFirstIssueLabel()).isTrue();
-        assertThat(client.listPulls("acme", "a").getFirst().mergedPull()).isTrue();
-        assertThat(client.listReleases("acme", "a").getFirst().tagName()).isEqualTo("v1.0.0");
-        assertThat(client.listContributors("acme", "a")).extracting(item -> item.login()).containsExactly("alice");
-        assertThat(client.getReadmeDetails("acme", "a")).hasValueSatisfying(readme -> {
-            assertThat(readme.sha()).isEqualTo("abc");
-            assertThat(readme.decodedText()).isEqualTo("# demo");
+    assertThat(client.listIssues("acme", "a")).hasSize(1);
+    assertThat(client.listIssues("acme", "a").getFirst().hasGoodFirstIssueLabel()).isTrue();
+    assertThat(client.listPulls("acme", "a").getFirst().mergedPull()).isTrue();
+    assertThat(client.listReleases("acme", "a").getFirst().tagName()).isEqualTo("v1.0.0");
+    assertThat(client.listContributors("acme", "a"))
+        .extracting(item -> item.login())
+        .containsExactly("alice");
+    assertThat(client.getReadmeDetails("acme", "a"))
+        .hasValueSatisfying(readme -> {
+          assertThat(readme.sha()).isEqualTo("abc");
+          assertThat(readme.decodedText()).isEqualTo("# demo");
         });
-    }
+  }
 
-    @Test
-    void keepsAnEncodedIssuesCursorOnTheNextPage() {
-        wireMock.stubFor(get(urlPathEqualTo("/repos/acme/a/issues"))
-                .withQueryParam("after", absent())
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withHeader("Link", "<" + wireMock.baseUrl() + "/repos/acme/a/issues?per_page=100&after=abc%3D&page=2>; rel=\"next\"")
-                        .withBody("""
-                                [{"id":11,"number":1,"title":"Help wanted","state":"open","html_url":"https://github.com/acme/a/issues/1","created_at":"2026-08-20T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[]}]
-                                """)));
-        wireMock.stubFor(get(urlPathEqualTo("/repos/acme/a/issues"))
-                .withQueryParam("after", equalTo("abc="))
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                [{"id":12,"number":2,"title":"Next","state":"open","html_url":"https://github.com/acme/a/issues/2","created_at":"2026-08-21T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[]}]
-                                """)));
-        assertThat(client.listIssues("acme", "a")).hasSize(2);
-    }
+  @Test
+  void keepsAnEncodedIssuesCursorOnTheNextPage() {
+    wireMock.stubFor(
+        get(urlPathEqualTo("/repos/acme/a/issues"))
+            .withQueryParam("after", absent())
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withHeader(
+                        "Link",
+                        "<"
+                            + wireMock.baseUrl()
+                            + "/repos/acme/a/issues?per_page=100&after=abc%3D&page=2>; rel=\"next\"")
+                    .withBody(
+                        """
+                        [{"id":11,"number":1,"title":"Help wanted","state":"open","html_url":"https://github.com/acme/a/issues/1","created_at":"2026-08-20T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[]}]
+                        """)));
+    wireMock.stubFor(
+        get(urlPathEqualTo("/repos/acme/a/issues"))
+            .withQueryParam("after", equalTo("abc="))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        [{"id":12,"number":2,"title":"Next","state":"open","html_url":"https://github.com/acme/a/issues/2","created_at":"2026-08-21T00:00:00Z","user":{"id":2,"login":"alice","type":"User"},"labels":[]}]
+                        """)));
+    assertThat(client.listIssues("acme", "a")).hasSize(2);
+  }
 
-    @Test
-    void readsClonesPathsReleasesAndMissingFiles() {
-        wireMock.stubFor(get("/repos/acme/a/traffic/clones")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
+  @Test
+  void readsClonesPathsReleasesAndMissingFiles() {
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/clones")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
                         {"count":2,"uniques":1,"clones":[{"timestamp":"2026-08-20T00:00:00Z","count":2,"uniques":1}]}
                         """)));
-        wireMock.stubFor(get("/repos/acme/a/traffic/popular/paths")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("""
+    wireMock.stubFor(
+        get("/repos/acme/a/traffic/popular/paths")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
                         [{"path":"/acme/a","title":"a","count":4,"uniques":2}]
                         """)));
-        wireMock.stubFor(get("/repos/acme/a/commits?per_page=1")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
-        wireMock.stubFor(get("/repos/acme/a/community/profile")
-                .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
-        wireMock.stubFor(get("/repos/acme/a/readme")
-                .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
-        wireMock.stubFor(get("/repos/acme/a/releases?per_page=1")
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
-        wireMock.stubFor(get("/repos/acme/a/contents/.github/SECURITY.md")
-                .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
+    wireMock.stubFor(
+        get("/repos/acme/a/commits?per_page=1")
+            .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
+    wireMock.stubFor(
+        get("/repos/acme/a/community/profile")
+            .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
+    wireMock.stubFor(
+        get("/repos/acme/a/readme")
+            .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
+    wireMock.stubFor(
+        get("/repos/acme/a/releases?per_page=1")
+            .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody("[]")));
+    wireMock.stubFor(
+        get("/repos/acme/a/contents/.github/SECURITY.md")
+            .willReturn(aResponse().withStatus(404).withBody("{\"message\":\"missing\"}")));
 
-        assertThat(client.getClones("acme", "a").days()).hasSize(1);
-        assertThat(client.getPopularPaths("acme", "a")).hasSize(1);
-        assertThat(client.latestCommitAt("acme", "a")).isEmpty();
-        assertThat(client.getCommunityProfile("acme", "a").filesOrEmpty().hasReadme()).isFalse();
-        assertThat(client.getReadme("acme", "a")).isEmpty();
-        assertThat(client.latestReleaseAt("acme", "a")).isEmpty();
-        assertThat(client.fileExists("acme", "a", ".github/SECURITY.md")).isFalse();
-        assertThat(client.maskedToken()).contains("****");
+    assertThat(client.getClones("acme", "a").days()).hasSize(1);
+    assertThat(client.getPopularPaths("acme", "a")).hasSize(1);
+    assertThat(client.latestCommitAt("acme", "a")).isEmpty();
+    assertThat(client.getCommunityProfile("acme", "a").filesOrEmpty().hasReadme()).isFalse();
+    assertThat(client.getReadme("acme", "a")).isEmpty();
+    assertThat(client.latestReleaseAt("acme", "a")).isEmpty();
+    assertThat(client.fileExists("acme", "a", ".github/SECURITY.md")).isFalse();
+    assertThat(client.maskedToken()).contains("****");
+  }
+
+  @Test
+  void searchPagesWhenTheFirstPageIsFull() {
+    StringBuilder items = new StringBuilder("[");
+    for (int i = 0; i < 100; i++) {
+      if (i > 0) {
+        items.append(',');
+      }
+      items
+          .append("{\"id\":")
+          .append(i)
+          .append(",\"full_name\":\"acme/r")
+          .append(i)
+          .append("\",\"stargazers_count\":1,\"forks_count\":0}");
     }
+    items.append(']');
+    wireMock.stubFor(
+        get(urlPathEqualTo("/search/repositories"))
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"total_count\":101,\"items\":" + items + "}")));
+    assertThat(client.searchRepositories("demo", 101).itemsOrEmpty()).isNotEmpty();
+  }
 
-    @Test
-    void searchPagesWhenTheFirstPageIsFull() {
-        StringBuilder items = new StringBuilder("[");
-        for (int i = 0; i < 100; i++) {
-            if (i > 0) {
-                items.append(',');
-            }
-            items.append("{\"id\":").append(i)
-                    .append(",\"full_name\":\"acme/r").append(i)
-                    .append("\",\"stargazers_count\":1,\"forks_count\":0}");
-        }
-        items.append(']');
-        wireMock.stubFor(get(urlPathEqualTo("/search/repositories"))
-                .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody(
-                        "{\"total_count\":101,\"items\":" + items + "}"
-                )));
-        assertThat(client.searchRepositories("demo", 101).itemsOrEmpty()).isNotEmpty();
-    }
+  @Test
+  void socialPreviewReadsTheCustomOpenGraphImage() {
+    wireMock.stubFor(
+        post("/graphql")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"data":{"repository":{"usesCustomOpenGraphImage":true,"openGraphImageUrl":"https://img/a.png"}}}
+                        """)));
+    assertThat(client.getSocialPreview("acme", "a").custom()).isTrue();
+    assertThat(client.getSocialPreview("acme", "a").imageUrl()).isEqualTo("https://img/a.png");
 
-    @Test
-    void socialPreviewReadsTheCustomOpenGraphImage() {
-        wireMock.stubFor(post("/graphql")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"data":{"repository":{"usesCustomOpenGraphImage":true,"openGraphImageUrl":"https://img/a.png"}}}
-                                """)));
-        assertThat(client.getSocialPreview("acme", "a").custom()).isTrue();
-        assertThat(client.getSocialPreview("acme", "a").imageUrl()).isEqualTo("https://img/a.png");
+    wireMock.stubFor(
+        post("/graphql")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"data":{"repository":{"usesCustomOpenGraphImage":false,"openGraphImageUrl":"https://img/auto.png"}},"errors":[]}
+                        """)));
+    assertThat(client.getSocialPreview("acme", "a").custom()).isFalse();
 
-        wireMock.stubFor(post("/graphql")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"data":{"repository":{"usesCustomOpenGraphImage":false,"openGraphImageUrl":"https://img/auto.png"}},"errors":[]}
-                                """)));
-        assertThat(client.getSocialPreview("acme", "a").custom()).isFalse();
+    wireMock.stubFor(
+        post("/graphql")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(
+                        """
+                        {"data":{"repository":null},"errors":[{"message":"Could not resolve"}]}
+                        """)));
+    assertThatThrownBy(() -> client.getSocialPreview("acme", "missing"))
+        .isInstanceOf(GitHubException.class);
 
-        wireMock.stubFor(post("/graphql")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("""
-                                {"data":{"repository":null},"errors":[{"message":"Could not resolve"}]}
-                                """)));
-        assertThatThrownBy(() -> client.getSocialPreview("acme", "missing")).isInstanceOf(GitHubException.class);
+    wireMock.stubFor(
+        post("/graphql")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"data\":null}")));
+    assertThatThrownBy(() -> client.getSocialPreview("acme", "gone"))
+        .isInstanceOf(GitHubException.class);
 
-        wireMock.stubFor(post("/graphql")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"data\":null}")));
-        assertThatThrownBy(() -> client.getSocialPreview("acme", "gone")).isInstanceOf(GitHubException.class);
+    wireMock.stubFor(
+        post("/graphql")
+            .willReturn(
+                aResponse()
+                    .withHeader("Content-Type", "application/json")
+                    .withBody("{\"data\":{\"repository\":null}}")));
+    assertThatThrownBy(() -> client.getSocialPreview("acme", "gone"))
+        .isInstanceOf(GitHubException.class);
 
-        wireMock.stubFor(post("/graphql")
-                .willReturn(aResponse()
-                        .withHeader("Content-Type", "application/json")
-                        .withBody("{\"data\":{\"repository\":null}}")));
-        assertThatThrownBy(() -> client.getSocialPreview("acme", "gone")).isInstanceOf(GitHubException.class);
+    wireMock.stubFor(post("/graphql").willReturn(aResponse().withStatus(500).withBody("oops")));
+    assertThatThrownBy(() -> client.getSocialPreview("acme", "a"))
+        .isInstanceOf(GitHubException.class)
+        .extracting(ex -> ((GitHubException) ex).retryable())
+        .isEqualTo(true);
 
-        wireMock.stubFor(post("/graphql").willReturn(aResponse().withStatus(500).withBody("oops")));
-        assertThatThrownBy(() -> client.getSocialPreview("acme", "a"))
-                .isInstanceOf(GitHubException.class)
-                .extracting(ex -> ((GitHubException) ex).retryable())
-                .isEqualTo(true);
-
-        wireMock.stubFor(post("/graphql")
-                .willReturn(aResponse().withFixedDelay(5000).withStatus(200).withBody("{}")));
-        assertThatThrownBy(() -> client.getSocialPreview("acme", "a")).isInstanceOf(GitHubException.class);
-    }
+    wireMock.stubFor(
+        post("/graphql")
+            .willReturn(aResponse().withFixedDelay(5000).withStatus(200).withBody("{}")));
+    assertThatThrownBy(() -> client.getSocialPreview("acme", "a"))
+        .isInstanceOf(GitHubException.class);
+  }
 }

@@ -1,5 +1,8 @@
 package com.kholodilin.repogrowth.search.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
@@ -11,248 +14,292 @@ import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.simple.JdbcClient;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 class SearchQueryServiceIT extends AbstractPostgresTest {
 
-    @Autowired
-    SearchQueryService searchQueryService;
-    @Autowired
-    GitHubOwnerJdbcRepository ownerJdbcRepository;
-    @Autowired
-    RepositoryJdbcRepository repositoryJdbcRepository;
-    @Autowired
-    SearchRunJdbcRepository searchRunRepository;
-    @Autowired
-    PlanningWindow planningWindow;
-    @Autowired
-    JdbcClient jdbcClient;
+  @Autowired SearchQueryService searchQueryService;
+  @Autowired GitHubOwnerJdbcRepository ownerJdbcRepository;
+  @Autowired RepositoryJdbcRepository repositoryJdbcRepository;
+  @Autowired SearchRunJdbcRepository searchRunRepository;
+  @Autowired PlanningWindow planningWindow;
+  @Autowired JdbcClient jdbcClient;
 
-    private Repository kafka;
-    private Repository outbox;
+  private Repository kafka;
+  private Repository outbox;
 
-    @BeforeEach
-    void seed() {
-        wipeRepositoryData(jdbcClient);
-        GitHubOwner owner = ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
-        kafka = track(owner, 301L, "kafka-starter", "acme/kafka-starter");
-        outbox = track(owner, 302L, "spring-outbox", "acme/spring-outbox");
-    }
+  @BeforeEach
+  void seed() {
+    wipeRepositoryData(jdbcClient);
+    GitHubOwner owner =
+        ownerJdbcRepository.upsert(100L, "acme", OwnerType.USER, null, "https://github.com/acme");
+    kafka = track(owner, 301L, "kafka-starter", "acme/kafka-starter");
+    outbox = track(owner, 302L, "spring-outbox", "acme/spring-outbox");
+  }
 
-    @Test
-    void rejectsDuplicateQueryForTheSameRepository() {
-        searchQueryService.create(kafka.id(), null, "spring boot transactional outbox", true, 50);
+  @Test
+  void rejectsDuplicateQueryForTheSameRepository() {
+    searchQueryService.create(kafka.id(), null, "spring boot transactional outbox", true, 50);
 
-        assertThatThrownBy(() -> searchQueryService.create(kafka.id(), null, "  Spring Boot   transactional outbox ", true, 50))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("This search query is already tracked for the repository");
-        assertThat(searchQueryService.list(kafka.id())).hasSize(1);
-    }
+    assertThatThrownBy(() ->
+            searchQueryService.create(
+                kafka.id(), null, "  Spring Boot   transactional outbox ", true, 50))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("This search query is already tracked for the repository");
+    assertThat(searchQueryService.list(kafka.id())).hasSize(1);
+  }
 
-    @Test
-    void allowsTheSameQueryOnAnotherRepository() {
-        searchQueryService.create(kafka.id(), null, "outbox kafka language:Java", true, 50);
-        searchQueryService.create(outbox.id(), null, "outbox kafka language:Java", true, 50);
-        assertThat(searchQueryService.list(kafka.id())).hasSize(1);
-        assertThat(searchQueryService.list(outbox.id())).hasSize(1);
-    }
+  @Test
+  void allowsTheSameQueryOnAnotherRepository() {
+    searchQueryService.create(kafka.id(), null, "outbox kafka language:Java", true, 50);
+    searchQueryService.create(outbox.id(), null, "outbox kafka language:Java", true, 50);
+    assertThat(searchQueryService.list(kafka.id())).hasSize(1);
+    assertThat(searchQueryService.list(outbox.id())).hasSize(1);
+  }
 
-    @Test
-    void runAllPlansARunForEachQuery() {
-        searchQueryService.create(kafka.id(), null, "outbox", true, 50);
-        searchQueryService.create(kafka.id(), null, "kafka outbox", true, 50);
-        searchQueryService.create(outbox.id(), null, "other repo query", true, 50);
+  @Test
+  void runAllPlansARunForEachQuery() {
+    searchQueryService.create(kafka.id(), null, "outbox", true, 50);
+    searchQueryService.create(kafka.id(), null, "kafka outbox", true, 50);
+    searchQueryService.create(outbox.id(), null, "other repo query", true, 50);
 
-        List<Long> runIds = searchQueryService.runAll(kafka.id());
-        assertThat(runIds).hasSize(2);
-        assertThat(searchQueryService.runAll(kafka.id())).containsExactlyInAnyOrderElementsOf(runIds);
-    }
+    List<Long> runIds = searchQueryService.runAll(kafka.id());
+    assertThat(runIds).hasSize(2);
+    assertThat(searchQueryService.runAll(kafka.id())).containsExactlyInAnyOrderElementsOf(runIds);
+  }
 
-    @Test
-    void reRunningTodayKeepsTheStoredSnapshotUntilANewOneArrives() {
-        SearchQuery query = searchQueryService.create(kafka.id(), null, "transactional outbox postgresql", true, 50);
-        LocalDate today = planningWindow.businessDate();
-        storeSnapshot(query.id(), today.minusDays(2), 3, 433);
-        storeSnapshot(query.id(), today.minusDays(1), 2, 441);
-        storeSnapshot(query.id(), today, 2, 443);
+  @Test
+  void reRunningTodayKeepsTheStoredSnapshotUntilANewOneArrives() {
+    SearchQuery query =
+        searchQueryService.create(kafka.id(), null, "transactional outbox postgresql", true, 50);
+    LocalDate today = planningWindow.businessDate();
+    storeSnapshot(query.id(), today.minusDays(2), 3, 433);
+    storeSnapshot(query.id(), today.minusDays(1), 2, 441);
+    storeSnapshot(query.id(), today, 2, 443);
 
-        SearchQueryService.SearchHistory before = searchQueryService.history(query.id());
-        assertThat(before.currentRank()).isEqualTo(2);
-        assertThat(before.change().kind()).isEqualTo(RankChangeMath.Kind.UNCHANGED);
-        assertThat(before.totalResults()).isEqualTo(443);
+    SearchQueryService.SearchHistory before = searchQueryService.history(query.id());
+    assertThat(before.currentRank()).isEqualTo(2);
+    assertThat(before.change().kind()).isEqualTo(RankChangeMath.Kind.UNCHANGED);
+    assertThat(before.totalResults()).isEqualTo(443);
 
-        searchQueryService.runNow(query.id());
+    searchQueryService.runNow(query.id());
 
-        SearchQueryService.SearchHistory during = searchQueryService.history(query.id());
-        assertThat(during.searchStatus()).isEqualTo("READY");
-        assertThat(during.currentRank()).isEqualTo(2);
-        assertThat(during.change().kind()).isEqualTo(RankChangeMath.Kind.UNCHANGED);
-        assertThat(during.change().amount()).isZero();
-        assertThat(during.totalResults()).isEqualTo(443);
-        assertThat(during.bestRank()).isEqualTo(2);
-        assertThat(during.points()).hasSize(3);
-        assertThat(during.sortMode()).isEqualTo("stars");
-        assertThat(during.lastChecked()).isEqualTo(before.lastChecked());
-    }
+    SearchQueryService.SearchHistory during = searchQueryService.history(query.id());
+    assertThat(during.searchStatus()).isEqualTo("READY");
+    assertThat(during.currentRank()).isEqualTo(2);
+    assertThat(during.change().kind()).isEqualTo(RankChangeMath.Kind.UNCHANGED);
+    assertThat(during.change().amount()).isZero();
+    assertThat(during.totalResults()).isEqualTo(443);
+    assertThat(during.bestRank()).isEqualTo(2);
+    assertThat(during.points()).hasSize(3);
+    assertThat(during.sortMode()).isEqualTo("stars");
+    assertThat(during.lastChecked()).isEqualTo(before.lastChecked());
+  }
 
-    @Test
-    void bestRankAndChartPreferConfiguredBestMatchWhenPresent() {
-        SearchQuery query = searchQueryService.create(kafka.id(), null, "mixed sort modes", true, 50);
-        LocalDate today = planningWindow.businessDate();
-        storeSnapshot(query.id(), today.minusDays(2), 1, 100); // legacy blank/stars rows
-        storeSnapshot(query.id(), today.minusDays(1), 5, 110);
-        storeSnapshot(query.id(), today, 3, 120);
-        long latest = runId(query.id(), today);
-        jdbcClient.sql("UPDATE search_run SET sort_mode = 'best_match' WHERE id = :id")
-                .param("id", latest)
-                .update();
+  @Test
+  void bestRankAndChartPreferConfiguredBestMatchWhenPresent() {
+    SearchQuery query = searchQueryService.create(kafka.id(), null, "mixed sort modes", true, 50);
+    LocalDate today = planningWindow.businessDate();
+    storeSnapshot(query.id(), today.minusDays(2), 1, 100); // legacy blank/stars rows
+    storeSnapshot(query.id(), today.minusDays(1), 5, 110);
+    storeSnapshot(query.id(), today, 3, 120);
+    long latest = runId(query.id(), today);
+    jdbcClient
+        .sql("UPDATE search_run SET sort_mode = 'best_match' WHERE id = :id")
+        .param("id", latest)
+        .update();
 
-        SearchQueryService.SearchHistory history = searchQueryService.history(query.id());
-        assertThat(history.sortMode()).isEqualTo("best_match");
-        assertThat(history.bestRank()).isEqualTo(3);
-        assertThat(history.currentRank()).isEqualTo(3);
-        assertThat(history.points()).extracting(SearchQueryService.RankPoint::position).containsExactly(3);
-    }
+    SearchQueryService.SearchHistory history = searchQueryService.history(query.id());
+    assertThat(history.sortMode()).isEqualTo("best_match");
+    assertThat(history.bestRank()).isEqualTo(3);
+    assertThat(history.currentRank()).isEqualTo(3);
+    assertThat(history.points())
+        .extracting(SearchQueryService.RankPoint::position)
+        .containsExactly(3);
+  }
 
-    @Test
-    void bestMatchOnlyQueriesKeepBestMatchChart() {
-        SearchQuery query = searchQueryService.create(kafka.id(), null, "best match only", true, 50);
-        LocalDate today = planningWindow.businessDate();
-        storeSnapshot(query.id(), today.minusDays(1), 5, 110);
-        storeSnapshot(query.id(), today, 3, 120);
-        jdbcClient.sql("UPDATE search_run SET sort_mode = 'best_match' WHERE search_query_id = :id")
-                .param("id", query.id())
-                .update();
+  @Test
+  void bestMatchOnlyQueriesKeepBestMatchChart() {
+    SearchQuery query = searchQueryService.create(kafka.id(), null, "best match only", true, 50);
+    LocalDate today = planningWindow.businessDate();
+    storeSnapshot(query.id(), today.minusDays(1), 5, 110);
+    storeSnapshot(query.id(), today, 3, 120);
+    jdbcClient
+        .sql("UPDATE search_run SET sort_mode = 'best_match' WHERE search_query_id = :id")
+        .param("id", query.id())
+        .update();
 
-        SearchQueryService.SearchHistory history = searchQueryService.history(query.id());
-        assertThat(history.sortMode()).isEqualTo("best_match");
-        assertThat(history.bestRank()).isEqualTo(3);
-        assertThat(history.currentRank()).isEqualTo(3);
-        assertThat(history.points()).extracting(SearchQueryService.RankPoint::position).containsExactly(5, 3);
-    }
+    SearchQueryService.SearchHistory history = searchQueryService.history(query.id());
+    assertThat(history.sortMode()).isEqualTo("best_match");
+    assertThat(history.bestRank()).isEqualTo(3);
+    assertThat(history.currentRank()).isEqualTo(3);
+    assertThat(history.points())
+        .extracting(SearchQueryService.RankPoint::position)
+        .containsExactly(5, 3);
+  }
 
-    @Test
-    void aFailedReRunLeavesTheLastStoredSnapshotOnTheRow() {
-        SearchQuery query = searchQueryService.create(kafka.id(), null, "transactional outbox kafka", true, 50);
-        LocalDate today = planningWindow.businessDate();
-        storeSnapshot(query.id(), today.minusDays(1), 4, 460);
-        storeSnapshot(query.id(), today, 3, 466);
+  @Test
+  void aFailedReRunLeavesTheLastStoredSnapshotOnTheRow() {
+    SearchQuery query =
+        searchQueryService.create(kafka.id(), null, "transactional outbox kafka", true, 50);
+    LocalDate today = planningWindow.businessDate();
+    storeSnapshot(query.id(), today.minusDays(1), 4, 460);
+    storeSnapshot(query.id(), today, 3, 466);
 
-        long runId = searchQueryService.runNow(query.id());
-        searchRunRepository.markFailed(runId, "RATE_LIMIT", "secondary rate limit");
+    long runId = searchQueryService.runNow(query.id());
+    searchRunRepository.markFailed(runId, "RATE_LIMIT", "secondary rate limit");
 
-        SearchQueryService.SearchHistory after = searchQueryService.history(query.id());
-        assertThat(after.searchStatus()).isEqualTo("FAILED");
-        assertThat(after.currentRank()).isEqualTo(3);
-        assertThat(after.change().kind()).isEqualTo(RankChangeMath.Kind.IMPROVED);
-        assertThat(after.change().amount()).isEqualTo(1);
-        assertThat(after.totalResults()).isEqualTo(466);
-        assertThat(searchQueryService.latestResults(query.id()).rows()).isEmpty();
-        assertThatThrownBy(() -> searchQueryService.results(999_999L)).isInstanceOf(ApiException.class);
-    }
+    SearchQueryService.SearchHistory after = searchQueryService.history(query.id());
+    assertThat(after.searchStatus()).isEqualTo("FAILED");
+    assertThat(after.currentRank()).isEqualTo(3);
+    assertThat(after.change().kind()).isEqualTo(RankChangeMath.Kind.IMPROVED);
+    assertThat(after.change().amount()).isEqualTo(1);
+    assertThat(after.totalResults()).isEqualTo(466);
+    assertThat(searchQueryService.latestResults(query.id()).rows()).isEmpty();
+    assertThatThrownBy(() -> searchQueryService.results(999_999L)).isInstanceOf(ApiException.class);
+  }
 
-    @Test
-    void seriesJoinsStoredSnapshotsByGithubRepository() {
-        SearchQuery query = searchQueryService.create(kafka.id(), "outbox", "transactional outbox", true, 50);
-        LocalDate today = planningWindow.businessDate();
-        storeSnapshot(query.id(), today.minusDays(1), 2, 10);
-        storeSnapshot(query.id(), today, 4, 12);
-        long older = runId(query.id(), today.minusDays(1));
-        long newer = runId(query.id(), today);
-        insertResult(older, 1, 500L, "other/repo", 10, 1);
-        insertResult(older, 2, kafka.githubId(), kafka.fullName(), 20, 2);
-        insertResult(newer, 1, 500L, "other/renamed", 11, 3);
+  @Test
+  void seriesJoinsStoredSnapshotsByGithubRepository() {
+    SearchQuery query =
+        searchQueryService.create(kafka.id(), "outbox", "transactional outbox", true, 50);
+    LocalDate today = planningWindow.businessDate();
+    storeSnapshot(query.id(), today.minusDays(1), 2, 10);
+    storeSnapshot(query.id(), today, 4, 12);
+    long older = runId(query.id(), today.minusDays(1));
+    long newer = runId(query.id(), today);
+    insertResult(older, 1, 500L, "other/repo", 10, 1);
+    insertResult(older, 2, kafka.githubId(), kafka.fullName(), 20, 2);
+    insertResult(newer, 1, 500L, "other/renamed", 11, 3);
 
-        SearchQueryService.SearchSeries series = searchQueryService.series(query.id());
+    SearchQueryService.SearchSeries series = searchQueryService.series(query.id());
 
-        assertThat(series.series()).extracting(SearchQueryService.SeriesLine::githubRepositoryId)
-                .containsExactly(500L, kafka.githubId());
-        SearchQueryService.SeriesLine neighbor = series.series().get(0);
-        assertThat(neighbor.fullName()).isEqualTo("other/renamed");
-        assertThat(neighbor.points()).extracting(SearchQueryService.SeriesPoint::date)
-                .containsExactly(today.minusDays(1), today);
-        assertThat(neighbor.points()).extracting(SearchQueryService.SeriesPoint::stars).containsExactly(10, 11);
-        assertThat(neighbor.points()).extracting(SearchQueryService.SeriesPoint::forks).containsExactly(1, 3);
-        assertThat(series.series().get(1).points()).hasSize(1);
-        assertThat(series.series().get(1).points().get(0).position()).isEqualTo(2);
+    assertThat(series.series())
+        .extracting(SearchQueryService.SeriesLine::githubRepositoryId)
+        .containsExactly(500L, kafka.githubId());
+    SearchQueryService.SeriesLine neighbor = series.series().get(0);
+    assertThat(neighbor.fullName()).isEqualTo("other/renamed");
+    assertThat(neighbor.points())
+        .extracting(SearchQueryService.SeriesPoint::date)
+        .containsExactly(today.minusDays(1), today);
+    assertThat(neighbor.points())
+        .extracting(SearchQueryService.SeriesPoint::stars)
+        .containsExactly(10, 11);
+    assertThat(neighbor.points())
+        .extracting(SearchQueryService.SeriesPoint::forks)
+        .containsExactly(1, 3);
+    assertThat(series.series().get(1).points()).hasSize(1);
+    assertThat(series.series().get(1).points().get(0).position()).isEqualTo(2);
 
-        SearchQuery empty = searchQueryService.create(outbox.id(), "plain", "plain query", true, 50);
-        storeSnapshot(empty.id(), today, 1, 1);
-        assertThat(searchQueryService.series(empty.id()).series()).isEmpty();
-        assertThatThrownBy(() -> searchQueryService.series(999_999L)).isInstanceOf(ApiException.class);
-    }
+    SearchQuery empty = searchQueryService.create(outbox.id(), "plain", "plain query", true, 50);
+    storeSnapshot(empty.id(), today, 1, 1);
+    assertThat(searchQueryService.series(empty.id()).series()).isEmpty();
+    assertThatThrownBy(() -> searchQueryService.series(999_999L)).isInstanceOf(ApiException.class);
+  }
 
-    private void storeSnapshot(long searchQueryId, LocalDate businessDate, int position, int totalCount) {
-        Instant collectedAt = businessDate.atTime(9, 30).toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS);
-        jdbcClient.sql("""
-                        INSERT INTO search_run (
-                            search_query_id, repository_id, business_date, status,
-                            started_at, completed_at, snapshot_at, total_count, tracked_repository_position
-                        )
-                        VALUES (
-                            :searchQueryId, :repositoryId, :businessDate, 'SUCCESS',
-                            :collectedAt, :collectedAt, :collectedAt, :totalCount, :position
-                        )
-                        """)
-                .param("searchQueryId", searchQueryId)
-                .param("repositoryId", kafka.id())
-                .param("businessDate", businessDate)
-                .param("collectedAt", SqlTime.ts(collectedAt))
-                .param("totalCount", totalCount)
-                .param("position", position)
-                .update();
-    }
+  private void storeSnapshot(
+      long searchQueryId, LocalDate businessDate, int position, int totalCount) {
+    Instant collectedAt =
+        businessDate.atTime(9, 30).toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS);
+    jdbcClient
+        .sql(
+            """
+            INSERT INTO search_run (
+                search_query_id, repository_id, business_date, status,
+                started_at, completed_at, snapshot_at, total_count, tracked_repository_position
+            )
+            VALUES (
+                :searchQueryId, :repositoryId, :businessDate, 'SUCCESS',
+                :collectedAt, :collectedAt, :collectedAt, :totalCount, :position
+            )
+            """)
+        .param("searchQueryId", searchQueryId)
+        .param("repositoryId", kafka.id())
+        .param("businessDate", businessDate)
+        .param("collectedAt", SqlTime.ts(collectedAt))
+        .param("totalCount", totalCount)
+        .param("position", position)
+        .update();
+  }
 
-    private long runId(long searchQueryId, LocalDate businessDate) {
-        return jdbcClient.sql("""
-                        SELECT id FROM search_run
-                        WHERE search_query_id = :searchQueryId AND business_date = :businessDate
-                        """)
-                .param("searchQueryId", searchQueryId)
-                .param("businessDate", businessDate)
-                .query(Long.class)
-                .single();
-    }
+  private long runId(long searchQueryId, LocalDate businessDate) {
+    return jdbcClient
+        .sql(
+            """
+            SELECT id FROM search_run
+            WHERE search_query_id = :searchQueryId AND business_date = :businessDate
+            """)
+        .param("searchQueryId", searchQueryId)
+        .param("businessDate", businessDate)
+        .query(Long.class)
+        .single();
+  }
 
-    private void insertResult(long searchRunId, int position, long githubRepositoryId, String fullName, int stars, int forks) {
-        jdbcClient.sql("""
-                        INSERT INTO search_result (
-                            search_run_id, position, github_repository_id, full_name, owner, stars, forks
-                        ) VALUES (
-                            :searchRunId, :position, :githubRepositoryId, :fullName, :owner, :stars, :forks
-                        )
-                        """)
-                .param("searchRunId", searchRunId)
-                .param("position", position)
-                .param("githubRepositoryId", githubRepositoryId)
-                .param("fullName", fullName)
-                .param("owner", fullName.substring(0, fullName.indexOf('/')))
-                .param("stars", stars)
-                .param("forks", forks)
-                .update();
-    }
+  private void insertResult(
+      long searchRunId,
+      int position,
+      long githubRepositoryId,
+      String fullName,
+      int stars,
+      int forks) {
+    jdbcClient
+        .sql(
+            """
+            INSERT INTO search_result (
+                search_run_id, position, github_repository_id, full_name, owner, stars, forks
+            ) VALUES (
+                :searchRunId, :position, :githubRepositoryId, :fullName, :owner, :stars, :forks
+            )
+            """)
+        .param("searchRunId", searchRunId)
+        .param("position", position)
+        .param("githubRepositoryId", githubRepositoryId)
+        .param("fullName", fullName)
+        .param("owner", fullName.substring(0, fullName.indexOf('/')))
+        .param("stars", stars)
+        .param("forks", forks)
+        .update();
+  }
 
-    private Repository track(GitHubOwner owner, long githubId, String name, String fullName) {
-        Repository repository = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
-                null, githubId, owner.id(), name, fullName, name, "PUBLIC", "main", "Java",
-                false, false, 1, 0, 0, 0, 0, false,
-                Instant.parse("2024-01-01T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"),
-                null, null, null, null, null, null
-        ));
-        repositoryJdbcRepository.markAccountAccessible(repository.id());
-        repositoryJdbcRepository.setTracking(repository.id(), true);
-        return repositoryJdbcRepository.findById(repository.id()).orElseThrow();
-    }
+  private Repository track(GitHubOwner owner, long githubId, String name, String fullName) {
+    Repository repository =
+        repositoryJdbcRepository.upsertKeepingTracking(
+            new Repository(
+                null,
+                githubId,
+                owner.id(),
+                name,
+                fullName,
+                name,
+                "PUBLIC",
+                "main",
+                "Java",
+                false,
+                false,
+                1,
+                0,
+                0,
+                0,
+                0,
+                false,
+                Instant.parse("2024-01-01T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+    repositoryJdbcRepository.markAccountAccessible(repository.id());
+    repositoryJdbcRepository.setTracking(repository.id(), true);
+    return repositoryJdbcRepository.findById(repository.id()).orElseThrow();
+  }
 }

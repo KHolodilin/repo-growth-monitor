@@ -17,22 +17,21 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Anonymous GETs under /api/v1/admin/repositories/{id}/** are allowed only for published dashboards.
- * Admins keep full read access. Mutations remain blocked by HTTP security config.
+ * Anonymous GETs under /api/v1/admin/repositories/{id}/** are allowed only for published
+ * dashboards. Admins keep full read access. Mutations remain blocked by HTTP security config.
  */
 @Component
 public class PublishedRepositoryReadFilter extends OncePerRequestFilter {
 
-  private static final Pattern REPO = Pattern.compile("^/api/v1/admin/repositories/(\\d+)(?:/.*)?$");
+  private static final Pattern REPO =
+      Pattern.compile("^/api/v1/admin/repositories/(\\d+)(?:/.*)?$");
 
   private final CurrentUserAccess currentUserAccess;
   private final PublicationService publicationService;
   private final JsonMapper json;
 
   public PublishedRepositoryReadFilter(
-      CurrentUserAccess currentUserAccess,
-      PublicationService publicationService,
-      JsonMapper json) {
+      CurrentUserAccess currentUserAccess, PublicationService publicationService, JsonMapper json) {
     this.currentUserAccess = currentUserAccess;
     this.publicationService = publicationService;
     this.json = json;

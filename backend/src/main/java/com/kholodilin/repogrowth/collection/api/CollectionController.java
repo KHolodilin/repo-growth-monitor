@@ -15,141 +15,145 @@ import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
 import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
+import java.time.LocalDate;
+import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/admin")
 public class CollectionController {
 
-    @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
-    private boolean orchestrationEnabled;
-    @org.springframework.beans.factory.annotation.Autowired(required=false) private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
-    @org.springframework.beans.factory.annotation.Autowired private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
-    private final CollectionPlanner collectionPlanner;
-    private final PlanningWindow planningWindow;
-    private final DailyPlanner dailyPlanner;
-    private final RepositoryService repositoryService;
-    private final CollectionRunJdbcRepository runRepository;
-    private final CollectionJobJdbcRepository jobRepository;
-    private final GitHubProperties gitHubProperties;
-    private final GitHubClient gitHubClient;
-    private final SearchQueryService searchQueryService;
-    private final TopicWatchSync topicWatchSync;
-    private final TopicPlanner topicPlanner;
+  @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+  private boolean orchestrationEnabled;
 
-    public CollectionController(
-            CollectionPlanner collectionPlanner,
-            PlanningWindow planningWindow,
-            DailyPlanner dailyPlanner,
-            RepositoryService repositoryService,
-            CollectionRunJdbcRepository runRepository,
-            CollectionJobJdbcRepository jobRepository,
-            GitHubProperties gitHubProperties,
-            GitHubClient gitHubClient,
-            SearchQueryService searchQueryService,
-            TopicWatchSync topicWatchSync,
-            TopicPlanner topicPlanner
-    ) {
-        this.collectionPlanner = collectionPlanner;
-        this.planningWindow = planningWindow;
-        this.dailyPlanner = dailyPlanner;
-        this.repositoryService = repositoryService;
-        this.runRepository = runRepository;
-        this.jobRepository = jobRepository;
-        this.gitHubProperties = gitHubProperties;
-        this.gitHubClient = gitHubClient;
-        this.searchQueryService = searchQueryService;
-        this.topicWatchSync = topicWatchSync;
-        this.topicPlanner = topicPlanner;
-    }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
 
-    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    @PostMapping("/repositories/{id}/collect")
-    public Object collect(@PathVariable long id) {
-        if (commands!=null)return commands.manual(id,commandWindow.businessDate());
-        if (!gitHubProperties.tokenConfigured()) {
-            throw GitHubException.auth(401, "GitHub token is not configured");
-        }
-        if (gitHubClient.tokenRejected()) {
-            throw GitHubException.auth(401, "GitHub rejected the token");
-        }
-        repositoryService.get(id);
-        LocalDate businessDate = planningWindow.businessDate();
-        CollectionRun run = collectionPlanner.planRepository(id, businessDate, true);
-        searchQueryService.runAll(id);
-        topicWatchSync.sync(id);
-        topicPlanner.planRepository(id, businessDate);
-        return toResponse(run);
-    }
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
 
-    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    @PostMapping("/collection/plan")
-    public DailyPlanner.PlannerResult plan() {
-        return dailyPlanner.planNow(true);
-    }
+  private final CollectionPlanner collectionPlanner;
+  private final PlanningWindow planningWindow;
+  private final DailyPlanner dailyPlanner;
+  private final RepositoryService repositoryService;
+  private final CollectionRunJdbcRepository runRepository;
+  private final CollectionJobJdbcRepository jobRepository;
+  private final GitHubProperties gitHubProperties;
+  private final GitHubClient gitHubClient;
+  private final SearchQueryService searchQueryService;
+  private final TopicWatchSync topicWatchSync;
+  private final TopicPlanner topicPlanner;
 
-    @GetMapping("/collection-runs/{id}")
-    public CollectionRunResponse getRun(@PathVariable long id) {
-        CollectionRun run = runRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Collection run not found"));
-        return toResponse(run);
-    }
+  public CollectionController(
+      CollectionPlanner collectionPlanner,
+      PlanningWindow planningWindow,
+      DailyPlanner dailyPlanner,
+      RepositoryService repositoryService,
+      CollectionRunJdbcRepository runRepository,
+      CollectionJobJdbcRepository jobRepository,
+      GitHubProperties gitHubProperties,
+      GitHubClient gitHubClient,
+      SearchQueryService searchQueryService,
+      TopicWatchSync topicWatchSync,
+      TopicPlanner topicPlanner) {
+    this.collectionPlanner = collectionPlanner;
+    this.planningWindow = planningWindow;
+    this.dailyPlanner = dailyPlanner;
+    this.repositoryService = repositoryService;
+    this.runRepository = runRepository;
+    this.jobRepository = jobRepository;
+    this.gitHubProperties = gitHubProperties;
+    this.gitHubClient = gitHubClient;
+    this.searchQueryService = searchQueryService;
+    this.topicWatchSync = topicWatchSync;
+    this.topicPlanner = topicPlanner;
+  }
 
-    public CollectionRunResponse toResponse(CollectionRun run) {
-        List<CollectionJob> jobs = jobRepository.findByRun(run.id());
-        return new CollectionRunResponse(
-                run.id(),
-                run.repositoryId(),
-                run.businessDate().toString(),
-                run.status().name(),
-                run.plannedJobs(),
-                run.successfulJobs(),
-                run.failedJobs(),
-                run.createdAt(),
-                run.completedAt(),
-                jobs.stream().map(job -> new CollectionJobResponse(
-                        job.id(),
-                        job.jobType().name(),
-                        job.status().name(),
-                        job.attempt(),
-                        job.errorCode(),
-                        job.errorMessage(),
-                        job.startedAt(),
-                        job.completedAt()
-                )).toList()
-        );
+  @org.springframework.web.bind.annotation.ResponseStatus(
+      org.springframework.http.HttpStatus.CREATED)
+  @PostMapping("/repositories/{id}/collect")
+  public Object collect(@PathVariable long id) {
+    if (commands != null) return commands.manual(id, commandWindow.businessDate());
+    if (!gitHubProperties.tokenConfigured()) {
+      throw GitHubException.auth(401, "GitHub token is not configured");
     }
+    if (gitHubClient.tokenRejected()) {
+      throw GitHubException.auth(401, "GitHub rejected the token");
+    }
+    repositoryService.get(id);
+    LocalDate businessDate = planningWindow.businessDate();
+    CollectionRun run = collectionPlanner.planRepository(id, businessDate, true);
+    searchQueryService.runAll(id);
+    topicWatchSync.sync(id);
+    topicPlanner.planRepository(id, businessDate);
+    return toResponse(run);
+  }
 
-    public record CollectionRunResponse(
-            long id,
-            long repositoryId,
-            String businessDate,
-            String status,
-            int plannedJobs,
-            int successfulJobs,
-            int failedJobs,
-            java.time.Instant createdAt,
-            java.time.Instant completedAt,
-            List<CollectionJobResponse> jobs
-    ) {
-    }
+  @org.springframework.web.bind.annotation.ResponseStatus(
+      org.springframework.http.HttpStatus.CREATED)
+  @PostMapping("/collection/plan")
+  public DailyPlanner.PlannerResult plan() {
+    return dailyPlanner.planNow(true);
+  }
 
-    public record CollectionJobResponse(
-            long id,
-            String jobType,
-            String status,
-            int attempt,
-            String errorCode,
-            String errorMessage,
-            java.time.Instant startedAt,
-            java.time.Instant completedAt
-    ) {
-    }
+  @GetMapping("/collection-runs/{id}")
+  public CollectionRunResponse getRun(@PathVariable long id) {
+    CollectionRun run =
+        runRepository
+            .findById(id)
+            .orElseThrow(() -> ApiException.notFound("Collection run not found"));
+    return toResponse(run);
+  }
+
+  public CollectionRunResponse toResponse(CollectionRun run) {
+    List<CollectionJob> jobs = jobRepository.findByRun(run.id());
+    return new CollectionRunResponse(
+        run.id(),
+        run.repositoryId(),
+        run.businessDate().toString(),
+        run.status().name(),
+        run.plannedJobs(),
+        run.successfulJobs(),
+        run.failedJobs(),
+        run.createdAt(),
+        run.completedAt(),
+        jobs.stream()
+            .map(job ->
+                new CollectionJobResponse(
+                    job.id(),
+                    job.jobType().name(),
+                    job.status().name(),
+                    job.attempt(),
+                    job.errorCode(),
+                    job.errorMessage(),
+                    job.startedAt(),
+                    job.completedAt()))
+            .toList());
+  }
+
+  public record CollectionRunResponse(
+      long id,
+      long repositoryId,
+      String businessDate,
+      String status,
+      int plannedJobs,
+      int successfulJobs,
+      int failedJobs,
+      java.time.Instant createdAt,
+      java.time.Instant completedAt,
+      List<CollectionJobResponse> jobs) {}
+
+  public record CollectionJobResponse(
+      long id,
+      String jobType,
+      String status,
+      int attempt,
+      String errorCode,
+      String errorMessage,
+      java.time.Instant startedAt,
+      java.time.Instant completedAt) {}
 }

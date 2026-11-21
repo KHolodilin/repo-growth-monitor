@@ -15,23 +15,25 @@ import javax.sql.DataSource;
  * fingerprinting, replay and conflicts belong to the published starter.
  */
 public final class RgmJdbcIdempotency {
-    private RgmJdbcIdempotency() {}
+  private RgmJdbcIdempotency() {}
 
-    public static JdbcPersistenceStore validatedStore(DataSource ds) {
-        new JdbcSchemaManager(ds, JdbcPersistenceStore.DEFAULT_TABLE_NAME, SchemaMode.VALIDATE).initialize();
-        return new JdbcPersistenceStore(ds);
-    }
+  public static JdbcPersistenceStore validatedStore(DataSource ds) {
+    new JdbcSchemaManager(ds, JdbcPersistenceStore.DEFAULT_TABLE_NAME, SchemaMode.VALIDATE)
+        .initialize();
+    return new JdbcPersistenceStore(ds);
+  }
 
-    public static IdempotencyService service(DataSource ds, JdbcPersistenceStore store, Duration ttl) {
-        if (ttl == null || ttl.isNegative() || ttl.isZero())
-            throw new IllegalArgumentException("Idempotency retention must be positive");
-        return new DefaultIdempotencyServiceBuilder(store)
-                .fingerprintStrategy(new CanonicalJsonFingerprintStrategy())
-                .serializer(new JacksonIdempotencySerializer())
-                .transactionContext(new DataSourceTransactionContext(ds))
-                .persistenceTtl(ttl)
-                .localCache(null)
-                .distributedCache(null)
-                .build();
-    }
+  public static IdempotencyService service(
+      DataSource ds, JdbcPersistenceStore store, Duration ttl) {
+    if (ttl == null || ttl.isNegative() || ttl.isZero())
+      throw new IllegalArgumentException("Idempotency retention must be positive");
+    return new DefaultIdempotencyServiceBuilder(store)
+        .fingerprintStrategy(new CanonicalJsonFingerprintStrategy())
+        .serializer(new JacksonIdempotencySerializer())
+        .transactionContext(new DataSourceTransactionContext(ds))
+        .persistenceTtl(ttl)
+        .localCache(null)
+        .distributedCache(null)
+        .build();
+  }
 }

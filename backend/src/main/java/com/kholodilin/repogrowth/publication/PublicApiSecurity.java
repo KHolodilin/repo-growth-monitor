@@ -42,14 +42,13 @@ public class PublicApiSecurity {
         .logout(c -> c.disable())
         .sessionManagement(c -> c.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .securityContext(c -> c.securityContextRepository(new NullSecurityContextRepository()))
-        .authorizeHttpRequests(
-            c ->
-                c.requestMatchers(HttpMethod.GET, "/**")
-                    .permitAll()
-                    .requestMatchers(HttpMethod.HEAD, "/**")
-                    .permitAll()
-                    .anyRequest()
-                    .denyAll())
+        .authorizeHttpRequests(c ->
+            c.requestMatchers(HttpMethod.GET, "/**")
+                .permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/**")
+                .permitAll()
+                .anyRequest()
+                .denyAll())
         .build();
   }
 }

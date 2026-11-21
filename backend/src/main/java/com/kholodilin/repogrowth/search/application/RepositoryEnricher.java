@@ -13,148 +13,154 @@ import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepositor
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 public class RepositoryEnricher {
 
-    private final GitHubClient gitHubClient;
-    private final GitHubOwnerJdbcRepository ownerRepository;
-    private final RepositoryJdbcRepository repositoryJdbcRepository;
-    private final ActivityClassifier activityClassifier;
-    private final SearchProperties searchProperties;
-    private final Clock clock;
+  private final GitHubClient gitHubClient;
+  private final GitHubOwnerJdbcRepository ownerRepository;
+  private final RepositoryJdbcRepository repositoryJdbcRepository;
+  private final ActivityClassifier activityClassifier;
+  private final SearchProperties searchProperties;
+  private final Clock clock;
 
-    public RepositoryEnricher(
-            GitHubClient gitHubClient,
-            GitHubOwnerJdbcRepository ownerRepository,
-            RepositoryJdbcRepository repositoryJdbcRepository,
-            ActivityClassifier activityClassifier,
-            SearchProperties searchProperties,
-            Clock clock
-    ) {
-        this.gitHubClient = gitHubClient;
-        this.ownerRepository = ownerRepository;
-        this.repositoryJdbcRepository = repositoryJdbcRepository;
-        this.activityClassifier = activityClassifier;
-        this.searchProperties = searchProperties;
-        this.clock = clock;
+  public RepositoryEnricher(
+      GitHubClient gitHubClient,
+      GitHubOwnerJdbcRepository ownerRepository,
+      RepositoryJdbcRepository repositoryJdbcRepository,
+      ActivityClassifier activityClassifier,
+      SearchProperties searchProperties,
+      Clock clock) {
+    this.gitHubClient = gitHubClient;
+    this.ownerRepository = ownerRepository;
+    this.repositoryJdbcRepository = repositoryJdbcRepository;
+    this.activityClassifier = activityClassifier;
+    this.searchProperties = searchProperties;
+    this.clock = clock;
+  }
+
+  public SearchResult fromSearchItem(long searchRunId, int position, GitHubSearchItem item) {
+    String ownerLogin = item.owner() == null ? "" : item.owner().login();
+    Instant activityAt = item.pushedAt();
+    SearchResult snapshot =
+        new SearchResult(
+            null,
+            searchRunId,
+            position,
+            item.id(),
+            item.fullName(),
+            ownerLogin,
+            item.stargazersCount(),
+            0,
+            item.forksCount(),
+            0,
+            item.language(),
+            item.description(),
+            item.htmlUrl() != null ? item.htmlUrl() : "https://github.com/" + item.fullName(),
+            item.createdAt(),
+            item.updatedAt(),
+            activityAt,
+            activityClassifier.classify(activityAt),
+            null);
+    // Prefer already-enriched repository metadata over placeholder zeros (watchers/contributors).
+    Repository cached = repositoryJdbcRepository.findByGithubId(item.id()).orElse(null);
+    if (cached != null && cached.enrichedAt() != null) {
+      return applyCache(snapshot, cached);
     }
+    return snapshot;
+  }
 
-    public SearchResult fromSearchItem(long searchRunId, int position, GitHubSearchItem item) {
-        String ownerLogin = item.owner() == null ? "" : item.owner().login();
-        Instant activityAt = item.pushedAt();
-        SearchResult snapshot = new SearchResult(
-                null,
-                searchRunId,
-                position,
-                item.id(),
-                item.fullName(),
-                ownerLogin,
-                item.stargazersCount(),
-                0,
-                item.forksCount(),
-                0,
-                item.language(),
-                item.description(),
-                item.htmlUrl() != null ? item.htmlUrl() : "https://github.com/" + item.fullName(),
-                item.createdAt(),
-                item.updatedAt(),
-                activityAt,
-                activityClassifier.classify(activityAt),
-                null
-        );
-        // Prefer already-enriched repository metadata over placeholder zeros (watchers/contributors).
-        Repository cached = repositoryJdbcRepository.findByGithubId(item.id()).orElse(null);
-        if (cached != null && cached.enrichedAt() != null) {
-            return applyCache(snapshot, cached);
-        }
-        return snapshot;
+  public SearchResult enrich(SearchResult snapshot, GitHubSearchItem item) {
+    Repository cached =
+        repositoryJdbcRepository.findByGithubId(snapshot.githubRepositoryId()).orElse(null);
+    if (cached != null && fresh(cached.enrichedAt())) {
+      return applyCache(snapshot, cached);
     }
-
-    public SearchResult enrich(SearchResult snapshot, GitHubSearchItem item) {
-        Repository cached = repositoryJdbcRepository.findByGithubId(snapshot.githubRepositoryId()).orElse(null);
-        if (cached != null && fresh(cached.enrichedAt())) {
-            return applyCache(snapshot, cached);
-        }
-        String owner = snapshot.owner();
-        String name = nameFromFullName(snapshot.fullName());
-        GitHubRepositoryResponse remote = gitHubClient.getRepository(owner, name);
-        int contributors = cached == null ? 0 : cached.contributors();
-        try {
-            contributors = gitHubClient.countContributors(owner, name);
-        } catch (GitHubException ex) {
-            log.warn("Contributor count failed fullName={} error={}", snapshot.fullName(), ex.errorCode());
-        }
-        Instant now = Instant.now(clock);
-        Instant lastCommitAt = cached == null ? null : cached.lastCommitAt();
-        try {
-            lastCommitAt = gitHubClient.latestCommitAt(owner, name).orElse(lastCommitAt);
-        } catch (GitHubException ex) {
-            log.warn("Latest commit lookup failed fullName={} error={}", snapshot.fullName(), ex.errorCode());
-        }
-        Repository stored = persist(item, remote, contributors, lastCommitAt, now);
-        return applyCache(snapshot, stored);
+    String owner = snapshot.owner();
+    String name = nameFromFullName(snapshot.fullName());
+    GitHubRepositoryResponse remote = gitHubClient.getRepository(owner, name);
+    int contributors = cached == null ? 0 : cached.contributors();
+    try {
+      contributors = gitHubClient.countContributors(owner, name);
+    } catch (GitHubException ex) {
+      log.warn(
+          "Contributor count failed fullName={} error={}", snapshot.fullName(), ex.errorCode());
     }
-
-    public boolean fresh(Instant enrichedAt) {
-        if (enrichedAt == null) {
-            return false;
-        }
-        Duration ttl = searchProperties.enrichmentTtl();
-        return Instant.now(clock).isBefore(enrichedAt.plus(ttl));
+    Instant now = Instant.now(clock);
+    Instant lastCommitAt = cached == null ? null : cached.lastCommitAt();
+    try {
+      lastCommitAt = gitHubClient.latestCommitAt(owner, name).orElse(lastCommitAt);
+    } catch (GitHubException ex) {
+      log.warn(
+          "Latest commit lookup failed fullName={} error={}", snapshot.fullName(), ex.errorCode());
     }
+    Repository stored = persist(item, remote, contributors, lastCommitAt, now);
+    return applyCache(snapshot, stored);
+  }
 
-    private SearchResult applyCache(SearchResult snapshot, Repository cached) {
-        Instant activityAt = cached.activityAt() != null ? cached.activityAt() : snapshot.activityAt();
-        ActivityStatus status = activityClassifier.classify(cached.archived(), activityAt);
-        return new SearchResult(
-                snapshot.id(),
-                snapshot.searchRunId(),
-                snapshot.position(),
-                snapshot.githubRepositoryId(),
-                cached.fullName(),
-                snapshot.owner(),
-                cached.stars(),
-                cached.watchers(),
-                cached.forks(),
-                cached.contributors(),
-                cached.language() != null ? cached.language() : snapshot.language(),
-                cached.description() != null ? cached.description() : snapshot.description(),
-                snapshot.htmlUrl(),
-                cached.githubCreatedAt() != null ? cached.githubCreatedAt() : snapshot.repositoryCreatedAt(),
-                cached.githubUpdatedAt() != null ? cached.githubUpdatedAt() : snapshot.repositoryUpdatedAt(),
-                activityAt,
-                status,
-                cached.enrichedAt()
-        );
+  public boolean fresh(Instant enrichedAt) {
+    if (enrichedAt == null) {
+      return false;
     }
+    Duration ttl = searchProperties.enrichmentTtl();
+    return Instant.now(clock).isBefore(enrichedAt.plus(ttl));
+  }
 
-    private Repository persist(
-            GitHubSearchItem item,
-            GitHubRepositoryResponse remote,
-            int contributors,
-            Instant lastCommitAt,
-            Instant enrichedAt
-    ) {
-        GitHubOwnerResponse ownerResponse = remote.owner() != null ? remote.owner() : item.owner();
-        OwnerType ownerType = ownerResponse != null && "Organization".equalsIgnoreCase(ownerResponse.type())
-                ? OwnerType.ORGANIZATION
-                : OwnerType.USER;
-        GitHubOwner owner = ownerRepository.upsert(
-                ownerResponse == null ? item.id() : ownerResponse.id(),
-                ownerResponse == null ? item.fullName().split("/")[0] : ownerResponse.login(),
-                ownerType,
-                ownerResponse == null ? null : ownerResponse.avatarUrl(),
-                ownerResponse == null ? null : ownerResponse.htmlUrl()
-        );
-        Repository stored = repositoryJdbcRepository.upsertKeepingTracking(new Repository(
+  private SearchResult applyCache(SearchResult snapshot, Repository cached) {
+    Instant activityAt = cached.activityAt() != null ? cached.activityAt() : snapshot.activityAt();
+    ActivityStatus status = activityClassifier.classify(cached.archived(), activityAt);
+    return new SearchResult(
+        snapshot.id(),
+        snapshot.searchRunId(),
+        snapshot.position(),
+        snapshot.githubRepositoryId(),
+        cached.fullName(),
+        snapshot.owner(),
+        cached.stars(),
+        cached.watchers(),
+        cached.forks(),
+        cached.contributors(),
+        cached.language() != null ? cached.language() : snapshot.language(),
+        cached.description() != null ? cached.description() : snapshot.description(),
+        snapshot.htmlUrl(),
+        cached.githubCreatedAt() != null
+            ? cached.githubCreatedAt()
+            : snapshot.repositoryCreatedAt(),
+        cached.githubUpdatedAt() != null
+            ? cached.githubUpdatedAt()
+            : snapshot.repositoryUpdatedAt(),
+        activityAt,
+        status,
+        cached.enrichedAt());
+  }
+
+  private Repository persist(
+      GitHubSearchItem item,
+      GitHubRepositoryResponse remote,
+      int contributors,
+      Instant lastCommitAt,
+      Instant enrichedAt) {
+    GitHubOwnerResponse ownerResponse = remote.owner() != null ? remote.owner() : item.owner();
+    OwnerType ownerType =
+        ownerResponse != null && "Organization".equalsIgnoreCase(ownerResponse.type())
+            ? OwnerType.ORGANIZATION
+            : OwnerType.USER;
+    GitHubOwner owner =
+        ownerRepository.upsert(
+            ownerResponse == null ? item.id() : ownerResponse.id(),
+            ownerResponse == null ? item.fullName().split("/")[0] : ownerResponse.login(),
+            ownerType,
+            ownerResponse == null ? null : ownerResponse.avatarUrl(),
+            ownerResponse == null ? null : ownerResponse.htmlUrl());
+    Repository stored =
+        repositoryJdbcRepository.upsertKeepingTracking(
+            new Repository(
                 null,
                 remote.id(),
                 owner.id(),
@@ -179,14 +185,13 @@ public class RepositoryEnricher {
                 null,
                 enrichedAt,
                 null,
-                null
-        ));
-        repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
-        return stored;
-    }
+                null));
+    repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
+    return stored;
+  }
 
-    private static String nameFromFullName(String fullName) {
-        int slash = fullName.lastIndexOf('/');
-        return slash < 0 ? fullName : fullName.substring(slash + 1);
-    }
+  private static String nameFromFullName(String fullName) {
+    int slash = fullName.lastIndexOf('/');
+    return slash < 0 ? fullName : fullName.substring(slash + 1);
+  }
 }

@@ -33,7 +33,8 @@ public class PublicApiErrors {
     org.springframework.web.bind.MissingServletRequestParameterException.class
   })
   public ResponseEntity<Error> parameters(Exception ex) {
-    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Invalid request parameters"));
+    return ResponseEntity.badRequest()
+        .body(error("VALIDATION_ERROR", "Invalid request parameters"));
   }
 
   @ExceptionHandler(Exception.class)

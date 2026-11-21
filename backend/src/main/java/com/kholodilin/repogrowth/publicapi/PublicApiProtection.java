@@ -2,6 +2,7 @@ package com.kholodilin.repogrowth.publicapi;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.kholodilin.repogrowth.common.web.AppHttpHeaders;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
@@ -19,7 +20,6 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import com.kholodilin.repogrowth.common.web.AppHttpHeaders;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -95,7 +95,8 @@ public final class PublicApiProtection extends OncePerRequestFilter {
       response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
       response.setHeader(
           HttpHeaders.RETRY_AFTER,
-          Long.toString(Math.max(1, (probe.getNanosToWaitForRefill() + 999_999_999L) / 1_000_000_000L)));
+          Long.toString(
+              Math.max(1, (probe.getNanosToWaitForRefill() + 999_999_999L) / 1_000_000_000L)));
       response.setCharacterEncoding(StandardCharsets.UTF_8.name());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
       if (!request.getMethod().equals("HEAD")) {
