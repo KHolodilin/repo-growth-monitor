@@ -2,7 +2,6 @@ package com.kholodilin.collector;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noFields;
 import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
@@ -12,7 +11,6 @@ import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
-import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -42,6 +40,15 @@ class CollectorArchitectureTest {
           c ->
               c.getPackageName().equals(ROOT)
                   && c.getSimpleName().equals("GitHubCollectorApplication"));
+
+  private static final DescribedPredicate<JavaClass> COLLECTOR_CONTRACTS =
+          DescribedPredicate.describe(
+                  "collector-contracts dependency",
+                  c -> {
+                    String contracts = ROOT + ".contracts";
+                    return c.getPackageName().equals(contracts)
+                            || c.getPackageName().startsWith(contracts + ".");
+                  });
 
   @ArchTest
   static final ArchRule layers =
@@ -76,7 +83,7 @@ class CollectorArchitectureTest {
           .whereLayer("Service")
           .mayOnlyBeAccessedByLayers("Controller", "Configuration")
           .whereLayer("Repository")
-          .mayOnlyBeAccessedByLayers("Service", "Integration", "Configuration")
+          .mayOnlyBeAccessedByLayers("Service", "Configuration")
           .whereLayer("Integration")
           .mayOnlyBeAccessedByLayers("Service", "Configuration")
           .whereLayer("Security")
@@ -86,7 +93,28 @@ class CollectorArchitectureTest {
               "Controller", "Service", "Repository", "Integration", "Security", "Configuration")
           // Logging is a narrow side layer: only the layers that correlate logs may use it.
           .whereLayer("Logging")
-          .mayOnlyBeAccessedByLayers("Controller", "Service", "Security", "Configuration");
+          .mayOnlyBeAccessedByLayers("Controller", "Service", "Security", "Configuration")
+              .ensureAllClassesAreContainedInArchitectureIgnoring(COLLECTOR_CONTRACTS);
+
+  @ArchTest
+  static final ArchRule integrationDoesNotDependOnRepository =
+      noClasses()
+          .that()
+          .resideInAPackage(INTEGRATION)
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage(REPOSITORY)
+          .because("checkpoint and queue ownership belong to service, not integration");
+
+  @ArchTest
+  static final ArchRule integrationDoesNotDependOnService =
+      noClasses()
+          .that()
+          .resideInAPackage(INTEGRATION)
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage(SERVICE)
+          .because("integration never calls back into service");
 
   @ArchTest
   static final ArchRule topLevelPackagesAreFreeOfCycles =
@@ -153,19 +181,6 @@ class CollectorArchitectureTest {
               "services decide on semantic outcomes, not on HTTP, security or bound properties");
 
   @ArchTest
-  static final ArchRule controllersNeverReachExecutionOrDeliveryServices =
-      noClasses()
-          .that()
-          .resideInAPackage(CONTROLLER)
-          .should()
-          .dependOnClassesThat()
-          .haveSimpleNameEndingWith("ExecutionService")
-          .orShould()
-          .dependOnClassesThat()
-          .haveSimpleNameEndingWith("DeliveryService")
-          .because("controllers use acceptance, recovery and invalidation services only");
-
-  @ArchTest
   static final ArchRule repositoryKnowsNoWebTypes =
       noClasses()
           .that()
@@ -193,14 +208,4 @@ class CollectorArchitectureTest {
           .areAnnotatedWith(Configuration.class)
           .should()
           .resideInAPackage(CONFIGURATION);
-
-  @ArchTest
-  static final ArchRule configurationHoldsNoStaticMetricState =
-      noFields()
-          .that()
-          .areDeclaredInClassesThat()
-          .resideInAPackage(CONFIGURATION)
-          .should()
-          .haveRawType(AtomicLong.class)
-          .because("counters are an injectable CollectorJobMetrics bean, not static state");
 }

@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.integration.github.AssignedTaskCollector;
 import com.kholodilin.collector.model.*;
 import com.kholodilin.collector.repository.JobQueue;
 import java.net.URI;
@@ -17,7 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class JobExecutionServiceTest {
   JobQueue queue = mock(JobQueue.class);
-  AssignedTaskCollector collector = mock(AssignedTaskCollector.class);
+  AssignedTaskCollectionService collector = mock(AssignedTaskCollectionService.class);
   JsonMapper json = JsonMapper.builder().build();
   static final RetrySettings RETRY =
       new RetrySettings(5, Duration.ofSeconds(5), Duration.ofMinutes(5), 2.0, 0.2);
@@ -66,7 +65,7 @@ class JobExecutionServiceTest {
 
   @Test
   void completionStoresOneImmutableDeliveryEnvelope() {
-    when(collector.collect(lease, job))
+    when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenReturn(
             new Snapshot(
                 Instant.now(),
@@ -94,7 +93,8 @@ class JobExecutionServiceTest {
   @Test
   void quotaWaitingDoesNotSpendTechnicalRetryBudget() {
     Instant next = Instant.now().plusSeconds(60);
-    when(collector.collect(lease, job)).thenThrow(new GitHubRateLimitedException(next));
+    when(collector.collect(any(CollectionContext.class), eq(job)))
+        .thenThrow(new GitHubRateLimitedException(next));
     try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
       executor.poll("worker");
     }
@@ -104,7 +104,8 @@ class JobExecutionServiceTest {
 
   @Test
   void permanentPermissionFailureDoesNotRepeatGitHubCollection() {
-    when(collector.collect(lease, job)).thenThrow(new GitHubPermissionDeniedException());
+    when(collector.collect(any(CollectionContext.class), eq(job)))
+        .thenThrow(new GitHubPermissionDeniedException());
     try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
       executor.poll("worker");
     }
@@ -115,7 +116,8 @@ class JobExecutionServiceTest {
 
   @Test
   void technicalFailuresUseBoundedRetriesAndSanitizedPayloads() {
-    when(collector.collect(lease, job)).thenThrow(new RuntimeException("secret-must-not-be-saved"));
+    when(collector.collect(any(CollectionContext.class), eq(job)))
+        .thenThrow(new RuntimeException("secret-must-not-be-saved"));
     try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
       executor.poll("worker");
     }
@@ -131,7 +133,7 @@ class JobExecutionServiceTest {
             lease.publicId(),
             4);
     when(queue.claim(anyString(), any())).thenReturn(Optional.of(exhausted));
-    when(collector.collect(exhausted, job))
+    when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new RuntimeException("secret-must-not-be-saved"));
     try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
       executor.poll("worker");
@@ -151,7 +153,7 @@ class JobExecutionServiceTest {
           renewed.countDown();
           return true;
         });
-    when(collector.collect(lease, job))
+    when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenAnswer(invocation -> {
           assertThat(renewed.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
           return new Snapshot(
@@ -180,7 +182,7 @@ class JobExecutionServiceTest {
           fenced.countDown();
           return false;
         });
-    when(collector.collect(lease, job))
+    when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenAnswer(invocation -> {
           assertThat(fenced.await(3, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
           Thread.sleep(20);
@@ -213,7 +215,7 @@ class JobExecutionServiceTest {
       reset(queue, collector);
       when(queue.claim(anyString(), any())).thenReturn(Optional.of(lease));
       when(queue.renew(any(), any())).thenReturn(true);
-      when(collector.collect(lease, job)).thenThrow(error);
+      when(collector.collect(any(CollectionContext.class), eq(job))).thenThrow(error);
       try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
         executor.poll("worker");
       }
@@ -229,7 +231,7 @@ class JobExecutionServiceTest {
       reset(queue, collector);
       when(queue.claim(anyString(), any())).thenReturn(Optional.of(lease));
       when(queue.renew(any(), any())).thenReturn(true);
-      when(collector.collect(lease, job)).thenThrow(error);
+      when(collector.collect(any(CollectionContext.class), eq(job))).thenThrow(error);
       try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
         executor.poll("worker");
       }
@@ -241,7 +243,8 @@ class JobExecutionServiceTest {
 
   @Test
   void temporarySourceOutageSpendsTheTechnicalRetryBudget() {
-    when(collector.collect(lease, job)).thenThrow(new GitHubSourceUnavailableException());
+    when(collector.collect(any(CollectionContext.class), eq(job)))
+        .thenThrow(new GitHubSourceUnavailableException());
     try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
       executor.poll("worker");
     }
@@ -251,7 +254,7 @@ class JobExecutionServiceTest {
 
   @Test
   void rateLimitDeferralInThePastIsPushedToTheNextSecond() {
-    when(collector.collect(lease, job))
+    when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new GitHubRateLimitedException(Instant.now().minusSeconds(30)));
     try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
       executor.poll("worker");

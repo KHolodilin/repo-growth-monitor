@@ -4,6 +4,10 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.kholodilin.idempotency.model.*;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class InMemoryPersistenceStoreTest {
@@ -39,5 +43,65 @@ class InMemoryPersistenceStoreTest {
         .containsExactly(IdempotencyStatus.REJECTED, "CAPACITY");
     assertThatThrownBy(() -> store.reject(key, "X", "{}", Instant.now()))
         .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void concurrentAcquireBlocksUntilTerminalThenLoses() throws Exception {
+    assertThat(store.acquire(key, "hash-a", created, expires)).isTrue();
+    AtomicBoolean started = new AtomicBoolean();
+    try (ExecutorService pool = Executors.newSingleThreadExecutor()) {
+      Future<Boolean> lost =
+          pool.submit(() -> {
+            started.set(true);
+            return store.acquire(key, "hash-a", created, expires);
+          });
+      awaitTrue(started);
+      assertThat(lost.isDone()).isFalse();
+      store.complete(key, "JobAccepted", "{}", Instant.parse("2027-01-01T00:01:00Z"));
+      assertThat(lost.get(2, TimeUnit.SECONDS)).isFalse();
+      assertThat(store.find(key))
+          .get()
+          .extracting(IdempotencyRecord::status)
+          .isEqualTo(IdempotencyStatus.COMPLETED);
+    }
+  }
+
+  @Test
+  void concurrentWinnersSerializeToSingleAcquire() throws Exception {
+    try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+      List<Callable<Boolean>> tasks = new ArrayList<>();
+      for (int i = 0; i < 20; i++) {
+        tasks.add(() -> store.acquire(key, "hash-a", created, expires));
+      }
+      List<Future<Boolean>> futures = new ArrayList<>();
+      for (Callable<Boolean> task : tasks) {
+        futures.add(
+            pool.submit(() -> {
+              boolean won = task.call();
+              if (won) {
+                store.complete(key, "JobAccepted", "{}", Instant.now());
+              }
+              return won;
+            }));
+      }
+      int winners = 0;
+      for (Future<Boolean> future : futures) {
+        if (Boolean.TRUE.equals(future.get(5, TimeUnit.SECONDS))) {
+          winners++;
+        }
+      }
+      assertThat(winners).isEqualTo(1);
+      assertThat(store.find(key))
+          .get()
+          .extracting(IdempotencyRecord::status)
+          .isEqualTo(IdempotencyStatus.COMPLETED);
+    }
+  }
+
+  private static void awaitTrue(AtomicBoolean flag) throws InterruptedException {
+    for (int i = 0; i < 200 && !flag.get(); i++) {
+      Thread.sleep(5);
+    }
+    assertThat(flag).isTrue();
   }
 }

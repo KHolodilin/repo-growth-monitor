@@ -27,7 +27,8 @@ import org.springframework.context.annotation.Import;
 public class GitHubCollectorApplication {
   public static void main(String[] args) {
     SpringApplication app = new SpringApplication(GitHubCollectorApplication.class);
-    // Standard application.yml / banner.txt; profile keeps library classpath from overriding product config.
+    // Standard application.yml / banner.txt; profile keeps library classpath from overriding
+    // product config.
     app.setDefaultProperties(java.util.Map.of("spring.profiles.default", "collector-node"));
     app.run(args);
   }

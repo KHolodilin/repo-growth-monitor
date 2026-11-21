@@ -1,8 +1,8 @@
 package com.kholodilin.collector.service;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.integration.github.AssignedTaskCollector;
 import com.kholodilin.collector.logging.CollectorMdc;
+import com.kholodilin.collector.model.CollectionContext;
 import com.kholodilin.collector.model.ExecutionSettings;
 import com.kholodilin.collector.model.GitHubAuthenticationFailedException;
 import com.kholodilin.collector.model.GitHubNotFoundException;
@@ -31,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public final class JobExecutionService implements AutoCloseable {
   private final JobQueue queue;
-  private final AssignedTaskCollector collector;
+  private final AssignedTaskCollectionService collector;
   private final ExecutionSettings settings;
   private final RetrySettings githubRetry;
   private final JsonMapper json;
@@ -82,7 +82,7 @@ public final class JobExecutionService implements AutoCloseable {
             live);
         return true;
       }
-      Snapshot snapshot = collector.collect(lease, job);
+      Snapshot snapshot = collector.collect(new CollectionContext(lease.origin(), lease.id()), job);
       if (!live.get()) {
         log.info("Collect aborted after lease loss type={}", job.type());
         return true;

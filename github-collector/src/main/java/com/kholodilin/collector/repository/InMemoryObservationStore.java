@@ -1,13 +1,12 @@
 package com.kholodilin.collector.repository;
 
 import com.kholodilin.collector.model.PayloadTooLarge;
-import com.kholodilin.collector.repository.JobQueue.Lease;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Process-local observation checkpoints for one RUNNING lease. */
+/** Process-local observation checkpoints for one RUNNING observation job. */
 public final class InMemoryObservationStore implements ObservationStore {
   private final int maximum;
   private final ConcurrentHashMap<Long, ConcurrentHashMap<String, Entry>> byJob =
@@ -30,21 +29,21 @@ public final class InMemoryObservationStore implements ObservationStore {
   }
 
   @Override
-  public Optional<String> find(Lease lease, String key) {
-    ConcurrentHashMap<String, Entry> map = byJob.get(lease.id());
+  public Optional<String> find(long observationJobId, String key) {
+    ConcurrentHashMap<String, Entry> map = byJob.get(observationJobId);
     if (map == null) return Optional.empty();
     Entry entry = map.get(requireKey(key));
     return entry == null ? Optional.empty() : Optional.of(entry.payload());
   }
 
   @Override
-  public void save(Lease lease, String key, String payload) {
+  public void save(long observationJobId, String key, String payload) {
     Objects.requireNonNull(payload);
     String observationKey = requireKey(key);
     int bytes = payload.getBytes(StandardCharsets.UTF_8).length;
     ConcurrentHashMap<String, Entry> map =
-        byJob.computeIfAbsent(lease.id(), id -> new ConcurrentHashMap<>());
-    Object lock = locks.computeIfAbsent(lease.id(), id -> new Object());
+        byJob.computeIfAbsent(observationJobId, id -> new ConcurrentHashMap<>());
+    Object lock = locks.computeIfAbsent(observationJobId, id -> new Object());
     synchronized (lock) {
       long existing =
           map.entrySet().stream()
@@ -54,24 +53,24 @@ public final class InMemoryObservationStore implements ObservationStore {
       if (existing + bytes > maximum) throw new PayloadTooLarge();
       Instant at = Instant.now();
       map.put(observationKey, new Entry(payload, bytes, at));
-      first.putIfAbsent(lease.id(), at);
+      first.putIfAbsent(observationJobId, at);
     }
   }
 
   @Override
-  public void remove(Lease lease, String key) {
-    ConcurrentHashMap<String, Entry> map = byJob.get(lease.id());
+  public void remove(long observationJobId, String key) {
+    ConcurrentHashMap<String, Entry> map = byJob.get(observationJobId);
     if (map == null) return;
     map.remove(requireKey(key));
     if (map.isEmpty()) {
-      byJob.remove(lease.id(), map);
-      first.remove(lease.id());
-      locks.remove(lease.id());
+      byJob.remove(observationJobId, map);
+      first.remove(observationJobId);
+      locks.remove(observationJobId);
     }
   }
 
   @Override
-  public Instant firstObserved(Lease lease) {
-    return first.getOrDefault(lease.id(), Instant.now());
+  public Instant firstObserved(long observationJobId) {
+    return first.getOrDefault(observationJobId, Instant.now());
   }
 }

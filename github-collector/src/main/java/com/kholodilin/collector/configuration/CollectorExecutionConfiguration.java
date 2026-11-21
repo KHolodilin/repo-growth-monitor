@@ -1,16 +1,17 @@
 package com.kholodilin.collector.configuration;
 
 import com.kholodilin.collector.integration.credentials.CredentialCache;
-import com.kholodilin.collector.integration.github.AssignedTaskCollector;
+import com.kholodilin.collector.integration.github.AssignedGithubSupport;
 import com.kholodilin.collector.integration.github.GitHubSourceReader;
 import com.kholodilin.collector.integration.github.LocalGitHubPacer;
-import com.kholodilin.collector.integration.github.SourceReader;
 import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.collector.model.ExecutionSettings;
 import com.kholodilin.collector.repository.InMemoryObservationStore;
 import com.kholodilin.collector.repository.JobQueue;
 import com.kholodilin.collector.repository.ObservationStore;
+import com.kholodilin.collector.service.AssignedTaskCollectionService;
 import com.kholodilin.collector.service.JobExecutionService;
+import com.kholodilin.collector.service.ObservationCheckpoint;
 import java.util.concurrent.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -44,27 +45,37 @@ public class CollectorExecutionConfiguration {
   }
 
   @Bean
-  SourceReader githubSourceReader(
-      ObservationStore store,
+  GitHubSourceReader gitHubSourceReader(
       CredentialCache cache,
       CredentialSettings credentials,
       ExecutionSettings settings,
       LocalGitHubPacer pacer,
       JsonMapper json) {
     return new GitHubSourceReader(
-        store, cache, credentials, settings, pacer, GitHubSourceReader.restClient(settings), json);
+        cache, credentials, settings, pacer, GitHubSourceReader.restClient(settings), json);
   }
 
   @Bean
-  AssignedTaskCollector assignedTaskCollector(
-      SourceReader source, ExecutionSettings settings, JsonMapper json) {
-    return new AssignedTaskCollector(source, settings, json);
+  AssignedGithubSupport assignedGithubSupport(ExecutionSettings settings, JsonMapper json) {
+    return new AssignedGithubSupport(settings, json);
+  }
+
+  @Bean
+  ObservationCheckpoint observationCheckpoint(
+      ObservationStore store, GitHubSourceReader github, JsonMapper json) {
+    return new ObservationCheckpoint(store, github, json);
+  }
+
+  @Bean
+  AssignedTaskCollectionService assignedTaskCollectionService(
+      ObservationCheckpoint checkpoint, AssignedGithubSupport github) {
+    return new AssignedTaskCollectionService(checkpoint, github);
   }
 
   @Bean(destroyMethod = "close")
   JobExecutionService jobExecutionService(
       JobQueue queue,
-      AssignedTaskCollector collector,
+      AssignedTaskCollectionService collector,
       ExecutionSettings settings,
       GitHubClientProperties github,
       JsonMapper json) {

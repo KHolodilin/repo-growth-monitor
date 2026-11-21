@@ -11,8 +11,6 @@ import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.collector.model.ExecutionSettings;
 import com.kholodilin.collector.model.GitHubRateLimitedException;
 import com.kholodilin.collector.model.GitHubSourceUnavailableException;
-import com.kholodilin.collector.repository.JobQueue;
-import com.kholodilin.collector.repository.ObservationStore;
 import com.sun.net.httpserver.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +30,6 @@ class GitHubSourceReaderTest {
   List<String> resources = new ArrayList<>();
   HttpHandler source;
   GitHubSourceReader reader;
-  Map<String, String> stored = new HashMap<>();
   JsonMapper json = JsonMapper.builder().build();
   JobRequest job =
       new JobRequest(
@@ -48,8 +45,6 @@ class GitHubSourceReaderTest {
           "results",
           Instant.now().plusSeconds(600),
           new AuthorizationScope("ctx", "main"));
-  JobQueue.Lease lease =
-      new JobQueue.Lease(1, "worker", 1, "{}", job.deadlineAt(), "rgm", UUID.randomUUID(), 0);
 
   @BeforeEach
   void setup() throws Exception {
@@ -112,20 +107,6 @@ class GitHubSourceReaderTest {
             credentials,
             Clock.systemUTC(),
             com.github.benmanes.caffeine.cache.Ticker.systemTicker());
-    var observations =
-        new ObservationStore() {
-          public Optional<String> find(JobQueue.Lease lease, String key) {
-            return Optional.ofNullable(stored.get(key));
-          }
-
-          public void save(JobQueue.Lease lease, String key, String payload) {
-            stored.put(key, payload);
-          }
-
-          public void remove(JobQueue.Lease lease, String key) {
-            stored.remove(key);
-          }
-        };
     var pacer = mock(LocalGitHubPacer.class);
     when(pacer.tryAcquire(anyString(), anyString()))
         .thenAnswer(invocation -> Optional.of((CredentialedGitHubRequest.Permit) () -> {}));
@@ -140,13 +121,7 @@ class GitHubSourceReaderTest {
             5 * 1024 * 1024);
     reader =
         new GitHubSourceReader(
-            observations,
-            cache,
-            credentials,
-            execution,
-            pacer,
-            GitHubSourceReader.restClient(execution),
-            json);
+            cache, credentials, execution, pacer, GitHubSourceReader.restClient(execution), json);
   }
 
   void respond(HttpExchange exchange, int status, String text) throws java.io.IOException {
@@ -163,7 +138,7 @@ class GitHubSourceReaderTest {
   }
 
   @Test
-  void checkpointsReuseObservedZeroAndEveryNetworkCallReportsItsPermit() {
+  void everyNetworkCallReportsItsPermitAndNeverCachesLocally() {
     source =
         exchange -> {
           assertThat(exchange.getRequestHeaders().getFirst("Authorization"))
@@ -172,22 +147,21 @@ class GitHubSourceReaderTest {
         };
     assertThat(
             reader
-                .read(lease, job, "repository", "GET", "/repos/owner/repo", null, false)
+                .fetch("rgm", job, "repository", "GET", "/repos/owner/repo", null, false)
                 .path("stargazers_count")
                 .asInt())
         .isZero();
-    reader.read(lease, job, "repository", "GET", "/repos/owner/repo", null, false);
-    assertThat(calls.get()).isEqualTo(1);
-    assertThat(permits.get()).isEqualTo(1);
-    assertThat(reports.get()).isEqualTo(1);
-    assertThat(resources).containsExactly("core");
-    assertThat(stored.values().toString()).doesNotContain("github-token");
+    reader.fetch("rgm", job, "repository", "GET", "/repos/owner/repo", null, false);
+    assertThat(calls.get()).isEqualTo(2);
+    assertThat(permits.get()).isEqualTo(2);
+    assertThat(reports.get()).isEqualTo(2);
+    assertThat(resources).containsExactly("core", "core");
   }
 
   @Test
   void rejectedTokenRefreshesExactlyOnceAndRetryGetsANewSharedPermit() {
     source = exchange -> respond(exchange, calls.get() == 1 ? 401 : 200, "{}");
-    reader.read(lease, job, "repository", "GET", "/repos/owner/repo", null, false);
+    reader.fetch("rgm", job, "repository", "GET", "/repos/owner/repo", null, false);
     assertThat(resolved.get()).isEqualTo(2);
     assertThat(permits.get()).isEqualTo(2);
     assertThat(reports.get()).isEqualTo(2);
@@ -201,13 +175,12 @@ class GitHubSourceReaderTest {
           respond(exchange, 429, "{}");
         };
     assertThatThrownBy(() ->
-            reader.read(lease, job, "search", "GET", "/search/repositories?q=test", null, false))
+            reader.fetch("rgm", job, "search", "GET", "/search/repositories?q=test", null, false))
         .isInstanceOfSatisfying(
             GitHubRateLimitedException.class,
             e -> assertThat(e.retryAt()).isAfter(Instant.now().plusSeconds(30)));
     assertThat(resolved.get()).isEqualTo(1);
     assertThat(resources).containsExactly("search");
-    assertThat(stored).isEmpty();
   }
 
   @Test
@@ -223,8 +196,8 @@ class GitHubSourceReaderTest {
         };
     assertThat(
             reader
-                .read(
-                    lease,
+                .fetch(
+                    "rgm",
                     job,
                     "contributor-count",
                     "GET",
@@ -237,7 +210,7 @@ class GitHubSourceReaderTest {
     source = exchange -> respond(exchange, 404, "{}");
     assertThat(
             reader
-                .read(lease, job, "readme", "GET", "/repos/owner/repo/readme", null, true)
+                .fetch("rgm", job, "readme", "GET", "/repos/owner/repo/readme", null, true)
                 .isNull())
         .isTrue();
     assertThat(resolved.get()).isEqualTo(1);
@@ -251,7 +224,7 @@ class GitHubSourceReaderTest {
           respond(exchange, 307, "");
         };
     assertThatThrownBy(
-            () -> reader.read(lease, job, "repository", "GET", "/repos/owner/repo", null, false))
+            () -> reader.fetch("rgm", job, "repository", "GET", "/repos/owner/repo", null, false))
         .isInstanceOf(GitHubSourceUnavailableException.class);
     assertThat(calls.get()).isEqualTo(1);
   }

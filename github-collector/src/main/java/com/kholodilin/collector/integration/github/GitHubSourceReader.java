@@ -7,8 +7,6 @@ import com.kholodilin.collector.integration.credentials.CredentialedGitHubReques
 import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.collector.model.ExecutionSettings;
 import com.kholodilin.collector.model.GitHubSourceUnavailableException;
-import com.kholodilin.collector.repository.JobQueue;
-import com.kholodilin.collector.repository.ObservationStore;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
@@ -16,9 +14,9 @@ import org.springframework.web.client.RestClient;
 import tools.jackson.databind.*;
 import tools.jackson.databind.json.JsonMapper;
 
+/** GitHub HTTP observation fetch and response projection. No local storage. */
 @RequiredArgsConstructor
-public final class GitHubSourceReader implements SourceReader {
-  private final ObservationStore observations;
+public final class GitHubSourceReader {
   private final CredentialCache cache;
   private final CredentialSettings credentials;
   private final ExecutionSettings properties;
@@ -30,90 +28,81 @@ public final class GitHubSourceReader implements SourceReader {
     return HttpClients.noRedirect(properties.requestTimeout(), properties.requestTimeout());
   }
 
-  @Override
-  public JsonNode read(
-      JobQueue.Lease lease,
+  public JsonNode fetch(
+      String trustedOrigin,
       JobRequest job,
       String key,
       String method,
       String path,
       String body,
       boolean optional) {
-    var stored = observations.find(lease, key);
-    if (stored.isPresent()) return json.readTree(stored.get());
     if (!job.deadlineAt().isAfter(java.time.Instant.now()))
       throw new GitHubSourceUnavailableException();
     String resource =
         path.startsWith("/search/") ? "search" : path.equals("/graphql") ? "graphql" : "core";
     var limiter =
         new GitHubRequestLimiter(
-            lease.origin(),
+            trustedOrigin,
             job,
             resource,
             credentials,
             pacer,
             properties.requestTimeout().multipliedBy(2).plusSeconds(2));
     var requests = new CredentialedGitHubRequest(cache, limiter);
-    JsonNode observation =
-        requests.execute(
-            lease.origin(),
-            job,
-            token -> {
-              var request =
-                  client
-                      .method(HttpMethod.valueOf(method))
-                      .uri(
-                          URI.create(
-                              properties.apiBaseUrl().toString().replaceAll("/+$", "") + path))
-                      .headers(h -> {
-                        h.setBearerAuth(token);
-                        h.set("Accept", "application/vnd.github+json");
-                        h.set("X-GitHub-Api-Version", "2022-11-28");
-                      })
-                      .contentType(MediaType.APPLICATION_JSON);
-              if (body != null) request.body(body);
-              return request.exchange((sent, response) -> {
-                int status = response.getStatusCode().value();
-                limiter.observe(optional && status == 404 ? 200 : status, response.getHeaders());
-                if (optional && status == 404) return json.readTree("null");
-                if (status < 200 || status >= 300) {
-                  var retry = retryAt(response.getHeaders());
-                  if (status == 403) {
-                    String message =
-                        new String(
-                                response.getBody().readNBytes(4096),
-                                java.nio.charset.StandardCharsets.UTF_8)
-                            .toLowerCase(java.util.Locale.ROOT);
-                    if (retry == null && message.contains("rate limit"))
-                      retry = java.time.Instant.now().plusSeconds(60);
+    return requests.execute(
+        trustedOrigin,
+        job,
+        token -> {
+          var request =
+              client
+                  .method(HttpMethod.valueOf(method))
+                  .uri(URI.create(properties.apiBaseUrl().toString().replaceAll("/+$", "") + path))
+                  .headers(h -> {
+                    h.setBearerAuth(token);
+                    h.set("Accept", "application/vnd.github+json");
+                    h.set("X-GitHub-Api-Version", "2022-11-28");
+                  })
+                  .contentType(MediaType.APPLICATION_JSON);
+          if (body != null) request.body(body);
+          return request.exchange((sent, response) -> {
+            int status = response.getStatusCode().value();
+            limiter.observe(optional && status == 404 ? 200 : status, response.getHeaders());
+            if (optional && status == 404) return json.readTree("null");
+            if (status < 200 || status >= 300) {
+              var retry = retryAt(response.getHeaders());
+              if (status == 403) {
+                String message =
+                    new String(
+                            response.getBody().readNBytes(4096),
+                            java.nio.charset.StandardCharsets.UTF_8)
+                        .toLowerCase(java.util.Locale.ROOT);
+                if (retry == null && message.contains("rate limit"))
+                  retry = java.time.Instant.now().plusSeconds(60);
+              }
+              if (optional && status == 403 && retry == null) return json.readTree("null");
+              throw new CredentialedGitHubRequest.Failure(status, retry);
+            }
+            byte[] bytes = response.getBody().readNBytes(properties.maximumPayloadBytes() * 4 + 1);
+            if (bytes.length > properties.maximumPayloadBytes() * 4)
+              throw new CredentialedGitHubRequest.Failure(413);
+            JsonNode parsed = bytes.length == 0 ? json.readTree("null") : json.readTree(bytes);
+            if (key.equals("contributor-count")) {
+              long total = parsed.size();
+              String link = response.getHeaders().getFirst("Link");
+              if (link != null)
+                for (String segment : link.split(","))
+                  if (segment.contains("rel=\"last\"")) {
+                    var matcher =
+                        java.util.regex.Pattern.compile("[?&]page=([0-9]+)").matcher(segment);
+                    if (matcher.find()) total = Long.parseLong(matcher.group(1));
                   }
-                  if (optional && status == 403 && retry == null) return json.readTree("null");
-                  throw new CredentialedGitHubRequest.Failure(status, retry);
-                }
-                byte[] bytes =
-                    response.getBody().readNBytes(properties.maximumPayloadBytes() * 4 + 1);
-                if (bytes.length > properties.maximumPayloadBytes() * 4)
-                  throw new CredentialedGitHubRequest.Failure(413);
-                JsonNode parsed = bytes.length == 0 ? json.readTree("null") : json.readTree(bytes);
-                if (key.equals("contributor-count")) {
-                  long total = parsed.size();
-                  String link = response.getHeaders().getFirst("Link");
-                  if (link != null)
-                    for (String segment : link.split(","))
-                      if (segment.contains("rel=\"last\"")) {
-                        var matcher =
-                            java.util.regex.Pattern.compile("[?&]page=([0-9]+)").matcher(segment);
-                        if (matcher.find()) total = Long.parseLong(matcher.group(1));
-                      }
-                  var count = json.createObjectNode();
-                  count.put("total", total);
-                  return count;
-                }
-                return project(key, parsed);
-              });
-            });
-    observations.save(lease, key, json.writeValueAsString(observation));
-    return observation;
+              var count = json.createObjectNode();
+              count.put("total", total);
+              return count;
+            }
+            return project(key, parsed);
+          });
+        });
   }
 
   private JsonNode project(String key, JsonNode raw) {
@@ -167,11 +156,6 @@ public final class GitHubSourceReader implements SourceReader {
     return projected;
   }
 
-  @Override
-  public java.time.Instant observedAt(JobQueue.Lease lease) {
-    return observations.firstObserved(lease);
-  }
-
   private java.time.Instant retryAt(HttpHeaders headers) {
     try {
       String after = headers.getFirst("Retry-After");
@@ -186,10 +170,5 @@ public final class GitHubSourceReader implements SourceReader {
     } catch (RuntimeException ignored) {
     }
     return null;
-  }
-
-  @Override
-  public void invalidate(JobQueue.Lease lease, String key) {
-    observations.remove(lease, key);
   }
 }
