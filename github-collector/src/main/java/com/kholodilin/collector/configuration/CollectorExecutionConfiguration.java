@@ -12,7 +12,9 @@ import com.kholodilin.collector.repository.ObservationStore;
 import com.kholodilin.collector.service.JobExecutionService;
 import com.kholodilin.collector.service.ObservationCheckpoint;
 import com.kholodilin.collector.service.collection.AssignedTaskCollectionService;
+import java.time.Clock;
 import java.util.concurrent.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.SmartLifecycle;
@@ -28,6 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
     },
     havingValue = "true")
 @EnableConfigurationProperties({ExecutionProperties.class, GitHubClientProperties.class})
+@Slf4j
 public class CollectorExecutionConfiguration {
   @Bean
   ExecutionSettings executionSettings(ExecutionProperties properties) {
@@ -78,8 +81,9 @@ public class CollectorExecutionConfiguration {
       AssignedTaskCollectionService collector,
       ExecutionSettings settings,
       GitHubClientProperties github,
-      JsonMapper json) {
-    return new JobExecutionService(queue, collector, settings, github.retrySettings(), json);
+      JsonMapper json,
+      Clock clock) {
+    return new JobExecutionService(queue, collector, settings, github.retrySettings(), json, clock);
   }
 
   @Bean
@@ -100,7 +104,8 @@ public class CollectorExecutionConfiguration {
             () -> {
               try {
                 executor.poll("collector-executor");
-              } catch (RuntimeException ignored) {
+              } catch (RuntimeException error) {
+                log.warn("Collector execution loop failed; continuing", error);
               }
             },
             0,

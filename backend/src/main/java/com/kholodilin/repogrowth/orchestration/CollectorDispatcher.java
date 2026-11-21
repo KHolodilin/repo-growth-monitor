@@ -4,6 +4,7 @@ import java.time.*;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -24,7 +25,8 @@ public class CollectorDispatcher {
         if(!claim.request().deadlineAt().isAfter(Instant.now())) {repository.expired(claim);return true;}
         try {repository.acknowledge(claim,transport.send(claim));}
         catch(RestClientResponseException error) {
-            int code=error.getStatusCode().value(); boolean retry=code==408 || code==429 || code>=500;
+            // Preserve code >= 500 (includes codes above 599), not only the 5xx class.
+            int code=error.getStatusCode().value(); boolean retry=code==HttpStatus.REQUEST_TIMEOUT.value() || code==HttpStatus.TOO_MANY_REQUESTS.value() || code>=HttpStatus.INTERNAL_SERVER_ERROR.value();
             repository.failed(claim, retry ? DispatchError.HTTP_RETRY : DispatchError.HTTP_REJECTED, retry, retry ? retryAfter(error) : null);
         }
         catch(RestClientException error) {repository.failed(claim, DispatchError.TRANSPORT, true, null);}

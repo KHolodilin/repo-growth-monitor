@@ -5,6 +5,7 @@ import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.collector.model.DeliverySettings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 
@@ -55,11 +56,14 @@ public final class ResultDeliveryClient {
   }
 
   static DeliveryOutcome outcome(int status, String destinationRef) {
-    if (status == 204) {
+    if (status == HttpStatus.NO_CONTENT.value()) {
       log.info("Delivered result to RGM ref={} status={}", destinationRef, status);
       return DeliveryOutcome.DELIVERED;
     }
-    if (status == 408 || status == 429 || status >= 500) {
+    // Preserve status >= 500 (includes codes above 599), not only the 5xx class.
+    if (status == HttpStatus.REQUEST_TIMEOUT.value()
+        || status == HttpStatus.TOO_MANY_REQUESTS.value()
+        || status >= HttpStatus.INTERNAL_SERVER_ERROR.value()) {
       log.info("Delivery retryable HTTP {} ref={}", status, destinationRef);
       return DeliveryOutcome.RETRYABLE;
     }

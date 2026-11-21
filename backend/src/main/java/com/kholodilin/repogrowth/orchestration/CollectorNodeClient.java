@@ -17,7 +17,7 @@ public final class CollectorNodeClient {
     private <T>Optional<T> get(String node,String endpoint,String path,Class<T> type){
         var configured=properties.trusted(node,endpoint);if(configured.serviceToken()==null || configured.serviceToken().isBlank())throw new IllegalStateException("Node authentication unavailable");
         try{return client.get().uri(endpoint+path).headers(h->h.setBearerAuth(configured.serviceToken())).exchange((request,response)->{
-            if(response.getStatusCode().value()==404)return Optional.empty();if(response.getStatusCode().value()!=200)throw new IllegalStateException("Node unavailable");
+            if(response.getStatusCode().value()==HttpStatus.NOT_FOUND.value())return Optional.empty();if(response.getStatusCode().value()!=HttpStatus.OK.value())throw new IllegalStateException("Node unavailable");
             byte[] bytes=response.getBody().readNBytes(5*1024*1024+1);if(bytes.length>5*1024*1024)throw new IllegalStateException("Node payload exceeds bounds");return Optional.of(json.readValue(bytes,type));
         });}catch(RuntimeException error){throw new IllegalStateException("Node status unavailable");}
     }
@@ -26,7 +26,7 @@ public final class CollectorNodeClient {
     public Optional<ResultDelivery> result(String node,String endpoint,UUID id){return get(node,endpoint,"/internal/v1/jobs/"+id+"/result",ResultDelivery.class);}
     public void confirm(String node,String endpoint,UUID id,UUID eventId){
         var configured=properties.trusted(node,endpoint);
-        try{client.post().uri(endpoint+"/internal/v1/jobs/"+id+"/delivery/ack").headers(h->h.setBearerAuth(configured.serviceToken())).contentType(MediaType.APPLICATION_JSON).body(Map.of("eventId",eventId)).exchange((request,response)->{if(!response.getStatusCode().is2xxSuccessful() && response.getStatusCode().value()!=404)throw new IllegalStateException("Node confirmation unavailable");return null;});}
+        try{client.post().uri(endpoint+"/internal/v1/jobs/"+id+"/delivery/ack").headers(h->h.setBearerAuth(configured.serviceToken())).contentType(MediaType.APPLICATION_JSON).body(Map.of("eventId",eventId)).exchange((request,response)->{if(!response.getStatusCode().is2xxSuccessful() && response.getStatusCode().value()!=HttpStatus.NOT_FOUND.value())throw new IllegalStateException("Node confirmation unavailable");return null;});}
         catch(RuntimeException error){throw new IllegalStateException("Node confirmation unavailable");}
     }
 }

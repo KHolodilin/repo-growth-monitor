@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.orchestration;
 
+import com.kholodilin.collector.contracts.CollectorHttpHeaders;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
@@ -17,7 +18,7 @@ public class CollectionRequestController {
     @PostMapping("/refresh")
     public ResponseEntity<java.util.List<CollectionRequestService.Created>> refresh(){return ResponseEntity.status(HttpStatus.CREATED).body(requests.refresh(window.businessDate()));}
     @PostMapping("/{id}/collections")
-    public ResponseEntity<CollectionRequestService.Created> create(@PathVariable long id,@RequestHeader("Idempotency-Key") String key,org.springframework.security.core.Authentication authentication) {
+    public ResponseEntity<CollectionRequestService.Created> create(@PathVariable long id,@RequestHeader(CollectorHttpHeaders.IDEMPOTENCY_KEY) String key,org.springframework.security.core.Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(((com.kholodilin.repogrowth.auth.security.AppUserPrincipal)authentication.getPrincipal()).userId(),key,id,window.businessDate()));
     }
 }

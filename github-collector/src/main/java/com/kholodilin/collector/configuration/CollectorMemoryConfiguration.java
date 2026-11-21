@@ -11,14 +11,17 @@ import com.kholodilin.idempotency.core.DefaultIdempotencyServiceBuilder;
 import com.kholodilin.idempotency.jackson.*;
 import com.kholodilin.idempotency.spi.PersistenceStore;
 import com.kholodilin.idempotency.spi.TransactionContext;
+import java.time.Clock;
 import java.time.Duration;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import tools.jackson.databind.json.JsonMapper;
 
 /** In-memory collector runtime: queue and idempotency (no PostgreSQL). */
 @Configuration(proxyBeanMethods = false)
@@ -31,11 +34,19 @@ import org.springframework.core.env.Environment;
 public class CollectorMemoryConfiguration {
 
   @Bean
-  JobQueue collectorJobQueue(CapacityProperties capacity) {
+  @ConditionalOnMissingBean(Clock.class)
+  Clock collectorClock() {
+    return Clock.systemUTC();
+  }
+
+  @Bean
+  JobQueue collectorJobQueue(CapacityProperties capacity, Clock clock, JsonMapper json) {
     return new InMemoryJobQueue(
         capacity.maxJobs(),
         capacity.maxQueueBytes(),
-        (int) Math.min(Integer.MAX_VALUE, capacity.maxRequestBytes()));
+        (int) Math.min(Integer.MAX_VALUE, capacity.maxRequestBytes()),
+        clock,
+        json);
   }
 
   @Bean

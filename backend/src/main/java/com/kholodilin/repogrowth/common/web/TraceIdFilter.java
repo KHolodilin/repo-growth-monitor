@@ -22,12 +22,12 @@ public class TraceIdFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String traceId = request.getHeader("X-Trace-Id");
+        String traceId = request.getHeader(AppHttpHeaders.TRACE_ID);
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString();
         }
         MDC.put(TRACE_ID, traceId);
-        response.setHeader("X-Trace-Id", traceId);
+        response.setHeader(AppHttpHeaders.TRACE_ID, traceId);
         try {
             filterChain.doFilter(request, response);
         } finally {

@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.orchestration;
 
+import com.kholodilin.collector.contracts.CollectorHttpHeaders;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
@@ -27,9 +28,9 @@ public class CollectorTransport {
         // No GitHub token here. A distinct service credential authenticates the selected collector.
         return client.post().uri(claim.endpoint()+"/internal/v1/jobs")
             .headers(h->h.setBearerAuth(node.serviceToken()))
-            .header("Idempotency-Key",claim.request().attemptId().toString())
+            .header(CollectorHttpHeaders.IDEMPOTENCY_KEY,claim.request().attemptId().toString())
             .contentType(MediaType.APPLICATION_JSON).body(claim.request()).exchange((request,response)->{
-                if(response.getStatusCode().value()!=201) {
+                if(response.getStatusCode().value()!=HttpStatus.CREATED.value()) {
                     if(response.getStatusCode().isError()) throw new HttpClientErrorException(response.getStatusCode());
                     throw new IllegalArgumentException("Expected durable 201 acceptance");
                 }

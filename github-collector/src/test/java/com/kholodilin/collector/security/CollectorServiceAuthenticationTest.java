@@ -9,17 +9,20 @@ import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+import tools.jackson.databind.json.JsonMapper;
 
 class CollectorServiceAuthenticationTest {
   private static final String RGM_TOKEN = "rgm-token-with-at-least-32-characters!";
   private static final String OTHER_TOKEN = "other-token-with-at-least-32-characters";
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   private final CollectorServiceAuthentication filter =
       new CollectorServiceAuthentication(
           new ServiceAuthSettings(
               java.util.List.of(
                   new ServiceAuthSettings.Client("rgm", RGM_TOKEN),
-                  new ServiceAuthSettings.Client("other", OTHER_TOKEN))));
+                  new ServiceAuthSettings.Client("other", OTHER_TOKEN))),
+          JSON);
 
   private MockHttpServletResponse run(String authorization, AtomicReference<String> seen)
       throws Exception {
@@ -68,7 +71,11 @@ class CollectorServiceAuthenticationTest {
 
       assertThat(response.getStatus()).isEqualTo(401);
       assertThat(response.getHeader("WWW-Authenticate")).isEqualTo("Bearer");
-      assertThat(response.getContentAsString()).contains("UNAUTHORIZED");
+      assertThat(response.getContentType()).contains("application/json");
+      var body = JSON.readTree(response.getContentAsString());
+      assertThat(body.path("code").asText()).isEqualTo("UNAUTHORIZED");
+      assertThat(body.path("message").asText())
+          .isEqualTo("Collector service authentication required");
       assertThat(seen.get()).isNull();
     }
   }

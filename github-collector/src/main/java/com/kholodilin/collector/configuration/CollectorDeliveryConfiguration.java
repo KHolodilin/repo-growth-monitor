@@ -7,6 +7,7 @@ import com.kholodilin.collector.repository.JobQueue;
 import com.kholodilin.collector.service.ResultDeliveryService;
 import java.time.Duration;
 import java.util.concurrent.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.SmartLifecycle;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.*;
     },
     havingValue = "true")
 @EnableConfigurationProperties(DeliveryProperties.class)
+@Slf4j
 public class CollectorDeliveryConfiguration {
   static void requireLeaseExceedsTimeouts(
       DeliverySettings delivery, CredentialSettings credentials) {
@@ -67,7 +69,8 @@ public class CollectorDeliveryConfiguration {
             () -> {
               try {
                 service.poll("collector-delivery");
-              } catch (RuntimeException ignored) {
+              } catch (RuntimeException error) {
+                log.warn("Collector delivery loop failed; continuing", error);
               }
             },
             0,

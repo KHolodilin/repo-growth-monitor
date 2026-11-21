@@ -74,8 +74,9 @@ public final class GitHubRequestLimiter implements CredentialedGitHubRequest.Req
     var local =
         pacer
             .tryAcquire(origin + ":" + key.quotaIdentity(), resource)
-            .orElseThrow(
-                () -> new CredentialedGitHubRequest.Failure(429, Instant.now().plusSeconds(3)));
+            .orElseThrow(() ->
+                new CredentialedGitHubRequest.Failure(
+                    HttpStatus.TOO_MANY_REQUESTS.value(), Instant.now().plusSeconds(3)));
     try {
       Grant grant =
           post(
@@ -93,14 +94,16 @@ public final class GitHubRequestLimiter implements CredentialedGitHubRequest.Req
           || grant.leasedUntil() == null
           || !grant.leasedUntil().isAfter(Instant.now().plus(requiredRequestTime)))
         throw new CredentialedGitHubRequest.Failure(
-            429, grant == null ? Instant.now().plusSeconds(30) : grant.retryAt());
+            HttpStatus.TOO_MANY_REQUESTS.value(),
+            grant == null ? Instant.now().plusSeconds(30) : grant.retryAt());
       Active permit = new Active(grant.permitId(), local);
       active.set(permit);
       return permit;
     } catch (RuntimeException error) {
       local.close();
       if (error instanceof CredentialedGitHubRequest.Failure failure) throw failure;
-      throw new CredentialedGitHubRequest.Failure(503, Instant.now().plusSeconds(30));
+      throw new CredentialedGitHubRequest.Failure(
+          HttpStatus.SERVICE_UNAVAILABLE.value(), Instant.now().plusSeconds(30));
     }
   }
 
@@ -113,17 +116,17 @@ public final class GitHubRequestLimiter implements CredentialedGitHubRequest.Req
     if (permit == null)
       throw new IllegalStateException("A GitHub response requires an active shared permit");
     permit.status = status;
-    String observed = headers.getFirst("X-RateLimit-Resource");
+    String observed = headers.getFirst(GitHubHttp.RATE_LIMIT_RESOURCE);
     if (observed == null || observed.equals(resource)) {
-      permit.remaining = nonnegative(headers.getFirst("X-RateLimit-Remaining"));
-      Long reset = nonnegative(headers.getFirst("X-RateLimit-Reset"));
+      permit.remaining = nonnegative(headers.getFirst(GitHubHttp.RATE_LIMIT_REMAINING));
+      Long reset = nonnegative(headers.getFirst(GitHubHttp.RATE_LIMIT_RESET));
       if (reset != null)
         try {
           permit.reset = Instant.ofEpochSecond(reset);
         } catch (RuntimeException ignored) {
         }
     }
-    String retry = headers.getFirst("Retry-After");
+    String retry = headers.getFirst(HttpHeaders.RETRY_AFTER);
     if (retry != null) {
       try {
         long seconds = Long.parseLong(retry);

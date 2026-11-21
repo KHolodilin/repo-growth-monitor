@@ -3,6 +3,7 @@ package com.kholodilin.collector.integration.credentials;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.collector.model.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 
 /**
  * Execution primitive for #215. A real limiter gate must be supplied by #214; there is no bypass
@@ -58,15 +59,14 @@ public final class CredentialedGitHubRequest {
      * status codes never leave the integration layer.
      */
     public GitHubSourceException toSemantic() {
-      if ((status == 429 || status == 403) && retryAt != null)
-        return new GitHubRateLimitedException(retryAt);
-      return switch (status) {
-        case 413 -> new GitHubResponseTooLargeException();
-        case 401 -> new GitHubAuthenticationFailedException();
-        case 404 -> new GitHubNotFoundException();
-        case 403 -> new GitHubPermissionDeniedException();
-        default -> new GitHubSourceUnavailableException();
-      };
+      if ((status == HttpStatus.TOO_MANY_REQUESTS.value() || status == HttpStatus.FORBIDDEN.value())
+          && retryAt != null) return new GitHubRateLimitedException(retryAt);
+      HttpStatus resolved = HttpStatus.resolve(status);
+      if (resolved == HttpStatus.CONTENT_TOO_LARGE) return new GitHubResponseTooLargeException();
+      if (resolved == HttpStatus.UNAUTHORIZED) return new GitHubAuthenticationFailedException();
+      if (resolved == HttpStatus.NOT_FOUND) return new GitHubNotFoundException();
+      if (resolved == HttpStatus.FORBIDDEN) return new GitHubPermissionDeniedException();
+      return new GitHubSourceUnavailableException();
     }
   }
 
@@ -89,12 +89,12 @@ public final class CredentialedGitHubRequest {
     try {
       return invoke(origin, lease, call);
     } catch (Failure error) {
-      if (error.status() != 401) throw error;
+      if (error.status() != HttpStatus.UNAUTHORIZED.value()) throw error;
       lease = cache.refreshRejected(origin, job, lease);
       try {
         return invoke(origin, lease, call);
       } catch (Failure second) {
-        if (second.status() == 401) cache.reject(origin, lease);
+        if (second.status() == HttpStatus.UNAUTHORIZED.value()) cache.reject(origin, lease);
         throw second;
       }
     }

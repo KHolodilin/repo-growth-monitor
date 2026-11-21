@@ -10,8 +10,11 @@ import com.kholodilin.collector.model.LocalJobState;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 class InMemoryJobQueueTest {
   private static final Duration LEASE = Duration.ofMinutes(1);
@@ -20,12 +23,18 @@ class InMemoryJobQueueTest {
   private static final String SAMPLE_PAYLOAD = "{\"a\":1,\"b\":2}";
   private static final String RESULT_PAYLOAD = "{\"data\":42}";
   private static final Instant DEADLINE = Instant.parse("2027-01-01T00:00:00Z");
+  private static final Clock CLOCK = Clock.systemUTC();
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   InMemoryJobQueue queue;
 
   @BeforeEach
   void create() {
-    queue = new InMemoryJobQueue(10, 1024 * 1024, 64 * 1024);
+    queue = new InMemoryJobQueue(10, 1024 * 1024, 64 * 1024, CLOCK, JSON);
+  }
+
+  private static InMemoryJobQueue queue(int maxJobs, long maxQueueBytes, int maxRequestBytes) {
+    return new InMemoryJobQueue(maxJobs, maxQueueBytes, maxRequestBytes, CLOCK, JSON);
   }
 
   Submission submission() {
@@ -75,11 +84,11 @@ class InMemoryJobQueueTest {
                     DESTINATION,
                     Instant.now())))
         .isInstanceOf(CapacityExceededException.class);
-    InMemoryJobQueue tiny = new InMemoryJobQueue(1, 1024 * 1024, 64 * 1024);
+    InMemoryJobQueue tiny = queue(1, 1024 * 1024, 64 * 1024);
     tiny.accept(submission());
     assertThatThrownBy(() -> tiny.accept(submission()))
         .isInstanceOf(CapacityExceededException.class);
-    InMemoryJobQueue tightBytes = new InMemoryJobQueue(10, 1024, 64 * 1024);
+    InMemoryJobQueue tightBytes = queue(10, 1024, 64 * 1024);
     String oversized = "{\"x\":\"" + "y".repeat(2000) + "\"}";
     assertThatThrownBy(() ->
             tightBytes.accept(
@@ -139,19 +148,38 @@ class InMemoryJobQueueTest {
   }
 
   @Test
-  void expiredLeaseIsReclaimedAndOldWorkerIsFenced() throws Exception {
-    queue.accept(submission());
-    Lease old = queue.claim("a", Duration.ofMillis(50)).orElseThrow();
-    Thread.sleep(80);
-    assertThat(queue.renew(old, LEASE)).isFalse();
+  void expiredLeaseIsReclaimedAndOldWorkerIsFenced() {
+    AtomicReference<Instant> now = new AtomicReference<>(Instant.parse("2026-01-01T00:00:00Z"));
+    Clock clock =
+        new Clock() {
+          @Override
+          public ZoneId getZone() {
+            return ZoneOffset.UTC;
+          }
+
+          @Override
+          public Clock withZone(ZoneId zone) {
+            return this;
+          }
+
+          @Override
+          public Instant instant() {
+            return now.get();
+          }
+        };
+    InMemoryJobQueue timed = new InMemoryJobQueue(10, 1024 * 1024, 64 * 1024, clock, JSON);
+    timed.accept(submission());
+    Lease old = timed.claim("a", Duration.ofSeconds(30)).orElseThrow();
+    now.set(now.get().plusSeconds(31));
+    assertThat(timed.renew(old, LEASE)).isFalse();
     assertThat(
-            queue.complete(old, LocalJobState.FAILED, UUID.randomUUID(), UUID.randomUUID(), "{}"))
+            timed.complete(old, LocalJobState.FAILED, UUID.randomUUID(), UUID.randomUUID(), "{}"))
         .isFalse();
-    Lease current = queue.claim("b", LEASE).orElseThrow();
+    Lease current = timed.claim("b", LEASE).orElseThrow();
     assertThat(current.generation()).isEqualTo(old.generation() + 1);
-    assertThat(queue.retry(old, Instant.now())).isFalse();
-    assertThat(queue.retry(current, Instant.now().plusSeconds(600))).isTrue();
-    assertThat(queue.claim("c", LEASE)).isEmpty();
+    assertThat(timed.retry(old, now.get())).isFalse();
+    assertThat(timed.retry(current, now.get().plusSeconds(600))).isTrue();
+    assertThat(timed.claim("c", LEASE)).isEmpty();
   }
 
   @Test
@@ -186,5 +214,37 @@ class InMemoryJobQueueTest {
     queue.complete(
         lease, LocalJobState.SUCCEEDED, UUID.randomUUID(), UUID.randomUUID(), "{\"ok\":true}");
     assertThat(queue.jobCountsByState()).containsEntry(LocalJobState.SUCCEEDED.name(), 1L);
+  }
+
+  @Test
+  void findSnapshotOmitsResultUntilComplete() {
+    Accepted accepted = queue.accept(submission());
+    JsonNode snapshot = JSON.readTree(queue.find(accepted.publicId()).orElseThrow().snapshot());
+    assertThat(snapshot.path("job").path("id").asLong()).isEqualTo(accepted.id());
+    assertThat(snapshot.path("job").path("state").asText()).isEqualTo(LocalJobState.READY.name());
+    assertThat(snapshot.path("job").path("generation").asLong()).isZero();
+    assertThat(snapshot.has("result")).isFalse();
+  }
+
+  @Test
+  void findSnapshotEmbedsResultPayloadAsObjectWithoutDoubleEncoding() {
+    Accepted accepted = queue.accept(submission());
+    Lease lease = queue.claim("w", LEASE).orElseThrow();
+    UUID resultId = UUID.randomUUID();
+    UUID eventId = UUID.randomUUID();
+    String nested = "{\"note\":\"quote \\\"slash\\\\ and юникод\",\"n\":1,\"inner\":{\"ok\":true}}";
+    assertThat(queue.complete(lease, LocalJobState.SUCCEEDED, resultId, eventId, nested)).isTrue();
+
+    JsonNode snapshot = JSON.readTree(queue.find(accepted.publicId()).orElseThrow().snapshot());
+    assertThat(snapshot.path("job").path("state").asText())
+        .isEqualTo(LocalJobState.SUCCEEDED.name());
+    assertThat(snapshot.path("result").path("public_id").asText()).isEqualTo(resultId.toString());
+    assertThat(snapshot.path("result").path("event_id").asText()).isEqualTo(eventId.toString());
+    JsonNode payload = snapshot.path("result").path("payload");
+    assertThat(payload.isObject()).isTrue();
+    assertThat(payload.path("note").asText()).isEqualTo("quote \"slash\\ and юникод");
+    assertThat(payload.path("n").asInt()).isEqualTo(1);
+    assertThat(payload.path("inner").path("ok").asBoolean()).isTrue();
+    assertThat(payload.isValueNode()).isFalse();
   }
 }

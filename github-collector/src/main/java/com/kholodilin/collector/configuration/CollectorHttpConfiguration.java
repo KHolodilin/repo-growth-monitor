@@ -15,6 +15,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.context.NullSecurityContextRepository;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
@@ -27,8 +28,8 @@ import org.springframework.security.web.context.NullSecurityContextRepository;
 public class CollectorHttpConfiguration {
   @Bean
   @Order(0)
-  SecurityFilterChain collectorServiceChain(HttpSecurity http, CollectorHttpProperties properties)
-      throws Exception {
+  SecurityFilterChain collectorServiceChain(
+      HttpSecurity http, CollectorHttpProperties properties, JsonMapper json) throws Exception {
     return http.securityMatcher("/internal/v1/**")
         .csrf(c -> c.disable())
         .requestCache(c -> c.disable())
@@ -40,7 +41,7 @@ public class CollectorHttpConfiguration {
         .authorizeHttpRequests(c -> c.anyRequest().authenticated())
         .addFilterBefore(new CollectorMdcFilter(), AnonymousAuthenticationFilter.class)
         .addFilterBefore(
-            new CollectorServiceAuthentication(properties.toSettings()),
+            new CollectorServiceAuthentication(properties.toSettings(), json),
             AnonymousAuthenticationFilter.class)
         .build();
   }

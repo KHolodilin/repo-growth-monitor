@@ -21,6 +21,7 @@ class JobExecutionServiceTest {
   JsonMapper json = JsonMapper.builder().build();
   static final RetrySettings RETRY =
       new RetrySettings(5, Duration.ofSeconds(5), Duration.ofMinutes(5), 2.0, 0.2);
+  static final Clock CLOCK = Clock.systemUTC();
   ExecutionSettings properties = settings(Duration.ofMinutes(1), Duration.ofSeconds(10));
 
   static ExecutionSettings settings(Duration lease, Duration requestTimeout) {
@@ -80,7 +81,7 @@ class JobExecutionServiceTest {
                 null,
                 Map.of(),
                 List.of()));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       assertThat(executor.poll("worker")).isTrue();
     }
     var payload = ArgumentCaptor.forClass(String.class);
@@ -96,7 +97,7 @@ class JobExecutionServiceTest {
     Instant next = Instant.now().plusSeconds(60);
     when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new GitHubRateLimitedException(next));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(queue).retry(lease, next, false);
@@ -107,7 +108,7 @@ class JobExecutionServiceTest {
   void permanentPermissionFailureDoesNotRepeatGitHubCollection() {
     when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new GitHubPermissionDeniedException());
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(queue)
@@ -119,7 +120,7 @@ class JobExecutionServiceTest {
   void technicalFailuresUseBoundedRetriesAndSanitizedPayloads() {
     when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new RuntimeException("secret-must-not-be-saved"));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(queue).retry(eq(lease), any(), eq(true));
@@ -136,7 +137,7 @@ class JobExecutionServiceTest {
     when(queue.claim(anyString(), any())).thenReturn(Optional.of(exhausted));
     when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new RuntimeException("secret-must-not-be-saved"));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     var payload = ArgumentCaptor.forClass(String.class);
@@ -170,7 +171,7 @@ class JobExecutionServiceTest {
               Map.of(),
               List.of());
         });
-    try (var executor = new JobExecutionService(queue, collector, shortLease, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, shortLease, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(queue, atLeast(2)).renew(lease, shortLease.lease());
@@ -200,7 +201,7 @@ class JobExecutionServiceTest {
               Map.of(),
               List.of());
         });
-    try (var executor = new JobExecutionService(queue, collector, shortLease, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, shortLease, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(queue, never()).complete(any(), any(), any(), any(), anyString());
@@ -217,7 +218,8 @@ class JobExecutionServiceTest {
       when(queue.claim(anyString(), any())).thenReturn(Optional.of(lease));
       when(queue.renew(any(), any())).thenReturn(true);
       when(collector.collect(any(CollectionContext.class), eq(job))).thenThrow(error);
-      try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+      try (var executor =
+          new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
         executor.poll("worker");
       }
       verify(queue).complete(eq(lease), eq(LocalJobState.FAILED), any(), any(), contains(code));
@@ -233,7 +235,8 @@ class JobExecutionServiceTest {
       when(queue.claim(anyString(), any())).thenReturn(Optional.of(lease));
       when(queue.renew(any(), any())).thenReturn(true);
       when(collector.collect(any(CollectionContext.class), eq(job))).thenThrow(error);
-      try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+      try (var executor =
+          new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
         executor.poll("worker");
       }
       verify(queue)
@@ -246,7 +249,7 @@ class JobExecutionServiceTest {
   void temporarySourceOutageSpendsTheTechnicalRetryBudget() {
     when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new GitHubSourceUnavailableException());
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(queue).retry(eq(lease), any(), eq(true));
@@ -257,7 +260,7 @@ class JobExecutionServiceTest {
   void rateLimitDeferralInThePastIsPushedToTheNextSecond() {
     when(collector.collect(any(CollectionContext.class), eq(job)))
         .thenThrow(new GitHubRateLimitedException(Instant.now().minusSeconds(30)));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     var next = ArgumentCaptor.forClass(Instant.class);
@@ -291,7 +294,7 @@ class JobExecutionServiceTest {
             UUID.randomUUID(),
             0);
     when(queue.claim(anyString(), any())).thenReturn(Optional.of(expired));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       executor.poll("worker");
     }
     verify(collector, never()).collect(any(), any());
@@ -305,7 +308,7 @@ class JobExecutionServiceTest {
     var broken =
         new JobQueue.Lease(1, "worker", 1, "not-json", Instant.now(), "rgm", UUID.randomUUID(), 0);
     when(queue.claim(anyString(), any())).thenReturn(Optional.of(broken));
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       assertThat(executor.poll("worker")).isTrue();
     }
     verify(queue).retry(eq(broken), any(), eq(true));
@@ -315,8 +318,109 @@ class JobExecutionServiceTest {
   @Test
   void emptyQueueReportsNoWork() {
     when(queue.claim(anyString(), any())).thenReturn(Optional.empty());
-    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json)) {
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, CLOCK)) {
       assertThat(executor.poll("worker")).isFalse();
     }
+  }
+
+  @Test
+  void deadlineAtExactClockInstantFailsWithoutCollecting() {
+    Instant now = Instant.parse("2026-06-01T12:00:00Z");
+    Clock fixed = Clock.fixed(now, ZoneOffset.UTC);
+    var boundary =
+        new JobRequest(
+            1,
+            job.requestId(),
+            job.jobId(),
+            job.attemptId(),
+            job.type(),
+            job.repository(),
+            job.businessDate(),
+            1,
+            job.parameters(),
+            job.destinationRef(),
+            now);
+    var claimed =
+        new JobQueue.Lease(
+            1,
+            "worker",
+            1,
+            json.writeValueAsString(boundary),
+            boundary.deadlineAt(),
+            "rgm",
+            UUID.randomUUID(),
+            0);
+    when(queue.claim(anyString(), any())).thenReturn(Optional.of(claimed));
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, fixed)) {
+      executor.poll("worker");
+    }
+    verify(collector, never()).collect(any(), any());
+    verify(queue)
+        .complete(
+            eq(claimed), eq(LocalJobState.FAILED), any(), any(), contains("DEADLINE_EXCEEDED"));
+  }
+
+  @Test
+  void deadlineAfterClockInstantAllowsCollection() {
+    Instant now = Instant.parse("2026-06-01T12:00:00Z");
+    Clock fixed = Clock.fixed(now, ZoneOffset.UTC);
+    var open =
+        new JobRequest(
+            1,
+            job.requestId(),
+            job.jobId(),
+            job.attemptId(),
+            job.type(),
+            job.repository(),
+            job.businessDate(),
+            1,
+            job.parameters(),
+            job.destinationRef(),
+            now.plusSeconds(1));
+    var claimed =
+        new JobQueue.Lease(
+            1,
+            "worker",
+            1,
+            json.writeValueAsString(open),
+            open.deadlineAt(),
+            "rgm",
+            UUID.randomUUID(),
+            0);
+    when(queue.claim(anyString(), any())).thenReturn(Optional.of(claimed));
+    when(collector.collect(any(CollectionContext.class), eq(open)))
+        .thenReturn(
+            new Snapshot(
+                now,
+                true,
+                Map.of(Metric.STARS, 1L),
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                null,
+                Map.of(),
+                List.of()));
+    try (var executor = new JobExecutionService(queue, collector, properties, RETRY, json, fixed)) {
+      executor.poll("worker");
+    }
+    verify(collector).collect(any(CollectionContext.class), eq(open));
+    verify(queue).complete(eq(claimed), eq(LocalJobState.SUCCEEDED), any(), any(), anyString());
+  }
+
+  @Test
+  void technicalRetryScheduleUsesInjectedClock() {
+    Instant now = Instant.parse("2026-06-01T12:00:00Z");
+    Clock fixed = Clock.fixed(now, ZoneOffset.UTC);
+    RetrySettings deterministic =
+        new RetrySettings(5, Duration.ofSeconds(5), Duration.ofMinutes(5), 2.0, 0);
+    when(collector.collect(any(CollectionContext.class), eq(job)))
+        .thenThrow(new GitHubSourceUnavailableException());
+    try (var executor =
+        new JobExecutionService(queue, collector, properties, deterministic, json, fixed)) {
+      executor.poll("worker");
+    }
+    verify(queue).retry(eq(lease), eq(now.plusSeconds(5)), eq(true));
   }
 }

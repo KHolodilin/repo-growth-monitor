@@ -73,8 +73,8 @@ public class SharedGitHubBudget {
             if(report.remaining()!=null && report.remaining()>=0)jdbc.update("UPDATE github_budget SET remaining=least(remaining,?) WHERE identity_key=? AND resource=?",report.remaining(),identity,resource);
             if(report.resetAt()!=null)jdbc.update("UPDATE github_budget SET reset_at=greatest(reset_at,?) WHERE identity_key=? AND resource=?",ts(report.resetAt()),identity,resource);
             Instant cooldown=report.retryAt();
-            if((report.status()==403 || report.status()==429) && cooldown==null)cooldown=Instant.now().plusSeconds(60);
-            if(report.status()==401 || report.status()==404)cooldown=Instant.now().plusSeconds(30);
+            if((report.status()==org.springframework.http.HttpStatus.FORBIDDEN.value() || report.status()==org.springframework.http.HttpStatus.TOO_MANY_REQUESTS.value()) && cooldown==null)cooldown=Instant.now().plusSeconds(60);
+            if(report.status()==org.springframework.http.HttpStatus.UNAUTHORIZED.value() || report.status()==org.springframework.http.HttpStatus.NOT_FOUND.value())cooldown=Instant.now().plusSeconds(30);
             if(cooldown!=null)jdbc.update("UPDATE github_budget SET cooldown_until=greatest(cooldown_until,?) WHERE identity_key=?",ts(cooldown),identity);
             jdbc.update("INSERT INTO github_budget_receipt(permit_id) VALUES (?) ON CONFLICT DO NOTHING",report.permitId());
             jdbc.update("DELETE FROM github_request_permit WHERE permit_id=?",report.permitId());return true;

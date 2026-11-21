@@ -12,12 +12,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import tools.jackson.databind.json.JsonMapper;
 
 /** Process-local JobQueue. No archive partitions; delivered terminals may be dropped. */
 public final class InMemoryJobQueue implements JobQueue {
   private final int maxJobs;
   private final long maxQueueBytes;
   private final int maxRequestBytes;
+  private final Clock clock;
+  private final JsonMapper json;
   private final AtomicLong ids = new AtomicLong();
   private final ConcurrentHashMap<Long, Job> jobs = new ConcurrentHashMap<>();
   private final ConcurrentHashMap<AttemptKey, Long> byAttempt = new ConcurrentHashMap<>();
@@ -25,13 +28,16 @@ public final class InMemoryJobQueue implements JobQueue {
   private final ReentrantLock lock = new ReentrantLock();
   private final AtomicLong totalBytes = new AtomicLong();
 
-  public InMemoryJobQueue(int maxJobs, long maxQueueBytes, int maxRequestBytes) {
+  public InMemoryJobQueue(
+      int maxJobs, long maxQueueBytes, int maxRequestBytes, Clock clock, JsonMapper json) {
     if (maxJobs < 1 || maxQueueBytes < 1024 || maxRequestBytes < 256) {
       throw new IllegalArgumentException("Invalid queue capacity");
     }
     this.maxJobs = maxJobs;
     this.maxQueueBytes = maxQueueBytes;
     this.maxRequestBytes = maxRequestBytes;
+    this.clock = Objects.requireNonNull(clock, "clock");
+    this.json = Objects.requireNonNull(json, "json");
   }
 
   private record AttemptKey(String origin, UUID attemptId) {}
@@ -166,7 +172,7 @@ public final class InMemoryJobQueue implements JobQueue {
       }
       long id = ids.incrementAndGet();
       UUID publicId = UUID.randomUUID();
-      Instant acceptedAt = Instant.now();
+      Instant acceptedAt = clock.instant();
       Job job =
           new Job(
               id,
@@ -212,7 +218,7 @@ public final class InMemoryJobQueue implements JobQueue {
   public Optional<Lease> claim(String worker, Duration duration) {
     owner(worker);
     long ms = millis(duration);
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = claimable(now);
@@ -252,7 +258,7 @@ public final class InMemoryJobQueue implements JobQueue {
   @Override
   public boolean renew(Lease lease, Duration duration) {
     long ms = millis(duration);
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = jobs.get(lease.id());
@@ -273,7 +279,7 @@ public final class InMemoryJobQueue implements JobQueue {
 
   @Override
   public boolean retry(Lease lease, Instant nextAttempt, boolean countFailure) {
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = jobs.get(lease.id());
@@ -304,7 +310,7 @@ public final class InMemoryJobQueue implements JobQueue {
     Objects.requireNonNull(resultId);
     Objects.requireNonNull(eventId);
     Objects.requireNonNull(payload);
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     int bytes = utf8(payload);
     lock.lock();
     try {
@@ -363,7 +369,7 @@ public final class InMemoryJobQueue implements JobQueue {
   public Optional<Delivery> claimDelivery(String worker, Duration duration) {
     owner(worker);
     long ms = millis(duration);
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = claimableDelivery(now);
@@ -401,7 +407,7 @@ public final class InMemoryJobQueue implements JobQueue {
 
   @Override
   public boolean acknowledge(Delivery delivery) {
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = jobs.get(delivery.jobId());
@@ -420,7 +426,7 @@ public final class InMemoryJobQueue implements JobQueue {
 
   @Override
   public boolean retryDelivery(Delivery delivery, Instant nextAttempt) {
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = jobs.get(delivery.jobId());
@@ -440,7 +446,7 @@ public final class InMemoryJobQueue implements JobQueue {
   @Override
   public boolean deadLetter(Delivery delivery, DeliveryError error) {
     Objects.requireNonNull(error);
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     lock.lock();
     try {
       Job job = jobs.get(delivery.jobId());
@@ -469,7 +475,7 @@ public final class InMemoryJobQueue implements JobQueue {
 
   @Override
   public Map<String, Object> diagnostics(String origin) {
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     long pending = 0;
     long dead = 0;
     Instant oldest = null;
@@ -549,7 +555,7 @@ public final class InMemoryJobQueue implements JobQueue {
         return false;
       }
       job.deliveryState = DeliveryState.DELIVERED;
-      job.deliveredAt = Instant.now();
+      job.deliveredAt = clock.instant();
       job.deliveryLockedBy = null;
       job.deliveryLockedUntil = null;
       return true;
@@ -622,7 +628,7 @@ public final class InMemoryJobQueue implements JobQueue {
     byAttempt.remove(new AttemptKey(job.origin, job.externalAttemptId));
     byPublicId.remove(job.publicId);
     totalBytes.addAndGet(-(job.payloadBytes + job.resultBytes));
-    job.archivedAt = Instant.now();
+    job.archivedAt = clock.instant();
     return true;
   }
 
@@ -636,40 +642,26 @@ public final class InMemoryJobQueue implements JobQueue {
     if (job == null) {
       return Optional.empty();
     }
-    String snapshot;
+    var root = json.createObjectNode();
+    var jobNode = root.putObject("job");
+    jobNode.put("id", job.id);
+    jobNode.put("state", job.state.name());
+    jobNode.put("generation", job.generation);
     if (job.resultPayload != null) {
-      snapshot =
-          "{\"job\":{\"id\":"
-              + job.id
-              + ",\"state\":\""
-              + job.state.name()
-              + "\",\"generation\":"
-              + job.generation
-              + "},\"result\":{\"public_id\":\""
-              + job.resultId
-              + "\",\"event_id\":\""
-              + job.eventId
-              + "\",\"payload\":"
-              + job.resultPayload
-              + "}}";
-    } else {
-      snapshot =
-          "{\"job\":{\"id\":"
-              + job.id
-              + ",\"state\":\""
-              + job.state.name()
-              + "\",\"generation\":"
-              + job.generation
-              + "}}";
+      // complete() requires non-null resultId/eventId whenever a payload is stored
+      var result = root.putObject("result");
+      result.put("public_id", job.resultId.toString());
+      result.put("event_id", job.eventId.toString());
+      result.set("payload", json.readTree(job.resultPayload));
     }
     return Optional.of(
         new Stored(
             new Accepted(job.id, job.publicId, job.state.name(), true, job.acceptedAt),
             job.archivedAt,
-            snapshot));
+            json.writeValueAsString(root)));
   }
 
-  /** Approximate job counts keyed by state name (READY/RUNNING/…). */
+  /** Approximate job counts keyed by state name (READY/RUNNING/â€¦). */
   public Map<String, Long> jobCountsByState() {
     Map<String, Long> counts = new LinkedHashMap<>();
     for (Job job : jobs.values()) {

@@ -37,7 +37,8 @@ public final class HttpCredentialResolver implements CredentialResolver {
           .contentType(MediaType.APPLICATION_JSON)
           .body(request)
           .exchange((sent, response) -> {
-            if (response.getStatusCode().value() != 200) throw new CredentialUnavailableException();
+            if (response.getStatusCode().value() != HttpStatus.OK.value())
+              throw new CredentialUnavailableException();
             var lease = response.bodyTo(CredentialLease.class);
             if (lease == null) throw new CredentialUnavailableException();
             return lease;

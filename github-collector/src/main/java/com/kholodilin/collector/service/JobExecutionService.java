@@ -36,6 +36,7 @@ public final class JobExecutionService implements AutoCloseable {
   private final ExecutionSettings settings;
   private final RetrySettings githubRetry;
   private final JsonMapper json;
+  private final Clock clock;
   private final ScheduledExecutorService heartbeats =
       Executors.newScheduledThreadPool(
           1,
@@ -56,6 +57,11 @@ public final class JobExecutionService implements AutoCloseable {
               try {
                 if (!queue.renew(lease, settings.lease())) live.set(false);
               } catch (RuntimeException e) {
+                log.warn(
+                    "Lease heartbeat failed publicId={} generation={}",
+                    lease.publicId(),
+                    lease.generation(),
+                    e);
                 live.set(false);
               }
             },
@@ -67,7 +73,7 @@ public final class JobExecutionService implements AutoCloseable {
       job = json.readValue(lease.payload(), JobRequest.class);
     } catch (RuntimeException invalid) {
       log.warn("Invalid job payload on claim publicId={}; deferring retry", lease.publicId());
-      queue.retry(lease, Instant.now().plusSeconds(60), true);
+      queue.retry(lease, clock.instant().plusSeconds(60), true);
       heartbeat.cancel(false);
       return true;
     }
@@ -75,7 +81,7 @@ public final class JobExecutionService implements AutoCloseable {
     CollectorMdc.bindJob(job.jobId().toString(), job.type().name());
     try {
       log.info("Collect start type={} repository={}", job.type(), job.repository().githubId());
-      if (!job.deadlineAt().isAfter(Instant.now())) {
+      if (!job.deadlineAt().isAfter(clock.instant())) {
         finish(
             lease,
             job,
@@ -148,7 +154,7 @@ public final class JobExecutionService implements AutoCloseable {
   }
 
   private Instant later(Instant value) {
-    Instant now = Instant.now();
+    Instant now = clock.instant();
     return value.isAfter(now) ? value : now.plusSeconds(1);
   }
 
@@ -179,7 +185,7 @@ public final class JobExecutionService implements AutoCloseable {
               githubRetry.multiplier(),
               githubRetry.jitter());
       log.info("Collect technical retry failures={} delay={}", failures, wait);
-      queue.retry(lease, Instant.now().plus(wait), true);
+      queue.retry(lease, clock.instant().plus(wait), true);
     }
   }
 

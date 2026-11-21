@@ -3,6 +3,8 @@ package com.kholodilin.repogrowth.github.client;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
+import com.kholodilin.repogrowth.common.web.AppHttpHeaders;
+import com.kholodilin.repogrowth.github.GitHubHttp;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
 import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
@@ -26,7 +28,9 @@ import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -102,7 +106,7 @@ public class GitHubClient {
         return RestClient.builder()
                 .requestFactory(factory)
                 .defaultHeader(HttpHeaders.ACCEPT, "*/*")
-                .defaultHeader("X-Requested-With", "XMLHttpRequest")
+                .defaultHeader(AppHttpHeaders.REQUESTED_WITH, "XMLHttpRequest")
                 .defaultHeader(HttpHeaders.USER_AGENT, "repo-growth-monitor")
                 .build();
     }
@@ -137,7 +141,7 @@ public class GitHubClient {
         ResponseEntity<byte[]> response = executePost("socialPreview", "/graphql", jsonMapper.writeValueAsString(payload));
         GitHubSocialPreviewResponse parsed = read(response.getBody(), GitHubSocialPreviewResponse.class);
         if (parsed.errors() != null && !parsed.errors().isEmpty()) {
-            throw GitHubException.api(200, false, null, parsed.errors().getFirst().message());
+            throw GitHubException.api(HttpStatus.OK.value(), false, null, parsed.errors().getFirst().message());
         }
         if (parsed.data() == null || parsed.data().repository() == null) {
             throw GitHubException.notFound("GitHub repository not found");
@@ -527,7 +531,7 @@ public class GitHubClient {
         try {
             ResponseEntity<byte[]> response = restClient.post()
                     .uri(requestUri(path))
-                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                    .contentType(MediaType.APPLICATION_JSON)
                     .body(json)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, this::handleError)
@@ -586,29 +590,32 @@ public class GitHubClient {
         String body = bodyAsString(response);
         String message = Optional.ofNullable(body).filter(s -> !s.isBlank()).orElse("GitHub API error " + status);
 
-        if (status == 401) {
+        if (status == HttpStatus.UNAUTHORIZED.value()) {
             noteRejected();
             throw GitHubException.auth(status, "GitHub authentication failed");
         }
-        if (status == 403 && remainingZero) {
+        if (status == HttpStatus.FORBIDDEN.value() && remainingZero) {
             noteRateLimit(reset);
             throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
         }
-        if (status == 403 && message.toLowerCase().contains("rate limit")) {
+        if (status == HttpStatus.FORBIDDEN.value() && message.toLowerCase().contains("rate limit")) {
             noteRateLimit(reset);
             throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
         }
-        if (status == 404) {
+        if (status == HttpStatus.NOT_FOUND.value()) {
             throw GitHubException.notFound("GitHub resource not found");
         }
-        if (status == 422) {
+        if (status == HttpStatus.UNPROCESSABLE_CONTENT.value()) {
             if (request.getURI().getPath().contains("/search/")) {
                 throw GitHubException.validation("Invalid GitHub search query");
             }
             throw GitHubException.validation(validationMessage(body));
         }
-        boolean retryable = status >= 500 || status == 429;
-        if (status == 429) {
+        // Preserve status >= 500 (includes codes above 599), not only the 5xx class.
+        boolean retryable =
+                status >= HttpStatus.INTERNAL_SERVER_ERROR.value()
+                        || status == HttpStatus.TOO_MANY_REQUESTS.value();
+        if (status == HttpStatus.TOO_MANY_REQUESTS.value()) {
             noteRateLimit(reset);
             throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
         }
@@ -739,7 +746,7 @@ public class GitHubClient {
     }
 
     private Instant rateLimitReset(HttpHeaders headers) {
-        String reset = headers.getFirst("X-RateLimit-Reset");
+        String reset = headers.getFirst(GitHubHttp.RATE_LIMIT_RESET);
         if (reset == null || reset.isBlank()) {
             String retryAfter = headers.getFirst(HttpHeaders.RETRY_AFTER);
             if (retryAfter != null) {
@@ -759,7 +766,7 @@ public class GitHubClient {
     }
 
     private boolean remainingZero(HttpHeaders headers) {
-        String remaining = headers.getFirst("X-RateLimit-Remaining");
+        String remaining = headers.getFirst(GitHubHttp.RATE_LIMIT_REMAINING);
         return "0".equals(remaining);
     }
 

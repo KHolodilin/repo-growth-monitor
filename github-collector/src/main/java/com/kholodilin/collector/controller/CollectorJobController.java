@@ -1,5 +1,6 @@
 package com.kholodilin.collector.controller;
 
+import com.kholodilin.collector.contracts.CollectorHttpHeaders;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.collector.model.AttemptConflictException;
 import com.kholodilin.collector.model.CapacityExceededException;
@@ -24,21 +25,21 @@ public class CollectorJobController {
 
   @PostMapping
   public ResponseEntity<JobAccepted> accept(
-      @RequestHeader("Idempotency-Key") String key,
+      @RequestHeader(CollectorHttpHeaders.IDEMPOTENCY_KEY) String key,
       @RequestBody JobRequest request,
       Authentication authentication) {
     JobAccepted body = service.accept(authentication.getName(), key, request);
     metrics.recordAccepted();
     log.info(
         "Accepted collector job type={} collectorJobId={}", request.type(), body.collectorJobId());
-    return ResponseEntity.status(201).body(body);
+    return ResponseEntity.status(HttpStatus.CREATED).body(body);
   }
 
   @ExceptionHandler(CapacityExceededException.class)
   ResponseEntity<Map<String, String>> capacity(CapacityExceededException error) {
     metrics.recordRejectedCapacity();
     log.info("Rejected job for capacity/shutdown: {}", error.getMessage());
-    return ResponseEntity.status(503)
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .header(HttpHeaders.RETRY_AFTER, "30")
         .body(
             Map.of(
@@ -51,7 +52,7 @@ public class CollectorJobController {
   @ExceptionHandler({IdempotencyConflictException.class, AttemptConflictException.class})
   ResponseEntity<Map<String, String>> conflict(Exception error) {
     log.info("Idempotency conflict on accept: {}", error.getMessage());
-    return ResponseEntity.status(409)
+    return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(
             Map.of(
                 "code", "IDEMPOTENCY_CONFLICT",

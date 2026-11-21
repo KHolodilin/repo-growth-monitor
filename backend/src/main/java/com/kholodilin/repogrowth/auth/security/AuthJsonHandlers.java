@@ -30,7 +30,7 @@ public class AuthJsonHandlers implements AuthenticationEntryPoint, AccessDeniedH
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException {
-        write(response, HttpServletResponse.SC_UNAUTHORIZED, ErrorCode.UNAUTHORIZED, "Authentication required");
+        write(response, org.springframework.http.HttpStatus.UNAUTHORIZED, ErrorCode.UNAUTHORIZED, "Authentication required");
     }
 
     @Override
@@ -39,11 +39,16 @@ public class AuthJsonHandlers implements AuthenticationEntryPoint, AccessDeniedH
             HttpServletResponse response,
             AccessDeniedException accessDeniedException
     ) throws IOException {
-        write(response, HttpServletResponse.SC_FORBIDDEN, ErrorCode.FORBIDDEN, "ADMIN role required");
+        write(response, org.springframework.http.HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN, "ADMIN role required");
     }
 
-    private void write(HttpServletResponse response, int status, ErrorCode code, String message) throws IOException {
-        response.setStatus(status);
+    private void write(
+            HttpServletResponse response,
+            org.springframework.http.HttpStatus status,
+            ErrorCode code,
+            String message
+    ) throws IOException {
+        response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("code", code.name());

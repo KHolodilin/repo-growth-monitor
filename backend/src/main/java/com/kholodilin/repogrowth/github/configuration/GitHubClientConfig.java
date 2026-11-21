@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.github.configuration;
 
 import com.kholodilin.repogrowth.common.config.GitHubProperties;
+import com.kholodilin.repogrowth.github.GitHubHttp;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
@@ -24,8 +25,8 @@ public class GitHubClientConfig {
         RestClient.Builder githubBuilder = RestClient.builder()
                 .baseUrl(properties.apiBaseUrl())
                 .requestFactory(factory)
-                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .defaultHeader(HttpHeaders.ACCEPT, GitHubHttp.ACCEPT_JSON)
+                .defaultHeader(GitHubHttp.API_VERSION_HEADER, GitHubHttp.API_VERSION)
                 .defaultHeader(HttpHeaders.USER_AGENT, "repo-growth-monitor");
 
         if (properties.tokenConfigured()) {

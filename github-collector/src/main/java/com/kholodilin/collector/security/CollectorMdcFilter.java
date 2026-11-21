@@ -12,7 +12,8 @@ public final class CollectorMdcFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
-    CollectorMdc.bindAttempt(request.getHeader("Idempotency-Key"));
+    CollectorMdc.bindAttempt(
+        request.getHeader(com.kholodilin.collector.contracts.CollectorHttpHeaders.IDEMPOTENCY_KEY));
     try {
       chain.doFilter(request, response);
     } finally {

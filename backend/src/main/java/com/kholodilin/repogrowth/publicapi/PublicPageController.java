@@ -61,7 +61,7 @@ public class PublicPageController {
    }
    if(target.redirect()){
     String query=request.getQueryString();
-    return ResponseEntity.status(308).location(URI.create(target.canonicalPath()+suffix+(query==null?"":"?"+query))).cacheControl(CacheControl.noStore()).build();
+    return ResponseEntity.status(HttpStatus.PERMANENT_REDIRECT).location(URI.create(target.canonicalPath()+suffix+(query==null?"":"?"+query))).cacheControl(CacheControl.noStore()).build();
    }
    return index.exists()?ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.TEXT_HTML).body(index):ResponseEntity.notFound().build();
   }catch(ApiException e){return ResponseEntity.notFound().build();}

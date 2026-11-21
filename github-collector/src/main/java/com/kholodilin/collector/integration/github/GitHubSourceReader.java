@@ -59,18 +59,20 @@ public final class GitHubSourceReader {
                   .uri(URI.create(properties.apiBaseUrl().toString().replaceAll("/+$", "") + path))
                   .headers(h -> {
                     h.setBearerAuth(token);
-                    h.set("Accept", "application/vnd.github+json");
-                    h.set("X-GitHub-Api-Version", "2022-11-28");
+                    h.set(HttpHeaders.ACCEPT, GitHubHttp.ACCEPT_JSON);
+                    h.set(GitHubHttp.API_VERSION_HEADER, GitHubHttp.API_VERSION);
                   })
                   .contentType(MediaType.APPLICATION_JSON);
           if (body != null) request.body(body);
           return request.exchange((sent, response) -> {
             int status = response.getStatusCode().value();
-            limiter.observe(optional && status == 404 ? 200 : status, response.getHeaders());
-            if (optional && status == 404) return json.readTree("null");
-            if (status < 200 || status >= 300) {
+            limiter.observe(
+                optional && status == HttpStatus.NOT_FOUND.value() ? HttpStatus.OK.value() : status,
+                response.getHeaders());
+            if (optional && status == HttpStatus.NOT_FOUND.value()) return json.readTree("null");
+            if (!response.getStatusCode().is2xxSuccessful()) {
               var retry = retryAt(response.getHeaders());
-              if (status == 403) {
+              if (status == HttpStatus.FORBIDDEN.value()) {
                 String message =
                     new String(
                             response.getBody().readNBytes(4096),
@@ -79,16 +81,17 @@ public final class GitHubSourceReader {
                 if (retry == null && message.contains("rate limit"))
                   retry = java.time.Instant.now().plusSeconds(60);
               }
-              if (optional && status == 403 && retry == null) return json.readTree("null");
+              if (optional && status == HttpStatus.FORBIDDEN.value() && retry == null)
+                return json.readTree("null");
               throw new CredentialedGitHubRequest.Failure(status, retry);
             }
             byte[] bytes = response.getBody().readNBytes(properties.maximumPayloadBytes() * 4 + 1);
             if (bytes.length > properties.maximumPayloadBytes() * 4)
-              throw new CredentialedGitHubRequest.Failure(413);
+              throw new CredentialedGitHubRequest.Failure(HttpStatus.CONTENT_TOO_LARGE.value());
             JsonNode parsed = bytes.length == 0 ? json.readTree("null") : json.readTree(bytes);
             if (key.equals("contributor-count")) {
               long total = parsed.size();
-              String link = response.getHeaders().getFirst("Link");
+              String link = response.getHeaders().getFirst(HttpHeaders.LINK);
               if (link != null)
                 for (String segment : link.split(","))
                   if (segment.contains("rel=\"last\"")) {
@@ -158,13 +161,13 @@ public final class GitHubSourceReader {
 
   private java.time.Instant retryAt(HttpHeaders headers) {
     try {
-      String after = headers.getFirst("Retry-After");
+      String after = headers.getFirst(HttpHeaders.RETRY_AFTER);
       if (after != null) return java.time.Instant.now().plusSeconds(Long.parseLong(after));
     } catch (RuntimeException ignored) {
     }
     try {
-      String remaining = headers.getFirst("X-RateLimit-Remaining"),
-          reset = headers.getFirst("X-RateLimit-Reset");
+      String remaining = headers.getFirst(GitHubHttp.RATE_LIMIT_REMAINING),
+          reset = headers.getFirst(GitHubHttp.RATE_LIMIT_RESET);
       if ("0".equals(remaining) && reset != null)
         return java.time.Instant.ofEpochSecond(Long.parseLong(reset));
     } catch (RuntimeException ignored) {

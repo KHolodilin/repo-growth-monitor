@@ -122,7 +122,7 @@ public class CollectionWorker {
                 job.jobType(), retryable, errorCode, job.attempt());
         transactionTemplate.executeWithoutResult(status -> {
             if (job.jobType() == CollectionJobType.TRAFFIC
-                    && statusCode == 403
+                    && statusCode == org.springframework.http.HttpStatus.FORBIDDEN.value()
                     && "GITHUB_API_ERROR".equals(errorCode)) {
                 repositoryJdbcRepository.setTrafficPermissionMissing(job.repositoryId(), true);
             }

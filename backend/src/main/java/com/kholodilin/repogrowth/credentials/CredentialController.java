@@ -14,7 +14,7 @@ public class CredentialController {
     public CredentialController(CredentialVault vault) {this.vault=vault;}
     @PostMapping("/internal/v1/credentials/resolve")
     public ResponseEntity<CredentialLease> resolve(@RequestBody CredentialRequest request,Authentication authentication) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("Pragma","no-cache").body(vault.resolve(authentication.getName(),request));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header(HttpHeaders.PRAGMA,"no-cache").body(vault.resolve(authentication.getName(),request));
     }
     @PutMapping("/api/v1/admin/credentials/{ref}")
     public CredentialVault.Metadata rotate(@PathVariable String ref,@RequestBody Rotation rotation) {return vault.rotate(ref,rotation.token(),rotation.expiresAt(),rotation.quotaIdentity());}
@@ -23,5 +23,5 @@ public class CredentialController {
     @DeleteMapping("/api/v1/admin/credentials/{ref}")
     public ResponseEntity<Void> revoke(@PathVariable String ref) {return vault.revoke(ref)?ResponseEntity.noContent().build():ResponseEntity.notFound().build();}
     @ExceptionHandler(IllegalStateException.class)
-    ResponseEntity<java.util.Map<String,String>> unavailable(Exception error) {return ResponseEntity.status(503).body(java.util.Map.of("code","CREDENTIAL_UNAVAILABLE","message","Credential storage unavailable"));}
+    ResponseEntity<java.util.Map<String,String>> unavailable(Exception error) {return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(java.util.Map.of("code","CREDENTIAL_UNAVAILABLE","message","Credential storage unavailable"));}
 }
