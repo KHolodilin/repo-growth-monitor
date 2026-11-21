@@ -4,7 +4,7 @@ import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 
 public interface Collector {
 
-    CollectionJobType type();
+  CollectionJobType type();
 
-    void collect(CollectionContext context);
+  void collect(CollectionContext context);
 }

@@ -4,6 +4,7 @@ import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,100 +14,106 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class SearchQueryController {
 
-    private final SearchQueryService searchQueryService;
-    private final CompetitorCardService competitorCardService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
 
-    public SearchQueryController(SearchQueryService searchQueryService, CompetitorCardService competitorCardService) {
-        this.searchQueryService = searchQueryService;
-        this.competitorCardService = competitorCardService;
-    }
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
 
-    @GetMapping("/repositories/{id}/search-queries")
-    public List<SearchQuery> list(@PathVariable long id) {
-        return searchQueryService.list(id);
-    }
+  private final SearchQueryService searchQueryService;
+  private final CompetitorCardService competitorCardService;
 
-    @PostMapping("/repositories/{id}/search-queries")
-    public SearchQuery create(@PathVariable long id, @Valid @RequestBody SearchQueryRequest request) {
-        return searchQueryService.create(id, request.name(), request.query(), request.enabled(), request.resultLimit());
-    }
+  public SearchQueryController(
+      SearchQueryService searchQueryService, CompetitorCardService competitorCardService) {
+    this.searchQueryService = searchQueryService;
+    this.competitorCardService = competitorCardService;
+  }
 
-    @PutMapping("/search-queries/{id}")
-    public SearchQuery update(@PathVariable long id, @RequestBody SearchQueryRequest request) {
-        return searchQueryService.update(id, request.name(), request.query(), request.enabled(), request.resultLimit());
-    }
+  @GetMapping("/repositories/{id}/search-queries")
+  public List<SearchQuery> list(@PathVariable long id) {
+    return searchQueryService.list(id);
+  }
 
-    @DeleteMapping("/search-queries/{id}")
-    public void delete(@PathVariable long id) {
-        searchQueryService.delete(id);
-    }
+  @org.springframework.web.bind.annotation.ResponseStatus(
+      org.springframework.http.HttpStatus.CREATED)
+  @PostMapping("/repositories/{id}/search-queries")
+  public SearchQuery create(@PathVariable long id, @Valid @RequestBody SearchQueryRequest request) {
+    return searchQueryService.create(
+        id, request.name(), request.query(), request.enabled(), request.resultLimit());
+  }
 
-    @PostMapping("/search-queries/{id}/run")
-    public RunAccepted run(@PathVariable long id) {
-        long runId = searchQueryService.runNow(id);
-        return new RunAccepted(runId);
-    }
+  @PutMapping("/search-queries/{id}")
+  public SearchQuery update(@PathVariable long id, @RequestBody SearchQueryRequest request) {
+    return searchQueryService.update(
+        id, request.name(), request.query(), request.enabled(), request.resultLimit());
+  }
 
-    @PostMapping("/repositories/{id}/search-queries/run")
-    public RunAllAccepted runAll(@PathVariable long id) {
-        return new RunAllAccepted(searchQueryService.runAll(id));
-    }
+  @DeleteMapping("/search-queries/{id}")
+  public void delete(@PathVariable long id) {
+    searchQueryService.delete(id);
+  }
 
-    @GetMapping("/search-queries/{id}")
-    public SearchQuery get(@PathVariable long id) {
-        return searchQueryService.getQuery(id);
-    }
+  @org.springframework.web.bind.annotation.ResponseStatus(
+      org.springframework.http.HttpStatus.CREATED)
+  @PostMapping("/search-queries/{id}/run")
+  public Object run(@PathVariable long id) {
+    if (commands != null) return commands.searchCommand(id, commandWindow.businessDate());
+    long runId = searchQueryService.runNow(id);
+    return new RunAccepted(runId);
+  }
 
-    @GetMapping("/search-queries/{id}/history")
-    public SearchQueryService.SearchHistory history(@PathVariable long id) {
-        return searchQueryService.history(id);
-    }
+  @org.springframework.web.bind.annotation.ResponseStatus(
+      org.springframework.http.HttpStatus.CREATED)
+  @PostMapping("/repositories/{id}/search-queries/run")
+  public Object runAll(@PathVariable long id) {
+    if (commands != null) return commands.searchAllCommand(id, commandWindow.businessDate());
+    return new RunAllAccepted(searchQueryService.runAll(id));
+  }
 
-    @GetMapping("/repositories/{id}/search-visibility")
-    public List<SearchQueryService.SearchHistory> visibility(@PathVariable long id) {
-        return searchQueryService.visibility(id);
-    }
+  @GetMapping("/search-queries/{id}")
+  public SearchQuery get(@PathVariable long id) {
+    return searchQueryService.getQuery(id);
+  }
 
-    @GetMapping("/search-queries/{id}/results")
-    public SearchQueryService.SearchRunResults latestResults(@PathVariable long id) {
-        return searchQueryService.latestResults(id);
-    }
+  @GetMapping("/search-queries/{id}/history")
+  public SearchQueryService.SearchHistory history(@PathVariable long id) {
+    return searchQueryService.history(id);
+  }
 
-    @GetMapping("/search-queries/{id}/series")
-    public SearchQueryService.SearchSeries series(@PathVariable long id) {
-        return searchQueryService.series(id);
-    }
+  @GetMapping("/repositories/{id}/search-visibility")
+  public List<SearchQueryService.SearchHistory> visibility(@PathVariable long id) {
+    return searchQueryService.visibility(id);
+  }
 
-    @GetMapping("/search-queries/{id}/competitors/{githubRepositoryId}")
-    public CompetitorCardService.CompetitorCard competitor(
-            @PathVariable long id,
-            @PathVariable long githubRepositoryId
-    ) {
-        return competitorCardService.card(id, githubRepositoryId);
-    }
+  @GetMapping("/search-queries/{id}/results")
+  public SearchQueryService.SearchRunResults latestResults(@PathVariable long id) {
+    return searchQueryService.latestResults(id);
+  }
 
-    @GetMapping("/search-runs/{id}/results")
-    public SearchQueryService.SearchRunResults results(@PathVariable long id) {
-        return searchQueryService.results(id);
-    }
+  @GetMapping("/search-queries/{id}/series")
+  public SearchQueryService.SearchSeries series(@PathVariable long id) {
+    return searchQueryService.series(id);
+  }
 
-    public record SearchQueryRequest(
-            String name,
-            String query,
-            Boolean enabled,
-            Integer resultLimit
-    ) {
-    }
+  @GetMapping("/search-queries/{id}/competitors/{githubRepositoryId}")
+  public CompetitorCardService.CompetitorCard competitor(
+      @PathVariable long id, @PathVariable long githubRepositoryId) {
+    return competitorCardService.card(id, githubRepositoryId);
+  }
 
-    public record RunAccepted(long searchRunId) {
-    }
+  @GetMapping("/search-runs/{id}/results")
+  public SearchQueryService.SearchRunResults results(@PathVariable long id) {
+    return searchQueryService.results(id);
+  }
 
-    public record RunAllAccepted(List<Long> searchRunIds) {
-    }
+  public record SearchQueryRequest(
+      String name, String query, Boolean enabled, Integer resultLimit) {}
+
+  public record RunAccepted(long searchRunId) {}
+
+  public record RunAllAccepted(List<Long> searchRunIds) {}
 }

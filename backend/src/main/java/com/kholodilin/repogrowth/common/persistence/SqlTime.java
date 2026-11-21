@@ -5,10 +5,9 @@ import java.time.Instant;
 
 public final class SqlTime {
 
-    private SqlTime() {
-    }
+  private SqlTime() {}
 
-    public static Timestamp ts(Instant instant) {
-        return instant == null ? null : Timestamp.from(instant);
-    }
+  public static Timestamp ts(Instant instant) {
+    return instant == null ? null : Timestamp.from(instant);
+  }
 }

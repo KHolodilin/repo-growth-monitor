@@ -16,13 +16,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 function mount(path: string, page: React.ReactNode) {
-  return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/repositories/:id" element={page} /><Route path="/repositories/:repositoryId/search-queries/:queryId" element={page} /><Route path="/repositories/:repositoryId/topics/:topic" element={page} /></Routes></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/admin/repositories/:id" element={page} /><Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={page} /><Route path="/admin/repositories/:repositoryId/topics/:topic" element={page} /></Routes></MemoryRouter>);
 }
 describe("chart batch integration", () => {
   it("retains the new total-Clones mobile choice through period changes and ignores a delayed stale response", async () => {
     const user = userEvent.setup(); let finishOld: (value: unknown) => void = () => {};
     api.mockImplementation(async (url: string) => {
-      if (url.endsWith("/repositories/13")) return repository;
+      if (url.endsWith("/admin/repositories/13")) return repository;
       if (url.includes("/traffic?")) {
         if (url.includes("period=30d")) return new Promise(resolve => { finishOld = resolve; });
         if (url.includes("period=1d")) return { ...traffic, traffic: [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: 8, uniqueCloners: null }] };
@@ -30,7 +30,7 @@ describe("chart batch integration", () => {
       }
       return [];
     });
-    mount("/repositories/13?period=7d", <RepositoryDetailsPage />);
+    mount("/admin/repositories/13?period=7d", <RepositoryDetailsPage />);
     // The app restores its period preference, so explicitly supply a short initial cookie.
     await screen.findByRole("tab", { name: "Clones" });
     await user.click(screen.getByRole("tab", { name: "Clones" }));
@@ -46,15 +46,15 @@ describe("chart batch integration", () => {
   it("uses the compact mobile summary in both detail pages and updates it when Topic scope changes", async () => {
     const user = userEvent.setup();
     api.mockImplementation(async (url: string) => {
-      if (url.endsWith("/repositories/13")) return repository;
+      if (url.endsWith("/admin/repositories/13")) return repository;
       if (url.includes("/history")) return url.includes("/topics/") ? { ...topicHistory, currentRank: url.includes("scope=language") ? 44 : 24 } : searchHistory;
       if (url.includes("/results")) return url.includes("/topics/") ? topicResults : searchResults;
       return [];
     });
-    const query = mount("/repositories/13/search-queries/1", <QueryDetailsPage />);
+    const query = mount("/admin/repositories/13/search-queries/1", <QueryDetailsPage />);
     expect(await screen.findByLabelText("Rank summary")).toHaveTextContent("Current Rank");
     expect(screen.getAllByText("Total Results")).toHaveLength(1); query.unmount();
-    mount("/repositories/13/topics/outbox", <TopicDetailsPage />);
+    mount("/admin/repositories/13/topics/outbox", <TopicDetailsPage />);
     expect(await screen.findByLabelText("Rank summary")).toHaveTextContent("#24");
     await user.click(screen.getByRole("button", { name: "Java" }));
     expect(await screen.findByLabelText("Rank summary")).toHaveTextContent("#44");
@@ -79,14 +79,14 @@ describe("query metric labels", () => {
   it("keeps selected competitors while cycling metric headings and restores the metric from its URL", async () => {
     const user = userEvent.setup();
     api.mockImplementation(async (url: string) => {
-      if (url.endsWith("/repositories/13")) return repository;
+      if (url.endsWith("/admin/repositories/13")) return repository;
       if (url.includes("/history")) return searchHistory;
       if (url.includes("/results")) return searchResults;
       return [];
     });
     const png = vi.spyOn(chartExports, "downloadChartPng").mockImplementation(() => {});
     const csv = vi.spyOn(chartExports, "downloadChartCsv").mockImplementation(() => {});
-    const view = mount("/repositories/13/search-queries/1?metric=stars", <QueryDetailsPage />);
+    const view = mount("/admin/repositories/13/search-queries/1?metric=stars", <QueryDetailsPage />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "Stars History" })).toBeInTheDocument());
     const rival = screen.getByRole("checkbox", { name: "Show other/repo on the chart" });
     await user.click(rival);
@@ -103,7 +103,7 @@ describe("query metric labels", () => {
       expect(screen.getByRole("button", { name: metric })).toHaveAttribute("aria-pressed", "true");
     }
     view.unmount();
-    mount("/repositories/13/search-queries/1?metric=invalid", <QueryDetailsPage />);
+    mount("/admin/repositories/13/search-queries/1?metric=invalid", <QueryDetailsPage />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "Rank History" })).toBeInTheDocument());
     png.mockRestore(); csv.mockRestore();
   });

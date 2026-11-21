@@ -84,13 +84,42 @@ describe("accessible chart controls and compact summaries", () => {
     const view = render(<RankSummary current={null} best={1} limit={50} change7d={0} change30d={null} total={123456789} />);
     expect(screen.getByLabelText("Rank summary")).toBeInTheDocument(); expect(screen.getByText(">50")).toBeInTheDocument(); expect(screen.getByText("No change")).toBeInTheDocument(); expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.getByText("Current Rank").compareDocumentPosition(screen.getByText("Best Rank")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    view.rerender(<RankSummary current={4} best={2} limit={50} change7d={3} change30d={-2} total={null} />);
+    view.rerender(<RankSummary current={4} best={2} limit={50} change7d={3} change30d={-2} total={null} sortMode="best_match" />);
     expect(screen.getByText("↑3")).toBeInTheDocument(); expect(screen.getByText("↓2")).toBeInTheDocument(); expect(screen.getByText("Total Results")).toBeInTheDocument();
+    expect(screen.getByText("Best Rank (Best Match)")).toBeInTheDocument();
+    view.rerender(<RankSummary current={4} best={2} limit={50} change7d={3} change30d={-2} total={null} sortMode="stars" />);
+    expect(screen.getByText("Best Rank (Stars)")).toBeInTheDocument();
   });
   it("offers an empty historical alternative and readable pattern/marker swatches", async () => {
     const user = userEvent.setup(); prepareSeriesStyles(Array.from({ length: 170 }, (_, i) => `test:large-${i}`));
     render(<><ChartDataAlternative option={{}} title="Empty" />{Array.from({ length: 170 }, (_, i) => <SeriesSwatch key={i} style={seriesStyle(`test:large-${i}`)} />)}</>);
     await user.click(screen.getByText("View historical data")); expect(screen.getByText("No observations for this period.")).toBeVisible();
+  });
+  it("sorts historical rows by date descending by default and toggles columns", async () => {
+    const user = userEvent.setup();
+    render(
+      <ChartDataAlternative
+        title="Traffic"
+        option={{
+          xAxis: { data: ["2026-11-15", "2026-11-16", "2026-11-17"] },
+          series: [
+            { name: "Views", type: "line", data: [10, 30, 20] },
+            { name: "Visitors", type: "line", data: [1, 3, 2] },
+          ],
+        }}
+      />,
+    );
+    await user.click(screen.getByText("View historical data"));
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("2026-11-17");
+    expect(rows[2]).toHaveTextContent("2026-11-15");
+    await user.click(screen.getByRole("button", { name: /Views/ }));
+    const byViews = screen.getAllByRole("row").slice(1);
+    expect(byViews[0]).toHaveTextContent("2026-11-15");
+    expect(byViews[2]).toHaveTextContent("2026-11-16");
+    await user.click(screen.getByRole("button", { name: /Views/ }));
+    const byViewsDesc = screen.getAllByRole("row").slice(1);
+    expect(byViewsDesc[0]).toHaveTextContent("2026-11-16");
   });
   it("keeps dynamic mobile selector marks tied to keys rather than their reordered labels", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })));

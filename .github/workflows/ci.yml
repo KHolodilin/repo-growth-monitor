@@ -26,7 +26,7 @@ jobs:
         run: docker info
 
       - name: Test
-        run: mvn -B -f backend/pom.xml test
+        run: mvn -B test
 
       - name: Upload surefire reports on failure
         if: failure()
@@ -39,7 +39,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: backend/target/site/jacoco/jacoco.xml
+          files: backend/target/site/jacoco/jacoco.xml,collector-contracts/target/site/jacoco/jacoco.xml,github-collector/target/site/jacoco/jacoco.xml
           flags: backend
           fail_ci_if_error: false
 

@@ -72,7 +72,7 @@ export function SearchResultsTable({
     const mine = trackedGithubId != null ? row.result.githubRepositoryId === trackedGithubId : trackedPosition != null && row.result.position === trackedPosition;
     return { id: row.result.githubRepositoryId, position: row.result.position, tracked: mine,
       name: <RepositoryName row={row} to={nameTo?.(row) ?? null} />,
-      metrics: [{ label: "Stars", value: formatNumber(row.result.stars) }, { label: "Forks", value: formatNumber(row.result.forks) }, { label: "Change", value: formatPositionDelta(row.positionDelta) },{ label: "Watchers", value: formatNumber(row.result.watchers) }, { label: "Contributors", value: formatNumber(row.result.contributors) }, { label: "Activity", value: formatActivityPresentation(row.result.activityStatus, row.result.activityAt) }],
+      metrics: [{ label: "Stars", value: formatNumber(row.result.stars) }, { label: "Forks", value: formatNumber(row.result.forks) }, { label: "Change", value: formatPositionDelta(row.positionDelta) },{ label: "Watchers", value: enrichedMetric(row.result.watchers, row.result.metadataUpdatedAt) }, { label: "Contributors", value: enrichedMetric(row.result.contributors, row.result.metadataUpdatedAt) }, { label: "Activity", value: formatActivityPresentation(row.result.activityStatus, row.result.activityAt) }],
       selection: onToggle && !mine ? <ChartSelection name={row.result.fullName} checked={selectedIds.includes(row.result.githubRepositoryId)} onChange={() => onToggle(row.result.githubRepositoryId)} /> : undefined };
   })} />;
   return (
@@ -174,9 +174,9 @@ export function SearchResultsTable({
                   <RepositoryName row={row} to={nameTo?.(row) ?? null} />
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.stars)}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.watchers)}</td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{enrichedMetric(row.result.watchers, row.result.metadataUpdatedAt)}</td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.forks)}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.contributors)}</td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{enrichedMetric(row.result.contributors, row.result.metadataUpdatedAt)}</td>
                 <td className={activityClass(row.result.activityStatus) + " whitespace-nowrap px-4 py-2.5 align-top"}>
                   {formatActivityPresentation(row.result.activityStatus, row.result.activityAt)}
                 </td>
@@ -280,4 +280,9 @@ function compareNumbers(left: number | null | undefined, right: number | null | 
     return -1;
   }
   return dir === "desc" ? right - left : left - right;
+}
+
+/** Watchers/Contributors stay placeholders (0) until enrichment writes metadataUpdatedAt. */
+function enrichedMetric(value: number, metadataUpdatedAt: string | null | undefined) {
+  return metadataUpdatedAt ? formatNumber(value) : "—";
 }

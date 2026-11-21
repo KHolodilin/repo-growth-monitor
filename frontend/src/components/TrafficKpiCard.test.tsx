@@ -141,6 +141,32 @@ describe("TrafficKpiCard", () => {
 
     rerender(
       <TrafficKpiCard
+        label="Views"
+        value={289}
+        growthPercent={null}
+        period="7d"
+        coverage={{ observedDays: 52, expectedDays: 60 }}
+        series={[10, 20]}
+      />,
+    );
+    expect(screen.getByText("289")).toBeInTheDocument();
+    expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
+
+    rerender(
+      <TrafficKpiCard
+        label="Unique Contributors"
+        value={14}
+        growthPercent={null}
+        absoluteChange={null}
+        period="30d"
+        series={[null, 14]}
+      />,
+    );
+    expect(screen.getByText("14")).toBeInTheDocument();
+    expect(screen.queryByText(/Observed unique logins/)).not.toBeInTheDocument();
+
+    rerender(
+      <TrafficKpiCard
         label="Stars"
         value={27}
         growthPercent={28.6}

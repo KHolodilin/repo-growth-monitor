@@ -23,6 +23,7 @@ type CardRow = {
 
 export function SnapshotCards({
   repositoryId,
+  historyBasePath,
   referrers,
   referrerSnapshotAt,
   paths,
@@ -30,7 +31,8 @@ export function SnapshotCards({
   showServicePaths,
   onShowServicePathsChange,
 }: {
-  repositoryId: number;
+  repositoryId: number | string;
+  historyBasePath?: string;
   referrers: { referrer: string; views: number; uniqueVisitors: number }[];
   referrerSnapshotAt?: string;
   paths: PathSnapshotRow[];
@@ -38,6 +40,7 @@ export function SnapshotCards({
   showServicePaths: boolean;
   onShowServicePathsChange: (next: boolean) => void;
 }) {
+  const historyRoot = historyBasePath ?? `/admin/repositories/${repositoryId}`;
   const referrerRows = referrers.map((row) => ({
     key: row.referrer,
     title: row.referrer,
@@ -63,7 +66,7 @@ export function SnapshotCards({
         rows={referrerRows}
         snapshotAt={referrerSnapshotAt}
         icons
-        historyTo={`/repositories/${repositoryId}/traffic/history?kind=referrers`}
+        historyTo={`${historyRoot}/traffic/history?kind=referrers`}
       />
       <SnapshotCard
         tableId="popular-paths"
@@ -72,30 +75,32 @@ export function SnapshotCards({
         firstColumn="Path"
         rows={pathRows}
         snapshotAt={pathSnapshotAt}
-        historyTo={`/repositories/${repositoryId}/traffic/history?kind=paths`}
+        historyTo={`${historyRoot}/traffic/history?kind=paths`}
         toolbar={<ServicePathToggle checked={showServicePaths} onChange={onShowServicePathsChange} />}
       />
     </div>
   );
 }
 
-function SnapshotCard({
+export function SnapshotCard({
   tableId,
   repositoryId,
   title,
   firstColumn,
   rows,
   snapshotAt,
+  snapshotLabel,
   historyTo,
   icons = false,
   toolbar,
 }: {
   tableId: TableId;
-  repositoryId: number;
+  repositoryId: number | string;
   title: string;
   firstColumn: string;
   rows: CardRow[];
   snapshotAt?: string;
+  snapshotLabel?: string;
   historyTo: string;
   icons?: boolean;
   toolbar?: ReactNode;
@@ -129,7 +134,7 @@ function SnapshotCard({
         </Link>
       </div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{snapshotAt ? `Snapshot: ${formatSyncTime(snapshotAt)}` : "No snapshot yet"}</span>
+        <span>{snapshotAt ? `Snapshot: ${formatSyncTime(snapshotAt)}` : snapshotLabel ?? "No snapshot yet"}</span>
         {toolbar}
       </div>
       <div className="overflow-x-auto">
@@ -161,6 +166,7 @@ function SnapshotCard({
             </tr>
           </thead>
           <tbody>
+            {sorted.length === 0 && <tr><td colSpan={3} className="py-6 text-center text-muted-foreground">No recorded sources or paths.</td></tr>}
             {sorted.map((row) => (
               <tr key={row.key} className="border-t">
                 <td className="max-w-0 py-2 pr-3 align-top">

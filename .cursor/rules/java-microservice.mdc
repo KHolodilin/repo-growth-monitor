@@ -1,0 +1,49 @@
+---
+description: Общие правила и ограничения разработки Java-микросервисов (слои, ArchUnit, качество)
+alwaysApply: true
+---
+
+# Java microservice development
+
+Правила для Spring Boot / Java MS в этом репозитории (collector и аналогичные модули). Issue/PR/release — в `issue-workflow` / `issue-execution`.
+
+## Архитектура: классические слои
+
+Только **Layered Architecture**. Не переходить на Hexagonal/Clean, не вводить ports/adapters «ради стиля», не плодить Maven-модули только под границы слоёв.
+
+Согласованная схема зависимостей:
+
+- `Controller` → `Service`
+- `Service` → `Repository` / `Integration` / `Model`
+- `Repository` → `Model`
+- `Integration` → `Model`
+- `Configuration` связывает компоненты; entrypoint зависит только от configuration
+- `Security` / `Logging` — узкие боковые слои по правилам ArchUnit модуля
+
+Запрещено:
+
+- `Integration` → `Repository` или `Service` (в т.ч. через callback/Supplier/Function к store/queue)
+- перенос классов между пакетами **только** чтобы обойти ArchUnit
+- `ignoreDependency`, frozen rules, exclude/suppression, чтобы скрыть нарушение слоя
+- тащить HTTP/security/`@ConfigurationProperties` в `service`
+- framework/JSON/HTTP/SQL/idempotency-wire в `model`
+
+Хранение, checkpoint, lease/fencing, оркестрация локальной очереди — в **service**. Integration — внешние API и преобразование ответов, без знания локального persistence.
+
+## ArchitectureTest — только пользователь
+
+Файлы `*ArchitectureTest*` правит **только пользователь**. Агент не создаёт, не меняет, не удаляет и не прогоняет через них автоформат/скрипты как способ правки правил.
+
+Если тест красный или кажется нужным менять правило:
+
+1. Код под **существующие** правила править можно сразу (предпочтительно).
+2. Иначе в чате: **причина** (какое правило / какая зависимость), **почему так вышло**, **последствия** оставить vs поменять правило, **предложение** (точный diff/сниппет ArchitectureTest и/или правка кода).
+3. Ждать, пока пользователь сам внесёт изменение в ArchitectureTest.
+4. После его правки / просьбы — запускать ArchitectureTest или `verify`.
+
+## Качество и объём работ
+
+- Не ослаблять анализаторы, пороги, suppressions и exclusions.
+- Не менять несвязанное «заодно»; не подменять контракты, семантику idempotency/lease/deadline/checkpoint без задачи.
+- Поведение и контракты сохранять, пока задача явно не говорит иное.
+- Тесты: обновлять/добавлять проверки затронутого поведения; гонять ArchUnit и затронутые тесты, затем `mvn verify` по модулю с зависимостями, когда просят проверить.

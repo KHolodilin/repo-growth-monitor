@@ -1,3 +1,4 @@
+import { publicContext, readPublicPreference, writePublicPreference } from "./publicPrefs";
 import { useState } from "react";
 import { readJsonCookie, writeJsonCookie } from "./cookies";
 
@@ -62,8 +63,8 @@ export function readTableSort<K extends string>(
   scope: number | string | undefined,
   keys: readonly K[],
 ): TableSort<K> | null {
-  const stored = readScopes(tableId)[scopeKey(scope)];
-  if (!stored || !(keys as readonly string[]).includes(stored.key)) {
+  const stored = publicContext(String(scope)) ? readPublicPreference(String(scope), `sort:${tableId}`, (v): v is StoredSort => Boolean(v && typeof v === "object" && "key" in v && "dir" in v)) : readScopes(tableId)[scopeKey(scope)];
+  if (!stored || (stored.dir !== "asc" && stored.dir !== "desc") || !(keys as readonly string[]).includes(stored.key)) {
     return null;
   }
   return { key: stored.key as K, dir: stored.dir };
@@ -74,6 +75,7 @@ export function writeTableSort<K extends string>(
   scope: number | string | undefined,
   sort: TableSort<K>,
 ) {
+  if (publicContext(String(scope))) { writePublicPreference(String(scope), `sort:${tableId}`, sort); return; }
   const scopes = readScopes(tableId);
   scopes[scopeKey(scope)] = { key: sort.key, dir: sort.dir };
   writeJsonCookie(cookieName(tableId), scopes);

@@ -21,6 +21,8 @@ type Series = {
 };
 type ChartOption = {
   snapshotHistory?: boolean;
+  /** Public saved data does not assert that a planner was expected to run yesterday. */
+  collectionExpected?: boolean;
   collectionDates?: string[];
   collectionSeries?: { name: string; dates: string[] }[];
   missedCollectionDates?: string[];
@@ -210,6 +212,7 @@ function toTimeline(option: ChartOption): ChartOption {
 /** Missing snapshots are metadata, never numeric zero or a fake rank. */
 export function withCollectionWarning(source: object, today = new Date().toISOString().slice(0, 10), extend = false): ChartOption {
   const option = source as ChartOption;
+  if (option.collectionExpected === false) return option;
   if (option.series?.some(item => item.name === "Collection warning")) return option;
   const dates = categoryDates(option);
   if (!dates?.length) return option;
@@ -249,8 +252,37 @@ export function withCollectionWarning(source: object, today = new Date().toISOSt
 function safeTooltip(tooltip: unknown, mobile: boolean): Record<string, unknown> {
   return { ...(tooltip as Record<string, unknown>), confine: true, appendToBody: false,
     ...(mobile ? { triggerOn: "click" } : {}),
-    extraCssText: "max-width: min(360px, calc(100vw - 48px)); min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
+    // Prefer above the pointer near the chart bottom so long Referrers/Paths tips stay in view at 390px.
+    position: tooltipPosition,
+    // Leave room above the home-indicator / browser chrome; scroll inside the tip if needed.
+    extraCssText: "max-width: min(360px, calc(100vw - 48px)); max-height: min(220px, calc(100vh - 96px)); overflow-y: auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
   };
+}
+
+/** Keep the box inside the chart view; flip above the cursor when it would clip the bottom. */
+function tooltipPosition(
+  point: number[],
+  _params: unknown,
+  _dom: unknown,
+  _rect: unknown,
+  size: { contentSize: number[]; viewSize: number[] },
+) {
+  const gap = 12;
+  const [boxW, boxH] = size.contentSize;
+  const [viewW, viewH] = size.viewSize;
+  let x = point[0];
+  let y = point[1];
+  if (y + boxH + gap > viewH) {
+    y = Math.max(0, y - boxH - gap);
+  } else {
+    y = Math.min(y + gap, Math.max(0, viewH - boxH));
+  }
+  if (x + boxW > viewW) {
+    x = Math.max(0, viewW - boxW);
+  } else if (x < 0) {
+    x = 0;
+  }
+  return [x, y];
 }
 
 /** Calendar dates stay as they are. Timeline and event markers are applied on top of a finished option. */

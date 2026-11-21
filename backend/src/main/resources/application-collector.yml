@@ -1,0 +1,70 @@
+# Legacy combined-process collector profile for tests / local embeds.
+# Prefer the standalone github-collector boot JAR (application.yml + banner.txt).
+# Keep non-secret defaults aligned with that canonical file.
+rgm:
+  web:
+    enabled: false
+  collector:
+    enabled: true
+  planner:
+    enabled: false
+spring:
+  banner:
+    location: classpath:banner.txt
+  main:
+    web-application-type: none
+  liquibase:
+    enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState
+
+collector:
+  runtime:
+    enabled: ${COLLECTOR_RUNTIME_ENABLED:true}
+  acceptance:
+    destinations:
+      - rgm-results
+  search:
+    rank-sort: best_match
+    rank-sort-order: desc
+  capacity:
+    max-jobs: ${COLLECTOR_CAPACITY_MAX_JOBS:100}
+    max-queue-bytes: ${COLLECTOR_CAPACITY_MAX_QUEUE_BYTES:67108864}
+    max-request-bytes: ${COLLECTOR_CAPACITY_MAX_REQUEST_BYTES:262144}
+  github:
+    pacing:
+      concurrency: 1
+      core-interval: 1200ms
+      search-interval: 3000ms
+      graphql-interval: 1200ms
+    retry:
+      max-attempts: 5
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2
+  credentials:
+    enabled: ${COLLECTOR_CREDENTIALS_ENABLED:false}
+    ttl: 2h
+    maximum-size: 100
+    allow-http: false
+  execution:
+    enabled: ${COLLECTOR_EXECUTION_ENABLED:false}
+    maximum-payload-bytes: 5242880
+    maximum-pages: 5
+  delivery:
+    enabled: ${COLLECTOR_DELIVERY_ENABLED:false}
+    allow-http: false
+    retry:
+      max-attempts: 12
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2

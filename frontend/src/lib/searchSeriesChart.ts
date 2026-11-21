@@ -1,6 +1,6 @@
 import type { Period } from "../components/PeriodSelector";
 import { periodDates } from "./searchVisibilityKpi";
-import { lineStyle, prepareSeriesStyles, seriesStyle } from "./seriesStyle";
+import { lineStyle, prepareSeriesStyles, seriesMarkerHtml } from "./seriesStyle";
 import type { GrowthEvent, SearchSeries } from "./api";
 import { eventUtcDate } from "./growthEvents";
 import { datesFromHistory, rankHistoryOption } from "./rankChart";
@@ -347,7 +347,7 @@ function countHistoryOption({
             const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             const identity = series.find(line => line.name === item.seriesName);
             const observedOn = tooltipDate?.(item.seriesName, item.axisValue);
-            return `<div><span style="color:${seriesStyle(identity?.key ?? item.seriesName).color}">●</span> ${item.seriesName}${observedOn ? ` (${observedOn})` : ""}: ${value}</div>`;
+            return `<div>${seriesMarkerHtml(identity?.key ?? item.seriesName)} ${item.seriesName}${observedOn ? ` (${observedOn})` : ""}: ${value}</div>`;
           })
           .join("");
         return `<div>${date}${rows}</div>`;

@@ -1,4 +1,4 @@
-import { prepareSeriesStyles, seriesStyle } from "./seriesStyle";
+import { prepareSeriesStyles, seriesMarkerHtml, seriesStyle } from "./seriesStyle";
 import type { Period } from "../components/PeriodSelector";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
@@ -174,7 +174,7 @@ export function rankHistoryOption({
             const point = item.points.find((entry) => entry.date === date);
             const missed = item.missedDates?.includes(date) ?? false;
             const observedOn = tooltipDate?.(item.name, date);
-            return `<span style="color:${seriesStyle(item.key ?? item.name).color}">●</span> ${item.name}${observedOn ? ` (${observedOn})` : ""}: ${rankTooltipText(point, item.limit, missed)}`;
+            return `${seriesMarkerHtml(item.key ?? item.name)} ${item.name}${observedOn ? ` (${observedOn})` : ""}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
         const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];

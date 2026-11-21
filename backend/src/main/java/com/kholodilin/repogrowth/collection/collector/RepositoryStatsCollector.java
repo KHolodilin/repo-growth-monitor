@@ -10,185 +10,211 @@ import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import java.time.Instant;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
-
-import java.time.Instant;
-import java.util.List;
 
 @Slf4j
 @Component
 public class RepositoryStatsCollector implements Collector {
 
-    private final GitHubClient gitHubClient;
-    private final RepositoryJdbcRepository repositoryJdbcRepository;
-    private final TrafficJdbcRepository trafficJdbcRepository;
-    private final TopicWatchSync topicWatchSync;
-    private final TransactionTemplate transactionTemplate;
+  private final GitHubClient gitHubClient;
+  private final RepositoryJdbcRepository repositoryJdbcRepository;
+  private final TrafficJdbcRepository trafficJdbcRepository;
+  private final TopicWatchSync topicWatchSync;
+  private final TransactionTemplate transactionTemplate;
 
-    public RepositoryStatsCollector(
-            GitHubClient gitHubClient,
-            RepositoryJdbcRepository repositoryJdbcRepository,
-            TrafficJdbcRepository trafficJdbcRepository,
-            TopicWatchSync topicWatchSync,
-            TransactionTemplate transactionTemplate
-    ) {
-        this.gitHubClient = gitHubClient;
-        this.repositoryJdbcRepository = repositoryJdbcRepository;
-        this.trafficJdbcRepository = trafficJdbcRepository;
-        this.topicWatchSync = topicWatchSync;
-        this.transactionTemplate = transactionTemplate;
+  public RepositoryStatsCollector(
+      GitHubClient gitHubClient,
+      RepositoryJdbcRepository repositoryJdbcRepository,
+      TrafficJdbcRepository trafficJdbcRepository,
+      TopicWatchSync topicWatchSync,
+      TransactionTemplate transactionTemplate) {
+    this.gitHubClient = gitHubClient;
+    this.repositoryJdbcRepository = repositoryJdbcRepository;
+    this.trafficJdbcRepository = trafficJdbcRepository;
+    this.topicWatchSync = topicWatchSync;
+    this.transactionTemplate = transactionTemplate;
+  }
+
+  @Override
+  public CollectionJobType type() {
+    return CollectionJobType.REPOSITORY_STATS;
+  }
+
+  @Override
+  public void collect(CollectionContext context) {
+    String owner = context.ownerLogin();
+    String name = context.repository().name();
+    GitHubRepositoryResponse remote = gitHubClient.getRepository(owner, name);
+    int contributors = context.repository().contributors();
+    try {
+      contributors = gitHubClient.countContributors(owner, name);
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Contributor count failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
     }
-
-    @Override
-    public CollectionJobType type() {
-        return CollectionJobType.REPOSITORY_STATS;
+    int resolvedContributors = contributors;
+    List<String> contributorLogins = null;
+    try {
+      contributorLogins =
+          gitHubClient.listContributors(owner, name).stream()
+              .map(GitHubContributorItem::login)
+              .filter(login -> login != null && !login.isBlank())
+              .map(String::trim)
+              .distinct()
+              .sorted()
+              .toList();
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Contributor list failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
     }
-
-    @Override
-    public void collect(CollectionContext context) {
-        String owner = context.ownerLogin();
-        String name = context.repository().name();
-        GitHubRepositoryResponse remote = gitHubClient.getRepository(owner, name);
-        int contributors = context.repository().contributors();
-        try {
-            contributors = gitHubClient.countContributors(owner, name);
-        } catch (RuntimeException ex) {
-            log.warn("Contributor count failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        int resolvedContributors = contributors;
-        List<String> contributorLogins = null;
-        try {
-            contributorLogins = gitHubClient.listContributors(owner, name).stream()
-                    .map(GitHubContributorItem::login)
-                    .filter(login -> login != null && !login.isBlank())
-                    .map(String::trim)
-                    .distinct()
-                    .sorted()
-                    .toList();
-        } catch (RuntimeException ex) {
-            log.warn("Contributor list failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        List<String> resolvedContributorLogins = contributorLogins;
-        Instant lastCommitAt = null;
-        try {
-            lastCommitAt = gitHubClient.latestCommitAt(owner, name).orElse(null);
-        } catch (RuntimeException ex) {
-            log.warn("Latest commit lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        Instant resolvedLastCommitAt = lastCommitAt;
-
-        GitHubCommunityProfileResponse profile = GitHubCommunityProfileResponse.empty();
-        try {
-            profile = gitHubClient.getCommunityProfile(owner, name);
-        } catch (RuntimeException ex) {
-            log.warn("Community profile failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        GitHubCommunityProfileResponse.GitHubCommunityFiles files = profile.filesOrEmpty();
-
-        String readmeText = null;
-        try {
-            readmeText = gitHubClient.getReadme(owner, name).orElse(null);
-        } catch (RuntimeException ex) {
-            log.warn("README lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        String resolvedReadme = readmeText;
-
-        boolean hasSecurityPolicy = false;
-        try {
-            hasSecurityPolicy = gitHubClient.fileExists(owner, name, ".github/SECURITY.md")
-                    || gitHubClient.fileExists(owner, name, "SECURITY.md")
-                    || gitHubClient.fileExists(owner, name, "docs/SECURITY.md");
-        } catch (RuntimeException ex) {
-            log.warn("Security policy lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        boolean resolvedSecurityPolicy = hasSecurityPolicy;
-
-        boolean hasIssueTemplate = files.hasIssueTemplate();
-        if (!hasIssueTemplate) {
-            try {
-                hasIssueTemplate = gitHubClient.hasIssueTemplates(owner, name);
-            } catch (RuntimeException ex) {
-                log.warn("Issue template lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-            }
-        }
-        boolean resolvedIssueTemplate = hasIssueTemplate;
-
-        Instant lastReleaseAt = null;
-        boolean releaseFetched = false;
-        try {
-            lastReleaseAt = gitHubClient.latestReleaseAt(owner, name).orElse(null);
-            releaseFetched = true;
-        } catch (RuntimeException ex) {
-            log.warn("Latest release lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        Instant resolvedLastReleaseAt = lastReleaseAt;
-        boolean resolvedReleaseFetched = releaseFetched;
-
-        boolean hasReadme = files.hasReadme() || resolvedReadme != null;
-        boolean hasSocialPreview = repositoryJdbcRepository.findHealth(context.repository().id())
-                .map(RepositoryHealthFacts::hasSocialPreview)
-                .orElse(false);
-        try {
-            hasSocialPreview = gitHubClient.getSocialPreview(owner, name).custom();
-        } catch (RuntimeException ex) {
-            log.warn("Social preview lookup failed repository={} error={}", context.repository().fullName(), ex.getMessage());
-        }
-        RepositoryHealthFacts healthFacts = new RepositoryHealthFacts(
-                remote.hasHomepage() ? remote.homepage().trim() : null,
-                hasReadme,
-                RepositoryHealthEvaluator.readmeHasH1(resolvedReadme),
-                RepositoryHealthEvaluator.readmeHasName(resolvedReadme, name),
-                files.hasLicense() || remote.hasLicense(),
-                files.hasCodeOfConduct(),
-                files.hasContributing(),
-                resolvedSecurityPolicy,
-                resolvedIssueTemplate,
-                files.hasPullRequestTemplate(),
-                hasSocialPreview
-        );
-        String description = remote.description() == null || remote.description().isBlank()
-                ? null
-                : remote.description().trim();
-
-        transactionTemplate.executeWithoutResult(status -> {
-            repositoryJdbcRepository.updateStats(
-                    context.repository().id(),
-                    description,
-                    remote.stargazersCount(),
-                    remote.watchers(),
-                    remote.forksCount(),
-                    remote.openIssuesCount(),
-                    resolvedContributors,
-                    remote.updatedAt(),
-                    remote.pushedAt(),
-                    resolvedLastCommitAt,
-                    Instant.now(),
-                    remote.archived()
-            );
-            repositoryJdbcRepository.replaceTopics(context.repository().id(), remote.topicsOrEmpty());
-            topicWatchSync.sync(context.repository().id());
-            repositoryJdbcRepository.upsertHealth(context.repository().id(), healthFacts);
-            if (resolvedReleaseFetched) {
-                repositoryJdbcRepository.updateLastReleaseAt(context.repository().id(), resolvedLastReleaseAt);
-            }
-            trafficJdbcRepository.upsertDailyStats(
-                    context.repository().id(),
-                    context.job().businessDate(),
-                    remote.stargazersCount(),
-                    remote.watchers(),
-                    remote.forksCount(),
-                    remote.openIssuesCount(),
-                    resolvedContributors
-            );
-            if (resolvedContributorLogins != null) {
-                trafficJdbcRepository.replaceContributorLogins(
-                        context.repository().id(),
-                        context.job().businessDate(),
-                        resolvedContributorLogins
-                );
-            }
-        });
+    List<String> resolvedContributorLogins = contributorLogins;
+    Instant lastCommitAt = null;
+    try {
+      lastCommitAt = gitHubClient.latestCommitAt(owner, name).orElse(null);
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Latest commit lookup failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
     }
+    Instant resolvedLastCommitAt = lastCommitAt;
+
+    GitHubCommunityProfileResponse profile = GitHubCommunityProfileResponse.empty();
+    try {
+      profile = gitHubClient.getCommunityProfile(owner, name);
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Community profile failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
+    }
+    GitHubCommunityProfileResponse.GitHubCommunityFiles files = profile.filesOrEmpty();
+
+    String readmeText = null;
+    try {
+      readmeText = gitHubClient.getReadme(owner, name).orElse(null);
+    } catch (RuntimeException ex) {
+      log.warn(
+          "README lookup failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
+    }
+    String resolvedReadme = readmeText;
+
+    boolean hasSecurityPolicy = false;
+    try {
+      hasSecurityPolicy =
+          gitHubClient.fileExists(owner, name, ".github/SECURITY.md")
+              || gitHubClient.fileExists(owner, name, "SECURITY.md")
+              || gitHubClient.fileExists(owner, name, "docs/SECURITY.md");
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Security policy lookup failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
+    }
+    boolean resolvedSecurityPolicy = hasSecurityPolicy;
+
+    boolean hasIssueTemplate = files.hasIssueTemplate();
+    if (!hasIssueTemplate) {
+      try {
+        hasIssueTemplate = gitHubClient.hasIssueTemplates(owner, name);
+      } catch (RuntimeException ex) {
+        log.warn(
+            "Issue template lookup failed repository={} error={}",
+            context.repository().fullName(),
+            ex.getMessage());
+      }
+    }
+    boolean resolvedIssueTemplate = hasIssueTemplate;
+
+    Instant lastReleaseAt = null;
+    boolean releaseFetched = false;
+    try {
+      lastReleaseAt = gitHubClient.latestReleaseAt(owner, name).orElse(null);
+      releaseFetched = true;
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Latest release lookup failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
+    }
+    Instant resolvedLastReleaseAt = lastReleaseAt;
+    boolean resolvedReleaseFetched = releaseFetched;
+
+    boolean hasReadme = files.hasReadme() || resolvedReadme != null;
+    boolean hasSocialPreview =
+        repositoryJdbcRepository
+            .findHealth(context.repository().id())
+            .map(RepositoryHealthFacts::hasSocialPreview)
+            .orElse(false);
+    try {
+      hasSocialPreview = gitHubClient.getSocialPreview(owner, name).custom();
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Social preview lookup failed repository={} error={}",
+          context.repository().fullName(),
+          ex.getMessage());
+    }
+    RepositoryHealthFacts healthFacts =
+        new RepositoryHealthFacts(
+            remote.hasHomepage() ? remote.homepage().trim() : null,
+            hasReadme,
+            RepositoryHealthEvaluator.readmeHasH1(resolvedReadme),
+            RepositoryHealthEvaluator.readmeHasName(resolvedReadme, name),
+            files.hasLicense() || remote.hasLicense(),
+            files.hasCodeOfConduct(),
+            files.hasContributing(),
+            resolvedSecurityPolicy,
+            resolvedIssueTemplate,
+            files.hasPullRequestTemplate(),
+            hasSocialPreview);
+    String description =
+        remote.description() == null || remote.description().isBlank()
+            ? null
+            : remote.description().trim();
+
+    transactionTemplate.executeWithoutResult(status -> {
+      repositoryJdbcRepository.updateStats(
+          context.repository().id(),
+          description,
+          remote.stargazersCount(),
+          remote.watchers(),
+          remote.forksCount(),
+          remote.openIssuesCount(),
+          resolvedContributors,
+          remote.updatedAt(),
+          remote.pushedAt(),
+          resolvedLastCommitAt,
+          Instant.now(),
+          remote.archived());
+      repositoryJdbcRepository.replaceTopics(context.repository().id(), remote.topicsOrEmpty());
+      topicWatchSync.sync(context.repository().id());
+      repositoryJdbcRepository.upsertHealth(context.repository().id(), healthFacts);
+      if (resolvedReleaseFetched) {
+        repositoryJdbcRepository.updateLastReleaseAt(
+            context.repository().id(), resolvedLastReleaseAt);
+      }
+      trafficJdbcRepository.upsertDailyStats(
+          context.repository().id(),
+          context.job().businessDate(),
+          remote.stargazersCount(),
+          remote.watchers(),
+          remote.forksCount(),
+          remote.openIssuesCount(),
+          resolvedContributors);
+      if (resolvedContributorLogins != null) {
+        trafficJdbcRepository.replaceContributorLogins(
+            context.repository().id(), context.job().businessDate(), resolvedContributorLogins);
+      }
+    });
+  }
 }

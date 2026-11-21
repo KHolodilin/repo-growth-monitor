@@ -144,10 +144,16 @@ The image is three stages:
 ```bash
 cp .env.example .env
 # set GITHUB_TOKEN — see "Create a GitHub token" above
+python deploy/prepare-combined-local.py
 docker compose up -d --build
+# once RGM has started (local MOCK authentication only):
+python deploy/bootstrap-combined-local.py
+docker compose up -d --force-recreate repo-growth-monitor collector
 ```
 
-Open http://localhost:8080. Stop with `docker compose down`.
+Open http://localhost:8080. The stack runs separate `repo-growth-monitor` and `collector` containers
+(same image, production-like roles). See [local split runtime](docs/collector-combined-local.md).
+Stop with `docker compose down`.
 
 ### Mock stack (WireMock + test database)
 
@@ -202,3 +208,9 @@ The token is only accepted from environment / Docker secrets. Diagnostics expose
 - OpenAPI UI: http://localhost:8080/swagger-ui.html
 - Health: http://localhost:8080/actuator/health
 - Prometheus (optional scrape): http://localhost:8080/actuator/prometheus
+
+## Collector module development
+
+The Maven reactor contains `collector-contracts`, `github-collector` and `backend`. Build from the repository root with `mvn -B package`; for backend tests with dependencies use `mvn -B -pl backend -am test`.
+
+The same image supports product and collector roles. Contributor Compose runs them as two containers with a shared PostgreSQL instance (product + collector databases). See [collector architecture](docs/collector-architecture.md) and [local split runtime](docs/collector-combined-local.md). The `web-only` profile remains a transitional single-process guard; prefer the split Compose topology for local work that should match production.

@@ -1,0 +1,97 @@
+# Standard Spring Boot names (application.yml + banner.txt), as in idempotency-demo.
+# Root document stays empty so this library jar does not override product application.yml.
+# Standalone GitHubCollectorApplication activates profile collector-node by default.
+---
+spring:
+  config:
+    activate:
+      on-profile: collector-node
+  application:
+    name: github-collector
+  banner:
+    location: classpath:banner.txt
+  main:
+    web-application-type: servlet
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  server:
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,collectorReady
+  info:
+    env:
+      enabled: true
+  metrics:
+    tags:
+      application: github-collector
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} [%thread] %-5level attemptId=%X{attemptId} jobId=%X{jobId} taskType=%X{taskType} %logger{36} - %msg%n"
+  level:
+    root: INFO
+    com.kholodilin.collector: INFO
+
+collector:
+  runtime:
+    enabled: true
+  acceptance:
+    destinations:
+      - rgm-results
+  http:
+    enabled: true
+  search:
+    rank-sort: best_match   # best_match (default) | stars
+    rank-sort-order: desc   # used only when rank-sort=stars
+  capacity:
+    max-jobs: 100
+    max-queue-bytes: 67108864   # 64 MiB approximate payload budget
+    max-request-bytes: 262144   # 256 KiB
+  github:
+    pacing:
+      concurrency: 1
+      core-interval: 1200ms
+      search-interval: 3000ms
+      graphql-interval: 1200ms
+    retry:
+      max-attempts: 5
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2
+  credentials:
+    enabled: true
+    ttl: 2h
+    maximum-size: 100
+    allow-http: false
+  execution:
+    enabled: true
+    maximum-payload-bytes: 5242880
+    maximum-pages: 5
+  delivery:
+    enabled: true
+    allow-http: false
+    retry:
+      max-attempts: 12
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2

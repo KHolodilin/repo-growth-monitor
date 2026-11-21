@@ -5,102 +5,113 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
 import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 public class DailyPlanner {
 
-    private final PlanningWindow planningWindow;
-    private final CollectionPlanner collectionPlanner;
-    private final SearchPlanner searchPlanner;
-    private final TopicPlanner topicPlanner;
-    private final CollectionProperties collectionProperties;
-    private final SnapshotSchedule snapshotSchedule;
-    private final PlannerSlotJdbcRepository slotRepository;
+  @Value("${rgm.planner.enabled:true}")
+  private boolean plannerEnabled = true;
 
-    public DailyPlanner(
-            PlanningWindow planningWindow,
-            CollectionPlanner collectionPlanner,
-            SearchPlanner searchPlanner,
-            TopicPlanner topicPlanner,
-            CollectionProperties collectionProperties,
-            SnapshotSchedule snapshotSchedule,
-            PlannerSlotJdbcRepository slotRepository
-    ) {
-        this.planningWindow = planningWindow;
-        this.collectionPlanner = collectionPlanner;
-        this.searchPlanner = searchPlanner;
-        this.topicPlanner = topicPlanner;
-        this.collectionProperties = collectionProperties;
-        this.snapshotSchedule = snapshotSchedule;
-        this.slotRepository = slotRepository;
-    }
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.kholodilin.repogrowth.orchestration.CollectionRequestService requestService;
 
-    @Scheduled(fixedDelayString = "${collection.planner.interval}")
-    public void tick() {
-        if (!collectionProperties.planner().enabled()) {
-            log.debug("Planner skipped, scheduling disabled");
-            return;
-        }
-        if (!planningWindow.isOpen()) {
-            log.debug("Planner skipped, outside strict window");
-            return;
-        }
-        planDue();
-    }
+  private final PlanningWindow planningWindow;
+  private final CollectionPlanner collectionPlanner;
+  private final SearchPlanner searchPlanner;
+  private final TopicPlanner topicPlanner;
+  private final CollectionProperties collectionProperties;
+  private final SnapshotSchedule snapshotSchedule;
+  private final PlannerSlotJdbcRepository slotRepository;
 
-    public PlannerResult planNow(boolean requireWindow) {
-        if (requireWindow && !planningWindow.isOpen()) {
-            throw ApiException.validation("Collection planner is outside the configured strict window");
-        }
-        return planDue();
-    }
+  public DailyPlanner(
+      PlanningWindow planningWindow,
+      CollectionPlanner collectionPlanner,
+      SearchPlanner searchPlanner,
+      TopicPlanner topicPlanner,
+      CollectionProperties collectionProperties,
+      SnapshotSchedule snapshotSchedule,
+      PlannerSlotJdbcRepository slotRepository) {
+    this.planningWindow = planningWindow;
+    this.collectionPlanner = collectionPlanner;
+    this.searchPlanner = searchPlanner;
+    this.topicPlanner = topicPlanner;
+    this.collectionProperties = collectionProperties;
+    this.snapshotSchedule = snapshotSchedule;
+    this.slotRepository = slotRepository;
+  }
 
-    private PlannerResult planDue() {
-        LocalDate date = planningWindow.businessDate();
-        Optional<LocalTime> slot = pendingSnapshot(date);
-        boolean snapshotDue = slot.isPresent();
-        int collection = collectionPlanner.planAll(date, snapshotDue);
-        int search = searchPlanner.planAll(date, snapshotDue);
-        int topics = topicPlanner.planAll(date, snapshotDue);
-        if (snapshotDue) {
-            slotRepository.save(date, slot.get());
-            log.info("Planner snapshot slot={} businessDate={}", slot.get(), date);
-        }
-        return new PlannerResult(true, collection, search, topics, date.toString());
+  @Scheduled(fixedDelayString = "${collection.planner.interval}")
+  public void tick() {
+    if (!plannerEnabled || !collectionProperties.planner().enabled()) {
+      log.debug("Planner skipped, scheduling disabled");
+      return;
     }
+    if (!planningWindow.isOpen()) {
+      log.debug("Planner skipped, outside strict window");
+      return;
+    }
+    planDue();
+  }
 
-    private Optional<LocalTime> pendingSnapshot(LocalDate date) {
-        CollectionProperties.Planner planner = collectionProperties.planner();
-        Optional<LocalTime> due = snapshotSchedule.due(
-                planningWindow.localTime(),
-                planningWindow.from(),
-                planningWindow.to(),
-                planner.snapshotInterval()
-        );
-        if (due.isEmpty()) {
-            return Optional.empty();
-        }
-        Optional<LocalTime> applied = slotRepository.find(date);
-        if (applied.isPresent() && !due.get().isAfter(applied.get())) {
-            return Optional.empty();
-        }
-        return due;
+  public PlannerResult planNow(boolean requireWindow) {
+    if (!plannerEnabled)
+      throw ApiException.validation("Collection planning is disabled in this role");
+    if (requireWindow && !planningWindow.isOpen()) {
+      throw ApiException.validation("Collection planner is outside the configured strict window");
     }
+    return planDue();
+  }
 
-    public record PlannerResult(
-            boolean planned,
-            int collectionRepositories,
-            int searchQueries,
-            int topicWatches,
-            String businessDate
-    ) {
+  private PlannerResult planDue() {
+    LocalDate date = planningWindow.businessDate();
+    Optional<LocalTime> slot = pendingSnapshot(date);
+    boolean snapshotDue = slot.isPresent();
+    if (requestService != null) {
+      var counts = requestService.scheduled(date, slot.map(LocalTime::toString).orElse(null));
+      if (snapshotDue) slotRepository.save(date, slot.get());
+      return new PlannerResult(
+          true, counts.repositories(), counts.queries(), counts.watches(), date.toString());
     }
+    int collection = collectionPlanner.planAll(date, snapshotDue);
+    int search = searchPlanner.planAll(date, snapshotDue);
+    int topics = topicPlanner.planAll(date, snapshotDue);
+    if (snapshotDue) {
+      slotRepository.save(date, slot.get());
+      log.info("Planner snapshot slot={} businessDate={}", slot.get(), date);
+    }
+    return new PlannerResult(true, collection, search, topics, date.toString());
+  }
+
+  private Optional<LocalTime> pendingSnapshot(LocalDate date) {
+    CollectionProperties.Planner planner = collectionProperties.planner();
+    Optional<LocalTime> due =
+        snapshotSchedule.due(
+            planningWindow.localTime(),
+            planningWindow.from(),
+            planningWindow.to(),
+            planner.snapshotInterval());
+    if (due.isEmpty()) {
+      return Optional.empty();
+    }
+    Optional<LocalTime> applied = slotRepository.find(date);
+    if (applied.isPresent() && !due.get().isAfter(applied.get())) {
+      return Optional.empty();
+    }
+    return due;
+  }
+
+  public record PlannerResult(
+      boolean planned,
+      int collectionRepositories,
+      int searchQueries,
+      int topicWatches,
+      String businessDate) {}
 }

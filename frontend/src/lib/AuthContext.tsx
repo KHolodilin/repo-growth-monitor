@@ -50,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await signOut(me.logoutUrl);
+    } catch {
+      // Logout still clears local session; response may be a non-JSON redirect page.
     } finally {
       setMe({ ...anonymousMe, loginUrl: me.loginUrl || anonymousMe.loginUrl });
     }

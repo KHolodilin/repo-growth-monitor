@@ -18,10 +18,10 @@ let status = "SUCCESS";
 let empty = false;
 let run: () => Promise<unknown>;
 function mount(tab = "search") {
-  return render(<MemoryRouter initialEntries={[`/repositories/13?tab=${tab}`]}><AuthProvider><Routes>
+  return render(<MemoryRouter initialEntries={[`/admin/repositories/13?tab=${tab}`]}><AuthProvider><Routes>
     <Route element={<Layout />}>
-      <Route path="/repositories/:id" element={<><Link to="/repositories/8?tab=search">Next repository</Link><Link to="/dashboard">Leave repository</Link><RepositoryDetailsPage /></>} />
-      <Route path="/dashboard" element={<p>Dashboard</p>} />
+      <Route path="/admin/repositories/:id" element={<><Link to="/admin/repositories/8?tab=search">Next repository</Link><Link to="/admin/dashboard">Leave repository</Link><RepositoryDetailsPage /></>} />
+      <Route path="/admin/dashboard" element={<p>Dashboard</p>} />
     </Route>
   </Routes></AuthProvider></MemoryRouter>);
 }
@@ -34,7 +34,7 @@ beforeEach(() => {
   status = "SUCCESS"; empty = false; run = async () => ({});
   api.mockImplementation(async (path: string, options?: { method?: string }) => {
     if (options?.method === "POST") return run();
-    if (path.startsWith("/api/v1/dashboard")) return dashboardReady;
+    if (path.startsWith("/api/v1/admin/dashboard")) return dashboardReady;
     if (/\/repositories\/\d+$/.test(path)) return { ...repository, id: path.endsWith("/8") ? 8 : 13 };
     if (path.includes("/traffic?")) return traffic;
     if (path.includes("/search-visibility")) return empty ? [] : [{ ...searchHistory, searchStatus: status }];
@@ -50,19 +50,19 @@ describe("repository Run all account action", () => {
     expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/search-queries/run", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/search-queries/run", { method: "POST" }));
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     await screen.findByRole("link", { name: "outbox" });
     expect(screen.queryByRole("button", { name: "Run all" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Java" }));
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/topic-watches/run?scope=language", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/topic-watches/run?scope=language", { method: "POST" }));
     await user.click(screen.getByRole("link", { name: "Next repository" }));
     await screen.findByRole("button", { name: "Add query" });
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/search-queries/run", { method: "POST" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/8/search-queries/run", { method: "POST" }));
     await user.click(screen.getByRole("button", { name: "Traffic" }));
     await openMenu(user);
     expect(screen.queryByRole("menuitem", { name: /Run all|Running/ })).not.toBeInTheDocument();

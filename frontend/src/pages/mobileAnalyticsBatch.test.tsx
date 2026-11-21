@@ -44,8 +44,8 @@ describe("mobile analytics batch", () => {
   it("keeps repository missing-data states distinct from data available only for one metric", async () => {
     const user = userEvent.setup();
     let points: typeof traffic.traffic = [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: null }];
-    api.mockImplementation((path: string) => Promise.resolve(path.includes("/traffic?") ? { ...traffic, traffic: points } : path.endsWith("/repositories/13") ? repository : []));
-    render(<MemoryRouter initialEntries={["/repositories/13"]}><Routes><Route path="/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
+    api.mockImplementation((path: string) => Promise.resolve(path.includes("/traffic?") ? { ...traffic, traffic: points } : path.endsWith("/admin/repositories/13") ? repository : []));
+    render(<MemoryRouter initialEntries={["/admin/repositories/13"]}><Routes><Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
     expect(await screen.findByRole("status")).toHaveTextContent("No traffic data for selected period");
     points = [{ date: "2026-11-02", views: null, uniqueVisitors: 2, clones: null, uniqueCloners: null }];
     await user.click(screen.getByRole("button", { name: "30d" }));
@@ -57,7 +57,7 @@ describe("mobile analytics batch", () => {
   it("keeps the mobile repository menu usable during viewport and page changes", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue([repository]);
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: id => `/repositories/${id}` } }]} /></MemoryRouter>);
+    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: (repo) => `/${repo.owner.login}/${repo.name}` } }]} /></MemoryRouter>);
     await user.click(screen.getByRole("button", { name: "Switch repository" }));
     fireEvent.resize(window); fireEvent.scroll(window);
     await user.type(screen.getByRole("textbox", { name: "Search repositories" }), "spring");
@@ -115,21 +115,32 @@ describe("mobile analytics batch", () => {
   });
 
   it("keeps the chosen metric for an empty period, renders missing values and suppresses comparisons", () => {
-    render(<TrafficKpiCard label="Visitors" value={null} growthPercent={null} period="1d" coverage={{ observedDays: 0, expectedDays: 1 }} previousCoverage={{ observedDays: 0, expectedDays: 1 }} />);
-    expect(screen.getByText("No traffic data for selected period")).toBeInTheDocument();
+    render(<TrafficKpiCard label="Visitors" value={null} growthPercent={null} period="1d" previousCoverage={{ observedDays: 0, expectedDays: 1 }} />);
     expect(screen.getByText(/Comparison unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
     expect(screen.queryByText(/100%/)).not.toBeInTheDocument();
   });
-  it("labels partial totals and preserves true zero", () => {
+  it("keeps coverage off KPI cards and preserves true zero", () => {
     const { rerender } = render(<TrafficKpiCard label="Views" value={5} growthPercent={null} period="7d" coverage={{ observedDays: 2, expectedDays: 6 }} />);
-    expect(screen.getByText("Partial data: 2 / 6 repository-days")).toBeInTheDocument();
+    expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/repository-days/)).not.toBeInTheDocument();
     rerender(<TrafficKpiCard label="Views" value={0} growthPercent={-100} period="1d" coverage={{ observedDays: 1, expectedDays: 1 }} previousCoverage={{ observedDays: 1, expectedDays: 1 }} />);
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getByText(/100%/)).toBeInTheDocument();
   });
+  it("colors sparklines from explicit series color and trend direction", () => {
+    const { rerender, container } = render(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={-10} period="7d" series={[1, null, 3]} preserveGaps sparklineColor="#111111" />);
+    expect(container.querySelector('polyline[stroke="#111111"]')).toBeTruthy();
+    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={-10} absoluteChange={-1} period="7d" series={[3, 1]} />);
+    expect(container.querySelector('polyline[stroke="#b91c1c"]')).toBeTruthy();
+    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={0} absoluteChange={0} period="7d" series={[2, 2]} />);
+    expect(container.querySelector('polyline[stroke="#6b7280"]')).toBeTruthy();
+    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={10} absoluteChange={1} period="7d" series={[1, 2]} />);
+    expect(container.querySelector('polyline[stroke="#047857"]')).toBeTruthy();
+  });
 
   it("keeps breadcrumb navigation and complete page labels available", () => {
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: id => `/repositories/${id}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
+    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: (repo) => `/${repo.owner.login}/${repo.name}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
     expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Search Visibility" })).toBeInTheDocument();
     expect(screen.getByTitle("a/very-long-repository-name")).toBeInTheDocument();
@@ -195,7 +206,7 @@ describe("mobile analytics batch", () => {
 
   it("closes the warning sheet via button, cancellation, backdrop and deliberate header swipe", () => {
     const onClose = vi.fn();
-    const { unmount } = render(<RepositoryWarningSheet count={2} onClose={onClose}><a href="/repositories/13">owner/repository</a></RepositoryWarningSheet>);
+    const { unmount } = render(<RepositoryWarningSheet count={2} onClose={onClose}><a href="/admin/repositories/13">owner/repository</a></RepositoryWarningSheet>);
     const dialog = screen.getByRole("dialog", { name: "Repository data warnings" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(document.body.style.overflow).toBe("hidden");

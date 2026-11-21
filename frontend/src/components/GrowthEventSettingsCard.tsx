@@ -11,7 +11,7 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
 
   useEffect(() => {
     let cancelled = false;
-    api<GrowthEventSetting[]>(`/api/v1/repositories/${repositoryId}/growth-event-settings`)
+    api<GrowthEventSetting[]>(`/api/v1/admin/repositories/${repositoryId}/growth-event-settings`)
       .then((data) => {
         if (!cancelled) {
           setSettings(data);
@@ -40,7 +40,7 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
       current.map((item) => (item.eventType === eventType ? { ...item, enabled } : item)),
     );
     try {
-      const updated = await api<GrowthEventSetting[]>(`/api/v1/repositories/${repositoryId}/growth-event-settings`, {
+      const updated = await api<GrowthEventSetting[]>(`/api/v1/admin/repositories/${repositoryId}/growth-event-settings`, {
         method: "PUT",
         body: JSON.stringify([{ eventType, enabled }]),
       });

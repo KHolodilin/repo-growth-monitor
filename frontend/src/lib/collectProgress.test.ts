@@ -71,6 +71,25 @@ describe("collect progress", () => {
     expect(headerProgress({ repositoryId: 13, rows: [row], watching: false })).toBe(
       "Collecting KHolodilin/repo: Traffic done, Referrers running, Popular Paths running, Repository Stats failed: missing, Growth Events failed, CUSTOM done",
     );
+    expect(
+      headerProgress({
+        repositoryId: 13,
+        rows: [
+          repo({
+            collectionStatus: "RUNNING",
+            jobs: [
+              { jobType: "TRAFFIC", status: "SUCCESS" },
+              ...Array.from({ length: 10 }, () => ({ jobType: "SEARCH_QUERY", status: "SUCCESS" })),
+              ...Array.from({ length: 5 }, () => ({ jobType: "SEARCH_QUERY", status: "RUNNING" })),
+              ...Array.from({ length: 10 }, () => ({ jobType: "TOPIC_WATCH", status: "SUCCESS" })),
+              ...Array.from({ length: 20 }, () => ({ jobType: "TOPIC_WATCH", status: "PLANNED" })),
+              { jobType: "TOPIC_WATCH", status: "FAILED", errorMessage: "rate limit" },
+            ],
+          }),
+        ],
+        watching: false,
+      }),
+    ).toBe("Collecting KHolodilin/repo: Traffic done, Search 10/15, Topics 10/31 failed: rate limit");
     expect(headerProgress({ repositoryId: 13, rows: [repo({ collectionStatus: "RUNNING", jobs: [] })], watching: false })).toBe(
       "Collecting KHolodilin/repo",
     );

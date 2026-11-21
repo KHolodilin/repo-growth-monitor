@@ -14,7 +14,7 @@ export function SearchResultsPage() {
     if (!id) {
       return;
     }
-    api<SearchRunResults>(`/api/v1/search-runs/${id}/results`)
+    api<SearchRunResults>(`/api/v1/admin/search-runs/${id}/results`)
       .then(setData)
       .catch((err: Error) => setError(err.message));
   }, [id]);

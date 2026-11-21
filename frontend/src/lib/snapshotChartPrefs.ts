@@ -1,3 +1,4 @@
+import { publicContext, readPublicPreference, writePublicPreference } from "./publicPrefs";
 import { readJsonCookie, writeJsonCookie } from "./cookies";
 
 const PREFIX = "repo-growth.snapshot-chart.";
@@ -33,6 +34,7 @@ export function readSnapshotChartPrefs(
   repositoryId: number | string,
   kind: SnapshotChartKind,
 ): SnapshotChartPrefs | null {
+  if(publicContext(String(repositoryId)))return readPublicPreference(String(repositoryId), `sources:${kind}`, (value):value is SnapshotChartPrefs => parsePrefs(value)!==null) ?? null;
   return readJsonCookie(cookieName(repositoryId, kind), parsePrefs);
 }
 
@@ -41,5 +43,6 @@ export function writeSnapshotChartPrefs(
   kind: SnapshotChartKind,
   prefs: SnapshotChartPrefs,
 ) {
+  if(publicContext(String(repositoryId))){writePublicPreference(String(repositoryId),`sources:${kind}`,prefs);return;}
   writeJsonCookie(cookieName(repositoryId, kind), prefs);
 }

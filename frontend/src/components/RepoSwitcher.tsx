@@ -8,7 +8,7 @@ import { cn } from "../lib/utils";
 type RepoSwitcherProps = {
   currentId: number;
   currentLabel: string;
-  hrefFor: (repositoryId: number) => string;
+  hrefFor: (repository: Repository) => string;
   description?: string;
 };
 
@@ -101,7 +101,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
       return;
     }
     try {
-      setRepos(await api<Repository[]>("/api/v1/repositories?refresh=false"));
+      setRepos(await api<Repository[]>("/api/v1/admin/repositories?refresh=false"));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -109,11 +109,15 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
 
   function select(repo: Repository) {
     setOpen(false);
-    const to = hrefFor(repo.id);
+    const to = hrefFor(repo);
     if (to === `${location.pathname}${location.search}`) {
       return;
     }
-    navigate(to);
+    const q = to.indexOf("?");
+    navigate(
+      q < 0 ? { pathname: to, search: "" } : { pathname: to.slice(0, q), search: to.slice(q) },
+      { replace: false },
+    );
   }
 
   function onSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {

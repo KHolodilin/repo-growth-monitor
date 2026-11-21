@@ -1,5 +1,6 @@
 import { lineStyle, metricColor } from "./seriesStyle";
 import type { StatsHistoryPoint } from "./api";
+import { withoutIncompletePortfolioTipDay } from "./portfolioTipDay";
 import { partialDayTooltip } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
 
@@ -62,11 +63,12 @@ export function statsChartOption(
   options?: { contributorsLabel?: string },
 ) {
   const contributorsLabel = options?.contributorsLabel ?? "Contributors";
-  const byDate = new Map(points.map((point) => [point.date, point]));
-  const dates = points.map((point) => point.date);
+  const seriesPoints = withoutIncompletePortfolioTipDay(points);
+  const byDate = new Map(seriesPoints.map((point) => [point.date, point]));
+  const dates = seriesPoints.map((point) => point.date);
   return {
-    collectionDates: points.filter(point => point.stars != null || point.forks != null || point.watchers != null || point.contributors != null).map(point => point.date),
-    partialCollectionDates: points.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
+    collectionDates: seriesPoints.filter(point => point.stars != null || point.forks != null || point.watchers != null || point.contributors != null).map(point => point.date),
+    partialCollectionDates: seriesPoints.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
     animation: false,
     tooltip: {
       trigger: "item" as const,
@@ -127,7 +129,7 @@ export function statsChartOption(
         showSymbol: true,
         symbolSize: 8,
         connectNulls: true,
-        data: points.map((point) => point.stars),
+        data: seriesPoints.map((point) => point.stars),
       },
       {
         name: "Forks",
@@ -136,7 +138,7 @@ export function statsChartOption(
         showSymbol: true,
         symbolSize: 8,
         connectNulls: true,
-        data: points.map((point) => point.forks),
+        data: seriesPoints.map((point) => point.forks),
       },
       {
         name: "Watchers",
@@ -145,7 +147,7 @@ export function statsChartOption(
         showSymbol: true,
         symbolSize: 8,
         connectNulls: true,
-        data: points.map((point) => point.watchers),
+        data: seriesPoints.map((point) => point.watchers),
       },
       {
         name: contributorsLabel,
@@ -154,7 +156,7 @@ export function statsChartOption(
         showSymbol: true,
         symbolSize: 8,
         connectNulls: true,
-        data: points.map((point) => point.contributors),
+        data: seriesPoints.map((point) => point.contributors),
       },
     ],
   };

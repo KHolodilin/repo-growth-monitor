@@ -207,4 +207,21 @@ describe("mobile plot spacing", () => {
     const result = presentChartOption<Record<string, unknown>>({}, { axis: "calendar", events: [], mobile: true });
     expect(result.grid).toEqual({ left: 4, right: 4, top: 12, bottom: 8, containLabel: true });
   });
+
+  it("flips tooltips above the pointer near the bottom of the chart", () => {
+    const option = presentChartOption(
+      { tooltip: { formatter: () => "long tip" }, series: [{ name: "Views", type: "line", data: [1] }] },
+      { axis: "calendar", events: [], mobile: true },
+    );
+    const position = option.tooltip.position as (
+      point: number[],
+      params: unknown,
+      dom: unknown,
+      rect: unknown,
+      size: { contentSize: number[]; viewSize: number[] },
+    ) => number[];
+    expect(position([10, 200], null, null, null, { contentSize: [300, 180], viewSize: [360, 220] })).toEqual([10, 8]);
+    expect(position([300, 20], null, null, null, { contentSize: [120, 40], viewSize: [360, 220] })).toEqual([240, 32]);
+    expect(position([-4, 20], null, null, null, { contentSize: [40, 20], viewSize: [360, 220] })).toEqual([0, 32]);
+  });
 });

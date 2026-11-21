@@ -56,7 +56,7 @@ export function parseGitHubAccess(value: unknown): GitHubAccess {
 
 export async function loadGitHubAccess(): Promise<GitHubAccess> {
   try {
-    return parseGitHubAccess(await api<unknown>("/api/v1/system/status"));
+    return parseGitHubAccess(await api<unknown>("/api/v1/admin/system/status"));
   } catch {
     return { tokenState: "OK", rateLimitReset: null, planner: null };
   }

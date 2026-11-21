@@ -34,18 +34,21 @@ describe("topic visibility bands", () => {
     expect(top3.series.filter((point) => point != null).at(-1)).toBe(1);
   });
 
-  it("uses the last measured day minus the first and omits a percent from zero", () => {
+  it("compares against the previous period end, not the first day inside the window", () => {
     const rising = topicBandKpi([
       topic("alpha", 1, [
-        { date: "2026-10-21", position: null },
+        { date: "2026-10-15", position: 5 },
+        { date: "2026-10-16", position: 5 },
         { date: "2026-10-22", position: 1 },
       ]),
     ], 3, "7d", today);
+    // Window starts 2026-10-16; previousTo=2026-10-15 was outside top3 → +1 from 0
+    expect(rising.value).toBe(1);
     expect(rising.absoluteChange).toBe(1);
     expect(rising.growthPercent).toBeNull();
   });
 
-  it("shows no change until two days in the window are measured", () => {
+  it("shows N/A change when the previous period has no baseline yet", () => {
     const single = topicBandKpi([
       topic("alpha", 1, [{ date: "2026-10-22", position: 1 }]),
     ], 3, "1d", today);
@@ -66,14 +69,30 @@ describe("topic visibility bands", () => {
     expect(topicBandKpi([topic("alpha", null, [])], 3, "all", today).series).toEqual([null]);
   });
 
-  it("rounds a percent from the first measured count", () => {
+  it("omits vs-prev labels when 90d/1y history starts inside the window", () => {
+    const shortHistory = [
+      topic("alpha", 2, [
+        { date: "2026-09-23", position: 3 },
+        { date: "2026-10-22", position: 2 },
+      ]),
+    ];
+    expect(topicBandKpi(shortHistory, 10, "90d", today).absoluteChange).toBeNull();
+    expect(topicBandKpi(shortHistory, 10, "1y", today).absoluteChange).toBeNull();
+  });
+
+  it("reports change when the prior period end already has a count", () => {
     const kpi = topicBandKpi([
       topic("alpha", 1, [
-        { date: "2026-10-16", position: 1 },
+        { date: "2026-10-15", position: 2 },
         { date: "2026-10-22", position: 1 },
       ]),
-      topic("beta", 2, [{ date: "2026-10-22", position: 2 }]),
+      topic("beta", 2, [
+        { date: "2026-10-15", position: 5 },
+        { date: "2026-10-22", position: 2 },
+      ]),
     ], 3, "7d", today);
+    // previousTo=2026-10-15 → 1 in top3; current → 2
+    expect(kpi.value).toBe(2);
     expect(kpi.absoluteChange).toBe(1);
     expect(kpi.growthPercent).toBe(100);
   });
@@ -81,11 +100,23 @@ describe("topic visibility bands", () => {
   it("keeps a flat count as zero change with a zero percent", () => {
     const flat = topicBandKpi([
       topic("alpha", 2, [
-        { date: "2026-10-16", position: 2 },
+        { date: "2026-10-15", position: 2 },
         { date: "2026-10-22", position: 2 },
       ]),
     ], 3, "7d", today);
     expect(flat.absoluteChange).toBe(0);
     expect(flat.growthPercent).toBe(0);
+  });
+
+  it("treats zero-to-zero band counts as flat growth", () => {
+    const outside = topicBandKpi([
+      topic("alpha", 9, [
+        { date: "2026-10-15", position: 9 },
+        { date: "2026-10-22", position: 9 },
+      ]),
+    ], 3, "7d", today);
+    expect(outside.value).toBe(0);
+    expect(outside.absoluteChange).toBe(0);
+    expect(outside.growthPercent).toBe(0);
   });
 });

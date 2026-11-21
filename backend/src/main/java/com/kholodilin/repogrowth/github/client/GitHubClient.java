@@ -3,6 +3,8 @@ package com.kholodilin.repogrowth.github.client;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
+import com.kholodilin.repogrowth.common.web.AppHttpHeaders;
+import com.kholodilin.repogrowth.github.GitHubHttp;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
 import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
@@ -23,22 +25,6 @@ import com.kholodilin.repogrowth.github.model.GitHubSocialPreviewResponse;
 import com.kholodilin.repogrowth.github.model.GitHubTrafficClonesResponse;
 import com.kholodilin.repogrowth.github.model.GitHubTrafficViewsResponse;
 import io.micrometer.core.instrument.Timer;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpRequest;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.ResourceAccessException;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriUtils;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
@@ -54,732 +40,813 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRequest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriUtils;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
 @Component
 public class GitHubClient {
 
-    private static final Pattern NEXT_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"next\"");
-    private static final Pattern LAST_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"last\"");
-    private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
-    private static final int MAX_PER_PAGE = 100;
-    private static final int MAX_LIST_PAGES = 5;
+  private static final Pattern NEXT_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"next\"");
+  private static final Pattern LAST_LINK = Pattern.compile("<([^>]+)>;\\s*rel=\"last\"");
+  private static final Pattern PAGE_QUERY = Pattern.compile("[?&]page=(\\d+)");
+  private static final int MAX_PER_PAGE = 100;
+  private static final int MAX_LIST_PAGES = 5;
 
-    private final RestClient restClient;
-    private final RestClient webClient;
-    private final JsonMapper jsonMapper;
-    private final GitHubProperties properties;
-    private final AppMetrics metrics;
-    private volatile boolean accessKnown;
-    private volatile boolean tokenRejected;
-    private volatile Instant rateLimitReset;
+  @Value("${rgm.collector.enabled:true}")
+  private boolean collectorEnabled = true;
 
-    public GitHubClient(
-            RestClient gitHubRestClient,
-            JsonMapper jsonMapper,
-            GitHubProperties properties,
-            AppMetrics metrics
-    ) {
-        this.restClient = gitHubRestClient;
-        this.webClient = webClient(properties);
-        this.jsonMapper = jsonMapper;
-        this.properties = properties;
-        this.metrics = metrics;
+  @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
+  private boolean durableOrchestration;
+
+  private final RestClient restClient;
+  private final RestClient webClient;
+  private final JsonMapper jsonMapper;
+  private final GitHubProperties properties;
+  private final AppMetrics metrics;
+  private volatile boolean accessKnown;
+  private volatile boolean tokenRejected;
+  private volatile Instant rateLimitReset;
+
+  public GitHubClient(
+      RestClient gitHubRestClient,
+      JsonMapper jsonMapper,
+      GitHubProperties properties,
+      AppMetrics metrics) {
+    this.restClient = gitHubRestClient;
+    this.webClient = webClient(properties);
+    this.jsonMapper = jsonMapper;
+    this.properties = properties;
+    this.metrics = metrics;
+  }
+
+  private static RestClient webClient(GitHubProperties properties) {
+    Duration connectTimeout =
+        properties.connectTimeout() == null ? Duration.ofSeconds(10) : properties.connectTimeout();
+    Duration readTimeout =
+        properties.readTimeout() == null ? Duration.ofSeconds(30) : properties.readTimeout();
+    HttpClient httpClient = HttpClient.newBuilder().connectTimeout(connectTimeout).build();
+    JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+    factory.setReadTimeout(readTimeout);
+    return RestClient.builder()
+        .requestFactory(factory)
+        .defaultHeader(HttpHeaders.ACCEPT, "*/*")
+        .defaultHeader(AppHttpHeaders.REQUESTED_WITH, "XMLHttpRequest")
+        .defaultHeader(HttpHeaders.USER_AGENT, "repo-growth-monitor")
+        .build();
+  }
+
+  public List<GitHubRepositoryResponse> listAccessibleRepositories() {
+    requireToken();
+    List<GitHubRepositoryResponse> all = new ArrayList<>();
+    String path =
+        "/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=full_name";
+    while (path != null) {
+      ResponseEntity<byte[]> response = execute("listRepositories", "GET", path);
+      all.addAll(read(response.getBody(), new TypeReference<List<GitHubRepositoryResponse>>() {}));
+      path = nextPath(response.getHeaders().getFirst(HttpHeaders.LINK));
     }
+    return all;
+  }
 
-    private static RestClient webClient(GitHubProperties properties) {
-        Duration connectTimeout = properties.connectTimeout() == null ? Duration.ofSeconds(10) : properties.connectTimeout();
-        Duration readTimeout = properties.readTimeout() == null ? Duration.ofSeconds(30) : properties.readTimeout();
-        HttpClient httpClient = HttpClient.newBuilder().connectTimeout(connectTimeout).build();
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-        factory.setReadTimeout(readTimeout);
-        return RestClient.builder()
-                .requestFactory(factory)
-                .defaultHeader(HttpHeaders.ACCEPT, "*/*")
-                .defaultHeader("X-Requested-With", "XMLHttpRequest")
-                .defaultHeader(HttpHeaders.USER_AGENT, "repo-growth-monitor")
-                .build();
+  public GitHubRepositoryResponse getRepository(String owner, String name) {
+    requireToken();
+    ResponseEntity<byte[]> response =
+        execute("getRepository", "GET", "/repos/" + owner + "/" + name);
+    return read(response.getBody(), GitHubRepositoryResponse.class);
+  }
+
+  public GitHubSocialPreview getSocialPreview(String owner, String name) {
+    requireToken();
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put(
+        "query",
+        "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){usesCustomOpenGraphImage openGraphImageUrl}}");
+    payload.put("variables", Map.of("owner", owner, "name", name));
+    ResponseEntity<byte[]> response =
+        executePost("socialPreview", "/graphql", jsonMapper.writeValueAsString(payload));
+    GitHubSocialPreviewResponse parsed =
+        read(response.getBody(), GitHubSocialPreviewResponse.class);
+    if (parsed.errors() != null && !parsed.errors().isEmpty()) {
+      throw GitHubException.api(
+          HttpStatus.OK.value(), false, null, parsed.errors().getFirst().message());
     }
-
-    public List<GitHubRepositoryResponse> listAccessibleRepositories() {
-        requireToken();
-        List<GitHubRepositoryResponse> all = new ArrayList<>();
-        String path = "/user/repos?per_page=100&affiliation=owner,collaborator,organization_member&sort=full_name";
-        while (path != null) {
-            ResponseEntity<byte[]> response = execute("listRepositories", "GET", path);
-            all.addAll(read(response.getBody(), new TypeReference<List<GitHubRepositoryResponse>>() {
-            }));
-            path = nextPath(response.getHeaders().getFirst(HttpHeaders.LINK));
-        }
-        return all;
+    if (parsed.data() == null || parsed.data().repository() == null) {
+      throw GitHubException.notFound("GitHub repository not found");
     }
+    GitHubSocialPreviewResponse.RepositoryNode repository = parsed.data().repository();
+    return new GitHubSocialPreview(
+        repository.usesCustomOpenGraphImage(), repository.openGraphImageUrl());
+  }
 
-    public GitHubRepositoryResponse getRepository(String owner, String name) {
-        requireToken();
-        ResponseEntity<byte[]> response = execute("getRepository", "GET", "/repos/" + owner + "/" + name);
-        return read(response.getBody(), GitHubRepositoryResponse.class);
+  public GitHubTrafficViewsResponse getViews(String owner, String name) {
+    requireToken();
+    ResponseEntity<byte[]> response =
+        execute("views", "GET", "/repos/" + owner + "/" + name + "/traffic/views");
+    return read(response.getBody(), GitHubTrafficViewsResponse.class);
+  }
+
+  public GitHubTrafficClonesResponse getClones(String owner, String name) {
+    requireToken();
+    ResponseEntity<byte[]> response =
+        execute("clones", "GET", "/repos/" + owner + "/" + name + "/traffic/clones");
+    return read(response.getBody(), GitHubTrafficClonesResponse.class);
+  }
+
+  public List<GitHubReferrerResponse> getReferrers(String owner, String name) {
+    requireToken();
+    ResponseEntity<byte[]> response =
+        execute("referrers", "GET", "/repos/" + owner + "/" + name + "/traffic/popular/referrers");
+    return read(response.getBody(), new TypeReference<List<GitHubReferrerResponse>>() {});
+  }
+
+  public List<GitHubPathResponse> getPopularPaths(String owner, String name) {
+    requireToken();
+    ResponseEntity<byte[]> response =
+        execute("popularPaths", "GET", "/repos/" + owner + "/" + name + "/traffic/popular/paths");
+    return read(response.getBody(), new TypeReference<List<GitHubPathResponse>>() {});
+  }
+
+  public int countContributors(String owner, String name) {
+    requireToken();
+    try {
+      Integer sidebar = countContributorsFromSidebar(owner, name);
+      if (sidebar != null) {
+        return sidebar;
+      }
+    } catch (RuntimeException ex) {
+      log.warn(
+          "Sidebar contributor count failed owner={} name={} error={}",
+          owner,
+          name,
+          ex.getMessage());
     }
+    return countContributorsFromRest(owner, name);
+  }
 
-    public GitHubSocialPreview getSocialPreview(String owner, String name) {
-        requireToken();
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put(
-                "query",
-                "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){usesCustomOpenGraphImage openGraphImageUrl}}"
-        );
-        payload.put("variables", Map.of("owner", owner, "name", name));
-        ResponseEntity<byte[]> response = executePost("socialPreview", "/graphql", jsonMapper.writeValueAsString(payload));
-        GitHubSocialPreviewResponse parsed = read(response.getBody(), GitHubSocialPreviewResponse.class);
-        if (parsed.errors() != null && !parsed.errors().isEmpty()) {
-            throw GitHubException.api(200, false, null, parsed.errors().getFirst().message());
-        }
-        if (parsed.data() == null || parsed.data().repository() == null) {
-            throw GitHubException.notFound("GitHub repository not found");
-        }
-        GitHubSocialPreviewResponse.RepositoryNode repository = parsed.data().repository();
-        return new GitHubSocialPreview(repository.usesCustomOpenGraphImage(), repository.openGraphImageUrl());
+  private Integer countContributorsFromSidebar(String owner, String name) {
+    String base = properties.webBaseUrl();
+    if (base.endsWith("/")) {
+      base = base.substring(0, base.length() - 1);
     }
-
-    public GitHubTrafficViewsResponse getViews(String owner, String name) {
-        requireToken();
-        ResponseEntity<byte[]> response = execute("views", "GET", "/repos/" + owner + "/" + name + "/traffic/views");
-        return read(response.getBody(), GitHubTrafficViewsResponse.class);
+    String uri =
+        base
+            + "/"
+            + UriUtils.encodePathSegment(owner, StandardCharsets.UTF_8)
+            + "/"
+            + UriUtils.encodePathSegment(name, StandardCharsets.UTF_8)
+            + "/_sidebar";
+    ResponseEntity<byte[]> response = executeAbsolute("repositorySidebar", uri);
+    GitHubSidebarResponse parsed = read(response.getBody(), GitHubSidebarResponse.class);
+    if (parsed.contributors() == null) {
+      return null;
     }
+    return parsed.contributors().contributorCount();
+  }
 
-    public GitHubTrafficClonesResponse getClones(String owner, String name) {
-        requireToken();
-        ResponseEntity<byte[]> response = execute("clones", "GET", "/repos/" + owner + "/" + name + "/traffic/clones");
-        return read(response.getBody(), GitHubTrafficClonesResponse.class);
+  private int countContributorsFromRest(String owner, String name) {
+    String path = "/repos/" + owner + "/" + name + "/contributors?per_page=1&anon=true";
+    ResponseEntity<byte[]> response = execute("contributors", "GET", path);
+    String last = lastPath(combinedLinkHeader(response.getHeaders()));
+    if (last != null) {
+      Matcher page = PAGE_QUERY.matcher(last);
+      if (page.find()) {
+        return Integer.parseInt(page.group(1));
+      }
     }
-
-    public List<GitHubReferrerResponse> getReferrers(String owner, String name) {
-        requireToken();
-        ResponseEntity<byte[]> response = execute(
-                "referrers",
-                "GET",
-                "/repos/" + owner + "/" + name + "/traffic/popular/referrers"
-        );
-        return read(response.getBody(), new TypeReference<List<GitHubReferrerResponse>>() {
-        });
-    }
-
-    public List<GitHubPathResponse> getPopularPaths(String owner, String name) {
-        requireToken();
-        ResponseEntity<byte[]> response = execute(
-                "popularPaths",
-                "GET",
-                "/repos/" + owner + "/" + name + "/traffic/popular/paths"
-        );
-        return read(response.getBody(), new TypeReference<List<GitHubPathResponse>>() {
-        });
-    }
-
-    public int countContributors(String owner, String name) {
-        requireToken();
-        try {
-            Integer sidebar = countContributorsFromSidebar(owner, name);
-            if (sidebar != null) {
-                return sidebar;
-            }
-        } catch (RuntimeException ex) {
-            log.warn("Sidebar contributor count failed owner={} name={} error={}", owner, name, ex.getMessage());
-        }
-        return countContributorsFromRest(owner, name);
-    }
-
-    private Integer countContributorsFromSidebar(String owner, String name) {
-        String base = properties.webBaseUrl();
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        String uri = base + "/" + UriUtils.encodePathSegment(owner, StandardCharsets.UTF_8)
-                + "/" + UriUtils.encodePathSegment(name, StandardCharsets.UTF_8)
-                + "/_sidebar";
-        ResponseEntity<byte[]> response = executeAbsolute("repositorySidebar", uri);
-        GitHubSidebarResponse parsed = read(response.getBody(), GitHubSidebarResponse.class);
-        if (parsed.contributors() == null) {
-            return null;
-        }
-        return parsed.contributors().contributorCount();
-    }
-
-    private int countContributorsFromRest(String owner, String name) {
-        String path = "/repos/" + owner + "/" + name + "/contributors?per_page=1&anon=true";
-        ResponseEntity<byte[]> response = execute("contributors", "GET", path);
-        String last = lastPath(combinedLinkHeader(response.getHeaders()));
-        if (last != null) {
-            Matcher page = PAGE_QUERY.matcher(last);
-            if (page.find()) {
-                return Integer.parseInt(page.group(1));
-            }
-        }
-        List<Object> items = read(response.getBody() == null || response.getBody().length == 0
+    List<Object> items =
+        read(
+            response.getBody() == null || response.getBody().length == 0
                 ? "[]".getBytes(StandardCharsets.UTF_8)
-                : response.getBody(), new TypeReference<List<Object>>() {
-        });
-        return items.size();
-    }
+                : response.getBody(),
+            new TypeReference<List<Object>>() {});
+    return items.size();
+  }
 
-    public Optional<Instant> latestCommitAt(String owner, String name) {
-        return latestCommitAt(owner, name, null);
-    }
+  public Optional<Instant> latestCommitAt(String owner, String name) {
+    return latestCommitAt(owner, name, null);
+  }
 
-    public Optional<Instant> latestCommitAt(String owner, String name, String path) {
-        requireToken();
+  public Optional<Instant> latestCommitAt(String owner, String name, String path) {
+    requireToken();
+    try {
+      String uri = "/repos/" + owner + "/" + name + "/commits?per_page=1";
+      if (path != null && !path.isBlank()) {
+        uri += "&path=" + URLEncoder.encode(path, StandardCharsets.UTF_8);
+      }
+      ResponseEntity<byte[]> response = execute("latestCommit", "GET", uri);
+      byte[] body = response.getBody();
+      if (body == null || body.length == 0) {
+        return Optional.empty();
+      }
+      List<GitHubCommitResponse> commits =
+          read(body, new TypeReference<List<GitHubCommitResponse>>() {});
+      if (commits.isEmpty()) {
+        return Optional.empty();
+      }
+      return Optional.ofNullable(commits.getFirst().committedAt());
+    } catch (GitHubException ex) {
+      if (ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+          || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED
+          || ex.retryable()) {
+        throw ex;
+      }
+      log.warn(
+          "Latest commit lookup failed owner={} name={} path={} error={}",
+          owner,
+          name,
+          path,
+          ex.errorCode());
+      return Optional.empty();
+    }
+  }
+
+  public GitHubCommunityProfileResponse getCommunityProfile(String owner, String name) {
+    requireToken();
+    try {
+      ResponseEntity<byte[]> response =
+          execute("communityProfile", "GET", "/repos/" + owner + "/" + name + "/community/profile");
+      return read(response.getBody(), GitHubCommunityProfileResponse.class);
+    } catch (GitHubException ex) {
+      if (ex.retryable()
+          || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+          || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+        throw ex;
+      }
+      log.warn(
+          "Community profile lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
+      return GitHubCommunityProfileResponse.empty();
+    }
+  }
+
+  public Optional<String> getReadme(String owner, String name) {
+    return getReadmeDetails(owner, name)
+        .map(GitHubReadmeResponse::decodedText)
+        .filter(text -> !text.isBlank());
+  }
+
+  public Optional<GitHubReadmeResponse> getReadmeDetails(String owner, String name) {
+    requireToken();
+    try {
+      ResponseEntity<byte[]> response =
+          execute("readme", "GET", "/repos/" + owner + "/" + name + "/readme");
+      return Optional.of(read(response.getBody(), GitHubReadmeResponse.class));
+    } catch (GitHubException ex) {
+      if (ex.retryable()
+          || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+          || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+        throw ex;
+      }
+      return Optional.empty();
+    }
+  }
+
+  public List<GitHubIssueItem> listIssues(String owner, String name) {
+    return listPaged(
+        "issues",
+        "/repos/"
+            + owner
+            + "/"
+            + name
+            + "/issues?state=all&per_page=100&sort=created&direction=desc",
+        new TypeReference<List<GitHubIssueItem>>() {});
+  }
+
+  public List<GitHubPullItem> listPulls(String owner, String name) {
+    return listPaged(
+        "pulls",
+        "/repos/"
+            + owner
+            + "/"
+            + name
+            + "/pulls?state=all&per_page=100&sort=created&direction=desc",
+        new TypeReference<List<GitHubPullItem>>() {});
+  }
+
+  public List<GitHubReleaseItem> listReleases(String owner, String name) {
+    return listPaged(
+        "releases",
+        "/repos/" + owner + "/" + name + "/releases?per_page=100",
+        new TypeReference<List<GitHubReleaseItem>>() {});
+  }
+
+  public List<GitHubContributorItem> listContributors(String owner, String name) {
+    return listPaged(
+        "contributorList",
+        "/repos/" + owner + "/" + name + "/contributors?per_page=100&anon=true",
+        new TypeReference<List<GitHubContributorItem>>() {});
+  }
+
+  public Optional<Instant> latestReleaseAt(String owner, String name) {
+    requireToken();
+    try {
+      ResponseEntity<byte[]> response =
+          execute("latestRelease", "GET", "/repos/" + owner + "/" + name + "/releases?per_page=1");
+      byte[] body = response.getBody();
+      if (body == null || body.length == 0) {
+        return Optional.empty();
+      }
+      List<GitHubReleaseResponse> releases =
+          read(body, new TypeReference<List<GitHubReleaseResponse>>() {});
+      return releases.stream()
+          .filter(release -> !release.draft())
+          .map(GitHubReleaseResponse::timestamp)
+          .filter(timestamp -> timestamp != null)
+          .findFirst();
+    } catch (GitHubException ex) {
+      if (ex.retryable()
+          || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+          || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+        throw ex;
+      }
+      log.warn(
+          "Latest release lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
+      return Optional.empty();
+    }
+  }
+
+  public boolean fileExists(String owner, String name, String path) {
+    requireToken();
+    try {
+      execute("contents", "GET", "/repos/" + owner + "/" + name + "/contents/" + path);
+      return true;
+    } catch (GitHubException ex) {
+      if (ex.retryable()
+          || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
+          || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
+        throw ex;
+      }
+      return false;
+    }
+  }
+
+  public boolean hasIssueTemplates(String owner, String name) {
+    return fileExists(owner, name, ".github/ISSUE_TEMPLATE")
+        || fileExists(owner, name, ".github/ISSUE_TEMPLATE.md")
+        || fileExists(owner, name, "ISSUE_TEMPLATE.md")
+        || fileExists(owner, name, "docs/ISSUE_TEMPLATE.md");
+  }
+
+  public GitHubSearchResponse searchRepositories(String query, int limit) {
+    return searchRepositories(query, limit, null, null);
+  }
+
+  public GitHubSearchResponse searchRepositories(
+      String query, int limit, String sort, String order) {
+    requireToken();
+    int remaining = Math.max(1, limit);
+    int page = 1;
+    int totalCount = 0;
+    List<GitHubSearchItem> items = new ArrayList<>();
+    boolean ranked = sort != null && !sort.isBlank();
+    while (remaining > 0) {
+      int perPage = Math.min(MAX_PER_PAGE, remaining);
+      ResponseEntity<byte[]> response;
+      if (ranked) {
+        String path =
+            "/search/repositories?q={query}&sort={sort}&order={order}&per_page={perPage}&page={page}";
+        response =
+            executeSearch(
+                query,
+                perPage,
+                page,
+                path,
+                sort,
+                order == null || order.isBlank() ? "desc" : order);
+      } else {
+        String path = "/search/repositories?q={query}&per_page={perPage}&page={page}";
+        response = executeSearch(query, perPage, page, path, null, null);
+      }
+      GitHubSearchResponse parsed = read(response.getBody(), GitHubSearchResponse.class);
+      totalCount = parsed.totalCount();
+      List<GitHubSearchItem> pageItems = parsed.itemsOrEmpty();
+      items.addAll(pageItems);
+      if (pageItems.size() < perPage) {
+        break;
+      }
+      remaining -= pageItems.size();
+      page++;
+    }
+    return new GitHubSearchResponse(totalCount, items);
+  }
+
+  public boolean tokenRejected() {
+    return tokenRejected;
+  }
+
+  public TokenStatus tokenStatus() {
+    if (!properties.tokenConfigured()) {
+      return new TokenStatus("MISSING", null);
+    }
+    if (!accessKnown) {
+      try {
+        execute("probeToken", "GET", "/user");
+      } catch (GitHubException ex) {
+        log.info("GitHub token probe failed category={}", ex.errorCode());
+      }
+      accessKnown = true;
+    }
+    if (tokenRejected) {
+      return new TokenStatus("REJECTED", null);
+    }
+    Instant reset = rateLimitReset;
+    if (reset != null && reset.isAfter(Instant.now())) {
+      return new TokenStatus("RATE_LIMITED", reset);
+    }
+    return new TokenStatus("OK", null);
+  }
+
+  public record TokenStatus(String state, Instant rateLimitReset) {}
+
+  public String maskedToken() {
+    String token = properties.token();
+    if (token == null || token.isBlank()) {
+      return null;
+    }
+    if (token.length() <= 8) {
+      return "****";
+    }
+    return token.substring(0, Math.min(11, token.length() - 4))
+        + "****"
+        + token.substring(token.length() - 4);
+  }
+
+  private ResponseEntity<byte[]> executeSearch(
+      String query, int perPage, int page, String uriTemplate, String sort, String order) {
+    requireToken();
+    Timer.Sample sample = metrics.startTimer();
+    long started = System.nanoTime();
+    try {
+      ResponseEntity<byte[]> response =
+          sort == null
+              ? restClient
+                  .get()
+                  .uri(uriTemplate, query, perPage, page)
+                  .retrieve()
+                  .onStatus(HttpStatusCode::isError, this::handleError)
+                  .toEntity(byte[].class)
+              : restClient
+                  .get()
+                  .uri(uriTemplate, query, sort, order, perPage, page)
+                  .retrieve()
+                  .onStatus(HttpStatusCode::isError, this::handleError)
+                  .toEntity(byte[].class);
+      metrics.githubRequest("search", true);
+      log.info("GitHub request durationMs={} operation=search", durationMs(started));
+      noteSuccess();
+      return response;
+    } catch (GitHubException ex) {
+      metrics.githubRequest("search", false);
+      log.info(
+          "GitHub request durationMs={} operation=search errorCategory={}",
+          durationMs(started),
+          ex.errorCode());
+      throw ex;
+    } catch (ResourceAccessException ex) {
+      metrics.githubRequest("search", false);
+      throw translateAccess(ex);
+    } finally {
+      sample.stop(
+          io.micrometer.core.instrument.Timer.builder("github.api.duration")
+              .tag("operation", "search")
+              .register(io.micrometer.core.instrument.Metrics.globalRegistry));
+    }
+  }
+
+  private ResponseEntity<byte[]> execute(String operation, String method, String path) {
+    Timer.Sample sample = metrics.startTimer();
+    long started = System.nanoTime();
+    try {
+      ResponseEntity<byte[]> response =
+          restClient
+              .get()
+              .uri(requestUri(path))
+              .retrieve()
+              .onStatus(HttpStatusCode::isError, this::handleError)
+              .toEntity(byte[].class);
+      metrics.githubRequest(operation, true);
+      log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+      noteSuccess();
+      return response;
+    } catch (GitHubException ex) {
+      metrics.githubRequest(operation, false);
+      log.info(
+          "GitHub request durationMs={} operation={} errorCategory={}",
+          durationMs(started),
+          operation,
+          ex.errorCode());
+      throw ex;
+    } catch (ResourceAccessException ex) {
+      metrics.githubRequest(operation, false);
+      throw translateAccess(ex);
+    } finally {
+      sample.stop(
+          io.micrometer.core.instrument.Timer.builder("github.api.duration")
+              .tag("operation", operation)
+              .register(io.micrometer.core.instrument.Metrics.globalRegistry));
+    }
+  }
+
+  private ResponseEntity<byte[]> executePost(String operation, String path, String json) {
+    Timer.Sample sample = metrics.startTimer();
+    long started = System.nanoTime();
+    try {
+      ResponseEntity<byte[]> response =
+          restClient
+              .post()
+              .uri(requestUri(path))
+              .contentType(MediaType.APPLICATION_JSON)
+              .body(json)
+              .retrieve()
+              .onStatus(HttpStatusCode::isError, this::handleError)
+              .toEntity(byte[].class);
+      metrics.githubRequest(operation, true);
+      log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+      noteSuccess();
+      return response;
+    } catch (GitHubException ex) {
+      metrics.githubRequest(operation, false);
+      log.info(
+          "GitHub request durationMs={} operation={} errorCategory={}",
+          durationMs(started),
+          operation,
+          ex.errorCode());
+      throw ex;
+    } catch (ResourceAccessException ex) {
+      metrics.githubRequest(operation, false);
+      throw translateAccess(ex);
+    } finally {
+      sample.stop(
+          io.micrometer.core.instrument.Timer.builder("github.api.duration")
+              .tag("operation", operation)
+              .register(io.micrometer.core.instrument.Metrics.globalRegistry));
+    }
+  }
+
+  private ResponseEntity<byte[]> executeAbsolute(String operation, String uri) {
+    Timer.Sample sample = metrics.startTimer();
+    long started = System.nanoTime();
+    try {
+      ResponseEntity<byte[]> response =
+          webClient
+              .get()
+              .uri(URI.create(uri))
+              .retrieve()
+              .onStatus(HttpStatusCode::isError, this::handleError)
+              .toEntity(byte[].class);
+      metrics.githubRequest(operation, true);
+      log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
+      noteSuccess();
+      return response;
+    } catch (GitHubException ex) {
+      metrics.githubRequest(operation, false);
+      log.info(
+          "GitHub request durationMs={} operation={} errorCategory={}",
+          durationMs(started),
+          operation,
+          ex.errorCode());
+      throw ex;
+    } catch (ResourceAccessException ex) {
+      metrics.githubRequest(operation, false);
+      throw translateAccess(ex);
+    } finally {
+      sample.stop(
+          io.micrometer.core.instrument.Timer.builder("github.api.duration")
+              .tag("operation", operation)
+              .register(io.micrometer.core.instrument.Metrics.globalRegistry));
+    }
+  }
+
+  private void handleError(HttpRequest request, ClientHttpResponse response) throws IOException {
+    int status = response.getStatusCode().value();
+    Instant reset = rateLimitReset(response.getHeaders());
+    boolean remainingZero = remainingZero(response.getHeaders());
+    String body = bodyAsString(response);
+    String message =
+        Optional.ofNullable(body).filter(s -> !s.isBlank()).orElse("GitHub API error " + status);
+
+    if (status == HttpStatus.UNAUTHORIZED.value()) {
+      noteRejected();
+      throw GitHubException.auth(status, "GitHub authentication failed");
+    }
+    if (status == HttpStatus.FORBIDDEN.value() && remainingZero) {
+      noteRateLimit(reset);
+      throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
+    }
+    if (status == HttpStatus.FORBIDDEN.value() && message.toLowerCase().contains("rate limit")) {
+      noteRateLimit(reset);
+      throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
+    }
+    if (status == HttpStatus.NOT_FOUND.value()) {
+      throw GitHubException.notFound("GitHub resource not found");
+    }
+    if (status == HttpStatus.UNPROCESSABLE_CONTENT.value()) {
+      if (request.getURI().getPath().contains("/search/")) {
+        throw GitHubException.validation("Invalid GitHub search query");
+      }
+      throw GitHubException.validation(validationMessage(body));
+    }
+    // Preserve status >= 500 (includes codes above 599), not only the 5xx class.
+    boolean retryable =
+        status >= HttpStatus.INTERNAL_SERVER_ERROR.value()
+            || status == HttpStatus.TOO_MANY_REQUESTS.value();
+    if (status == HttpStatus.TOO_MANY_REQUESTS.value()) {
+      noteRateLimit(reset);
+      throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
+    }
+    throw GitHubException.api(status, retryable, reset, message);
+  }
+
+  private void noteSuccess() {
+    accessKnown = true;
+    tokenRejected = false;
+    rateLimitReset = null;
+  }
+
+  private void noteRejected() {
+    accessKnown = true;
+    tokenRejected = true;
+    rateLimitReset = null;
+  }
+
+  private void noteRateLimit(Instant reset) {
+    accessKnown = true;
+    rateLimitReset = reset;
+  }
+
+  private GitHubException translateAccess(ResourceAccessException ex) {
+    Throwable cause = ex.getCause();
+    if (cause instanceof SocketTimeoutException) {
+      return GitHubException.timeout(ex);
+    }
+    return GitHubException.network(ex);
+  }
+
+  private void requireToken() {
+    if (!collectorEnabled || durableOrchestration) {
+      throw GitHubException.api(503, false, null, "GitHub collection is disabled in web-only mode");
+    }
+    if (!properties.tokenConfigured()) {
+      throw GitHubException.auth(401, "GitHub token is not configured");
+    }
+  }
+
+  private <T> T read(byte[] body, Class<T> type) {
+    if (body == null || body.length == 0) {
+      throw GitHubException.malformed(new IllegalStateException("Empty GitHub payload"));
+    }
+    try {
+      return jsonMapper.readValue(body, type);
+    } catch (JacksonException ex) {
+      throw GitHubException.malformed(ex);
+    }
+  }
+
+  private <T> T read(byte[] body, TypeReference<T> type) {
+    if (body == null || body.length == 0) {
+      throw GitHubException.malformed(new IllegalStateException("Empty GitHub payload"));
+    }
+    try {
+      return jsonMapper.readValue(body, type);
+    } catch (JacksonException ex) {
+      throw GitHubException.malformed(ex);
+    }
+  }
+
+  private <T> List<T> listPaged(String operation, String firstPath, TypeReference<List<T>> type) {
+    requireToken();
+    List<T> all = new ArrayList<>();
+    String path = firstPath;
+    int pages = 0;
+    while (path != null && pages < MAX_LIST_PAGES) {
+      ResponseEntity<byte[]> response = execute(operation, "GET", path);
+      all.addAll(readList(response.getBody(), type));
+      path = nextPath(combinedLinkHeader(response.getHeaders()));
+      pages++;
+    }
+    return all;
+  }
+
+  private <T> List<T> readList(byte[] body, TypeReference<List<T>> type) {
+    if (body == null || body.length == 0) {
+      return List.of();
+    }
+    return read(body, type);
+  }
+
+  private String combinedLinkHeader(HttpHeaders headers) {
+    List<String> values = headers.getOrEmpty(HttpHeaders.LINK);
+    if (values.isEmpty()) {
+      return null;
+    }
+    return String.join(", ", values);
+  }
+
+  private String lastPath(String linkHeader) {
+    if (linkHeader == null || linkHeader.isBlank()) {
+      return null;
+    }
+    Matcher matcher = LAST_LINK.matcher(linkHeader);
+    if (!matcher.find()) {
+      return null;
+    }
+    return matcher.group(1);
+  }
+
+  private URI requestUri(String path) {
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+      return URI.create(path);
+    }
+    String base = properties.apiBaseUrl();
+    if (base.endsWith("/")) {
+      base = base.substring(0, base.length() - 1);
+    }
+    return URI.create(base + (path.startsWith("/") ? path : "/" + path));
+  }
+
+  private String nextPath(String linkHeader) {
+    if (linkHeader == null || linkHeader.isBlank()) {
+      return null;
+    }
+    Matcher matcher = NEXT_LINK.matcher(linkHeader);
+    if (!matcher.find()) {
+      return null;
+    }
+    String next = matcher.group(1);
+    String base = properties.apiBaseUrl();
+    if (next.startsWith(base)) {
+      return next.substring(base.length());
+    }
+    return next;
+  }
+
+  private Instant rateLimitReset(HttpHeaders headers) {
+    String reset = headers.getFirst(GitHubHttp.RATE_LIMIT_RESET);
+    if (reset == null || reset.isBlank()) {
+      String retryAfter = headers.getFirst(HttpHeaders.RETRY_AFTER);
+      if (retryAfter != null) {
         try {
-            String uri = "/repos/" + owner + "/" + name + "/commits?per_page=1";
-            if (path != null && !path.isBlank()) {
-                uri += "&path=" + URLEncoder.encode(path, StandardCharsets.UTF_8);
-            }
-            ResponseEntity<byte[]> response = execute("latestCommit", "GET", uri);
-            byte[] body = response.getBody();
-            if (body == null || body.length == 0) {
-                return Optional.empty();
-            }
-            List<GitHubCommitResponse> commits = read(body, new TypeReference<List<GitHubCommitResponse>>() {
-            });
-            if (commits.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(commits.getFirst().committedAt());
-        } catch (GitHubException ex) {
-            if (ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
-                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED
-                    || ex.retryable()) {
-                throw ex;
-            }
-            log.warn("Latest commit lookup failed owner={} name={} path={} error={}", owner, name, path, ex.errorCode());
-            return Optional.empty();
+          return Instant.now().plusSeconds(Long.parseLong(retryAfter));
+        } catch (NumberFormatException ignored) {
+          return null;
         }
+      }
+      return null;
     }
-
-    public GitHubCommunityProfileResponse getCommunityProfile(String owner, String name) {
-        requireToken();
-        try {
-            ResponseEntity<byte[]> response = execute(
-                    "communityProfile",
-                    "GET",
-                    "/repos/" + owner + "/" + name + "/community/profile"
-            );
-            return read(response.getBody(), GitHubCommunityProfileResponse.class);
-        } catch (GitHubException ex) {
-            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
-                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
-                throw ex;
-            }
-            log.warn("Community profile lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
-            return GitHubCommunityProfileResponse.empty();
-        }
+    try {
+      return Instant.ofEpochSecond(Long.parseLong(reset));
+    } catch (NumberFormatException ex) {
+      return null;
     }
+  }
 
-    public Optional<String> getReadme(String owner, String name) {
-        return getReadmeDetails(owner, name).map(GitHubReadmeResponse::decodedText).filter(text -> !text.isBlank());
+  private boolean remainingZero(HttpHeaders headers) {
+    String remaining = headers.getFirst(GitHubHttp.RATE_LIMIT_REMAINING);
+    return "0".equals(remaining);
+  }
+
+  private String validationMessage(String body) {
+    if (body == null || body.isBlank()) {
+      return "GitHub rejected the request";
     }
-
-    public Optional<GitHubReadmeResponse> getReadmeDetails(String owner, String name) {
-        requireToken();
-        try {
-            ResponseEntity<byte[]> response = execute("readme", "GET", "/repos/" + owner + "/" + name + "/readme");
-            return Optional.of(read(response.getBody(), GitHubReadmeResponse.class));
-        } catch (GitHubException ex) {
-            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
-                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
-                throw ex;
-            }
-            return Optional.empty();
-        }
+    try {
+      JsonNode node = jsonMapper.readTree(body);
+      String text = node.path("message").asText("");
+      if (!text.isBlank()) {
+        return text;
+      }
+    } catch (JacksonException ignored) {
+      return "GitHub rejected the request";
     }
+    return "GitHub rejected the request";
+  }
 
-    public List<GitHubIssueItem> listIssues(String owner, String name) {
-        return listPaged(
-                "issues",
-                "/repos/" + owner + "/" + name + "/issues?state=all&per_page=100&sort=created&direction=desc",
-                new TypeReference<List<GitHubIssueItem>>() {
-                }
-        );
+  private String bodyAsString(ClientHttpResponse response) {
+    try {
+      byte[] bytes = response.getBody().readAllBytes();
+      return new String(bytes, StandardCharsets.UTF_8);
+    } catch (IOException ex) {
+      return "";
     }
+  }
 
-    public List<GitHubPullItem> listPulls(String owner, String name) {
-        return listPaged(
-                "pulls",
-                "/repos/" + owner + "/" + name + "/pulls?state=all&per_page=100&sort=created&direction=desc",
-                new TypeReference<List<GitHubPullItem>>() {
-                }
-        );
-    }
-
-    public List<GitHubReleaseItem> listReleases(String owner, String name) {
-        return listPaged(
-                "releases",
-                "/repos/" + owner + "/" + name + "/releases?per_page=100",
-                new TypeReference<List<GitHubReleaseItem>>() {
-                }
-        );
-    }
-
-    public List<GitHubContributorItem> listContributors(String owner, String name) {
-        return listPaged(
-                "contributorList",
-                "/repos/" + owner + "/" + name + "/contributors?per_page=100&anon=true",
-                new TypeReference<List<GitHubContributorItem>>() {
-                }
-        );
-    }
-
-    public Optional<Instant> latestReleaseAt(String owner, String name) {
-        requireToken();
-        try {
-            ResponseEntity<byte[]> response = execute(
-                    "latestRelease",
-                    "GET",
-                    "/repos/" + owner + "/" + name + "/releases?per_page=1"
-            );
-            byte[] body = response.getBody();
-            if (body == null || body.length == 0) {
-                return Optional.empty();
-            }
-            List<GitHubReleaseResponse> releases = read(body, new TypeReference<List<GitHubReleaseResponse>>() {
-            });
-            return releases.stream()
-                    .filter(release -> !release.draft())
-                    .map(GitHubReleaseResponse::timestamp)
-                    .filter(timestamp -> timestamp != null)
-                    .findFirst();
-        } catch (GitHubException ex) {
-            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
-                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
-                throw ex;
-            }
-            log.warn("Latest release lookup failed owner={} name={} error={}", owner, name, ex.errorCode());
-            return Optional.empty();
-        }
-    }
-
-    public boolean fileExists(String owner, String name, String path) {
-        requireToken();
-        try {
-            execute("contents", "GET", "/repos/" + owner + "/" + name + "/contents/" + path);
-            return true;
-        } catch (GitHubException ex) {
-            if (ex.retryable() || ex.errorCode() == ErrorCode.GITHUB_AUTH_ERROR
-                    || ex.errorCode() == ErrorCode.GITHUB_RATE_LIMIT_EXCEEDED) {
-                throw ex;
-            }
-            return false;
-        }
-    }
-
-    public boolean hasIssueTemplates(String owner, String name) {
-        return fileExists(owner, name, ".github/ISSUE_TEMPLATE")
-                || fileExists(owner, name, ".github/ISSUE_TEMPLATE.md")
-                || fileExists(owner, name, "ISSUE_TEMPLATE.md")
-                || fileExists(owner, name, "docs/ISSUE_TEMPLATE.md");
-    }
-
-    public GitHubSearchResponse searchRepositories(String query, int limit) {
-        return searchRepositories(query, limit, null, null);
-    }
-
-    public GitHubSearchResponse searchRepositories(String query, int limit, String sort, String order) {
-        requireToken();
-        int remaining = Math.max(1, limit);
-        int page = 1;
-        int totalCount = 0;
-        List<GitHubSearchItem> items = new ArrayList<>();
-        boolean ranked = sort != null && !sort.isBlank();
-        while (remaining > 0) {
-            int perPage = Math.min(MAX_PER_PAGE, remaining);
-            ResponseEntity<byte[]> response;
-            if (ranked) {
-                String path = "/search/repositories?q={query}&sort={sort}&order={order}&per_page={perPage}&page={page}";
-                response = executeSearch(query, perPage, page, path, sort, order == null || order.isBlank() ? "desc" : order);
-            } else {
-                String path = "/search/repositories?q={query}&per_page={perPage}&page={page}";
-                response = executeSearch(query, perPage, page, path, null, null);
-            }
-            GitHubSearchResponse parsed = read(response.getBody(), GitHubSearchResponse.class);
-            totalCount = parsed.totalCount();
-            List<GitHubSearchItem> pageItems = parsed.itemsOrEmpty();
-            items.addAll(pageItems);
-            if (pageItems.size() < perPage) {
-                break;
-            }
-            remaining -= pageItems.size();
-            page++;
-        }
-        return new GitHubSearchResponse(totalCount, items);
-    }
-
-    public boolean tokenRejected() {
-        return tokenRejected;
-    }
-
-    public TokenStatus tokenStatus() {
-        if (!properties.tokenConfigured()) {
-            return new TokenStatus("MISSING", null);
-        }
-        if (!accessKnown) {
-            try {
-                execute("probeToken", "GET", "/user");
-            } catch (GitHubException ex) {
-                log.info("GitHub token probe failed category={}", ex.errorCode());
-            }
-            accessKnown = true;
-        }
-        if (tokenRejected) {
-            return new TokenStatus("REJECTED", null);
-        }
-        Instant reset = rateLimitReset;
-        if (reset != null && reset.isAfter(Instant.now())) {
-            return new TokenStatus("RATE_LIMITED", reset);
-        }
-        return new TokenStatus("OK", null);
-    }
-
-    public record TokenStatus(String state, Instant rateLimitReset) {
-    }
-
-    public String maskedToken() {
-        String token = properties.token();
-        if (token == null || token.isBlank()) {
-            return null;
-        }
-        if (token.length() <= 8) {
-            return "****";
-        }
-        return token.substring(0, Math.min(11, token.length() - 4)) + "****" + token.substring(token.length() - 4);
-    }
-
-    private ResponseEntity<byte[]> executeSearch(
-            String query,
-            int perPage,
-            int page,
-            String uriTemplate,
-            String sort,
-            String order
-    ) {
-        requireToken();
-        Timer.Sample sample = metrics.startTimer();
-        long started = System.nanoTime();
-        try {
-            ResponseEntity<byte[]> response = sort == null
-                    ? restClient.get().uri(uriTemplate, query, perPage, page).retrieve()
-                            .onStatus(HttpStatusCode::isError, this::handleError)
-                            .toEntity(byte[].class)
-                    : restClient.get().uri(uriTemplate, query, sort, order, perPage, page).retrieve()
-                            .onStatus(HttpStatusCode::isError, this::handleError)
-                            .toEntity(byte[].class);
-            metrics.githubRequest("search", true);
-            log.info("GitHub request durationMs={} operation=search", durationMs(started));
-            noteSuccess();
-            return response;
-        } catch (GitHubException ex) {
-            metrics.githubRequest("search", false);
-            log.info("GitHub request durationMs={} operation=search errorCategory={}", durationMs(started), ex.errorCode());
-            throw ex;
-        } catch (ResourceAccessException ex) {
-            metrics.githubRequest("search", false);
-            throw translateAccess(ex);
-        } finally {
-            sample.stop(io.micrometer.core.instrument.Timer.builder("github.api.duration")
-                    .tag("operation", "search")
-                    .register(io.micrometer.core.instrument.Metrics.globalRegistry));
-        }
-    }
-
-    private ResponseEntity<byte[]> execute(String operation, String method, String path) {
-        Timer.Sample sample = metrics.startTimer();
-        long started = System.nanoTime();
-        try {
-            ResponseEntity<byte[]> response = restClient.get()
-                    .uri(requestUri(path))
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, this::handleError)
-                    .toEntity(byte[].class);
-            metrics.githubRequest(operation, true);
-            log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
-            noteSuccess();
-            return response;
-        } catch (GitHubException ex) {
-            metrics.githubRequest(operation, false);
-            log.info("GitHub request durationMs={} operation={} errorCategory={}",
-                    durationMs(started), operation, ex.errorCode());
-            throw ex;
-        } catch (ResourceAccessException ex) {
-            metrics.githubRequest(operation, false);
-            throw translateAccess(ex);
-        } finally {
-            sample.stop(io.micrometer.core.instrument.Timer.builder("github.api.duration")
-                    .tag("operation", operation)
-                    .register(io.micrometer.core.instrument.Metrics.globalRegistry));
-        }
-    }
-
-    private ResponseEntity<byte[]> executePost(String operation, String path, String json) {
-        Timer.Sample sample = metrics.startTimer();
-        long started = System.nanoTime();
-        try {
-            ResponseEntity<byte[]> response = restClient.post()
-                    .uri(requestUri(path))
-                    .header(HttpHeaders.CONTENT_TYPE, "application/json")
-                    .body(json)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, this::handleError)
-                    .toEntity(byte[].class);
-            metrics.githubRequest(operation, true);
-            log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
-            noteSuccess();
-            return response;
-        } catch (GitHubException ex) {
-            metrics.githubRequest(operation, false);
-            log.info("GitHub request durationMs={} operation={} errorCategory={}",
-                    durationMs(started), operation, ex.errorCode());
-            throw ex;
-        } catch (ResourceAccessException ex) {
-            metrics.githubRequest(operation, false);
-            throw translateAccess(ex);
-        } finally {
-            sample.stop(io.micrometer.core.instrument.Timer.builder("github.api.duration")
-                    .tag("operation", operation)
-                    .register(io.micrometer.core.instrument.Metrics.globalRegistry));
-        }
-    }
-
-    private ResponseEntity<byte[]> executeAbsolute(String operation, String uri) {
-        Timer.Sample sample = metrics.startTimer();
-        long started = System.nanoTime();
-        try {
-            ResponseEntity<byte[]> response = webClient.get()
-                    .uri(URI.create(uri))
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, this::handleError)
-                    .toEntity(byte[].class);
-            metrics.githubRequest(operation, true);
-            log.info("GitHub request durationMs={} operation={}", durationMs(started), operation);
-            noteSuccess();
-            return response;
-        } catch (GitHubException ex) {
-            metrics.githubRequest(operation, false);
-            log.info("GitHub request durationMs={} operation={} errorCategory={}",
-                    durationMs(started), operation, ex.errorCode());
-            throw ex;
-        } catch (ResourceAccessException ex) {
-            metrics.githubRequest(operation, false);
-            throw translateAccess(ex);
-        } finally {
-            sample.stop(io.micrometer.core.instrument.Timer.builder("github.api.duration")
-                    .tag("operation", operation)
-                    .register(io.micrometer.core.instrument.Metrics.globalRegistry));
-        }
-    }
-
-    private void handleError(HttpRequest request, ClientHttpResponse response) throws IOException {
-        int status = response.getStatusCode().value();
-        Instant reset = rateLimitReset(response.getHeaders());
-        boolean remainingZero = remainingZero(response.getHeaders());
-        String body = bodyAsString(response);
-        String message = Optional.ofNullable(body).filter(s -> !s.isBlank()).orElse("GitHub API error " + status);
-
-        if (status == 401) {
-            noteRejected();
-            throw GitHubException.auth(status, "GitHub authentication failed");
-        }
-        if (status == 403 && remainingZero) {
-            noteRateLimit(reset);
-            throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
-        }
-        if (status == 403 && message.toLowerCase().contains("rate limit")) {
-            noteRateLimit(reset);
-            throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
-        }
-        if (status == 404) {
-            throw GitHubException.notFound("GitHub resource not found");
-        }
-        if (status == 422) {
-            if (request.getURI().getPath().contains("/search/")) {
-                throw GitHubException.validation("Invalid GitHub search query");
-            }
-            throw GitHubException.validation(validationMessage(body));
-        }
-        boolean retryable = status >= 500 || status == 429;
-        if (status == 429) {
-            noteRateLimit(reset);
-            throw GitHubException.rateLimit(reset, "GitHub API rate limit exceeded");
-        }
-        throw GitHubException.api(status, retryable, reset, message);
-    }
-
-    private void noteSuccess() {
-        accessKnown = true;
-        tokenRejected = false;
-        rateLimitReset = null;
-    }
-
-    private void noteRejected() {
-        accessKnown = true;
-        tokenRejected = true;
-        rateLimitReset = null;
-    }
-
-    private void noteRateLimit(Instant reset) {
-        accessKnown = true;
-        rateLimitReset = reset;
-    }
-
-    private GitHubException translateAccess(ResourceAccessException ex) {
-        Throwable cause = ex.getCause();
-        if (cause instanceof SocketTimeoutException) {
-            return GitHubException.timeout(ex);
-        }
-        return GitHubException.network(ex);
-    }
-
-    private void requireToken() {
-        if (!properties.tokenConfigured()) {
-            throw GitHubException.auth(401, "GitHub token is not configured");
-        }
-    }
-
-    private <T> T read(byte[] body, Class<T> type) {
-        if (body == null || body.length == 0) {
-            throw GitHubException.malformed(new IllegalStateException("Empty GitHub payload"));
-        }
-        try {
-            return jsonMapper.readValue(body, type);
-        } catch (JacksonException ex) {
-            throw GitHubException.malformed(ex);
-        }
-    }
-
-    private <T> T read(byte[] body, TypeReference<T> type) {
-        if (body == null || body.length == 0) {
-            throw GitHubException.malformed(new IllegalStateException("Empty GitHub payload"));
-        }
-        try {
-            return jsonMapper.readValue(body, type);
-        } catch (JacksonException ex) {
-            throw GitHubException.malformed(ex);
-        }
-    }
-
-    private <T> List<T> listPaged(String operation, String firstPath, TypeReference<List<T>> type) {
-        requireToken();
-        List<T> all = new ArrayList<>();
-        String path = firstPath;
-        int pages = 0;
-        while (path != null && pages < MAX_LIST_PAGES) {
-            ResponseEntity<byte[]> response = execute(operation, "GET", path);
-            all.addAll(readList(response.getBody(), type));
-            path = nextPath(combinedLinkHeader(response.getHeaders()));
-            pages++;
-        }
-        return all;
-    }
-
-    private <T> List<T> readList(byte[] body, TypeReference<List<T>> type) {
-        if (body == null || body.length == 0) {
-            return List.of();
-        }
-        return read(body, type);
-    }
-
-    private String combinedLinkHeader(HttpHeaders headers) {
-        List<String> values = headers.getOrEmpty(HttpHeaders.LINK);
-        if (values.isEmpty()) {
-            return null;
-        }
-        return String.join(", ", values);
-    }
-
-    private String lastPath(String linkHeader) {
-        if (linkHeader == null || linkHeader.isBlank()) {
-            return null;
-        }
-        Matcher matcher = LAST_LINK.matcher(linkHeader);
-        if (!matcher.find()) {
-            return null;
-        }
-        return matcher.group(1);
-    }
-
-    private URI requestUri(String path) {
-        if (path.startsWith("http://") || path.startsWith("https://")) {
-            return URI.create(path);
-        }
-        String base = properties.apiBaseUrl();
-        if (base.endsWith("/")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        return URI.create(base + (path.startsWith("/") ? path : "/" + path));
-    }
-
-    private String nextPath(String linkHeader) {
-        if (linkHeader == null || linkHeader.isBlank()) {
-            return null;
-        }
-        Matcher matcher = NEXT_LINK.matcher(linkHeader);
-        if (!matcher.find()) {
-            return null;
-        }
-        String next = matcher.group(1);
-        String base = properties.apiBaseUrl();
-        if (next.startsWith(base)) {
-            return next.substring(base.length());
-        }
-        return next;
-    }
-
-    private Instant rateLimitReset(HttpHeaders headers) {
-        String reset = headers.getFirst("X-RateLimit-Reset");
-        if (reset == null || reset.isBlank()) {
-            String retryAfter = headers.getFirst(HttpHeaders.RETRY_AFTER);
-            if (retryAfter != null) {
-                try {
-                    return Instant.now().plusSeconds(Long.parseLong(retryAfter));
-                } catch (NumberFormatException ignored) {
-                    return null;
-                }
-            }
-            return null;
-        }
-        try {
-            return Instant.ofEpochSecond(Long.parseLong(reset));
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-    }
-
-    private boolean remainingZero(HttpHeaders headers) {
-        String remaining = headers.getFirst("X-RateLimit-Remaining");
-        return "0".equals(remaining);
-    }
-
-    private String validationMessage(String body) {
-        if (body == null || body.isBlank()) {
-            return "GitHub rejected the request";
-        }
-        try {
-            JsonNode node = jsonMapper.readTree(body);
-            String text = node.path("message").asText("");
-            if (!text.isBlank()) {
-                return text;
-            }
-        } catch (JacksonException ignored) {
-            return "GitHub rejected the request";
-        }
-        return "GitHub rejected the request";
-    }
-
-    private String bodyAsString(ClientHttpResponse response) {
-        try {
-            byte[] bytes = response.getBody().readAllBytes();
-            return new String(bytes, StandardCharsets.UTF_8);
-        } catch (IOException ex) {
-            return "";
-        }
-    }
-
-    private long durationMs(long startedNanos) {
-        return (System.nanoTime() - startedNanos) / 1_000_000;
-    }
+  private long durationMs(long startedNanos) {
+    return (System.nanoTime() - startedNanos) / 1_000_000;
+  }
 }

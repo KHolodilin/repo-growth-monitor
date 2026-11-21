@@ -40,7 +40,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers,
-    credentials: "include",
+    credentials: path.startsWith("/api/v1/public/") ? "omit" : "include",
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ message: response.statusText }));
@@ -177,7 +177,7 @@ export type Dashboard = {
 };
 
 export type RankHighlight = {
-  repositoryId: number;
+  repositoryId: number | string;
   fullName: string;
   queryName: string;
   fromRank: number;
@@ -186,13 +186,13 @@ export type RankHighlight = {
 
 export type EventHighlight = {
   count: number;
-  repositoryId: number;
+  repositoryId: number | string;
   fullName: string;
   repositoryNames: string[];
 };
 
 export type VisitorHighlight = {
-  repositoryId: number;
+  repositoryId: number | string;
   fullName: string;
   growthPercent: number;
 };
@@ -250,7 +250,7 @@ export type SnapshotHistoryRow = {
 };
 
 export type SnapshotHistory = {
-  repositoryId: number;
+  repositoryId: number | string;
   kind: SnapshotKind;
   days: number;
   from: string;
@@ -276,6 +276,8 @@ export type StatsMetricTotal = {
   value: number | null;
   absoluteChange: number | null;
   growthPercent: number | null;
+  /** False when Unique Contributors is an observed-only union across incomplete tip login sets. */
+  complete?: boolean | null;
 };
 
 export type RepositoryStatsHistory = {
@@ -339,6 +341,8 @@ export type SearchHistory = {
   change7d: number | null;
   change30d: number | null;
   bestRank: number | null;
+  /** GitHub sort used for Current/Best Rank and chart points (`stars` or `best_match`). */
+  sortMode?: string | null;
   points: { date: string; position: number | null; searchRunId: number }[];
   lastChecked?: string | null;
   searchStatus?: string | null;
@@ -349,8 +353,8 @@ export type SearchHistory = {
 };
 
 export type GrowthEvent = {
-  id: number;
-  repositoryId: number;
+  id: number | string;
+  repositoryId: number | string;
   eventAt: string;
   category: string;
   type: string;

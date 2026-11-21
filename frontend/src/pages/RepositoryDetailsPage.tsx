@@ -48,7 +48,7 @@ import type { RunAllMenuAction } from "../components/Layout";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
-import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { ChartModePlot } from "../components/PersistentECharts";
@@ -67,6 +67,8 @@ import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/querySort";
 import { useTableSort } from "../lib/tableSortPrefs";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { resolveRepository } from "../lib/resolveRepository";
 
 type Tab = "overview" | "traffic" | "stats" | "search" | "topics" | "growth-events";
 
@@ -89,14 +91,14 @@ function parseTab(tabParam: string | null): Tab {
   ) {
     return tabParam;
   }
-  if (tabParam === "settings") {
+  if (tabParam === "events" || tabParam === "settings") {
     return "growth-events";
   }
   return "traffic";
 }
 
 export function RepositoryDetailsPage() {
-  const { id } = useParams();
+  const { id: idParam, owner = "", repository: repositoryName = "" } = useParams();
   const location = useLocation();
   const outlet = useOutletContext<{ setRunAll?: Dispatch<SetStateAction<RunAllMenuAction | null>> } | null>();
   const setRunAll = outlet?.setRunAll;
@@ -104,15 +106,58 @@ export function RepositoryDetailsPage() {
   const { allowMutations } = useMutationAccess();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
+  const periodParam = searchParams.get("period");
   const scopeQuery = searchParams.get("scope");
+  const [resolvedId, setResolvedId] = useState<string | undefined>(idParam);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const id = resolvedId ?? idParam;
   const [period, setPeriod] = usePeriod(id);
+
+  useEffect(() => {
+    if (periodParam && (PERIODS as readonly string[]).includes(periodParam) && periodParam !== period) {
+      setPeriod(periodParam as Period);
+    }
+  }, [periodParam, id]);
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
-  const storedScope = readTopicScope(Number(id));
+  const repoBase = repo
+    ? repoPath(repo.owner.login, repo.name)
+    : owner && repositoryName
+      ? repoPath(owner, repositoryName)
+      : "";
+  const storedScope = readTopicScope(Number(id ?? 0));
   const scope: TopicScope = tab === "topics"
     ? resolveVisibleScope(scopeQuery, storedScope, Boolean(repo?.language))
     : "all";
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
+
+  useEffect(() => {
+    if (idParam) {
+      setResolvedId(idParam);
+      setResolveError(null);
+      return;
+    }
+    let cancelled = false;
+    setResolvedId(undefined);
+    setResolveError(null);
+    setRepo(null);
+    setLoading(true);
+    resolveRepository(owner, repositoryName)
+      .then((matched) => {
+        if (!cancelled) {
+          setResolvedId(String(matched.id));
+        }
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setResolveError(err.message);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [idParam, owner, repositoryName]);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
   const [plainTopics, setPlainTopics] = useState<TopicHistory[]>([]);
   const [languageTopics, setLanguageTopics] = useState<TopicHistory[]>([]);
@@ -146,7 +191,7 @@ export function RepositoryDetailsPage() {
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
   const [runningAll, setRunningAll] = useState(false);
   const [focusHealth, setFocusHealth] = useState(false);
-  const scopeIntent = useRef<TopicScope | null>(null);
+  const scopeIntent = useRef<{ repositoryId: string; scope: TopicScope } | null>(null);
   const [scopeChoice, setScopeChoice] = useState(0);
 
   function setTab(next: Tab) {
@@ -163,13 +208,18 @@ export function RepositoryDetailsPage() {
   }
 
   function setScope(next: TopicScope) {
-    scopeIntent.current = next;
+    if (!id) {
+      return;
+    }
+    scopeIntent.current = { repositoryId: id, scope: next };
     writeTopicScope(Number(id), next);
     setScopeChoice((value) => value + 1);
   }
 
   useEffect(() => {
-    scopeIntent.current = null;
+    if (scopeIntent.current && scopeIntent.current.repositoryId !== id) {
+      scopeIntent.current = null;
+    }
   }, [id]);
 
   useEffect(() => {
@@ -177,8 +227,9 @@ export function RepositoryDetailsPage() {
       return;
     }
     const hasLanguage = Boolean(repo.language);
-    if (scopeIntent.current) {
-      const desired = scopeIntent.current;
+    if (scopeIntent.current && scopeIntent.current.repositoryId === id) {
+      const desired = scopeIntent.current.scope;
+      scopeIntent.current = null;
       writeTopicScope(repo.id, desired);
       const shown: TopicScope = scopeQuery === "language" ? "language" : "all";
       if (shown !== desired) {
@@ -211,13 +262,13 @@ export function RepositoryDetailsPage() {
     }
     const version = ++requestVersion.current;
     const [repository, trafficData, searchData, plainTopicData, languageTopicData] = await Promise.all([
-      api<Repository>(`/api/v1/repositories/${id}`),
+      api<Repository>(`/api/v1/admin/repositories/${id}`),
       api<RepositoryTraffic>(
-        `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
+        `/api/v1/admin/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
       ),
-      api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=all`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=language`),
+      api<SearchHistory[]>(`/api/v1/admin/repositories/${id}/search-visibility`),
+      api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=all`),
+      api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=language`),
     ]);
     if (version !== requestVersion.current) return;
     setRepo(repository);
@@ -304,7 +355,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/repositories/${id}/search-queries`, {
+      await api(`/api/v1/admin/repositories/${id}/search-queries`, {
         method: "POST",
         body: JSON.stringify({ name: query, query, enabled: true, resultLimit: 50 }),
       });
@@ -322,7 +373,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(queryId);
     try {
-      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -335,7 +386,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/repositories/${id}/search-queries/run`, { method: "POST" });
+      await api(`/api/v1/admin/repositories/${id}/search-queries/run`, { method: "POST" });
       await load();
     } catch (err) {
       setQueryError((err as Error).message);
@@ -350,7 +401,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(watchId);
     try {
-      await api(`/api/v1/topic-watches/${watchId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/topic-watches/${watchId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -363,7 +414,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/repositories/${id}/topic-watches/run?scope=${scope}`, { method: "POST" });
+      await api(`/api/v1/admin/repositories/${id}/topic-watches/run?scope=${scope}`, { method: "POST" });
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -394,7 +445,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/search-queries/${queryId}`, { method: "DELETE" });
+      await api(`/api/v1/admin/search-queries/${queryId}`, { method: "DELETE" });
       pruneChartSelection(
         repoSearchChartId(id),
         visibility.filter((item) => item.query.id !== queryId).map((item) => String(item.query.id)),
@@ -405,6 +456,9 @@ export function RepositoryDetailsPage() {
     }
   }
 
+  if (resolveError) {
+    return <p className="text-red-600">{resolveError}</p>;
+  }
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -431,17 +485,28 @@ export function RepositoryDetailsPage() {
       <header>
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/dashboard" },
+            { label: "Home", to: "/" },
+            { label: repo.owner.login, to: ownerPath(repo.owner.login) },
             {
-              label: repo.fullName,
-              repoSwitcher: {
-                currentId: repo.id,
-                description: repo.description,
-                hrefFor: (repositoryId) =>
-                  tab === "traffic"
-                    ? `/repositories/${repositoryId}`
-                    : `/repositories/${repositoryId}?tab=${tab}`,
-              },
+              label: repo.name,
+              ...(allowMutations
+                ? {
+                    repoSwitcher: {
+                      currentId: repo.id,
+                      description: repo.description,
+                      hrefFor: (next: typeof repo) => {
+                        // Never carry topic scope (or other query) across repositories.
+                        if (tab === "traffic") {
+                          return repoPath(next.owner.login, next.name);
+                        }
+                        if (tab === "topics") {
+                          return `${repoPath(next.owner.login, next.name)}?tab=topics`;
+                        }
+                        return repoHref(next.owner.login, next.name, tab);
+                      },
+                    },
+                  }
+                : {}),
             },
             { label: TAB_LABEL[tab] },
           ]}
@@ -566,6 +631,7 @@ export function RepositoryDetailsPage() {
       {tab === "traffic" && (
         <TrafficPanel selectedMobileSeries={trafficSeries} onMobileSeriesChange={setTrafficSeries}
           repositoryId={repo.id}
+          repoBase={repoBase}
           traffic={traffic}
           period={period}
           showServicePaths={showServicePaths}
@@ -578,6 +644,7 @@ export function RepositoryDetailsPage() {
       {tab === "topics" && (
         <TopicsPanel
           repositoryId={repo.id}
+          repoBase={repoBase}
           language={repo.language}
           scope={scope}
           period={period}
@@ -592,6 +659,7 @@ export function RepositoryDetailsPage() {
       {tab === "search" && (
         <SearchPanel
           repositoryId={repo.id}
+          repoBase={repoBase}
           period={period}
           visibility={visibility}
           queryText={queryText}
@@ -924,7 +992,7 @@ function GrowthEventsTab({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then(setEvents)
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
@@ -944,12 +1012,14 @@ function GrowthEventsTab({
 function TrafficPanel({
   selectedMobileSeries, onMobileSeriesChange,
   repositoryId,
+  repoBase,
   traffic,
   period,
   showServicePaths,
   onShowServicePathsChange,
 }: {
   repositoryId: number;
+  repoBase: string;
   traffic: RepositoryTraffic;
   period: Period;
   selectedMobileSeries: string;
@@ -960,7 +1030,7 @@ function TrafficPanel({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
@@ -1030,6 +1100,7 @@ function TrafficPanel({
       </ChartCard>
       <SnapshotCards
         repositoryId={repositoryId}
+        historyBasePath={repoBase}
         referrers={traffic.referrers}
         referrerSnapshotAt={traffic.referrerSnapshotAt}
         paths={traffic.paths}
@@ -1049,6 +1120,7 @@ function normalizeSearchQuery(value: string) {
 
 function TopicsPanel({
   repositoryId,
+  repoBase,
   language,
   scope,
   period,
@@ -1060,6 +1132,7 @@ function TopicsPanel({
   onRun,
 }: {
   repositoryId: number;
+  repoBase: string;
   language?: string;
   scope: TopicScope;
   period: Period;
@@ -1148,7 +1221,7 @@ function TopicsPanel({
             }} rows={sorted.map(item => {
               const running = runningQueryId === item.watch.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
               return {
-              id: item.watch.id, name: item.watch.topic, href: `/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
+              id: item.watch.id, name: item.watch.topic, href: `${repoBase}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
               seriesKey: `topic:${repositoryId}:${scope}:${item.watch.id}`, checked: selected.has(item.watch.topic),
               onToggle: () => writeSelection(selected.has(item.watch.topic) ? selectedSlugs.filter(slug => slug !== item.watch.topic) : [...selectedSlugs, item.watch.topic], [item.watch.topic]),
               rank: item.currentRank, limit: item.watch.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
@@ -1228,7 +1301,7 @@ function TopicsPanel({
                         )}
                         <Link
                           className="text-primary hover:underline"
-                          to={`/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
+                          to={`${repoBase}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
                         >
                           {item.watch.topic}
                         </Link>
@@ -1288,7 +1361,7 @@ function CombinedTopicRankChart({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);
@@ -1362,6 +1435,7 @@ function CombinedTopicRankChart({
 
 function SearchPanel({
   repositoryId,
+  repoBase,
   period,
   visibility,
   queryText,
@@ -1375,6 +1449,7 @@ function SearchPanel({
   onDelete,
 }: {
   repositoryId: number;
+  repoBase: string;
   period: Period;
   visibility: SearchHistory[];
   queryText: string;
@@ -1494,7 +1569,7 @@ function SearchPanel({
           rows={sorted.map(item => {
             const running = runningQueryId === item.query.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
             return {
-              id: item.query.id, name: item.query.name, href: `/repositories/${repositoryId}/search-queries/${item.query.id}`,
+              id: item.query.id, name: item.query.name, href: `${repoBase}/search-queries/${item.query.id}`,
               seriesKey: `query:${item.query.id}`, checked: selected.has(item.query.id),
               onToggle: () => writeSelection(selected.has(item.query.id) ? selectedIds.filter(id => id !== item.query.id) : [...selectedIds, item.query.id], [item.query.id]),
               rank: item.currentRank, limit: item.query.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
@@ -1571,7 +1646,7 @@ function SearchPanel({
                       )}
                       <Link
                         className="text-primary hover:underline"
-                        to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
+                        to={`${repoBase}/search-queries/${item.query.id}`}
                       >
                         {item.query.name}
                       </Link>
@@ -1665,7 +1740,7 @@ function CombinedRankChart({
   const [events, setEvents] = useState<GrowthEvent[]>([]);
 
   const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
+    api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`)
       .then((rows) => setEvents(asGrowthEvents(rows)))
       .catch(() => setEvents([]));
   }, [repositoryId, period]);

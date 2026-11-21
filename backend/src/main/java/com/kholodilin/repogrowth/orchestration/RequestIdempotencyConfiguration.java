@@ -1,0 +1,34 @@
+package com.kholodilin.repogrowth.orchestration;
+
+import com.kholodilin.idempotency.IdempotencyService;
+import com.kholodilin.idempotency.jdbc.JdbcPersistenceStore;
+import com.kholodilin.repogrowth.orchestration.idempotency.RgmJdbcIdempotency;
+import java.time.Duration;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitialization;
+import org.springframework.context.annotation.*;
+import org.springframework.core.env.Environment;
+
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnProperty(name = "rgm.orchestration.enabled", havingValue = "true")
+public class RequestIdempotencyConfiguration {
+  @Bean(name = "rgmIdempotencyStore", defaultCandidate = false)
+  @DependsOnDatabaseInitialization
+  JdbcPersistenceStore rgmIdempotencyStore(DataSource ds) {
+    return RgmJdbcIdempotency.validatedStore(ds);
+  }
+
+  @Bean(name = "rgmIdempotency", defaultCandidate = false)
+  IdempotencyService rgmIdempotency(
+      DataSource ds,
+      @Qualifier("rgmIdempotencyStore") JdbcPersistenceStore store,
+      Environment env) {
+    return RgmJdbcIdempotency.service(
+        ds,
+        store,
+        env.getProperty(
+            "rgm.orchestration.idempotency-retention", Duration.class, Duration.ofDays(7)));
+  }
+}

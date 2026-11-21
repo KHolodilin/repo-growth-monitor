@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-node-recovery
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE collector_node_health(node_key VARCHAR(64) PRIMARY KEY,state VARCHAR(16) NOT NULL DEFAULT 'UNKNOWN',consecutive_failures INTEGER NOT NULL DEFAULT 0,last_checked_at TIMESTAMPTZ,last_success_at TIMESTAMPTZ,next_check_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),locked_by VARCHAR(128),locked_until TIMESTAMPTZ,generation BIGINT NOT NULL DEFAULT 0);
+              ALTER TABLE collection_attempt ADD COLUMN last_checked_at TIMESTAMPTZ;
+              ALTER TABLE collection_attempt ADD COLUMN last_progress_at TIMESTAMPTZ;
+              ALTER TABLE collection_attempt ADD COLUMN status_failures INTEGER NOT NULL DEFAULT 0;
+              ALTER TABLE collection_attempt ADD COLUMN last_collector_state VARCHAR(32);
+              CREATE INDEX collection_attempt_recovery_due ON collection_attempt(last_checked_at,assigned_at) WHERE state IN ('ASSIGNED','ACCEPTED','RUNNING');

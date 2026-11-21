@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 025-search-run-sort-mode
+      author: rgm
+      changes:
+        - sql:
+            sql: |
+              ALTER TABLE search_run
+                  ADD COLUMN IF NOT EXISTS sort_mode VARCHAR(32) NOT NULL DEFAULT 'stars';
+              -- Historical collector/Search runs used sort=stars; new Best Match writes best_match.
+              UPDATE search_run SET sort_mode = 'stars' WHERE snapshot_at IS NOT NULL;

@@ -5,10 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubOwnerResponse(
-        long id,
-        String login,
-        String type,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("html_url") String htmlUrl
-) {
-}
+    long id,
+    String login,
+    String type,
+    @JsonProperty("avatar_url") String avatarUrl,
+    @JsonProperty("html_url") String htmlUrl) {}

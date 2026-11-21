@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { dashboardTrafficOption } from "./dashboardChart";
 
 describe("dashboardTrafficOption", () => {
@@ -108,4 +108,18 @@ describe("dashboardTrafficOption", () => {
     ]);
     expect(hole.series.find((series) => series.name === "Views")?.data).toEqual([4, null, 6]);
   });
+
+  it("omits incomplete portfolio T−1 while keeping earlier partial days", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-18T12:00:00Z"));
+    const option = dashboardTrafficOption([
+      { date: "2026-11-15", views: 10, visitors: 4, clones: 1, missingRepositories: 2 },
+      { date: "2026-11-16", views: 11, visitors: 4, clones: 1, missingRepositories: 0 },
+      { date: "2026-11-17", views: 5, visitors: 2, clones: 1, missingRepositories: 3 },
+    ]);
+    expect(option.xAxis.data).toEqual(["2026-11-15", "2026-11-16"]);
+    expect(option.series.find((series) => series.name === "Views")?.data).toEqual([10, 11]);
+    vi.useRealTimers();
+  });
 });
+
