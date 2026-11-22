@@ -46,6 +46,38 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>3.6.0</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>14.4.0</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <!-- Formatting is owned by Spotless/Google Java Format; this config is structural. -->
+          <!--
+            Resolved via maven.multiModuleProjectDirectory (repo root marked by .mvn/),
+            so the same file works from reactor root, -pl, child cwd, and -f module/pom.xml.
+          -->
+          <configLocation>${maven.multiModuleProjectDirectory}/checkstyle.xml</configLocation>
+          <consoleOutput>true</consoleOutput>
+          <failsOnError>true</failsOnError>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+        </configuration>
+        <executions>
+          <execution>
+            <id>checkstyle-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
