@@ -469,11 +469,9 @@ describe("remaining coverage edges", () => {
     expect(screen.getByText(/No growth events/)).toBeInTheDocument();
     render(<GrowthEventsPanel repositoryId={13} events={[growthEvent]} onChanged={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "View all →" }));
-    fireEvent.click(screen.getByText("All Growth Events"));
-    const overlay = screen.getByText("All Growth Events").closest("div.fixed");
-    if (overlay) {
-      fireEvent.click(overlay);
-    }
+    expect(screen.getByText("All Growth Events")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close all growth events" }));
+    expect(screen.queryByText("All Growth Events")).not.toBeInTheDocument();
     await user.click(screen.getByText("LinkedIn launch"));
     await user.click(screen.getAllByRole("button", { name: "Edit" }).at(-1)!);
     fireEvent.change(screen.getByLabelText("Date / Time"), {

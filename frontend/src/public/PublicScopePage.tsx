@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, type GrowthEvent } from "../lib/api";
-import { DashboardPresentation, type DashboardViewData } from "../pages/DashboardPage";
+import { DashboardPresentation } from "../pages/DashboardPage";
+import type { DashboardViewData } from "../lib/dashboardViewData";
 import { DashboardViewContext, useDashboardView } from "../lib/dashboardView";
 import { PERIODS, type Period } from "../components/PeriodSelector";
 import { readPublicPreference, writePublicPreference } from "../lib/publicPrefs";

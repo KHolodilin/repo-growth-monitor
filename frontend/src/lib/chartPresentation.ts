@@ -1,5 +1,5 @@
 import { periodDates } from "./searchVisibilityKpi";
-import type { Period } from "../components/PeriodSelector";
+import type { Period } from "./period";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { formatChartAxisDate } from "./utils";

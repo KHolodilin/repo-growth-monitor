@@ -20,12 +20,27 @@ export function RepositoryWarningSheet({
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     node.showModal();
+    const dismissOutside = (event: MouseEvent) => {
+      // Native modal backdrop clicks target the <dialog> itself outside its layout box.
+      if (event.target !== node) return;
+      const r = node.getBoundingClientRect();
+      if (
+        event.clientY < r.top ||
+        event.clientY > r.bottom ||
+        event.clientX < r.left ||
+        event.clientX > r.right
+      ) {
+        onClose();
+      }
+    };
+    node.addEventListener("click", dismissOutside);
     return () => {
+      node.removeEventListener("click", dismissOutside);
       node.close();
       document.body.style.overflow = overflow;
       focused?.focus();
     };
-  }, []);
+  }, [onClose]);
   return (
     <dialog
       ref={dialog}
@@ -35,18 +50,6 @@ export function RepositoryWarningSheet({
       onCancel={(event) => {
         event.preventDefault();
         onClose();
-      }}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          const r = event.currentTarget.getBoundingClientRect();
-          if (
-            event.clientY < r.top ||
-            event.clientY > r.bottom ||
-            event.clientX < r.left ||
-            event.clientX > r.right
-          )
-            onClose();
-        }
       }}
     >
       <div
@@ -72,7 +75,6 @@ export function RepositoryWarningSheet({
             Repository data warnings
           </h2>
           <button
-            autoFocus
             type="button"
             aria-label="Close repository warnings"
             className="flex size-11 shrink-0 items-center justify-center rounded-md border"

@@ -1,12 +1,7 @@
 import { RepositoryWarningSheet } from "../components/RepositoryWarningSheet";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  api,
-  type Dashboard as ApiDashboard,
-  type GrowthEvent,
-  type RankHighlight,
-} from "../lib/api";
+import { api, type GrowthEvent, type RankHighlight } from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { statsChartOption } from "../lib/statsChart";
 import { asGrowthEvents } from "../lib/growthEvents";
@@ -46,15 +41,9 @@ import { useIsMobileChart } from "../lib/useMediaQuery";
 
 import { readPublicPreference, writePublicPreference } from "../lib/publicPrefs";
 import { DashboardViewContext, useDashboardView, repositoryHref } from "../lib/dashboardView";
-type Dashboard = Omit<ApiDashboard, "repositories" | "summary"> & {
-  summary: ApiDashboard["summary"] & { clones?: ApiDashboard["summary"]["views"] };
-  repositories: (Omit<ApiDashboard["repositories"][number], "id" | "stars" | "forks"> & {
-    id: number | string;
-    stars: number | null;
-    forks: number | null;
-  })[];
-};
-export type DashboardViewData = Dashboard;
+import type { DashboardViewData } from "../lib/dashboardViewData";
+
+type Dashboard = DashboardViewData;
 
 const SORT_KEYS = [
   "visitors",

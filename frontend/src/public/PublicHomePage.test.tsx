@@ -128,10 +128,10 @@ describe("public homepage owners directory", () => {
     await user.selectOptions(screen.getByLabelText("Owners page size"), "50");
     await waitFor(() => expect(api.mock.calls.at(-1)?.[0]).toContain("limit=50"));
     api.mockResolvedValueOnce({ items: [], nextCursor: null });
-    await user.click(screen.getByRole("button", { name: /^Stars/ }));
+    await user.click(screen.getByRole("button", { name: /Stars/ }));
     expect(await screen.findByText("No published owners yet.")).toBeInTheDocument();
     api.mockRejectedValueOnce(new Error("Directory unavailable"));
-    await user.click(screen.getByRole("button", { name: /^Owner/ }));
+    await user.click(screen.getByRole("button", { name: /Owner/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Directory unavailable");
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
@@ -157,7 +157,7 @@ describe("public homepage owners directory", () => {
     expect(screen.queryByRole("link", { name: "Beta" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Previous" }));
     expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Stars/ })).toHaveAttribute(
+    expect(screen.getByRole("columnheader", { name: /Stars/ })).toHaveAttribute(
       "aria-sort",
       "descending",
     );

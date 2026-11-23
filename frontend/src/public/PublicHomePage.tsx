@@ -287,13 +287,18 @@ export function PublicHomePage() {
                     <th
                       key={column}
                       scope="col"
+                      aria-sort={
+                        active ? (prefs.order === "asc" ? "ascending" : "descending") : "none"
+                      }
                       className={cn("p-3 font-medium", numeric && "text-right")}
                     >
                       <button
                         type="button"
                         className="inline-flex min-h-11 items-center gap-1"
-                        aria-sort={
-                          active ? (prefs.order === "asc" ? "ascending" : "descending") : "none"
+                        aria-label={
+                          active
+                            ? `${COLUMN_LABELS[column]}, sorted ${prefs.order === "asc" ? "ascending" : "descending"}`
+                            : `Sort by ${COLUMN_LABELS[column]}`
                         }
                         onClick={() => toggleSort(column)}
                       >

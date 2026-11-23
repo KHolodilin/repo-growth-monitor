@@ -1,4 +1,4 @@
-import type { Period } from "../components/PeriodSelector";
+import type { Period } from "./period";
 import { periodDates } from "./searchVisibilityKpi";
 import { lineStyle, prepareSeriesStyles, seriesMarkerHtml } from "./seriesStyle";
 import type { GrowthEvent, SearchSeries } from "./api";

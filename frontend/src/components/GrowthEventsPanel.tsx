@@ -145,14 +145,14 @@ export function GrowthEventsPanel({
         change caused traffic.
       </p>
       {viewAll && (
-        <div
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setViewAll(false)}
-        >
-          <Card
-            className="max-h-[80vh] w-full max-w-xl overflow-hidden"
-            onClick={(event) => event.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40"
+            aria-label="Close all growth events"
+            onClick={() => setViewAll(false)}
+          />
+          <Card className="relative z-10 max-h-[80vh] w-full max-w-xl overflow-hidden">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-medium">All Growth Events</h2>
               <Button
@@ -369,14 +369,14 @@ export function EventDetailsDialog({
   }, [repositoryId, eventDate, today]);
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <Card
-        className="max-h-[80vh] w-full max-w-lg overflow-auto"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label="Close growth event details"
+        onClick={onClose}
+      />
+      <Card className="relative z-10 max-h-[80vh] w-full max-w-lg overflow-auto">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-medium">
             {events.length === 1 ? "Growth event" : `${events.length} events`}
@@ -542,11 +542,14 @@ function EventFormDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <Card className="w-full max-w-lg" onClick={(click) => click.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label={event ? "Close edit event dialog" : "Close add event dialog"}
+        onClick={onClose}
+      />
+      <Card className="relative z-10 w-full max-w-lg">
         <h2 className="mb-4 font-medium">{event ? "Edit event" : "Add event"}</h2>
         <div className="space-y-3">
           <label className="block text-sm">

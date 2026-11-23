@@ -1,4 +1,4 @@
-import type { Period } from "../components/PeriodSelector";
+import type { Period } from "./period";
 
 export type TopicRankSample = {
   slug: string;

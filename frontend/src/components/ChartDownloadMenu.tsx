@@ -896,18 +896,20 @@ function PublicEventDialog({ events, onClose }: { events: GrowthEvent[]; onClose
     return () => window.removeEventListener("keydown", listener);
   }, [onClose]);
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/30"
+        aria-label="Close events dialog"
+        onClick={onClose}
+      />
       <section
         role="dialog"
         aria-modal="true"
         aria-label="Events"
-        className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-xl bg-card p-5"
-        onClick={(event) => event.stopPropagation()}
+        className="relative z-10 max-h-[80vh] w-full max-w-lg overflow-auto rounded-xl bg-card p-5"
       >
-        <button type="button" className="float-right min-h-11 px-3" onClick={onClose} autoFocus>
+        <button type="button" className="float-right min-h-11 px-3" onClick={onClose}>
           Close
         </button>
         <h2 className="text-lg font-semibold">Events</h2>

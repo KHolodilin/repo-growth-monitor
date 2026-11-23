@@ -1,4 +1,4 @@
-import type { Period } from "../components/PeriodSelector";
+import type { Period } from "./period";
 
 export const SEARCH_QUERY_LIMIT = 50;
 

@@ -1,5 +1,5 @@
 import { api, type GrowthEvent, type Dashboard } from "./api";
-import type { DashboardViewData } from "../pages/DashboardPage";
+import type { DashboardViewData } from "./dashboardViewData";
 export type PublicOverview = {
   owner: { id: string; login: string; type: string };
   repository?: { id: string; name: string; description?: string; pathPrefixes?: string[] };

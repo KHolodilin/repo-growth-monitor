@@ -1,5 +1,5 @@
 import { prepareSeriesStyles, seriesMarkerHtml, seriesStyle } from "./seriesStyle";
-import type { Period } from "../components/PeriodSelector";
+import type { Period } from "./period";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { eventUtcDate } from "./growthEvents";
