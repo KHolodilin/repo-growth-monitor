@@ -14,18 +14,37 @@ class CollectorProtocolTest {
   private final Instant at = Instant.parse("2026-11-09T00:00:00Z");
 
   private JobRequest request(int version, TaskType type, Parameters parameters) {
+    return request(
+        version,
+        type,
+        new RepositoryTarget("9007199254740993", "Owner", "repo"),
+        parameters,
+        type == TaskType.DISCOVER_REPOSITORIES ? scope() : null);
+  }
+
+  private JobRequest request(
+      int version,
+      TaskType type,
+      RepositoryTarget repository,
+      Parameters parameters,
+      AuthorizationScope authorization) {
     return new JobRequest(
         version,
         id,
         id,
         id,
         type,
-        new RepositoryTarget("9007199254740993", "Owner", "repo"),
+        repository,
         LocalDate.parse("2026-11-09"),
         1,
         parameters,
         "rgm-primary",
-        at.plusSeconds(3600));
+        at.plusSeconds(3600),
+        authorization);
+  }
+
+  private AuthorizationScope scope() {
+    return new AuthorizationScope(id.toString(), "github-main");
   }
 
   @Test
@@ -35,10 +54,34 @@ class CollectorProtocolTest {
           request(1, type, new Parameters("language:Java", "java", "Java", 50, "stars", "desc"));
       var json = mapper.writeValueAsString(value);
       assertThat(mapper.readValue(json, JobRequest.class)).isEqualTo(value);
-      assertThat(json)
-          .contains("9007199254740993")
-          .doesNotContain("credential", "token", "callbackUrl");
+      assertThat(json).contains("9007199254740993").doesNotContain("token", "callbackUrl");
+      if (type != TaskType.DISCOVER_REPOSITORIES) assertThat(json).doesNotContain("credential");
     }
+  }
+
+  @Test
+  void discoverRequestRoundTripsWithoutRepositoryButWithAuthorization() {
+    var value = request(1, TaskType.DISCOVER_REPOSITORIES, null, Parameters.repository(), scope());
+    assertThat(value.repository()).isNull();
+    assertThat(mapper.readValue(mapper.writeValueAsString(value), JobRequest.class))
+        .isEqualTo(value);
+  }
+
+  @Test
+  void rejectsMissingRepositoryExceptForDiscoverAndDiscoverWithoutAuthorization() {
+    assertThatThrownBy(() -> request(1, TaskType.STATS, null, Parameters.repository(), scope()))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(
+            () -> request(1, TaskType.DISCOVER_REPOSITORIES, null, Parameters.repository(), null))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(() ->
+            request(
+                1,
+                TaskType.DISCOVER_REPOSITORIES,
+                new RepositoryTarget("1", "owner", "repo"),
+                Parameters.repository(),
+                null))
+        .isInstanceOf(NullPointerException.class);
   }
 
   @Test
@@ -129,6 +172,26 @@ class CollectorProtocolTest {
     assertThatThrownBy(() ->
             new ResultDelivery(
                 1, id, id, id, id, id, TaskType.STATS, "12", JobState.SUCCEEDED, snapshot, failure))
+        .isInstanceOf(IllegalArgumentException.class);
+    var discovered =
+        new ResultDelivery(
+            1,
+            id,
+            id,
+            id,
+            id,
+            id,
+            TaskType.DISCOVER_REPOSITORIES,
+            null,
+            JobState.SUCCEEDED,
+            snapshot,
+            null);
+    assertThat(discovered.repositoryGithubId()).isNull();
+    assertThat(mapper.readValue(mapper.writeValueAsString(discovered), ResultDelivery.class))
+        .isEqualTo(discovered);
+    assertThatThrownBy(() ->
+            new ResultDelivery(
+                1, id, id, id, id, id, TaskType.STATS, null, JobState.SUCCEEDED, snapshot, null))
         .isInstanceOf(IllegalArgumentException.class);
     var status = new JobStatus(1, id, id, id, JobState.RETRY, at, null, failure);
     assertThat(mapper.readValue(mapper.writeValueAsString(status), JobStatus.class))

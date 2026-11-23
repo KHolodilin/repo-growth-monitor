@@ -49,3 +49,5 @@ databaseChangeLog:
       file: db/changelog/024-enable-tracked-public-publication.yaml
   - include:
       file: db/changelog/025-search-run-sort-mode.yaml
+  - include:
+      file: db/changelog/026-credential-discovery.yaml

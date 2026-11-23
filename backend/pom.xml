@@ -37,7 +37,25 @@
     </dependencyManagement>
 
     <dependencies>
-        <dependency><groupId>com.kholodilin</groupId><artifactId>github-collector</artifactId><version>${project.version}</version></dependency>
+        <dependency>
+            <groupId>com.kholodilin</groupId>
+            <artifactId>collector-contracts</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.kholodilin</groupId>
+            <artifactId>spring-boot-idempotency-starter</artifactId>
+            <version>${idempotency-starter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>8.14.0</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>

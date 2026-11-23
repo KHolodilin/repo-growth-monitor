@@ -17,6 +17,7 @@ import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpSession;
@@ -25,6 +26,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+@SpringBootTest(
+    properties = {
+      "rgm.orchestration.enabled=true",
+      "rgm.orchestration.nodes[0].key=collector",
+      "rgm.orchestration.nodes[0].pool=default",
+      "rgm.orchestration.nodes[0].endpoint=https://collector.example",
+      "rgm.orchestration.nodes[0].enabled=true"
+    })
 @AutoConfigureMockMvc
 class AuthSecurityIT extends AbstractPostgresTest {
 

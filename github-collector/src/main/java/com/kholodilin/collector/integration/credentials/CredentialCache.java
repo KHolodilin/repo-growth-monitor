@@ -97,7 +97,7 @@ public final class CredentialCache {
         || !job.deadlineAt().isAfter(clock.instant())) throw new CredentialUnavailableException();
     return new ProjectKey(
         origin,
-        job.repository().githubId(),
+        job.repository() == null ? "discover" : job.repository().githubId(),
         job.authorization().context(),
         job.authorization().credentialRef());
   }

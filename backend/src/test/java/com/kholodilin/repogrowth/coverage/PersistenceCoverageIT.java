@@ -2,11 +2,8 @@ package com.kholodilin.repogrowth.coverage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
 
-import com.kholodilin.repogrowth.github.client.GitHubClient;
-import com.kholodilin.repogrowth.github.model.GitHubOwnerResponse;
-import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
@@ -36,11 +33,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 class PersistenceCoverageIT extends AbstractPostgresTest {
-
-  @MockitoBean GitHubClient gitHubClient;
 
   @Autowired RepositoryService repositoryService;
   @Autowired RepositoryHealthService healthService;
@@ -53,6 +47,15 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
   @Autowired TopicRunJdbcRepository topicRunJdbcRepository;
   @Autowired TopicResultJdbcRepository topicResultJdbcRepository;
   @Autowired TrafficJdbcRepository trafficJdbcRepository;
+
+  @Autowired
+  com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository
+      collectionJobJdbcRepository;
+
+  @Autowired
+  com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository
+      collectionRunJdbcRepository;
+
   @Autowired JdbcClient jdbcClient;
 
   private Repository repository;
@@ -144,29 +147,18 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
   }
 
   @Test
-  void refreshPullsAccessibleRepositories() {
-    when(gitHubClient.listAccessibleRepositories())
-        .thenReturn(
-            List.of(
-                remote(
-                    300L,
-                    "extra",
-                    "acme/extra",
-                    new GitHubOwnerResponse(100L, "acme", "User", null, null)),
-                remote(
-                    301L,
-                    "org-repo",
-                    "org/org-repo",
-                    new GitHubOwnerResponse(
-                        400L, "org", "Organization", "https://img", "https://github.com/org"))));
-    assertThat(repositoryService.list(true))
-        .extracting(Repository::fullName)
-        .contains("acme/extra", "org/org-repo");
-    assertThat(repositoryJdbcRepository.isAccountAccessible(repository.id())).isFalse();
+  void refreshAndTrackingRequireCollectorOrchestration() {
+    assertThatThrownBy(() -> repositoryService.list(true))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Collector orchestration is required");
+    assertThat(repositoryJdbcRepository.isAccountAccessible(repository.id())).isTrue();
     Repository disabled = repositoryService.setTracking(repository.id(), false);
     assertThat(disabled.trackingEnabled()).isFalse();
     assertThatThrownBy(() -> repositoryService.setTracking(repository.id(), true))
-        .hasMessageContaining("Only repositories available");
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("Collector orchestration is required");
+    assertThat(repositoryJdbcRepository.findById(repository.id()).orElseThrow().trackingEnabled())
+        .isFalse();
   }
 
   @Test
@@ -381,30 +373,26 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
     assertThat(trafficJdbcRepository.latestReferrerSnapshot(repository.id()).rows()).isEmpty();
   }
 
-  private static GitHubRepositoryResponse remote(
-      long id, String name, String fullName, GitHubOwnerResponse owner) {
-    return new GitHubRepositoryResponse(
-        id,
-        name,
-        fullName,
-        "desc",
-        false,
-        "public",
-        "main",
-        "Java",
-        false,
-        false,
-        1,
-        0,
-        0,
-        0,
-        "https://github.com/" + fullName,
-        Instant.parse("2024-01-01T00:00:00Z"),
-        Instant.parse("2026-01-01T00:00:00Z"),
-        Instant.parse("2026-01-01T00:00:00Z"),
-        owner,
-        List.of("kafka"),
-        null,
-        null);
+  @Test
+  void collectionJobsSupportInsertLookupAndTruncatedFailures() {
+    LocalDate today = LocalDate.of(2026, 9, 23);
+    var run = collectionRunJdbcRepository.insertIgnore(repository.id(), today, 1);
+    collectionJobJdbcRepository.insertIgnore(
+        run.id(),
+        repository.id(),
+        today,
+        com.kholodilin.repogrowth.collection.domain.CollectionJobType.TRAFFIC);
+    assertThat(collectionJobJdbcRepository.findByRunIds(List.of())).isEmpty();
+    assertThat(collectionJobJdbcRepository.findByRunIds(null)).isEmpty();
+    var jobs = collectionJobJdbcRepository.findByRun(run.id());
+    assertThat(jobs).hasSize(1);
+    assertThat(collectionJobJdbcRepository.findByRunIds(List.of(run.id()))).hasSize(1);
+    collectionJobJdbcRepository.markFailed(jobs.getFirst().id(), "ERR", null);
+    collectionJobJdbcRepository.markFailed(jobs.getFirst().id(), "ERR", "x".repeat(2500));
+    collectionJobJdbcRepository.markSuccess(jobs.getFirst().id());
+    assertThat(
+            collectionJobJdbcRepository.countByStatus(
+                com.kholodilin.repogrowth.collection.domain.CollectionJobStatus.SUCCESS))
+        .isPositive();
   }
 }

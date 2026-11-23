@@ -335,6 +335,22 @@ class GitHubObservationMapperTest {
   }
 
   @Test
+  void accessibleRepositoriesMetadataKeepsEveryOwnerAndRejectsNonObjects() {
+    JsonArrayPage page =
+        mapper.arrayPage(
+            json.readTree(
+                "[{\"id\":1,\"owner\":{\"login\":\"Owner\"}},{\"id\":2,\"owner\":{\"login\":\"other\"}}]"),
+            100);
+
+    assertThat(mapper.accessibleRepositoriesMetadata(page))
+        .isEqualTo(
+            "[{\"id\":1,\"owner\":{\"login\":\"Owner\"}},{\"id\":2,\"owner\":{\"login\":\"other\"}}]");
+    assertThatThrownBy(() ->
+            mapper.accessibleRepositoriesMetadata(mapper.arrayPage(json.readTree("[1]"), 100)))
+        .isInstanceOf(IncompleteObservationException.class);
+  }
+
+  @Test
   void contentPresentAcceptsSourceMarkerAndRejectsMissingOrUnexpectedShapes() {
     assertThat(mapper.contentPresent(null)).isFalse();
     assertThat(mapper.contentPresent(json.readTree("null"))).isFalse();

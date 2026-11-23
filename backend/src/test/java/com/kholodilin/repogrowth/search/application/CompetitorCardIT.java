@@ -2,36 +2,28 @@ package com.kholodilin.repogrowth.search.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
-import com.kholodilin.repogrowth.github.client.GitHubClient;
-import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
-import com.kholodilin.repogrowth.github.model.GitHubLicenseResponse;
-import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
-import com.kholodilin.repogrowth.github.model.GitHubSocialPreview;
 import com.kholodilin.repogrowth.repository.api.HealthCheckItem;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.search.domain.CompetitorProfile;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
+import com.kholodilin.repogrowth.search.persistence.CompetitorProfileJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 class CompetitorCardIT extends AbstractPostgresTest {
 
@@ -40,7 +32,7 @@ class CompetitorCardIT extends AbstractPostgresTest {
   @Autowired GitHubOwnerJdbcRepository ownerJdbcRepository;
   @Autowired RepositoryJdbcRepository repositoryJdbcRepository;
   @Autowired JdbcClient jdbcClient;
-  @MockitoBean GitHubClient gitHubClient;
+  @Autowired CompetitorProfileJdbcRepository profileRepository;
 
   private Repository kafka;
   private SearchQuery query;
@@ -92,18 +84,24 @@ class CompetitorCardIT extends AbstractPostgresTest {
   }
 
   @Test
-  void loadsThePublicProfileOnceAndLeavesMissingDaysEmpty() {
-    when(gitHubClient.getRepository("other", "repo"))
-        .thenReturn(
-            remote(false, "A production-ready neighbor for the transactional outbox pattern."));
-    when(gitHubClient.getReadme("other", "repo"))
-        .thenReturn(Optional.of("# other\n\nother is a neighbor."));
-    when(gitHubClient.getCommunityProfile("other", "repo"))
-        .thenReturn(GitHubCommunityProfileResponse.empty());
-    when(gitHubClient.getSocialPreview("other", "repo"))
-        .thenReturn(new GitHubSocialPreview(true, "https://example.test/og.png"));
-    when(gitHubClient.latestReleaseAt("other", "repo"))
-        .thenReturn(Optional.of(Instant.parse("2026-06-01T00:00:00Z")));
+  void usesTheStoredProfileAndLeavesMissingDaysEmpty() {
+    profileRepository.save(
+        new CompetitorProfile(
+            500L,
+            "other/repo",
+            "A production-ready neighbor for the transactional outbox pattern.",
+            "https://github.com/other/repo",
+            List.of("kafka", "outbox", "spring"),
+            "https://other.example",
+            false,
+            Instant.parse("2026-09-01T00:00:00Z"),
+            Instant.parse("2026-06-01T00:00:00Z"),
+            true,
+            true,
+            true,
+            true,
+            true,
+            Instant.parse("2026-09-20T00:00:00Z")));
 
     CompetitorCardService.CompetitorCard first = competitorCardService.card(query.id(), 500L);
     CompetitorCardService.CompetitorCard second = competitorCardService.card(query.id(), 500L);
@@ -126,80 +124,31 @@ class CompetitorCardIT extends AbstractPostgresTest {
     assertThat(first.points().get(0).forks()).isEqualTo(1);
     assertThat(first.points().get(1).stars()).isNull();
     assertThat(first.points().get(1).forks()).isNull();
-    assertThat(second.topics()).containsExactly("kafka", "outbox", "spring");
-    verify(gitHubClient, times(1)).getRepository("other", "repo");
+    assertThat(second).isEqualTo(first);
   }
 
   @Test
-  void keepsACardWhenOptionalGitHubReadsFailAndDoesNotCacheAMissingRepository() {
-    when(gitHubClient.getRepository("bad", "name")).thenReturn(remote(true, " "));
-    when(gitHubClient.getReadme("bad", "name")).thenThrow(new RuntimeException("readme"));
-    when(gitHubClient.getCommunityProfile("bad", "name"))
-        .thenThrow(new RuntimeException("community"));
-    when(gitHubClient.getSocialPreview("bad", "name")).thenThrow(new RuntimeException("preview"));
-    when(gitHubClient.latestReleaseAt("bad", "name")).thenThrow(new RuntimeException("release"));
-
+  void buildsAnEmptyCardWithoutTouchingGitHubWhenNoProfileIsStored() {
     CompetitorCardService.CompetitorCard card = competitorCardService.card(query.id(), 501L);
     competitorCardService.card(query.id(), 501L);
 
+    assertThat(card.fullName()).isEqualTo("bad/name");
     assertThat(card.description()).isNull();
     assertThat(card.topics()).isEmpty();
-    assertThat(card.htmlUrl()).isEqualTo("https://github.com/bad/name");
+    assertThat(card.htmlUrl()).isNull();
     assertThat(card.discoverability())
         .filteredOn(item -> item.label().equals("README exists"))
         .noneMatch(HealthCheckItem::passed);
-    assertThat(card.discoverability())
-        .filteredOn(item -> item.label().equals("Repository not archived"))
-        .noneMatch(HealthCheckItem::passed);
-    verify(gitHubClient, times(1)).getRepository("bad", "name");
-
-    when(gitHubClient.getRepository("other", "repo")).thenThrow(new RuntimeException("missing"));
-    assertThatThrownBy(() -> competitorCardService.card(query.id(), 500L))
-        .isInstanceOf(RuntimeException.class);
-    assertThatThrownBy(() -> competitorCardService.card(query.id(), 500L))
-        .isInstanceOf(RuntimeException.class);
-    verify(gitHubClient, times(2)).getRepository("other", "repo");
+    assertThat(profileRepository.find(501L)).isEmpty();
+    assertThat(competitorCardService.card(query.id(), 502L).fullName()).isEqualTo("noslash");
   }
 
   @Test
-  void rejectsANameThatCannotBeOpenedOnGitHub() {
-    assertThatThrownBy(() -> competitorCardService.card(query.id(), 502L))
-        .isInstanceOf(ApiException.class);
+  void rejectsAnUnknownSearchOrARepositoryThatWasNeverRanked() {
     assertThatThrownBy(() -> competitorCardService.card(999_999L, 500L))
         .isInstanceOf(ApiException.class);
     assertThatThrownBy(() -> competitorCardService.card(query.id(), 404L))
         .isInstanceOf(ApiException.class);
-    assertThat(CompetitorCardService.ownerAndName("other/repo")).containsExactly("other", "repo");
-    assertThatThrownBy(() -> CompetitorCardService.ownerAndName(null))
-        .isInstanceOf(ApiException.class);
-    assertThatThrownBy(() -> CompetitorCardService.ownerAndName("trailing/"))
-        .isInstanceOf(ApiException.class);
-  }
-
-  private GitHubRepositoryResponse remote(boolean archived, String description) {
-    return new GitHubRepositoryResponse(
-        500L,
-        archived ? "name" : "repo",
-        archived ? " " : "other/repo",
-        description,
-        false,
-        "public",
-        "main",
-        "Java",
-        false,
-        archived,
-        10,
-        1,
-        2,
-        0,
-        archived ? " " : "https://github.com/other/repo",
-        Instant.parse("2024-01-01T00:00:00Z"),
-        Instant.parse("2026-09-01T00:00:00Z"),
-        Instant.now(),
-        null,
-        archived ? List.of() : List.of("kafka", "outbox", "spring"),
-        archived ? " " : "https://other.example",
-        archived ? null : new GitHubLicenseResponse("mit", "MIT", "MIT"));
   }
 
   private void storeSnapshot(LocalDate businessDate) {

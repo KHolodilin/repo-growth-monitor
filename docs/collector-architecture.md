@@ -5,16 +5,16 @@
 | Artifact | Role |
 |---|---|
 | `collector-contracts` | Plain Java wire DTOs |
-| `github-collector` | Standalone Boot app (`GitHubCollectorApplication`) + library jar for backend |
-| `backend` | Product UI, planner, orchestration, credential vault |
+| `github-collector` | Standalone Boot app (`GitHubCollectorApplication`) |
+| `backend` | Product UI, planner, orchestration, credential vault (no GitHub product fetches) |
 
 Build: `mvn -B package`. Collector tests: `mvn -B -pl github-collector -am test`. Backend: `mvn -B -pl backend -am test`.
 
 Standalone collector image: `Dockerfile.collector` → `github-collector-*-boot.jar`. No collector PostgreSQL.
 Queue, observations and acceptance idempotency are process-local. RGM owns schedules, retries and history.
 
-Product process keeps `collector.runtime.enabled=false` by default. Enable collector HTTP/runtime only in the
-standalone node (or explicit IT profiles).
+The product process does **not** embed collector execution or GitHub integration. Combined-process
+`collector` profiles were removed from backend; run the standalone collector JAR / image only.
 
 ## Wire endpoints
 

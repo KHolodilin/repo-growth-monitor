@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.search.application;
 
-import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
@@ -10,7 +10,6 @@ import com.kholodilin.repogrowth.search.domain.SearchRun;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchResultJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
-import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -32,32 +31,23 @@ public class SearchQueryService {
   private final SearchQueryJdbcRepository queryRepository;
   private final SearchRunJdbcRepository runRepository;
   private final SearchResultJdbcRepository resultRepository;
-  private final SearchPlanner searchPlanner;
-  private final PlanningWindow planningWindow;
   private final RepositoryService repositoryService;
   private final SearchProperties searchProperties;
-  private final com.kholodilin.collector.configuration.SearchProperties rankSort;
+  private final CollectorSearchProperties rankSort;
 
   public SearchQueryService(
       SearchQueryJdbcRepository queryRepository,
       SearchRunJdbcRepository runRepository,
       SearchResultJdbcRepository resultRepository,
-      SearchPlanner searchPlanner,
-      PlanningWindow planningWindow,
       RepositoryService repositoryService,
       SearchProperties searchProperties,
-      com.kholodilin.collector.configuration.SearchProperties rankSort) {
+      CollectorSearchProperties rankSort) {
     this.queryRepository = queryRepository;
     this.runRepository = runRepository;
     this.resultRepository = resultRepository;
-    this.searchPlanner = searchPlanner;
-    this.planningWindow = planningWindow;
     this.repositoryService = repositoryService;
     this.searchProperties = searchProperties;
-    this.rankSort =
-        rankSort == null
-            ? new com.kholodilin.collector.configuration.SearchProperties(null, null)
-            : rankSort;
+    this.rankSort = rankSort == null ? new CollectorSearchProperties(null, null) : rankSort;
   }
 
   public List<SearchQuery> list(long repositoryId) {
@@ -117,50 +107,14 @@ public class SearchQueryService {
         .orElseThrow(() -> ApiException.notFound("Search query not found"));
   }
 
+  /** Search runs are collected only by the Collector; the product never queues local jobs. */
   public long runNow(long searchQueryId) {
-    SearchQuery query = getQuery(searchQueryId);
-    LocalDate date = planningWindow.businessDate();
-    long runId = searchPlanner.planQuery(query.id(), query.repositoryId(), date);
-    requeueIncompatibleSortTips(query.repositoryId(), date);
-    return runId;
+    throw ApiException.serviceUnavailable("Collector orchestration is required");
   }
 
+  /** Search runs are collected only by the Collector; the product never queues local jobs. */
   public List<Long> runAll(long repositoryId) {
-    repositoryService.get(repositoryId);
-    LocalDate date = planningWindow.businessDate();
-    List<Long> ids =
-        list(repositoryId).stream()
-            .map(query -> searchPlanner.planQuery(query.id(), query.repositoryId(), date))
-            .toList();
-    requeueIncompatibleSortTips(repositoryId, date);
-    return ids;
-  }
-
-  private void requeueIncompatibleSortTips(long repositoryId, LocalDate asOf) {
-    String preferred = rankSort.sortModeLabel();
-    if (!"stars".equals(preferred)) {
-      return;
-    }
-    LocalDate from = asOf.minusDays(14);
-    for (SearchQuery query : list(repositoryId)) {
-      if (!query.enabled()) {
-        continue;
-      }
-      List<SearchRun> runs = runRepository.snapshots(query.id());
-      boolean hasPreferred = runs.stream().anyMatch(run -> sameSortMode(run.sortMode(), preferred));
-      if (!hasPreferred) {
-        continue;
-      }
-      for (SearchRun run : runs) {
-        if (run.businessDate().isBefore(from) || run.businessDate().isAfter(asOf)) {
-          continue;
-        }
-        if (sameSortMode(run.sortMode(), preferred)) {
-          continue;
-        }
-        searchPlanner.planQuery(query.id(), query.repositoryId(), run.businessDate());
-      }
-    }
+    throw ApiException.serviceUnavailable("Collector orchestration is required");
   }
 
   public SearchHistory history(long searchQueryId) {

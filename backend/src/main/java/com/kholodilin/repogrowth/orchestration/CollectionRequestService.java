@@ -1,10 +1,10 @@
 package com.kholodilin.repogrowth.orchestration;
 
-import com.kholodilin.collector.configuration.SearchProperties;
 import com.kholodilin.collector.contracts.CollectorProtocol;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
+import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventSettingJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
@@ -60,7 +60,7 @@ public class CollectionRequestService {
   private final JsonMapper json;
   private final TopicWatchSync watchSync;
   private final GrowthEventSettingJdbcRepository eventSettings;
-  private final SearchProperties search;
+  private final CollectorSearchProperties search;
 
   public CollectionRequestService(
       JdbcTemplate jdbc,
@@ -72,7 +72,7 @@ public class CollectionRequestService {
       JsonMapper json,
       TopicWatchSync watchSync,
       GrowthEventSettingJdbcRepository eventSettings,
-      SearchProperties search) {
+      CollectorSearchProperties search) {
     this.jdbc = jdbc;
     this.tx = new TransactionTemplate(tm);
     this.properties = properties;
@@ -82,7 +82,7 @@ public class CollectionRequestService {
     this.queries = queries;
     this.watches = watches;
     this.json = json;
-    this.search = search == null ? new SearchProperties(null, null) : search;
+    this.search = search == null ? new CollectorSearchProperties(null, null) : search;
   }
 
   public Created manual(long repositoryId, LocalDate date) {
@@ -114,10 +114,186 @@ public class CollectionRequestService {
         jdbc.queryForList(
             "SELECT min(r.id) FROM repository r JOIN repository_credential b ON b.repository_id=r.id JOIN github_credential c ON c.id=b.credential_id AND NOT c.revoked GROUP BY r.owner_id,b.credential_id ORDER BY min(r.id)",
             Long.class);
-    if (seeds.isEmpty())
-      throw ApiException.validation(
-          "Configure a repository credential before refreshing repositories");
-    return seeds.stream().map(id -> create(id, date, null, true)).toList();
+    if (!seeds.isEmpty()) return seeds.stream().map(id -> create(id, date, null, true)).toList();
+    // Empty install: discover from vault credentials without inventing a seed repository.
+    if (credentialVault == null) throw discoveryCredentialRequired();
+    var refs =
+        jdbc.queryForList(
+            "SELECT ref FROM github_credential WHERE NOT revoked ORDER BY ref", String.class);
+    if (refs.isEmpty()) throw discoveryCredentialRequired();
+    return refs.stream().map(ref -> createCredentialDiscovery(ref, date)).toList();
+  }
+
+  /** The protocol requires an authorization scope for DISCOVER_REPOSITORIES. */
+  private static ApiException discoveryCredentialRequired() {
+    return ApiException.validation("Configure a credential before refreshing repositories");
+  }
+
+  private Created createCredentialDiscovery(String credentialRef, LocalDate date) {
+    return tx.execute(status -> {
+      jdbc.queryForObject(
+          "SELECT pg_advisory_xact_lock(?)", Object.class, Objects.hash("discover", credentialRef));
+      AuthorizationScope authority = credentialVault.discoveryScope(credentialRef);
+      var existing =
+          jdbc.queryForList(
+              "SELECT id,public_id,state FROM collection_request WHERE repository_id IS NULL AND credential_ref=? AND state='ACTIVE' ORDER BY id DESC LIMIT 1 FOR UPDATE",
+              credentialRef);
+      if (!existing.isEmpty()) {
+        var row = existing.getFirst();
+        long request = ((Number) row.get("id")).longValue();
+        if (jdbc.queryForObject(
+                "SELECT count(*) FROM collection_task WHERE request_id=? AND task_type='DISCOVER_REPOSITORIES'",
+                Long.class,
+                request)
+            > 0) return response(request, (UUID) row.get("public_id"), true);
+        appendCredentialDiscovery(request, authority, date);
+        return response(request, (UUID) row.get("public_id"), true);
+      }
+      String pool = properties.defaultPool();
+      var candidates =
+          properties.nodes().stream()
+              .filter(n ->
+                  n.enabled()
+                      && n.pool().equals(pool)
+                      && (nodeMonitor == null || nodeMonitor.eligible(n.key())))
+              .sorted(Comparator.comparing(OrchestrationProperties.Node::key))
+              .toList();
+      if (candidates.isEmpty())
+        throw new ApiException(
+            ErrorCode.INTERNAL_ERROR,
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "No collector is configured for the repository pool");
+      var node = candidates.get(Math.floorMod(credentialRef.hashCode(), candidates.size()));
+      Long nodeId =
+          jdbc.queryForObject(
+              "INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true,updated_at=clock_timestamp() RETURNING id",
+              Long.class,
+              node.key(),
+              node.pool(),
+              OrchestrationProperties.endpoint(node));
+      UUID requestId = UUID.randomUUID();
+      Long request =
+          jdbc.queryForObject(
+              "INSERT INTO collection_request(public_id,repository_id,trigger_type,trigger_key,business_date,credential_ref) VALUES (?,NULL,'MANUAL',NULL,?,?) RETURNING id",
+              Long.class,
+              requestId,
+              date,
+              credentialRef);
+      UUID taskId = UUID.randomUUID(), attemptId = UUID.randomUUID();
+      Instant deadline =
+          Instant.now()
+              .plus(properties.jobTimeout())
+              .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+      Map<String, Object> frozenConfiguration = new TreeMap<>();
+      frozenConfiguration.put("parameters", Parameters.repository());
+      frozenConfiguration.put("authorization", authority);
+      frozenConfiguration.put("growthEventSettings", Map.of());
+      String frozen = json.writeValueAsString(frozenConfiguration);
+      long revision =
+          revision(TaskType.DISCOVER_REPOSITORIES + "credential:" + credentialRef + frozen);
+      Long task =
+          jdbc.queryForObject(
+              "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id,authorization_context,credential_ref) VALUES (?,?,NULL,'DISCOVER_REPOSITORIES',?,?::jsonb,?::jsonb,?,?,?::uuid,?) RETURNING id",
+              Long.class,
+              taskId,
+              request,
+              "credential:" + credentialRef,
+              json.writeValueAsString(Parameters.repository()),
+              frozen,
+              revision,
+              attemptId,
+              authority.context(),
+              authority.credentialRef());
+      jdbc.update(
+          "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
+          attemptId,
+          task,
+          nodeId);
+      var envelope =
+          new JobRequest(
+              CollectorProtocol.VERSION,
+              requestId,
+              taskId,
+              attemptId,
+              TaskType.DISCOVER_REPOSITORIES,
+              null,
+              date,
+              revision,
+              Parameters.repository(),
+              properties.destinationRef(),
+              deadline,
+              authority);
+      jdbc.update(
+          "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
+          attemptId,
+          OrchestrationProperties.endpoint(node),
+          json.writeValueAsString(envelope),
+          Timestamp.from(deadline));
+      return response(request, requestId, false);
+    });
+  }
+
+  private void appendCredentialDiscovery(
+      long request, AuthorizationScope authority, LocalDate date) {
+    var parent =
+        json.readValue(
+            jdbc.queryForObject(
+                "SELECT d.payload::text FROM collection_task t JOIN collector_dispatch d ON d.attempt_id=t.current_attempt_id WHERE t.request_id=? ORDER BY t.id LIMIT 1",
+                String.class,
+                request),
+            JobRequest.class);
+    UUID taskId = UUID.randomUUID(), attemptId = UUID.randomUUID();
+    Map<String, Object> configuration = new TreeMap<>();
+    configuration.put("parameters", Parameters.repository());
+    configuration.put("authorization", authority);
+    configuration.put("growthEventSettings", Map.of());
+    String frozen = json.writeValueAsString(configuration);
+    long revision =
+        revision(
+            TaskType.DISCOVER_REPOSITORIES + "credential:" + authority.credentialRef() + frozen);
+    var envelope =
+        new JobRequest(
+            CollectorProtocol.VERSION,
+            parent.requestId(),
+            taskId,
+            attemptId,
+            TaskType.DISCOVER_REPOSITORIES,
+            null,
+            date,
+            revision,
+            Parameters.repository(),
+            parent.destinationRef(),
+            Instant.now().plus(properties.jobTimeout()),
+            authority);
+    long node =
+        jdbc.queryForObject(
+            "SELECT node_id FROM collection_attempt WHERE public_id=?",
+            Long.class,
+            parent.attemptId());
+    long task =
+        jdbc.queryForObject(
+            "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id,authorization_context,credential_ref) VALUES (?,?,NULL,'DISCOVER_REPOSITORIES',?,?::jsonb,?::jsonb,?,?,?::uuid,?) RETURNING id",
+            Long.class,
+            taskId,
+            request,
+            "credential:" + authority.credentialRef(),
+            json.writeValueAsString(Parameters.repository()),
+            frozen,
+            revision,
+            attemptId,
+            authority.context(),
+            authority.credentialRef());
+    jdbc.update(
+        "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
+        attemptId,
+        task,
+        node);
+    jdbc.update(
+        "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,(SELECT endpoint FROM collector_node WHERE id=?),?::jsonb,?)",
+        attemptId,
+        node,
+        json.writeValueAsString(envelope),
+        Timestamp.from(envelope.deadlineAt()));
   }
 
   private Created create(long repositoryId, LocalDate date, String triggerKey) {
@@ -307,6 +483,7 @@ public class CollectionRequestService {
               var parent = json.readValue(raw, JobRequest.class);
               var taskId = UUID.randomUUID();
               var attemptId = UUID.randomUUID();
+              if (credentialVault == null) throw discoveryCredentialRequired();
               var authority = credentialVault.scope(repositoryId);
               var payload =
                   new JobRequest(
@@ -361,6 +538,7 @@ public class CollectionRequestService {
           githubId = repository.get("github_id").toString();
       AuthorizationScope authorization =
           credentialVault == null ? null : credentialVault.scope(repositoryId);
+      if (refresh && authorization == null) throw discoveryCredentialRequired();
       String pool = properties.poolFor(owner, githubId);
       var candidates =
           properties.nodes().stream()

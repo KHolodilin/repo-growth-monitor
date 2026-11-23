@@ -2,17 +2,9 @@ package com.kholodilin.repogrowth.topic.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
-import com.kholodilin.repogrowth.github.client.GitHubClient;
-import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
-import com.kholodilin.repogrowth.github.model.GitHubLicenseResponse;
-import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
-import com.kholodilin.repogrowth.github.model.GitHubSocialPreview;
 import com.kholodilin.repogrowth.repository.api.HealthCheckItem;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.OwnerType;
@@ -20,6 +12,8 @@ import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.search.application.CompetitorCardService;
+import com.kholodilin.repogrowth.search.domain.CompetitorProfile;
+import com.kholodilin.repogrowth.search.persistence.CompetitorProfileJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
 import com.kholodilin.repogrowth.topic.persistence.TopicWatchJdbcRepository;
@@ -28,19 +22,16 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 class TopicCompetitorIT extends AbstractPostgresTest {
 
-  @MockitoBean GitHubClient gitHubClient;
-
   @Autowired TopicCompetitorService topicCompetitorService;
   @Autowired TopicWatchSync topicWatchSync;
+  @Autowired CompetitorProfileJdbcRepository profileRepository;
   @Autowired TopicWatchJdbcRepository watchRepository;
   @Autowired GitHubOwnerJdbcRepository ownerJdbcRepository;
   @Autowired RepositoryJdbcRepository repositoryJdbcRepository;
@@ -108,16 +99,7 @@ class TopicCompetitorIT extends AbstractPostgresTest {
 
   @Test
   void usesTheCachedProfileAndBreaksTheLineOnACollectedDayWithoutThisRepository() {
-    when(gitHubClient.getRepository("other", "repo"))
-        .thenReturn(remote("other/repo", "A production-ready neighbor."));
-    when(gitHubClient.getReadme("other", "repo"))
-        .thenReturn(Optional.of("# other\n\nother is a neighbor."));
-    when(gitHubClient.getCommunityProfile("other", "repo"))
-        .thenReturn(GitHubCommunityProfileResponse.empty());
-    when(gitHubClient.getSocialPreview("other", "repo"))
-        .thenReturn(new GitHubSocialPreview(true, "https://example.test/og.png"));
-    when(gitHubClient.latestReleaseAt("other", "repo"))
-        .thenReturn(Optional.of(Instant.parse("2026-06-01T00:00:00Z")));
+    profileRepository.save(profile(500L, "other/repo", "A production-ready neighbor.", true));
 
     CompetitorCardService.CompetitorCard first =
         topicCompetitorService.card(repository.id(), "kafka", "all", 500L);
@@ -140,19 +122,11 @@ class TopicCompetitorIT extends AbstractPostgresTest {
     assertThat(first.points().get(1).stars()).isNull();
     assertThat(first.points().get(1).forks()).isNull();
     assertThat(second.topics()).containsExactly("kafka", "outbox", "spring");
-    verify(gitHubClient, times(1)).getRepository("other", "repo");
   }
 
   @Test
   void keepsLanguageResultsSeparateAndRejectsARepositoryThatNeverAppeared() {
-    when(gitHubClient.getRepository("lang", "only"))
-        .thenReturn(remote("lang/only", "Language scoped neighbor."));
-    when(gitHubClient.getReadme("lang", "only")).thenReturn(Optional.empty());
-    when(gitHubClient.getCommunityProfile("lang", "only"))
-        .thenReturn(GitHubCommunityProfileResponse.empty());
-    when(gitHubClient.getSocialPreview("lang", "only"))
-        .thenReturn(new GitHubSocialPreview(false, null));
-    when(gitHubClient.latestReleaseAt("lang", "only")).thenReturn(Optional.empty());
+    profileRepository.save(profile(700L, "lang/only", "Language scoped neighbor.", false));
 
     CompetitorCardService.CompetitorCard card =
         topicCompetitorService.card(repository.id(), "kafka", "language", 700L);
@@ -208,31 +182,24 @@ class TopicCompetitorIT extends AbstractPostgresTest {
         .orElseThrow();
   }
 
-  private GitHubRepositoryResponse remote(String fullName, String description) {
-    String name = fullName.substring(fullName.indexOf('/') + 1);
-    return new GitHubRepositoryResponse(
-        500L,
-        name,
+  private static CompetitorProfile profile(
+      long githubRepositoryId, String fullName, String description, boolean complete) {
+    return new CompetitorProfile(
+        githubRepositoryId,
         fullName,
         description,
-        false,
-        "public",
-        "main",
-        "Java",
-        false,
-        false,
-        10,
-        1,
-        2,
-        0,
         "https://github.com/" + fullName,
-        Instant.parse("2024-01-01T00:00:00Z"),
-        Instant.parse("2026-09-01T00:00:00Z"),
-        Instant.now(),
-        null,
         List.of("kafka", "outbox", "spring"),
         "https://other.example",
-        new GitHubLicenseResponse("mit", "MIT", "MIT"));
+        false,
+        Instant.parse("2026-09-01T00:00:00Z"),
+        complete ? Instant.parse("2026-06-01T00:00:00Z") : null,
+        complete,
+        complete,
+        complete,
+        true,
+        complete,
+        Instant.parse("2026-09-20T00:00:00Z"));
   }
 
   private void storeSnapshot(long topicWatchId, LocalDate businessDate) {

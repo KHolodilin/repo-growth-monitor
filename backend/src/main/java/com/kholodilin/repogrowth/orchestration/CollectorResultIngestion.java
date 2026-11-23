@@ -1,12 +1,12 @@
 package com.kholodilin.repogrowth.orchestration;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.repository.ScopedIdempotency;
 import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.exception.IdempotencyConflictException;
 import com.kholodilin.idempotency.jackson.CanonicalJsonFingerprintStrategy;
 import com.kholodilin.idempotency.model.IdempotencyKey;
 import com.kholodilin.repogrowth.common.api.*;
+import com.kholodilin.repogrowth.orchestration.idempotency.ScopedIdempotency;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -77,10 +77,10 @@ public class CollectorResultIngestion {
             "Result is not authorized for this assignment");
       var attempt = attempts.getFirst();
       JobRequest job = json.readValue(attempt.get("payload").toString(), JobRequest.class);
-      if (!job.jobId().equals(result.jobId())
-          || job.type() != result.type()
-          || !job.repository().githubId().equals(result.repositoryGithubId()))
+      if (!job.jobId().equals(result.jobId()) || job.type() != result.type())
         throw conflict(result);
+      String expectedGithubId = job.repository() == null ? null : job.repository().githubId();
+      if (!Objects.equals(expectedGithubId, result.repositoryGithubId())) throw conflict(result);
       if (attempt.get("collector_job_id") != null
           && !attempt.get("collector_job_id").equals(result.collectorJobId()))
         throw conflict(result);
@@ -200,6 +200,7 @@ public class CollectorResultIngestion {
           throw ApiException.validation("Repository observation is incomplete");
     }
     if (repository != null
+        && job.repository() != null
         && !json.readTree(repository).path("id").asText().equals(job.repository().githubId()))
       throw ApiException.validation("Source repository identity mismatch");
   }

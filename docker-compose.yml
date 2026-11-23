@@ -17,15 +17,13 @@ services:
       retries: 10
 
   # Product web + planner + orchestration + credential vault + result ingestion.
-  # Collector execution modules stay off (rgm.collector.enabled=false via runtime YAML).
+  # GitHub product fetches run only in the standalone collector service.
   repo-growth-monitor:
     build: .
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
-      GITHUB_API_BASE_URL: https://api.github.com
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/repogrowth
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres

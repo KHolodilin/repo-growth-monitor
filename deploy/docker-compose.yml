@@ -49,7 +49,6 @@ services:
       POSTGRES_RUNTIME_USER: ${POSTGRES_RUNTIME_USER:-repogrowth}
       AUTH_PROVIDER: ${AUTH_PROVIDER:-mock}
       AUTH_PRODUCTION: "false"
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
     logging: *default-logging
 
   # Product web + planner + orchestration. Collector execution stays in the collector service.
@@ -74,8 +73,6 @@ services:
       MANAGEMENT_PORT: "8081"
       MANAGEMENT_USER: ${MANAGEMENT_USER:-actuator}
       MANAGEMENT_PASSWORD: ${MANAGEMENT_PASSWORD:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
-      GITHUB_API_BASE_URL: https://api.github.com
       APP_TIMEZONE: ${APP_TIMEZONE:-UTC}
       APP_BASE_URL: ${APP_BASE_URL:-}
       SITE_DOMAIN: ${SITE_DOMAIN:-}

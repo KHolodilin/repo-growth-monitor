@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.topic.api;
 
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.topic.application.TopicCompetitorService;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService;
@@ -41,16 +42,21 @@ public class TopicVisibilityController {
       org.springframework.http.HttpStatus.CREATED)
   @PostMapping("/repositories/{id}/topic-watches/run")
   public Object runAll(@PathVariable long id, @RequestParam(defaultValue = "all") String scope) {
-    if (commands != null) return commands.topicsCommand(id, scope, commandWindow.businessDate());
-    return new RunAllAccepted(topicVisibilityService.runAll(id, scope));
+    return requireCommands().topicsCommand(id, scope, commandWindow.businessDate());
   }
 
   @org.springframework.web.bind.annotation.ResponseStatus(
       org.springframework.http.HttpStatus.CREATED)
   @PostMapping("/topic-watches/{id}/run")
   public Object run(@PathVariable long id) {
-    if (commands != null) return commands.topicCommand(id, commandWindow.businessDate());
-    return new RunAccepted(topicVisibilityService.runNow(id));
+    return requireCommands().topicCommand(id, commandWindow.businessDate());
+  }
+
+  private com.kholodilin.repogrowth.orchestration.CollectionRequestService requireCommands() {
+    if (commands == null) {
+      throw ApiException.serviceUnavailable("Collector orchestration is required");
+    }
+    return commands;
   }
 
   @GetMapping("/topic-watches/{id}/history")

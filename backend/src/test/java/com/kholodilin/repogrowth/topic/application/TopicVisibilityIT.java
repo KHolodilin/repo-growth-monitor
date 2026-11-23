@@ -2,17 +2,10 @@ package com.kholodilin.repogrowth.topic.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
-import com.kholodilin.repogrowth.github.client.GitHubClient;
-import com.kholodilin.repogrowth.github.model.GitHubOwnerResponse;
-import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
-import com.kholodilin.repogrowth.github.model.GitHubSearchResponse;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
 import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
@@ -22,7 +15,6 @@ import com.kholodilin.repogrowth.search.application.RankChangeMath;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
 import com.kholodilin.repogrowth.topic.persistence.TopicWatchJdbcRepository;
-import com.kholodilin.repogrowth.topic.worker.TopicWorker;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -32,16 +24,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 class TopicVisibilityIT extends AbstractPostgresTest {
-
-  @MockitoBean GitHubClient gitHubClient;
 
   @Autowired TopicVisibilityService topicVisibilityService;
   @Autowired TopicWatchSync topicWatchSync;
   @Autowired TopicWatchJdbcRepository watchRepository;
-  @Autowired TopicWorker topicWorker;
   @Autowired GitHubOwnerJdbcRepository ownerJdbcRepository;
   @Autowired RepositoryJdbcRepository repositoryJdbcRepository;
   @Autowired PlanningWindow planningWindow;
@@ -139,34 +127,16 @@ class TopicVisibilityIT extends AbstractPostgresTest {
   }
 
   @Test
-  void workerRecordsPositionFromSortedTopicSearch() {
-    when(gitHubClient.searchRepositories(eq("topic:kafka"), anyInt(), eq("stars"), eq("desc")))
-        .thenReturn(
-            new GitHubSearchResponse(
-                12, List.of(item(999L, "other/lib"), item(301L, "acme/kafka-starter"))));
-    topicWatchSync.sync(repository.id());
-    TopicWatch watch =
-        watchRepository.findEnabledByRepository(repository.id(), true).stream()
-            .filter(item -> "kafka".equals(item.topic()))
-            .findFirst()
-            .orElseThrow();
-    topicVisibilityService.runNow(watch.id());
-    assertThat(topicWorker.poll("topic-it")).isTrue();
-
-    TopicVisibilityService.TopicHistory history = topicVisibilityService.history(watch.id());
-    assertThat(history.currentRank()).isEqualTo(2);
-    TopicVisibilityService.TopicRunResults results =
-        topicVisibilityService.latestResults(watch.id());
-    assertThat(results.rows()).hasSize(2);
-    assertThat(results.rows().get(1).result().githubRepositoryId()).isEqualTo(301L);
-  }
-
-  @Test
   void searchVisibilityQueriesStayUntouched() {
     topicVisibilityService.visibility(repository.id(), "all");
     assertThat(jdbcClient.sql("SELECT COUNT(*) FROM search_query").query(Integer.class).single())
         .isZero();
-    assertThat(topicVisibilityService.runAll(repository.id(), "language")).isNotEmpty();
+    assertThatThrownBy(() -> topicVisibilityService.runAll(repository.id(), "language"))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("Collector orchestration is required");
+    assertThatThrownBy(() -> topicVisibilityService.runNow(1L))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("Collector orchestration is required");
     assertThat(
             topicVisibilityService.historyByTopic(repository.id(), "kafka", "all").watch().topic())
         .isEqualTo("kafka");
@@ -177,11 +147,40 @@ class TopicVisibilityIT extends AbstractPostgresTest {
         .isInstanceOf(ApiException.class);
   }
 
-  private void storeSnapshot(
+  @Test
+  void latestResultsExposeDeltasAcrossSnapshots() {
+    TopicWatch watch = watchRepository.findEnabledByRepository(repository.id(), true).getFirst();
+    LocalDate today = planningWindow.businessDate();
+    long previous = storeSnapshot(watch.id(), today.minusDays(1), 4, 80);
+    long current = storeSnapshot(watch.id(), today, 2, 80);
+    insertResult(previous, 301L, 4);
+    insertResult(previous, 999L, 1);
+    insertResult(current, 301L, 2);
+    insertResult(current, 999L, 1);
+
+    var latest = topicVisibilityService.latestResults(watch.id());
+    assertThat(latest.rows()).hasSize(2);
+    assertThat(
+            latest.rows().stream()
+                .filter(row -> row.result().githubRepositoryId() == 301L)
+                .findFirst()
+                .orElseThrow()
+                .positionDelta())
+        .isEqualTo(2);
+    assertThat(
+            topicVisibilityService
+                .latestResultsByTopic(repository.id(), watch.topic(), "all")
+                .run()
+                .id())
+        .isEqualTo(current);
+    assertThat(topicVisibilityService.results(current).watch().id()).isEqualTo(watch.id());
+  }
+
+  private long storeSnapshot(
       long topicWatchId, LocalDate businessDate, Integer position, int totalCount) {
     Instant collectedAt =
         businessDate.atTime(9, 30).toInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS);
-    jdbcClient
+    return jdbcClient
         .sql(
             """
             INSERT INTO topic_run (
@@ -192,6 +191,7 @@ class TopicVisibilityIT extends AbstractPostgresTest {
                 :topicWatchId, :repositoryId, :businessDate, 'SUCCESS',
                 :collectedAt, :collectedAt, :collectedAt, :totalCount, :position
             )
+            RETURNING id
             """)
         .param("topicWatchId", topicWatchId)
         .param("repositoryId", repository.id())
@@ -199,21 +199,27 @@ class TopicVisibilityIT extends AbstractPostgresTest {
         .param("collectedAt", SqlTime.ts(collectedAt))
         .param("totalCount", totalCount)
         .param("position", position)
-        .update();
+        .query(Long.class)
+        .single();
   }
 
-  private static GitHubSearchItem item(long githubId, String fullName) {
-    return new GitHubSearchItem(
-        githubId,
-        fullName,
-        new GitHubOwnerResponse(1L, "acme", "User", null, null),
-        10,
-        1,
-        "Java",
-        "demo",
-        "https://github.com/" + fullName,
-        Instant.parse("2024-01-01T00:00:00Z"),
-        Instant.parse("2026-01-01T00:00:00Z"),
-        Instant.parse("2026-01-01T00:00:00Z"));
+  private void insertResult(long topicRunId, long githubRepositoryId, int position) {
+    jdbcClient
+        .sql(
+            """
+            INSERT INTO topic_result (
+                topic_run_id, position, github_repository_id, full_name, owner,
+                stars, watchers, forks, language, html_url
+            ) VALUES (
+                :runId, :position, :githubId, :fullName, 'acme',
+                1, 0, 0, 'Java', :htmlUrl
+            )
+            """)
+        .param("runId", topicRunId)
+        .param("position", position)
+        .param("githubId", githubRepositoryId)
+        .param("fullName", "acme/repo-" + githubRepositoryId)
+        .param("htmlUrl", "https://github.com/acme/repo-" + githubRepositoryId)
+        .update();
   }
 }

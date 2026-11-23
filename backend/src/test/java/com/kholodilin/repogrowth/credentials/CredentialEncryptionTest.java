@@ -38,6 +38,24 @@ class CredentialEncryptionTest {
   }
 
   @Test
+  void rejectsMalformedAndWrongSizedKeys() {
+    assertThatThrownBy(() ->
+            new CredentialEncryption(
+                new CredentialVaultProperties(true, "bad", Map.of("bad", "!!!"), null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("encoding");
+    assertThatThrownBy(() ->
+            new CredentialEncryption(
+                new CredentialVaultProperties(
+                    true,
+                    "short",
+                    Map.of("short", Base64.getEncoder().encodeToString(new byte[16])),
+                    null)))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("AES-256");
+  }
+
+  @Test
   void keyringRotationRetainsOldDecryptKeysAndFailsClosedIfKeyIsMissing() {
     var first =
         new CredentialEncryption(

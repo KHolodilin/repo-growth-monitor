@@ -185,6 +185,31 @@ class AssignedTaskCollectionServiceTest {
   }
 
   @Test
+  void discoveryWithoutRepositoryReturnsAllAccessibleRepositories() {
+    fixtures.put(
+        "accessible-repositories:1",
+        "[{\"id\":1,\"owner\":{\"login\":\"owner\"}},{\"id\":2,\"owner\":{\"login\":\"another\"}}]");
+    var base = job(TaskType.DISCOVER_REPOSITORIES);
+    var request =
+        new JobRequest(
+            1,
+            base.requestId(),
+            base.jobId(),
+            base.attemptId(),
+            base.type(),
+            null,
+            base.businessDate(),
+            1,
+            base.parameters(),
+            base.destinationRef(),
+            base.deadlineAt(),
+            base.authorization());
+    var snapshot = collector.collect(context, request);
+    assertThat(json.readTree(snapshot.metadata().get("repositories"))).hasSize(2);
+    assertThat(fetchedKeys).containsExactly("accessible-repositories:1");
+  }
+
+  @Test
   void explicitlyPublishedSearchRequestsOnlyPublicResultsAndRequiresProof() {
     fixtures.put(
         "search",

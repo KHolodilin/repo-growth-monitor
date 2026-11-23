@@ -148,6 +148,37 @@ public class CredentialVault {
     });
   }
 
+  /**
+   * Authorization for credential-scoped discovery when no repository binding exists yet. Reuses one
+   * durable context per credential so empty-install refresh stays coalescable.
+   */
+  public AuthorizationScope discoveryScope(String ref) {
+    return tx.execute(status -> {
+      var rows =
+          jdbc.queryForList(
+              "SELECT id FROM github_credential WHERE ref=? AND NOT revoked FOR UPDATE",
+              Long.class,
+              ref);
+      if (rows.isEmpty()) throw ApiException.notFound("Active credential not found");
+      long credentialId = rows.getFirst();
+      var existing =
+          jdbc.queryForList(
+              "SELECT authorization_context FROM credential_discovery_scope WHERE credential_id=?",
+              credentialId);
+      UUID context;
+      if (existing.isEmpty()) {
+        context = UUID.randomUUID();
+        jdbc.update(
+            "INSERT INTO credential_discovery_scope(credential_id,authorization_context) VALUES (?,?)",
+            credentialId,
+            context);
+      } else {
+        context = (UUID) existing.getFirst().get("authorization_context");
+      }
+      return new AuthorizationScope(context.toString(), ref);
+    });
+  }
+
   public CredentialLease resolve(String node, CredentialRequest request) {
     return tx.execute(status -> {
       jdbc.queryForList(
@@ -165,12 +196,26 @@ public class CredentialVault {
               FROM collection_task t JOIN collection_attempt a ON a.task_id=t.id AND a.public_id=t.current_attempt_id
               JOIN collector_node n ON n.id=a.node_id JOIN collector_dispatch d ON d.attempt_id=a.public_id
               JOIN collection_request r ON r.id=t.request_id
-              JOIN repository_credential b ON b.repository_id=t.repository_id AND b.authorization_context=t.authorization_context
-              JOIN github_credential c ON c.id=b.credential_id AND c.ref=t.credential_ref
+              JOIN github_credential c ON c.ref=t.credential_ref AND NOT c.revoked
               JOIN github_credential_version v ON v.credential_id=c.id AND v.version=c.current_version
-              WHERE t.public_id=? AND a.public_id=? AND n.node_key=? AND n.enabled AND NOT c.revoked AND r.state='ACTIVE'
+              WHERE t.public_id=? AND a.public_id=? AND n.node_key=? AND n.enabled AND r.state='ACTIVE'
                 AND a.state IN ('ASSIGNED','ACCEPTED','RUNNING') AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY')
-              FOR SHARE OF a,t,r,n,b,c,v
+                AND t.authorization_context IS NOT NULL AND t.credential_ref IS NOT NULL
+                AND (
+                  EXISTS (
+                    SELECT 1 FROM repository_credential b
+                    WHERE b.repository_id=t.repository_id
+                      AND b.authorization_context=t.authorization_context
+                      AND b.credential_id=c.id
+                  )
+                  OR EXISTS (
+                    SELECT 1 FROM credential_discovery_scope s
+                    WHERE s.credential_id=c.id
+                      AND s.authorization_context=t.authorization_context
+                      AND t.task_type='DISCOVER_REPOSITORIES'
+                  )
+                )
+              FOR SHARE OF a,t,r,n,c,v
               """,
               request.jobId(),
               request.attemptId(),

@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.search.api;
 
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
@@ -61,17 +62,21 @@ public class SearchQueryController {
       org.springframework.http.HttpStatus.CREATED)
   @PostMapping("/search-queries/{id}/run")
   public Object run(@PathVariable long id) {
-    if (commands != null) return commands.searchCommand(id, commandWindow.businessDate());
-    long runId = searchQueryService.runNow(id);
-    return new RunAccepted(runId);
+    return requireCommands().searchCommand(id, commandWindow.businessDate());
   }
 
   @org.springframework.web.bind.annotation.ResponseStatus(
       org.springframework.http.HttpStatus.CREATED)
   @PostMapping("/repositories/{id}/search-queries/run")
   public Object runAll(@PathVariable long id) {
-    if (commands != null) return commands.searchAllCommand(id, commandWindow.businessDate());
-    return new RunAllAccepted(searchQueryService.runAll(id));
+    return requireCommands().searchAllCommand(id, commandWindow.businessDate());
+  }
+
+  private com.kholodilin.repogrowth.orchestration.CollectionRequestService requireCommands() {
+    if (commands == null) {
+      throw ApiException.serviceUnavailable("Collector orchestration is required");
+    }
+    return commands;
   }
 
   @GetMapping("/search-queries/{id}")

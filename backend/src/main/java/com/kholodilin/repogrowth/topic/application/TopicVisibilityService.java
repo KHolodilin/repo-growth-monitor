@@ -1,6 +1,5 @@
 package com.kholodilin.repogrowth.topic.application;
 
-import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.application.RankChangeMath;
@@ -10,7 +9,6 @@ import com.kholodilin.repogrowth.topic.domain.TopicWatch;
 import com.kholodilin.repogrowth.topic.persistence.TopicResultJdbcRepository;
 import com.kholodilin.repogrowth.topic.persistence.TopicRunJdbcRepository;
 import com.kholodilin.repogrowth.topic.persistence.TopicWatchJdbcRepository;
-import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -27,8 +25,6 @@ public class TopicVisibilityService {
   private final TopicRunJdbcRepository runRepository;
   private final TopicResultJdbcRepository resultRepository;
   private final TopicWatchSync topicWatchSync;
-  private final TopicPlanner topicPlanner;
-  private final PlanningWindow planningWindow;
   private final RepositoryService repositoryService;
 
   public TopicVisibilityService(
@@ -36,15 +32,11 @@ public class TopicVisibilityService {
       TopicRunJdbcRepository runRepository,
       TopicResultJdbcRepository resultRepository,
       TopicWatchSync topicWatchSync,
-      TopicPlanner topicPlanner,
-      PlanningWindow planningWindow,
       RepositoryService repositoryService) {
     this.watchRepository = watchRepository;
     this.runRepository = runRepository;
     this.resultRepository = resultRepository;
     this.topicWatchSync = topicWatchSync;
-    this.topicPlanner = topicPlanner;
-    this.planningWindow = planningWindow;
     this.repositoryService = repositoryService;
   }
 
@@ -106,18 +98,14 @@ public class TopicVisibilityService {
     return history(watch.id());
   }
 
+  /** Topic runs are collected only by the Collector; the product never queues local jobs. */
   public long runNow(long topicWatchId) {
-    TopicWatch watch = getWatch(topicWatchId);
-    return topicPlanner.planWatch(watch.id(), watch.repositoryId(), planningWindow.businessDate());
+    throw ApiException.serviceUnavailable("Collector orchestration is required");
   }
 
+  /** Topic runs are collected only by the Collector; the product never queues local jobs. */
   public List<Long> runAll(long repositoryId, String scope) {
-    repositoryService.get(repositoryId);
-    boolean allLanguages = parseAllLanguages(scope);
-    LocalDate date = planningWindow.businessDate();
-    return watchRepository.findEnabledByRepository(repositoryId, allLanguages).stream()
-        .map(watch -> topicPlanner.planWatch(watch.id(), watch.repositoryId(), date))
-        .toList();
+    throw ApiException.serviceUnavailable("Collector orchestration is required");
   }
 
   public TopicRunResults latestResults(long topicWatchId) {

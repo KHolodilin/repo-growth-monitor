@@ -1,74 +1,48 @@
 package com.kholodilin.repogrowth.repository.application;
 
-import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
-import com.kholodilin.repogrowth.github.client.GitHubClient;
-import com.kholodilin.repogrowth.github.exception.GitHubException;
-import com.kholodilin.repogrowth.github.model.GitHubOwnerResponse;
-import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
 import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RepositoryService {
 
-  @org.springframework.beans.factory.annotation.Value("${rgm.orchestration.enabled:false}")
-  private boolean durableOrchestration;
-
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
 
-  private final GitHubClient gitHubClient;
-  private final GitHubProperties gitHubProperties;
   private final GitHubOwnerJdbcRepository ownerRepository;
   private final RepositoryJdbcRepository repositoryJdbcRepository;
   private final AppMetrics metrics;
-  private final CollectionPlanner collectionPlanner;
   private final PlanningWindow planningWindow;
 
   public RepositoryService(
-      GitHubClient gitHubClient,
-      GitHubProperties gitHubProperties,
       GitHubOwnerJdbcRepository ownerRepository,
       RepositoryJdbcRepository repositoryJdbcRepository,
       AppMetrics metrics,
-      CollectionPlanner collectionPlanner,
       PlanningWindow planningWindow) {
-    this.gitHubClient = gitHubClient;
-    this.gitHubProperties = gitHubProperties;
     this.ownerRepository = ownerRepository;
     this.repositoryJdbcRepository = repositoryJdbcRepository;
     this.metrics = metrics;
-    this.collectionPlanner = collectionPlanner;
     this.planningWindow = planningWindow;
   }
 
   @Transactional
   public List<Repository> list(boolean refresh) {
-    if (refresh && durableOrchestration)
-      throw ApiException.validation("Use POST /api/v1/admin/repositories/refresh");
-    if (!durableOrchestration && !gitHubProperties.tokenConfigured()) {
-      return List.of();
-    }
     if (refresh) {
-      if (gitHubClient.tokenRejected()) {
-        throw GitHubException.auth(401, "GitHub rejected the token");
-      }
-      syncFromGitHub();
+      throw ApiException.validation(
+          commands != null
+              ? "Use POST /api/v1/admin/repositories/refresh"
+              : "Collector orchestration is required to refresh repositories");
     }
     List<Repository> repositories = repositoryJdbcRepository.findListed();
     metrics.setTrackedRepositories(repositoryJdbcRepository.countTracked());
@@ -96,6 +70,9 @@ public class RepositoryService {
   @Transactional
   public Repository setTracking(long id, boolean enabled) {
     get(id);
+    if (enabled && commands == null) {
+      throw ApiException.serviceUnavailable("Collector orchestration is required to track");
+    }
     if (enabled && !repositoryJdbcRepository.isAccountAccessible(id)) {
       throw ApiException.validation(
           "Only repositories available to the GitHub token can be tracked");
@@ -103,65 +80,13 @@ public class RepositoryService {
     Repository updated = repositoryJdbcRepository.setTracking(id, enabled);
     metrics.setTrackedRepositories(repositoryJdbcRepository.countTracked());
     if (enabled) {
-      if (commands != null) commands.manual(id, planningWindow.businessDate());
-      else collectionPlanner.planRepository(id, planningWindow.businessDate(), true);
+      commands.manual(id, planningWindow.businessDate());
     }
     return updated;
   }
 
   public List<Repository> tracked() {
     return repositoryJdbcRepository.findTracked();
-  }
-
-  private void syncFromGitHub() {
-    List<GitHubRepositoryResponse> remoteRepositories = gitHubClient.listAccessibleRepositories();
-    Set<Long> seen = new HashSet<>();
-    for (GitHubRepositoryResponse remote : remoteRepositories) {
-      GitHubOwnerResponse ownerResponse = remote.owner();
-      OwnerType ownerType =
-          "Organization".equalsIgnoreCase(ownerResponse.type())
-              ? OwnerType.ORGANIZATION
-              : OwnerType.USER;
-      GitHubOwner owner =
-          ownerRepository.upsert(
-              ownerResponse.id(),
-              ownerResponse.login(),
-              ownerType,
-              ownerResponse.avatarUrl(),
-              ownerResponse.htmlUrl());
-      Repository stored =
-          repositoryJdbcRepository.upsertKeepingTracking(
-              new Repository(
-                  null,
-                  remote.id(),
-                  owner.id(),
-                  remote.name(),
-                  remote.fullName(),
-                  remote.description(),
-                  remote.resolvedVisibility(),
-                  remote.defaultBranch(),
-                  remote.language(),
-                  remote.fork(),
-                  remote.archived(),
-                  remote.stargazersCount(),
-                  remote.watchers(),
-                  remote.forksCount(),
-                  remote.openIssuesCount(),
-                  0,
-                  false,
-                  remote.createdAt(),
-                  remote.updatedAt(),
-                  remote.pushedAt(),
-                  null,
-                  null,
-                  null,
-                  null,
-                  null));
-      repositoryJdbcRepository.markAccountAccessible(stored.id());
-      repositoryJdbcRepository.replaceTopics(stored.id(), remote.topicsOrEmpty());
-      seen.add(stored.id());
-    }
-    repositoryJdbcRepository.markInaccessibleExcept(seen);
   }
 
   public List<String> topics(long repositoryId) {

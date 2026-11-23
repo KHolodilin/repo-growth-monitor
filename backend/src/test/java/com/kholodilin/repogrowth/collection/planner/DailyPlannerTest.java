@@ -3,7 +3,7 @@ package com.kholodilin.repogrowth.collection.planner;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,8 +11,7 @@ import static org.mockito.Mockito.when;
 import com.kholodilin.repogrowth.collection.persistence.PlannerSlotJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
-import com.kholodilin.repogrowth.search.planner.SearchPlanner;
-import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
+import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -22,14 +21,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class DailyPlannerTest {
 
   @Mock PlanningWindow planningWindow;
-  @Mock CollectionPlanner collectionPlanner;
-  @Mock SearchPlanner searchPlanner;
-  @Mock TopicPlanner topicPlanner;
+  @Mock CollectionRequestService requestService;
   @Mock PlannerSlotJdbcRepository slotRepository;
 
   private DailyPlanner planner;
@@ -42,40 +41,42 @@ class DailyPlannerTest {
     date = LocalDate.of(2026, 10, 20);
     enabled = properties(true);
     disabled = properties(false);
-    planner =
-        new DailyPlanner(
-            planningWindow,
-            collectionPlanner,
-            searchPlanner,
-            topicPlanner,
-            enabled,
-            new SnapshotSchedule(),
-            slotRepository);
+    planner = plannerWith(enabled);
+    ReflectionTestUtils.setField(planner, "requestService", requestService);
   }
 
   @Test
   void tickSkipsWhenSchedulingIsDisabled() {
     planner = plannerWith(disabled);
+    ReflectionTestUtils.setField(planner, "requestService", requestService);
     planner.tick();
     verify(planningWindow, never()).isOpen();
-    verify(collectionPlanner, never()).planAll(any(), anyBoolean());
+    verify(requestService, never()).scheduled(any(), any());
+  }
+
+  @Test
+  void tickSkipsWhenCollectorOrchestrationIsMissing() {
+    planner = plannerWith(enabled);
+    planner.tick();
+    verify(planningWindow, never()).isOpen();
+    verify(slotRepository, never()).save(any(), any());
   }
 
   @Test
   void tickSkipsWhenTheWindowIsClosed() {
     when(planningWindow.isOpen()).thenReturn(false);
     planner.tick();
-    verify(collectionPlanner, never()).planAll(any(), anyBoolean());
+    verify(requestService, never()).scheduled(any(), any());
   }
 
   @Test
   void tickAppliesTheLatestDueSlotOnce() {
     openAt(LocalTime.of(7, 0));
     when(slotRepository.find(date)).thenReturn(Optional.empty());
+    when(requestService.scheduled(date, "06:00"))
+        .thenReturn(new CollectionRequestService.ScheduledCounts(1, 0, 0));
     planner.tick();
-    verify(collectionPlanner).planAll(date, true);
-    verify(searchPlanner).planAll(date, true);
-    verify(topicPlanner).planAll(date, true);
+    verify(requestService).scheduled(date, "06:00");
     verify(slotRepository).save(date, LocalTime.of(6, 0));
   }
 
@@ -83,10 +84,10 @@ class DailyPlannerTest {
   void tickDoesNotRepeatASlotThatAlreadyRan() {
     openAt(LocalTime.of(9, 5));
     when(slotRepository.find(date)).thenReturn(Optional.of(LocalTime.of(9, 0)));
+    when(requestService.scheduled(date, null))
+        .thenReturn(new CollectionRequestService.ScheduledCounts(1, 0, 0));
     planner.tick();
-    verify(collectionPlanner).planAll(date, false);
-    verify(searchPlanner).planAll(date, false);
-    verify(topicPlanner).planAll(date, false);
+    verify(requestService).scheduled(date, null);
     verify(slotRepository, never()).save(any(), any());
   }
 
@@ -94,8 +95,10 @@ class DailyPlannerTest {
   void tickMovesOnWhenALaterSlotIsDue() {
     openAt(LocalTime.of(12, 0));
     when(slotRepository.find(date)).thenReturn(Optional.of(LocalTime.of(9, 0)));
+    when(requestService.scheduled(date, "12:00"))
+        .thenReturn(new CollectionRequestService.ScheduledCounts(1, 0, 0));
     planner.tick();
-    verify(collectionPlanner).planAll(date, true);
+    verify(requestService).scheduled(date, "12:00");
     verify(slotRepository).save(date, LocalTime.of(12, 0));
   }
 
@@ -103,19 +106,40 @@ class DailyPlannerTest {
   void planNowRejectsAClosedWindowWhenRequired() {
     when(planningWindow.isOpen()).thenReturn(false);
     assertThatThrownBy(() -> planner.planNow(true)).isInstanceOf(ApiException.class);
-    verify(collectionPlanner, never()).planAll(any(), anyBoolean());
+    verify(requestService, never()).scheduled(any(), any());
   }
 
   @Test
-  void planNowRunsAllPlannersForTheDueSlot() {
+  void planNowRejectsAPlannerThatIsDisabledInThisRole() {
+    ReflectionTestUtils.setField(planner, "plannerEnabled", false);
+    assertThatThrownBy(() -> planner.planNow(false))
+        .isInstanceOf(ApiException.class)
+        .hasMessageContaining("disabled");
+    verify(requestService, never()).scheduled(any(), any());
+  }
+
+  @Test
+  void planNowRequiresCollectorOrchestration() {
+    planner = plannerWith(enabled);
+    assertThatThrownBy(() -> planner.planNow(false))
+        .isInstanceOfSatisfying(
+            ApiException.class,
+            ex -> {
+              assertThat(ex.status()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+              assertThat(ex.getMessage()).contains("Collector orchestration is required");
+            });
+    verify(slotRepository, never()).save(any(), any());
+  }
+
+  @Test
+  void planNowReportsTheScheduledCountsForTheDueSlot() {
     when(planningWindow.businessDate()).thenReturn(date);
     when(planningWindow.localTime()).thenReturn(LocalTime.of(7, 0));
     when(planningWindow.from()).thenReturn(LocalTime.of(6, 0));
     when(planningWindow.to()).thenReturn(LocalTime.of(18, 0));
     when(slotRepository.find(date)).thenReturn(Optional.empty());
-    when(collectionPlanner.planAll(date, true)).thenReturn(2);
-    when(searchPlanner.planAll(date, true)).thenReturn(3);
-    when(topicPlanner.planAll(date, true)).thenReturn(4);
+    when(requestService.scheduled(date, "06:00"))
+        .thenReturn(new CollectionRequestService.ScheduledCounts(2, 3, 4));
 
     DailyPlanner.PlannerResult result = planner.planNow(false);
 
@@ -133,14 +157,15 @@ class DailyPlannerTest {
     when(planningWindow.localTime()).thenReturn(LocalTime.of(19, 0));
     when(planningWindow.from()).thenReturn(LocalTime.of(6, 0));
     when(planningWindow.to()).thenReturn(LocalTime.of(18, 0));
-    when(collectionPlanner.planAll(date, false)).thenReturn(1);
-    when(searchPlanner.planAll(date, false)).thenReturn(0);
-    when(topicPlanner.planAll(date, false)).thenReturn(0);
+    when(requestService.scheduled(date, null))
+        .thenReturn(new CollectionRequestService.ScheduledCounts(1, 0, 0));
 
     planner.planNow(false);
 
+    verify(requestService).scheduled(date, null);
     verify(slotRepository, never()).find(any());
     verify(slotRepository, never()).save(any(), any());
+    verify(requestService, never()).scheduled(any(), anyString());
   }
 
   private void openAt(LocalTime now) {
@@ -152,14 +177,7 @@ class DailyPlannerTest {
   }
 
   private DailyPlanner plannerWith(CollectionProperties properties) {
-    return new DailyPlanner(
-        planningWindow,
-        collectionPlanner,
-        searchPlanner,
-        topicPlanner,
-        properties,
-        new SnapshotSchedule(),
-        slotRepository);
+    return new DailyPlanner(planningWindow, properties, new SnapshotSchedule(), slotRepository);
   }
 
   private static CollectionProperties properties(boolean schedulingEnabled) {

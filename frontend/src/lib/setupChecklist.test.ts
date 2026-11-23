@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { parseGitHubAccess, parsePlannerWindow } from "./githubAccess";
+import {
+  COLLECTOR_UNAVAILABLE,
+  ORCHESTRATION_DISABLED,
+  TOKEN_MISSING,
+  collectionBlocked,
+  credentialConfigured,
+  parseGitHubAccess,
+  parsePlannerWindow,
+  tokenBanner,
+} from "./githubAccess";
 import { TRAFFIC_PERMISSION } from "./githubAccess";
 import { checklistSchedule, collectionJobLines, headerSchedule } from "./setupChecklist";
 
@@ -68,9 +77,45 @@ describe("setup checklist copy", () => {
     );
     expect(parseGitHubAccess(null)).toEqual({ tokenState: "OK", rateLimitReset: null, planner: null });
     expect(parseGitHubAccess({ tokenState: "OTHER", planner: utc })).toMatchObject({ tokenState: "OK", planner: utc });
+    expect(parseGitHubAccess({ tokenState: "UNVERIFIED", planner: utc })).toMatchObject({ tokenState: "UNVERIFIED", planner: utc });
+    expect(parseGitHubAccess({ tokenState: "COLLECTOR_UNAVAILABLE", planner: utc })).toMatchObject({
+      tokenState: "COLLECTOR_UNAVAILABLE",
+      planner: utc,
+    });
     expect(parseGitHubAccess({ tokenState: "MISSING", rateLimitReset: null, planner: { from: "10:00", to: "18:00", open: false } })).toMatchObject({
       tokenState: "MISSING",
       planner: { timezone: "UTC", open: false },
     });
+  });
+});
+
+describe("credential state banners", () => {
+  const access = (
+    tokenState: "MISSING" | "UNVERIFIED" | "ORCHESTRATION_DISABLED" | "COLLECTOR_UNAVAILABLE",
+  ) => ({ tokenState, rateLimitReset: null, planner: null });
+
+  it("points a missing credential at the vault and blocks collection", () => {
+    expect(tokenBanner(access("MISSING"))).toBe(TOKEN_MISSING);
+    expect(TOKEN_MISSING).not.toContain("GITHUB_TOKEN");
+    expect(collectionBlocked(access("MISSING"))).toBe(true);
+    expect(credentialConfigured(access("MISSING"))).toBe(false);
+  });
+
+  it("does not warn about an unverified credential and keeps collection available", () => {
+    expect(tokenBanner(access("UNVERIFIED"))).toBeNull();
+    expect(collectionBlocked(access("UNVERIFIED"))).toBe(false);
+    expect(credentialConfigured(access("UNVERIFIED"))).toBe(true);
+  });
+
+  it("warns that orchestration is disabled and blocks collection", () => {
+    expect(tokenBanner(access("ORCHESTRATION_DISABLED"))).toBe(ORCHESTRATION_DISABLED);
+    expect(collectionBlocked(access("ORCHESTRATION_DISABLED"))).toBe(true);
+    expect(credentialConfigured(access("ORCHESTRATION_DISABLED"))).toBe(false);
+  });
+
+  it("warns that the collector is unavailable and blocks collection", () => {
+    expect(tokenBanner(access("COLLECTOR_UNAVAILABLE"))).toBe(COLLECTOR_UNAVAILABLE);
+    expect(collectionBlocked(access("COLLECTOR_UNAVAILABLE"))).toBe(true);
+    expect(credentialConfigured(access("COLLECTOR_UNAVAILABLE"))).toBe(false);
   });
 });

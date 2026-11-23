@@ -3,8 +3,6 @@ package com.kholodilin.repogrowth.collection.planner;
 import com.kholodilin.repogrowth.collection.persistence.PlannerSlotJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
-import com.kholodilin.repogrowth.search.planner.SearchPlanner;
-import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Optional;
@@ -24,25 +22,16 @@ public class DailyPlanner {
   private com.kholodilin.repogrowth.orchestration.CollectionRequestService requestService;
 
   private final PlanningWindow planningWindow;
-  private final CollectionPlanner collectionPlanner;
-  private final SearchPlanner searchPlanner;
-  private final TopicPlanner topicPlanner;
   private final CollectionProperties collectionProperties;
   private final SnapshotSchedule snapshotSchedule;
   private final PlannerSlotJdbcRepository slotRepository;
 
   public DailyPlanner(
       PlanningWindow planningWindow,
-      CollectionPlanner collectionPlanner,
-      SearchPlanner searchPlanner,
-      TopicPlanner topicPlanner,
       CollectionProperties collectionProperties,
       SnapshotSchedule snapshotSchedule,
       PlannerSlotJdbcRepository slotRepository) {
     this.planningWindow = planningWindow;
-    this.collectionPlanner = collectionPlanner;
-    this.searchPlanner = searchPlanner;
-    this.topicPlanner = topicPlanner;
     this.collectionProperties = collectionProperties;
     this.snapshotSchedule = snapshotSchedule;
     this.slotRepository = slotRepository;
@@ -52,6 +41,10 @@ public class DailyPlanner {
   public void tick() {
     if (!plannerEnabled || !collectionProperties.planner().enabled()) {
       log.debug("Planner skipped, scheduling disabled");
+      return;
+    }
+    if (requestService == null) {
+      log.debug("Planner skipped, collector orchestration is disabled");
       return;
     }
     if (!planningWindow.isOpen()) {
@@ -64,6 +57,9 @@ public class DailyPlanner {
   public PlannerResult planNow(boolean requireWindow) {
     if (!plannerEnabled)
       throw ApiException.validation("Collection planning is disabled in this role");
+    if (requestService == null) {
+      throw ApiException.serviceUnavailable("Collector orchestration is required");
+    }
     if (requireWindow && !planningWindow.isOpen()) {
       throw ApiException.validation("Collection planner is outside the configured strict window");
     }
@@ -73,21 +69,13 @@ public class DailyPlanner {
   private PlannerResult planDue() {
     LocalDate date = planningWindow.businessDate();
     Optional<LocalTime> slot = pendingSnapshot(date);
-    boolean snapshotDue = slot.isPresent();
-    if (requestService != null) {
-      var counts = requestService.scheduled(date, slot.map(LocalTime::toString).orElse(null));
-      if (snapshotDue) slotRepository.save(date, slot.get());
-      return new PlannerResult(
-          true, counts.repositories(), counts.queries(), counts.watches(), date.toString());
-    }
-    int collection = collectionPlanner.planAll(date, snapshotDue);
-    int search = searchPlanner.planAll(date, snapshotDue);
-    int topics = topicPlanner.planAll(date, snapshotDue);
-    if (snapshotDue) {
+    var counts = requestService.scheduled(date, slot.map(LocalTime::toString).orElse(null));
+    if (slot.isPresent()) {
       slotRepository.save(date, slot.get());
       log.info("Planner snapshot slot={} businessDate={}", slot.get(), date);
     }
-    return new PlannerResult(true, collection, search, topics, date.toString());
+    return new PlannerResult(
+        true, counts.repositories(), counts.queries(), counts.watches(), date.toString());
   }
 
   private Optional<LocalTime> pendingSnapshot(LocalDate date) {

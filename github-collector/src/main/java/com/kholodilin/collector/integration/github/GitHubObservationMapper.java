@@ -90,6 +90,13 @@ public final class GitHubObservationMapper {
         json.writeValueAsString(array), array.size(), array.size() == requestedPageSize);
   }
 
+  /** All repositories from the page as a JSON array, without any owner filter. */
+  public String accessibleRepositoriesMetadata(JsonArrayPage page) {
+    JsonNode array = requireArrayNode(json.readTree(page.rawJson()));
+    for (JsonNode item : array) requireObject(item);
+    return json.writeValueAsString(array);
+  }
+
   public String ownedRepositoriesMetadata(JsonArrayPage page, String ownerLogin) {
     JsonNode array = requireArrayNode(json.readTree(page.rawJson()));
     List<JsonNode> owned = new ArrayList<>();

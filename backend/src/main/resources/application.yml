@@ -48,14 +48,8 @@ auth:
   mock:
     users-location: ${AUTH_MOCK_USERS_LOCATION:classpath:auth/mock-users.yml}
 
-github:
-  token: ${GITHUB_TOKEN:}
-  api-base-url: https://api.github.com
-  web-base-url: https://github.com
-  connect-timeout: 10s
-  read-timeout: 30s
-
 collection:
+  # workers/job-lease remain for configuration binding; in-process workers were removed.
   workers: 4
   job-lease: 5m
   planner:
@@ -147,10 +141,9 @@ springdoc:
     path: /swagger-ui.html
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
 
-# Collector runtime stays off in the product web process; use the standalone boot JAR.
+# Rank-sort frozen into SEARCH_QUERY / TOPIC_WATCH parameters (collector.search.*).
+# Collector GitHub execution is not started in this process — use the standalone boot JAR.
 collector:
-  runtime:
-    enabled: false
   search:
     rank-sort: best_match
     rank-sort-order: desc

@@ -423,12 +423,8 @@ class PublicApiIT extends AbstractPostgresTest {
     assertThat(jdbc.queryForObject("SELECT count(*) FROM competitor_profile", Long.class)).isZero();
   }
 
-  @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
-  com.kholodilin.repogrowth.github.client.GitHubClient github;
-
   @Test
-  void publicReadFamiliesNeverUseGitHubOrCreateWatchDefinitions() throws Exception {
-    org.mockito.Mockito.clearInvocations(github);
+  void publicReadFamiliesNeverCreateWatchDefinitionsOrCollectionRequests() throws Exception {
     long watches = jdbc.queryForObject("SELECT count(*) FROM topic_watch", Long.class);
     for (String url :
         List.of(
@@ -449,7 +445,6 @@ class PublicApiIT extends AbstractPostgresTest {
           .andExpect(cookie().doesNotExist("JSESSIONID"))
           .andExpect(cookie().doesNotExist("XSRF-TOKEN"));
     }
-    org.mockito.Mockito.verifyNoInteractions(github);
     assertThat(jdbc.queryForObject("SELECT count(*) FROM topic_watch", Long.class))
         .isEqualTo(watches);
     assertThat(jdbc.queryForObject("SELECT count(*) FROM collection_request", Long.class)).isZero();

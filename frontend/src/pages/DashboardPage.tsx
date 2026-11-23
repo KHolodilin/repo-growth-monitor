@@ -8,7 +8,15 @@ import { asGrowthEvents } from "../lib/growthEvents";
 import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
-import { loadGitHubAccess, parseGitHubAccess, type GitHubAccess, type TokenState } from "../lib/githubAccess";
+import {
+  COLLECTOR_UNAVAILABLE,
+  ORCHESTRATION_DISABLED,
+  credentialConfigured,
+  loadGitHubAccess,
+  parseGitHubAccess,
+  type GitHubAccess,
+  type TokenState,
+} from "../lib/githubAccess";
 import { checklistSchedule, collectionJobLines, DEFAULT_PLANNER } from "../lib/setupChecklist";
 import { repositoryProblemBadge, repositoryProblemLines } from "../lib/trafficGap";
 import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
@@ -852,7 +860,7 @@ function useGitHubAccess(): GitHubAccess | null {
 }
 
 function tokenAccepted(access: GitHubAccess | null): boolean {
-  return access?.tokenState === "OK" || access?.tokenState === "RATE_LIMITED";
+  return credentialConfigured(access);
 }
 
 function SetupChecklist({
@@ -872,7 +880,17 @@ function SetupChecklist({
       <Card className="space-y-5">
         <ChecklistRow done title="Application is running." />
         <ChecklistRow done={accepted} title="GitHub accepted the token.">
-          {!accepted && <TokenHelp rejected={access?.tokenState === "REJECTED"} />}
+          {access?.tokenState === "ORCHESTRATION_DISABLED" && (
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">{ORCHESTRATION_DISABLED}</p>
+          )}
+          {access?.tokenState === "COLLECTOR_UNAVAILABLE" && (
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">{COLLECTOR_UNAVAILABLE}</p>
+          )}
+          {!accepted &&
+            access?.tokenState !== "COLLECTOR_UNAVAILABLE" &&
+            access?.tokenState !== "ORCHESTRATION_DISABLED" && (
+            <TokenHelp rejected={access?.tokenState === "REJECTED"} />
+          )}
         </ChecklistRow>
         <ChecklistRow done={false} title="Repositories are selected." muted={!accepted}>
           {accepted && (

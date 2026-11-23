@@ -6,7 +6,9 @@ import com.kholodilin.repogrowth.event.domain.*;
 import com.kholodilin.repogrowth.event.persistence.*;
 import com.kholodilin.repogrowth.github.model.*;
 import com.kholodilin.repogrowth.repository.application.RepositoryHealthEvaluator;
+import com.kholodilin.repogrowth.repository.domain.OwnerType;
 import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
+import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.search.application.RepositoryEnricher;
 import com.kholodilin.repogrowth.search.persistence.*;
@@ -30,9 +32,13 @@ public class CollectorHistoryApplier {
   @org.springframework.beans.factory.annotation.Autowired
   private com.kholodilin.repogrowth.publication.PublicationService publication;
 
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.kholodilin.repogrowth.credentials.CredentialVault credentialVault;
+
   private final JdbcTemplate jdbc;
   private final JsonMapper json;
   private final RepositoryJdbcRepository repositories;
+  private final GitHubOwnerJdbcRepository owners;
   private final TrafficJdbcRepository traffic;
   private final TopicWatchSync watches;
   private final ServicePathClassifier paths;
@@ -48,6 +54,7 @@ public class CollectorHistoryApplier {
       JdbcTemplate jdbc,
       JsonMapper json,
       RepositoryJdbcRepository repositories,
+      GitHubOwnerJdbcRepository owners,
       TrafficJdbcRepository traffic,
       TopicWatchSync watches,
       ServicePathClassifier paths,
@@ -61,6 +68,7 @@ public class CollectorHistoryApplier {
     this.jdbc = jdbc;
     this.json = json;
     this.repositories = repositories;
+    this.owners = owners;
     this.traffic = traffic;
     this.watches = watches;
     this.paths = paths;
@@ -102,10 +110,12 @@ public class CollectorHistoryApplier {
   }
 
   public void apply(Map<String, Object> task, JobRequest job, ResultDelivery result) {
-    long repository = ((Number) task.get("repository_id")).longValue();
+    Long repositoryId =
+        task.get("repository_id") == null ? null : ((Number) task.get("repository_id")).longValue();
     long taskId = ((Number) task.get("id")).longValue();
     if (result.status() == JobState.FAILED && job.type() == TaskType.DISCOVER_REPOSITORIES) return;
     if (result.status() == JobState.FAILED) {
+      long repository = Objects.requireNonNull(repositoryId, "repository_id");
       if (result.failure().code() == ErrorCode.PERMISSION_DENIED
           && Set.of(TaskType.TRAFFIC, TaskType.REFERRERS, TaskType.POPULAR_PATHS)
               .contains(job.type())) repositories.setTrafficPermissionMissing(repository, true);
@@ -115,8 +125,9 @@ public class CollectorHistoryApplier {
     Snapshot snapshot = result.snapshot();
     switch (job.type()) {
       case DISCOVER_REPOSITORIES -> discover(job, snapshot);
-      case STATS -> stats(repository, job, snapshot);
+      case STATS -> stats(requireRepository(repositoryId), job, snapshot);
       case TRAFFIC -> {
+        long repository = requireRepository(repositoryId);
         for (var day : snapshot.traffic()) {
           if (day.views() != null
               && day.visitors() != null
@@ -151,6 +162,7 @@ public class CollectorHistoryApplier {
         repositories.setTrafficPermissionMissing(repository, false);
       }
       case REFERRERS, POPULAR_PATHS -> {
+        long repository = requireRepository(repositoryId);
         LocalDate date = snapshot.observedAt().atZone(ZoneOffset.UTC).toLocalDate();
         if (job.type() == TaskType.REFERRERS) traffic.deleteReferrerSnapshot(repository, date);
         else traffic.deletePathSnapshot(repository, date);
@@ -181,25 +193,47 @@ public class CollectorHistoryApplier {
             ts(snapshot.observedAt()));
         repositories.setTrafficPermissionMissing(repository, false);
       }
-      case GROWTH_EVENTS -> growth(repository, task, job, snapshot);
+      case GROWTH_EVENTS -> growth(requireRepository(repositoryId), task, job, snapshot);
       case SEARCH_QUERY, TOPIC_WATCH ->
-          rank(taskId, repository, job, snapshot, (String) task.get("target_key"));
+          rank(
+              taskId,
+              requireRepository(repositoryId),
+              job,
+              snapshot,
+              (String) task.get("target_key"));
     }
     if (job.type() != TaskType.DISCOVER_REPOSITORIES
         && job.type() != TaskType.SEARCH_QUERY
-        && job.type() != TaskType.TOPIC_WATCH) legacy(taskId, repository, job, result);
+        && job.type() != TaskType.TOPIC_WATCH)
+      legacy(taskId, requireRepository(repositoryId), job, result);
+  }
+
+  private static long requireRepository(Long repositoryId) {
+    return Objects.requireNonNull(repositoryId, "repository_id");
   }
 
   private void discover(JobRequest job, Snapshot snapshot) {
     for (var remote : list(snapshot, "repositories", GitHubRepositoryResponse.class)) {
       if (remote.owner() == null
-          || !remote.owner().login().equalsIgnoreCase(job.repository().owner()))
+          || remote.owner().login() == null
+          || remote.owner().login().isBlank())
+        throw new IllegalArgumentException("Discovery owner identity missing");
+      if (job.repository() != null
+          && !remote.owner().login().equalsIgnoreCase(job.repository().owner()))
         throw new IllegalArgumentException("Discovery owner identity mismatch");
+      OwnerType ownerType =
+          "Organization".equalsIgnoreCase(remote.owner().type())
+              ? OwnerType.ORGANIZATION
+              : OwnerType.USER;
       long owner =
-          jdbc.queryForObject(
-              "SELECT id FROM github_owner WHERE lower(login)=lower(?)",
-              Long.class,
-              job.repository().owner());
+          owners
+              .upsert(
+                  remote.owner().id(),
+                  remote.owner().login(),
+                  ownerType,
+                  remote.owner().avatarUrl(),
+                  remote.owner().htmlUrl())
+              .id();
       var existing = repositories.findByGithubId(remote.id());
       // Keep the stored visibility until PublicationService.verify() accepts this observation.
       // Writing remote visibility here would let a stale PUBLIC discovery reopen a newer PRIVATE
@@ -237,6 +271,8 @@ public class CollectorHistoryApplier {
       publication.metadata(stored.id(), remote, snapshot.observedAt());
       repositories.markAccountAccessible(stored.id());
       repositories.replaceTopics(stored.id(), remote.topicsOrEmpty());
+      if (credentialVault != null && job.authorization() != null)
+        credentialVault.bind(stored.id(), job.authorization().credentialRef());
     }
   }
 

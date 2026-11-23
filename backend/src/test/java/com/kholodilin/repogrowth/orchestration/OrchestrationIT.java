@@ -14,9 +14,8 @@ import com.kholodilin.repogrowth.auth.domain.AppUser;
 import com.kholodilin.repogrowth.auth.mock.MockUserCatalog;
 import com.kholodilin.repogrowth.auth.security.*;
 import com.kholodilin.repogrowth.collection.planner.*;
-import com.kholodilin.repogrowth.collection.worker.CollectionWorkerPool;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.search.planner.SearchPlanner;
-import com.kholodilin.repogrowth.search.worker.SearchWorkerPool;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import java.time.*;
@@ -115,6 +114,32 @@ class OrchestrationIT extends AbstractPostgresTest {
         "INSERT INTO collection_run(repository_id,business_date,status,planned_jobs) VALUES (?,'2020-01-01','SUCCESS',5)",
         repositoryId);
     catalog.syncMissingUsers();
+  }
+
+  @Test
+  void explicitSearchAndTopicCommandsDispatchFrozenTargets() {
+    long queryId =
+        jdbc.queryForObject(
+            "SELECT id FROM search_query WHERE repository_id=? AND enabled",
+            Long.class,
+            repositoryId);
+    assertThat(service.searchCommand(queryId, day).taskIds()).isNotEmpty();
+    assertThat(service.searchAllCommand(repositoryId, day).taskIds()).isNotEmpty();
+    assertThatThrownBy(() -> service.searchCommand(-1, day)).isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> service.searchAllCommand(repositoryId + 99, day))
+        .isInstanceOf(Exception.class);
+    service.manual(repositoryId, day);
+    long watchId =
+        jdbc.queryForObject(
+            "SELECT id FROM topic_watch WHERE repository_id=? AND enabled LIMIT 1",
+            Long.class,
+            repositoryId);
+    assertThat(service.topicCommand(watchId, day).taskIds()).isNotEmpty();
+    assertThat(service.topicsCommand(repositoryId, "all", day).taskIds()).isNotEmpty();
+    assertThat(service.topicsCommand(repositoryId, "language", day).taskIds()).isNotEmpty();
+    assertThatThrownBy(() -> service.topicsCommand(repositoryId, "nope", day))
+        .isInstanceOf(ApiException.class);
+    assertThatThrownBy(() -> service.topicCommand(-1, day)).isInstanceOf(ApiException.class);
   }
 
   @Test
@@ -359,14 +384,15 @@ class OrchestrationIT extends AbstractPostgresTest {
 
   @Test
   void schedulerUsesNewServiceAndLegacyPathsAreBlocked() {
-    assertThat(context.getBeansOfType(CollectionWorkerPool.class)).isEmpty();
-    assertThat(context.getBeansOfType(SearchWorkerPool.class)).isEmpty();
     daily.planNow(false);
     assertThat(count("collection_request")).isEqualTo(1);
     assertThat(count("collection_run")).isEqualTo(1);
-    assertThatThrownBy(() -> legacy.planAll(day)).hasMessageContaining("/collections");
-    assertThatThrownBy(() -> legacySearch.planAll(day)).hasMessageContaining("/collections");
-    assertThatThrownBy(() -> legacyTopic.planAll(day)).hasMessageContaining("/collections");
+    assertThatThrownBy(() -> legacy.planAll(day))
+        .hasMessageContaining("Collector orchestration is required");
+    assertThatThrownBy(() -> legacySearch.planAll(day))
+        .hasMessageContaining("Collector orchestration is required");
+    assertThatThrownBy(() -> legacyTopic.planAll(day))
+        .hasMessageContaining("Collector orchestration is required");
   }
 
   @Test

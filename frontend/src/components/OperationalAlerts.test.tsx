@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../lib/AuthContext";
 import { anonymousMe } from "../lib/auth";
-import { NO_ACCESS, TOKEN_MISSING, TOKEN_REJECTED, TRAFFIC_PERMISSION } from "../lib/githubAccess";
+import { COLLECTOR_UNAVAILABLE, NO_ACCESS, TOKEN_MISSING, TOKEN_REJECTED, TRAFFIC_PERMISSION } from "../lib/githubAccess";
 import { dashboardReady } from "../test/fixtures";
 import { Layout } from "./Layout";
 import { RepositoryAccessNote } from "./RepositoryAccessNote";
@@ -14,7 +14,7 @@ vi.mock("../lib/api", async (original) => ({ ...await original<typeof import("..
 vi.mock("../lib/auth", async (original) => ({ ...await original<typeof import("../lib/auth")>(), loadMe, signOut }));
 const registered = { ...anonymousMe, authenticated: true, userId: "1", displayName: "User", roles: ["USER"], actions: [] };
 const admin = { ...registered, roles: ["USER", "ADMIN"], actions: ["MUTATE"] };
-const banners = [["MISSING", TOKEN_MISSING], ["REJECTED", TOKEN_REJECTED], ["RATE_LIMITED", "Collection continues after the rate limit resets."]] as const;
+const banners = [["MISSING", TOKEN_MISSING], ["REJECTED", TOKEN_REJECTED], ["COLLECTOR_UNAVAILABLE", COLLECTOR_UNAVAILABLE], ["RATE_LIMITED", "Collection continues after the rate limit resets."]] as const;
 let tokenState = "MISSING";
 function mount(path = "/KHolodilin") {
   return render(
@@ -49,6 +49,7 @@ function mount(path = "/KHolodilin") {
 function expectHidden() {
   expect(screen.queryByText(TOKEN_MISSING)).not.toBeInTheDocument();
   expect(screen.queryByText(TOKEN_REJECTED)).not.toBeInTheDocument();
+  expect(screen.queryByText(COLLECTOR_UNAVAILABLE)).not.toBeInTheDocument();
   expect(screen.queryByText(/Collection continues after/)).not.toBeInTheDocument();
   expect(screen.queryByText("No GitHub token")).not.toBeInTheDocument();
   expect(screen.queryByText(/Collected \d+ of/)).not.toBeInTheDocument();

@@ -18,7 +18,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,14 +65,18 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
   }
 
   @Test
-  void runAllPlansARunForEachQuery() {
-    searchQueryService.create(kafka.id(), null, "outbox", true, 50);
+  void runAllDoesNotQueueLocalRunsBecauseOnlyTheCollectorCollects() {
+    SearchQuery first = searchQueryService.create(kafka.id(), null, "outbox", true, 50);
     searchQueryService.create(kafka.id(), null, "kafka outbox", true, 50);
-    searchQueryService.create(outbox.id(), null, "other repo query", true, 50);
 
-    List<Long> runIds = searchQueryService.runAll(kafka.id());
-    assertThat(runIds).hasSize(2);
-    assertThat(searchQueryService.runAll(kafka.id())).containsExactlyInAnyOrderElementsOf(runIds);
+    assertThatThrownBy(() -> searchQueryService.runAll(kafka.id()))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("Collector orchestration is required");
+    assertThatThrownBy(() -> searchQueryService.runNow(first.id()))
+        .isInstanceOf(ApiException.class)
+        .hasMessage("Collector orchestration is required");
+    assertThat(jdbcClient.sql("SELECT COUNT(*) FROM search_run").query(Integer.class).single())
+        .isZero();
   }
 
   @Test
@@ -90,7 +93,8 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
     assertThat(before.change().kind()).isEqualTo(RankChangeMath.Kind.UNCHANGED);
     assertThat(before.totalResults()).isEqualTo(443);
 
-    searchQueryService.runNow(query.id());
+    // The Collector re-collecting today re-opens the day's run; simulate that state directly.
+    searchRunRepository.requeueCompleted(runId(query.id(), today));
 
     SearchQueryService.SearchHistory during = searchQueryService.history(query.id());
     assertThat(during.searchStatus()).isEqualTo("READY");
@@ -154,7 +158,7 @@ class SearchQueryServiceIT extends AbstractPostgresTest {
     storeSnapshot(query.id(), today.minusDays(1), 4, 460);
     storeSnapshot(query.id(), today, 3, 466);
 
-    long runId = searchQueryService.runNow(query.id());
+    long runId = runId(query.id(), today);
     searchRunRepository.markFailed(runId, "RATE_LIMIT", "secondary rate limit");
 
     SearchQueryService.SearchHistory after = searchQueryService.history(query.id());

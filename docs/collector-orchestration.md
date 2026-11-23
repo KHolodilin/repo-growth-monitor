@@ -8,11 +8,13 @@ acceptance, credentials, execution and callback ingestion (#212–#217) are impl
 
 Migration 014 is additive in the **existing RGM database**. It creates six new tables and never copies,
 renames, truncates or alters existing collection/history tables. New relationships are logical, without FK.
-Existing default execution stays enabled until `rgm.orchestration.enabled=true`. When that flag is true,
-DailyPlanner uses the new creation service and both legacy worker pools are excluded. Old planner entry
-points and the old Collect POST reject calls with the new route, preventing duplicate legacy work.
-Before the final switch, drain/reconcile existing legacy jobs; disabling a pool does not migrate unfinished jobs.
-The frontend caller changes in the later UI/API work packages. Do not enable this flag in production yet.
+In-process legacy GitHub workers, `GitHubClient`, and embedded collector runtime
+(`CollectorRuntimeConfiguration` / `rgm.collector.enabled`) have been removed from the product
+backend. Collection requires `rgm.orchestration.enabled=true` (plus credentials and collector nodes).
+Without orchestration, admin collect/search/topic/plan commands fail closed and never fall back to a
+direct GitHub call. Status distinguishes `ORCHESTRATION_DISABLED` from `COLLECTOR_UNAVAILABLE`.
+Empty-install repository refresh creates credential-scoped `DISCOVER_REPOSITORIES` jobs (no seed
+repository row required).
 
 Example operator configuration (node endpoints and pools are trusted deployment configuration):
 

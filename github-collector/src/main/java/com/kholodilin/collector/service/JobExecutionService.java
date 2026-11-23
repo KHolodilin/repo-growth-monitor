@@ -80,7 +80,7 @@ public final class JobExecutionService implements AutoCloseable {
     CollectorMdc.bindAttempt(job.attemptId().toString());
     CollectorMdc.bindJob(job.jobId().toString(), job.type().name());
     try {
-      log.info("Collect start type={} repository={}", job.type(), job.repository().githubId());
+      log.info("Collect start type={} repository={}", job.type(), repositoryGithubId(job));
       if (!job.deadlineAt().isAfter(clock.instant())) {
         finish(
             lease,
@@ -103,7 +103,7 @@ public final class JobExecutionService implements AutoCloseable {
               job.jobId(),
               job.attemptId(),
               job.type(),
-              job.repository().githubId(),
+              repositoryGithubId(job),
               JobState.SUCCEEDED,
               snapshot,
               null);
@@ -151,6 +151,11 @@ public final class JobExecutionService implements AutoCloseable {
       CollectorMdc.clear();
     }
     return true;
+  }
+
+  /** {@code null} only for DISCOVER_REPOSITORIES, which has no repository yet. */
+  private static String repositoryGithubId(JobRequest job) {
+    return job.repository() == null ? null : job.repository().githubId();
   }
 
   private Instant later(Instant value) {
@@ -201,7 +206,7 @@ public final class JobExecutionService implements AutoCloseable {
             job.jobId(),
             job.attemptId(),
             job.type(),
-            job.repository().githubId(),
+            repositoryGithubId(job),
             JobState.FAILED,
             null,
             failure);

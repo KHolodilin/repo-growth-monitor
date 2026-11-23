@@ -2,9 +2,12 @@ package com.kholodilin.repogrowth.common.api;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -25,18 +28,17 @@ import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
 import com.kholodilin.repogrowth.collection.planner.DailyPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.common.config.GitHubProperties;
 import com.kholodilin.repogrowth.common.web.SpaController;
+import com.kholodilin.repogrowth.credentials.GitHubAccessStatusService;
 import com.kholodilin.repogrowth.event.api.GrowthEventController;
 import com.kholodilin.repogrowth.event.application.GrowthEventService;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
-import com.kholodilin.repogrowth.github.client.GitHubClient;
 import com.kholodilin.repogrowth.github.client.SystemStatusController;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
+import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.repository.api.HealthCheckItem;
 import com.kholodilin.repogrowth.repository.api.RepositoryController;
@@ -59,10 +61,8 @@ import com.kholodilin.repogrowth.support.WebMvcTestSecurityConfig;
 import com.kholodilin.repogrowth.topic.api.TopicVisibilityController;
 import com.kholodilin.repogrowth.topic.application.TopicCompetitorService;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService;
-import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
 import com.kholodilin.repogrowth.topic.domain.TopicRun;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
-import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -70,6 +70,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +78,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
@@ -94,11 +96,17 @@ import org.springframework.test.web.servlet.MockMvc;
 class ApiControllersWebMvcTest {
 
   @Autowired MockMvc mockMvc;
+  @Autowired CollectionController collectionController;
+  @Autowired SearchQueryController searchQueryController;
+  @Autowired TopicVisibilityController topicVisibilityController;
+
+  private final CollectionRequestService collectionRequestService =
+      mock(CollectionRequestService.class);
 
   @MockitoBean RepositoryService repositoryService;
   @MockitoBean RepositoryHealthService repositoryHealthService;
   @MockitoBean ActivityClassifier activityClassifier;
-  @MockitoBean CollectionPlanner collectionPlanner;
+  @MockitoBean GitHubAccessStatusService accessStatusService;
   @MockitoBean PlanningWindow planningWindow;
   @MockitoBean DailyPlanner dailyPlanner;
   @MockitoBean CollectionRunJdbcRepository runRepository;
@@ -108,11 +116,7 @@ class ApiControllersWebMvcTest {
   @MockitoBean GrowthEventService growthEventService;
   @MockitoBean TopicVisibilityService topicVisibilityService;
   @MockitoBean TopicCompetitorService topicCompetitorService;
-  @MockitoBean TopicWatchSync topicWatchSync;
-  @MockitoBean TopicPlanner topicPlanner;
   @MockitoBean AnalyticsService analyticsService;
-  @MockitoBean GitHubProperties gitHubProperties;
-  @MockitoBean GitHubClient gitHubClient;
   @MockitoBean CurrentUserAccess currentUserAccess;
   @MockitoBean PublicationService publicationService;
 
@@ -122,6 +126,13 @@ class ApiControllersWebMvcTest {
 
   @BeforeEach
   void stubs() {
+    ReflectionTestUtils.setField(collectionController, "commands", collectionRequestService);
+    ReflectionTestUtils.setField(searchQueryController, "commands", collectionRequestService);
+    ReflectionTestUtils.setField(topicVisibilityController, "commands", collectionRequestService);
+    when(accessStatusService.status())
+        .thenReturn(
+            new GitHubAccessStatusService.Status(
+                true, GitHubAccessStatusService.TokenState.UNVERIFIED));
     Instant now = Instant.parse("2026-09-23T06:00:00Z");
     repository =
         new Repository(
@@ -171,10 +182,18 @@ class ApiControllersWebMvcTest {
     when(planningWindow.from()).thenReturn(LocalTime.of(9, 30));
     when(planningWindow.to()).thenReturn(LocalTime.of(17, 0));
     when(planningWindow.isOpen()).thenReturn(true);
+    CollectionRequestService.Created created =
+        new CollectionRequestService.Created(UUID.randomUUID(), List.of(UUID.randomUUID()), false);
     CollectionRun run =
         new CollectionRun(
             1L, 13L, LocalDate.of(2026, 9, 23), CollectionRunStatus.SUCCESS, 1, 1, 0, now, now);
-    when(collectionPlanner.planRepository(eq(13L), any(), eq(true))).thenReturn(run);
+    when(collectionRequestService.manual(13L, LocalDate.of(2026, 9, 23))).thenReturn(created);
+    when(collectionRequestService.searchCommand(5L, LocalDate.of(2026, 9, 23))).thenReturn(created);
+    when(collectionRequestService.searchAllCommand(13L, LocalDate.of(2026, 9, 23)))
+        .thenReturn(created);
+    when(collectionRequestService.topicCommand(7L, LocalDate.of(2026, 9, 23))).thenReturn(created);
+    when(collectionRequestService.topicsCommand(13L, "all", LocalDate.of(2026, 9, 23)))
+        .thenReturn(created);
     when(runRepository.findById(1L)).thenReturn(Optional.of(run));
     when(jobRepository.findByRun(1L))
         .thenReturn(
@@ -200,8 +219,6 @@ class ApiControllersWebMvcTest {
     when(searchQueryService.create(eq(13L), any(), any(), any(), any())).thenReturn(query);
     when(searchQueryService.update(eq(5L), any(), any(), any(), any())).thenReturn(query);
     when(searchQueryService.getQuery(5L)).thenReturn(query);
-    when(searchQueryService.runNow(5L)).thenReturn(9L);
-    when(searchQueryService.runAll(13L)).thenReturn(List.of(9L));
     SearchRun searchRun =
         new SearchRun(
             9L,
@@ -291,8 +308,6 @@ class ApiControllersWebMvcTest {
     TopicVisibilityService.TopicRunResults topicResults =
         new TopicVisibilityService.TopicRunResults(topicRun, watch, List.of());
     when(topicVisibilityService.visibility(eq(13L), anyString())).thenReturn(List.of(history));
-    when(topicVisibilityService.runAll(eq(13L), anyString())).thenReturn(List.of(3L));
-    when(topicVisibilityService.runNow(7L)).thenReturn(3L);
     when(topicVisibilityService.history(7L)).thenReturn(history);
     when(topicVisibilityService.latestResults(7L)).thenReturn(topicResults);
     when(topicVisibilityService.historyByTopic(eq(13L), eq("outbox"), anyString()))
@@ -317,8 +332,6 @@ class ApiControllersWebMvcTest {
     when(analyticsService.snapshotHistory(eq(13L), any(), any(), any(), anyBoolean()))
         .thenReturn(null);
     when(analyticsService.statsHistory(eq(13L), anyString())).thenReturn(null);
-    when(gitHubProperties.tokenConfigured()).thenReturn(true);
-    when(gitHubClient.maskedToken()).thenReturn("gho_****");
   }
 
   @Test
@@ -337,10 +350,8 @@ class ApiControllersWebMvcTest {
     mockMvc
         .perform(post("/api/v1/admin/repositories/13/collect"))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.status").value("SUCCESS"));
-    verify(searchQueryService).runAll(13L);
-    verify(topicWatchSync).sync(13L);
-    verify(topicPlanner).planRepository(eq(13L), eq(LocalDate.of(2026, 9, 23)));
+        .andExpect(jsonPath("$.coalesced").value(false));
+    verify(collectionRequestService).manual(13L, LocalDate.of(2026, 9, 23));
     mockMvc.perform(post("/api/v1/admin/collection/plan")).andExpect(status().isCreated());
     mockMvc
         .perform(get("/api/v1/admin/collection-runs/1"))
@@ -365,10 +376,12 @@ class ApiControllersWebMvcTest {
     mockMvc
         .perform(post("/api/v1/admin/search-queries/5/run"))
         .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.searchRunId").value(9));
+        .andExpect(jsonPath("$.coalesced").value(false));
     mockMvc
         .perform(post("/api/v1/admin/repositories/13/search-queries/run"))
         .andExpect(status().isCreated());
+    verify(collectionRequestService).searchCommand(5L, LocalDate.of(2026, 9, 23));
+    verify(collectionRequestService).searchAllCommand(13L, LocalDate.of(2026, 9, 23));
     mockMvc.perform(get("/api/v1/admin/search-queries/5")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/admin/search-queries/5/history")).andExpect(status().isOk());
     mockMvc
@@ -418,6 +431,8 @@ class ApiControllersWebMvcTest {
         .perform(post("/api/v1/admin/repositories/13/topic-watches/run"))
         .andExpect(status().isCreated());
     mockMvc.perform(post("/api/v1/admin/topic-watches/7/run")).andExpect(status().isCreated());
+    verify(collectionRequestService).topicsCommand(13L, "all", LocalDate.of(2026, 9, 23));
+    verify(collectionRequestService).topicCommand(7L, LocalDate.of(2026, 9, 23));
     mockMvc.perform(get("/api/v1/admin/topic-watches/7/history")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/admin/topic-watches/7/results")).andExpect(status().isOk());
     mockMvc
@@ -513,38 +528,85 @@ class ApiControllersWebMvcTest {
   }
 
   @Test
-  void statusAndCollectFollowTheTokenAndRepositorySignals() throws Exception {
-    when(gitHubClient.tokenStatus()).thenReturn(null);
-    when(gitHubProperties.tokenConfigured()).thenReturn(false);
+  void statusReportsCredentialStateWithoutClaimingTheTokenWorks() throws Exception {
+    when(accessStatusService.status())
+        .thenReturn(
+            new GitHubAccessStatusService.Status(
+                false, GitHubAccessStatusService.TokenState.MISSING));
     mockMvc
         .perform(get("/api/v1/admin/system/status"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.credentialsConfigured").value(false))
         .andExpect(jsonPath("$.tokenState").value("MISSING"))
         .andExpect(jsonPath("$.planner.timezone").value("Europe/Berlin"))
         .andExpect(jsonPath("$.planner.from").value("09:30"))
         .andExpect(jsonPath("$.planner.to").value("17:00"))
         .andExpect(jsonPath("$.planner.open").value(true));
 
-    when(gitHubProperties.tokenConfigured()).thenReturn(true);
-    when(gitHubClient.tokenStatus())
+    when(accessStatusService.status())
         .thenReturn(
-            new GitHubClient.TokenStatus("RATE_LIMITED", Instant.parse("2033-05-18T03:33:20Z")));
+            new GitHubAccessStatusService.Status(
+                true, GitHubAccessStatusService.TokenState.UNVERIFIED));
     mockMvc
         .perform(get("/api/v1/admin/system/status"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.tokenState").value("RATE_LIMITED"))
-        .andExpect(jsonPath("$.rateLimitReset").exists());
+        .andExpect(jsonPath("$.credentialsConfigured").value(true))
+        .andExpect(jsonPath("$.tokenState").value("UNVERIFIED"))
+        .andExpect(jsonPath("$.githubTokenMasked").doesNotExist());
 
-    when(gitHubProperties.tokenConfigured()).thenReturn(false);
+    when(accessStatusService.status())
+        .thenReturn(
+            new GitHubAccessStatusService.Status(
+                true, GitHubAccessStatusService.TokenState.ORCHESTRATION_DISABLED));
     mockMvc
-        .perform(post("/api/v1/admin/repositories/13/collect"))
-        .andExpect(status().isUnauthorized());
-    when(gitHubProperties.tokenConfigured()).thenReturn(true);
-    when(gitHubClient.tokenRejected()).thenReturn(true);
-    mockMvc
-        .perform(post("/api/v1/admin/repositories/13/collect"))
-        .andExpect(status().isUnauthorized());
+        .perform(get("/api/v1/admin/system/status"))
+        .andExpect(jsonPath("$.tokenState").value("ORCHESTRATION_DISABLED"));
 
+    when(accessStatusService.status())
+        .thenReturn(
+            new GitHubAccessStatusService.Status(
+                true, GitHubAccessStatusService.TokenState.COLLECTOR_UNAVAILABLE));
+    mockMvc
+        .perform(get("/api/v1/admin/system/status"))
+        .andExpect(jsonPath("$.tokenState").value("COLLECTOR_UNAVAILABLE"));
+  }
+
+  @Test
+  void collectIsUnavailableWithoutCollectorOrchestration() throws Exception {
+    ReflectionTestUtils.setField(collectionController, "commands", null);
+    try {
+      mockMvc
+          .perform(post("/api/v1/admin/repositories/13/collect"))
+          .andExpect(status().isServiceUnavailable());
+    } finally {
+      ReflectionTestUtils.setField(collectionController, "commands", collectionRequestService);
+    }
+  }
+
+  @Test
+  void searchAndTopicRunsAreUnavailableWithoutCollectorOrchestration() throws Exception {
+    ReflectionTestUtils.setField(searchQueryController, "commands", null);
+    ReflectionTestUtils.setField(topicVisibilityController, "commands", null);
+    try {
+      for (String path :
+          List.of(
+              "/api/v1/admin/search-queries/5/run",
+              "/api/v1/admin/repositories/13/search-queries/run",
+              "/api/v1/admin/repositories/13/topic-watches/run",
+              "/api/v1/admin/topic-watches/7/run")) {
+        mockMvc.perform(post(path)).andExpect(status().isServiceUnavailable());
+      }
+      verify(searchQueryService, never()).runNow(anyLong());
+      verify(searchQueryService, never()).runAll(anyLong());
+      verify(topicVisibilityService, never()).runNow(anyLong());
+      verify(topicVisibilityService, never()).runAll(anyLong(), anyString());
+    } finally {
+      ReflectionTestUtils.setField(searchQueryController, "commands", collectionRequestService);
+      ReflectionTestUtils.setField(topicVisibilityController, "commands", collectionRequestService);
+    }
+  }
+
+  @Test
+  void repositorySignalsAreExposedOnTheDetail() throws Exception {
     when(repositoryService.signalsFor(any()))
         .thenReturn(Map.of(13L, new RepositorySignals(false, true)));
     mockMvc

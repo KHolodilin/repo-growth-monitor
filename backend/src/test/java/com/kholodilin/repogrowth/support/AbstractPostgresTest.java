@@ -24,7 +24,8 @@ public abstract class AbstractPostgresTest {
     registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
     registry.add("spring.datasource.username", POSTGRES::getUsername);
     registry.add("spring.datasource.password", POSTGRES::getPassword);
-    registry.add("github.token", () -> "test-token");
+    // Keep CURRENT_DATE aligned with the app Clock (UTC), not the host JVM zone.
+    registry.add("spring.datasource.hikari.connection-init-sql", () -> "SET TIME ZONE 'UTC'");
     registry.add("collection.planner.from", () -> "00:00");
     registry.add("collection.planner.to", () -> "23:59");
     registry.add("collection.workers", () -> "0");

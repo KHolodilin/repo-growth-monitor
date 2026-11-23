@@ -1,12 +1,10 @@
 package com.kholodilin.repogrowth;
 
-import com.kholodilin.bootstrap.CollectorRuntimeConfiguration;
-import com.kholodilin.bootstrap.ProductRoleFilter;
 import com.kholodilin.repogrowth.auth.application.UserAccountService;
 import com.kholodilin.repogrowth.auth.cli.UsersCli;
 import com.kholodilin.repogrowth.common.config.AppProperties;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
-import com.kholodilin.repogrowth.common.config.GitHubProperties;
+import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
 import com.kholodilin.repogrowth.common.config.TrafficProperties;
 import org.springframework.boot.SpringApplication;
@@ -18,7 +16,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
-import org.springframework.context.annotation.Import;
 
 @SpringBootApplication(
     excludeName = {
@@ -30,23 +27,20 @@ import org.springframework.context.annotation.Import;
       "com.kholodilin.idempotency.autoconfigure.IdempotencyCleanupAutoConfiguration",
       "com.kholodilin.idempotency.autoconfigure.IdempotencyAutoConfiguration"
     })
-@Import(CollectorRuntimeConfiguration.class)
 @ComponentScan(
     basePackages = "com.kholodilin.repogrowth",
     excludeFilters = {
       @ComponentScan.Filter(type = FilterType.CUSTOM, classes = TypeExcludeFilter.class),
       @ComponentScan.Filter(
           type = FilterType.CUSTOM,
-          classes = AutoConfigurationExcludeFilter.class),
-      @ComponentScan.Filter(type = FilterType.CUSTOM, classes = ProductRoleFilter.class)
+          classes = AutoConfigurationExcludeFilter.class)
     })
 @EnableConfigurationProperties({
   AppProperties.class,
-  GitHubProperties.class,
   CollectionProperties.class,
   SearchProperties.class,
-  TrafficProperties.class,
-  com.kholodilin.collector.configuration.SearchProperties.class
+  CollectorSearchProperties.class,
+  TrafficProperties.class
 })
 public class RepoGrowthMonitorApplication {
 

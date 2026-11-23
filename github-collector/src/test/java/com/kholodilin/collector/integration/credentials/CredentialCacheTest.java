@@ -125,6 +125,30 @@ class CredentialCacheTest {
   }
 
   @Test
+  void discoveryJobWithoutRepositoryUsesDiscoverSlot() {
+    var base = job("context-d");
+    var discover =
+        new JobRequest(
+            1,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            TaskType.DISCOVER_REPOSITORIES,
+            null,
+            base.businessDate(),
+            1,
+            Parameters.repository(),
+            "rgm-results",
+            base.deadlineAt(),
+            base.authorization());
+    jobs.put(discover.jobId(), discover);
+    assertThat(cache.get("rgm", discover).token()).isEqualTo("rgm-secret-1");
+    assertThat(cache.get("rgm", discover).token()).isEqualTo("rgm-secret-1");
+    assertThat(calls).hasValue(1);
+    assertThat(cache.mappingSize()).isEqualTo(1);
+  }
+
+  @Test
   void ttlIsTwoHoursAfterWriteAndReadsDoNotExtendIt() {
     var job = job("ctx");
     cache.get("rgm", job);

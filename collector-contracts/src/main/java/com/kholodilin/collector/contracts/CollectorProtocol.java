@@ -189,14 +189,15 @@ public final class CollectorProtocol {
    * @param jobId durable product task / job id
    * @param attemptId this specific attempt (also used as HTTP idempotency key)
    * @param type work kind
-   * @param repository target repository
+   * @param repository target repository; {@code null} only for {@link
+   *     TaskType#DISCOVER_REPOSITORIES} (account-wide discovery with no repository yet)
    * @param businessDate calendar day the snapshot belongs to
    * @param configurationRevision hash/revision of the frozen configuration used for this job
    * @param parameters search/topic settings or {@link Parameters#repository()}
    * @param destinationRef where Collector should deliver the result (RGM destination)
    * @param deadlineAt stop trying after this instant
    * @param authorization vault scope for credential resolve; may be {@code null} only for legacy
-   *     jobs
+   *     jobs, never for {@link TaskType#DISCOVER_REPOSITORIES}
    */
   public record JobRequest(
       int schemaVersion,
@@ -248,7 +249,8 @@ public final class CollectorProtocol {
       Objects.requireNonNull(jobId);
       Objects.requireNonNull(attemptId);
       Objects.requireNonNull(type);
-      Objects.requireNonNull(repository);
+      if (type == TaskType.DISCOVER_REPOSITORIES) Objects.requireNonNull(authorization);
+      else Objects.requireNonNull(repository);
       Objects.requireNonNull(businessDate);
       Objects.requireNonNull(parameters);
       text(destinationRef, "destinationRef");
@@ -451,7 +453,8 @@ public final class CollectorProtocol {
    * @param jobId product job id
    * @param attemptId product attempt id
    * @param type task type that produced this result
-   * @param repositoryGithubId repository GitHub id as decimal string
+   * @param repositoryGithubId repository GitHub id as decimal string; {@code null} only for {@link
+   *     TaskType#DISCOVER_REPOSITORIES}
    * @param status {@link JobState#SUCCEEDED} or {@link JobState#FAILED}
    * @param snapshot present only on success
    * @param failure present only on failure
@@ -476,7 +479,7 @@ public final class CollectorProtocol {
       Objects.requireNonNull(jobId);
       Objects.requireNonNull(attemptId);
       Objects.requireNonNull(type);
-      text(repositoryGithubId, "repositoryGithubId");
+      if (type != TaskType.DISCOVER_REPOSITORIES) text(repositoryGithubId, "repositoryGithubId");
       if (status == JobState.SUCCEEDED) {
         Objects.requireNonNull(snapshot);
         if (failure != null) throw new IllegalArgumentException("successful result has no failure");

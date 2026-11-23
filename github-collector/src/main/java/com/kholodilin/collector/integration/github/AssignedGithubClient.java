@@ -126,6 +126,10 @@ public final class AssignedGithubClient {
             "/user/repos?affiliation=owner,collaborator,organization_member&sort=full_name", page));
   }
 
+  public String accessibleRepositoriesMetadata(JsonArrayPage page) {
+    return observations.accessibleRepositoriesMetadata(page);
+  }
+
   public String ownedRepositoriesMetadata(JsonArrayPage page, String ownerLogin) {
     return observations.ownedRepositoriesMetadata(page, ownerLogin);
   }

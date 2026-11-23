@@ -6,8 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.collector.integration.credentials.CredentialCache;
-import com.kholodilin.collector.model.CredentialSettings;
 import com.kholodilin.repogrowth.auth.application.UserAccountService;
 import com.kholodilin.repogrowth.auth.mock.MockUserCatalog;
 import com.kholodilin.repogrowth.auth.security.*;
@@ -229,23 +227,8 @@ class CredentialVaultIT extends AbstractPostgresTest {
     resolve(credentialRequest(original), NODE_A, 403);
     resolve(credentialRequest(moved), NODE_A, 403);
     resolve(credentialRequest(moved), NODE_B, 200);
-    var properties =
-        new CredentialSettings(
-            Duration.ofHours(2),
-            100,
-            1000,
-            Duration.ofSeconds(5),
-            Duration.ofSeconds(3),
-            Duration.ofSeconds(10),
-            List.of());
-    var b =
-        new CredentialCache(
-            (origin, request) -> vault.resolve("node-b", request),
-            properties,
-            Clock.systemUTC(),
-            com.github.benmanes.caffeine.cache.Ticker.systemTicker());
-    assertThat(b.mappingSize()).isZero();
-    assertThat(b.get("rgm", moved).token()).isEqualTo("github-secret-v1");
+    assertThat(vault.resolve("node-b", credentialRequest(moved)).token())
+        .isEqualTo("github-secret-v1");
   }
 
   @Test
@@ -883,6 +866,33 @@ class CredentialVaultIT extends AbstractPostgresTest {
         .andExpect(status().isCreated());
   }
 
+  @Test
+  void emptyInstallRefreshDiscoversFromTheVaultCredentialWithoutARepositoryTarget()
+      throws Exception {
+    jdbc.update("DELETE FROM repository_credential");
+    wipeRepositoryData(jdbcClient);
+    vault.rotate("github-main", "github-secret-v2", null);
+
+    var created = requests.refresh(LocalDate.now());
+
+    assertThat(created).hasSize(1);
+    assertThat(
+            jdbc.queryForObject(
+                "SELECT count(*) FROM collection_task WHERE task_type='DISCOVER_REPOSITORIES' AND repository_id IS NULL AND credential_ref='github-main'",
+                Long.class))
+        .isEqualTo(1);
+    JobRequest discovery =
+        json.readValue(
+            jdbc.queryForObject(
+                "SELECT d.payload::text FROM collector_dispatch d JOIN collection_task t ON t.current_attempt_id=d.attempt_id WHERE t.task_type='DISCOVER_REPOSITORIES'",
+                String.class),
+            JobRequest.class);
+    assertThat(discovery.type()).isEqualTo(TaskType.DISCOVER_REPOSITORIES);
+    assertThat(discovery.repository()).isNull();
+    assertThat(discovery.authorization()).isNotNull();
+    assertThat(discovery.authorization().credentialRef()).isEqualTo("github-main");
+  }
+
   @Autowired com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository trafficRepository;
 
   @Test
@@ -890,7 +900,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
     var job = typedTask(TaskType.REFERRERS);
     trafficRepository.insertReferrers(
         repositoryId,
-        LocalDate.now().minusDays(1),
+        LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1),
         Instant.now().minusSeconds(86400),
         "old.example",
         7,
@@ -925,13 +935,13 @@ class CredentialVaultIT extends AbstractPostgresTest {
             null));
     assertThat(trafficRepository.latestReferrerSnapshot(repositoryId).rows()).isEmpty();
     assertThat(trafficRepository.latestReferrerSnapshot(repositoryId).snapshotAt()).isNotNull();
+    LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
     var pivot =
         com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.pivot(
-            trafficRepository.referrerSnapshotsForDelta(
-                repositoryId, LocalDate.now().minusDays(1), LocalDate.now()),
-            LocalDate.now().minusDays(1),
-            LocalDate.now());
-    assertThat(pivot.dates()).containsExactly(LocalDate.now().minusDays(1), LocalDate.now());
+            trafficRepository.referrerSnapshotsForDelta(repositoryId, today.minusDays(1), today),
+            today.minusDays(1),
+            today);
+    assertThat(pivot.dates()).containsExactly(today.minusDays(1), today);
   }
 
   @Test

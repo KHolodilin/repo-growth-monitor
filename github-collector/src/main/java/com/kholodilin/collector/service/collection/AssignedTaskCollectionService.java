@@ -227,11 +227,13 @@ public final class AssignedTaskCollectionService {
     // Page budget exhausted while the last page still looks full: result may be incomplete.
     if (lastRepositories != null && lastRepositories.hasNext())
       throw new IncompleteObservationException();
+    JsonArrayPage accessible = new JsonArrayPage(github.mergeJsonArrays(pages), totalItems, false);
+    // No repository yet (empty install): publish everything the credential can see.
     draft.metadata.put(
         "repositories",
-        github.ownedRepositoriesMetadata(
-            new JsonArrayPage(github.mergeJsonArrays(pages), totalItems, false),
-            job.repository().owner()));
+        job.repository() == null
+            ? github.accessibleRepositoriesMetadata(accessible)
+            : github.ownedRepositoriesMetadata(accessible, job.repository().owner()));
   }
 
   private void collectTraffic(

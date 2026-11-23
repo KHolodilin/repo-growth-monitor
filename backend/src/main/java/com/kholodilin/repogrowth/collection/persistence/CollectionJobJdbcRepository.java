@@ -3,13 +3,10 @@ package com.kholodilin.repogrowth.collection.persistence;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
-import com.kholodilin.repogrowth.common.persistence.SqlTime;
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -60,59 +57,6 @@ public class CollectionJobJdbcRepository {
         .update();
   }
 
-  public Optional<CollectionJob> claim(String workerId, Duration lease) {
-    return jdbcClient
-        .sql(
-            """
-            WITH candidate AS (
-                SELECT id
-                FROM collection_job
-                WHERE (
-                    status IN ('READY', 'RETRY')
-                    OR (status = 'RUNNING' AND locked_until < NOW())
-                )
-                  AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-                  AND (locked_until IS NULL OR locked_until < NOW())
-                ORDER BY created_at
-                FOR UPDATE SKIP LOCKED
-                LIMIT 1
-            )
-            UPDATE collection_job j
-            SET status = 'RUNNING',
-                locked_by = :workerId,
-                locked_until = NOW() + make_interval(secs => :leaseSeconds),
-                started_at = NOW(),
-                attempt = attempt + 1,
-                updated_at = NOW()
-            FROM candidate
-            WHERE j.id = candidate.id
-            RETURNING j.*
-            """)
-        .param("workerId", workerId)
-        .param("leaseSeconds", lease.toSeconds())
-        .query(MAPPER)
-        .optional();
-  }
-
-  public void releaseClaim(long id, CollectionJobStatus status) {
-    jdbcClient
-        .sql(
-            """
-            UPDATE collection_job
-            SET status = :status,
-                locked_by = NULL,
-                locked_until = NULL,
-                started_at = NULL,
-                attempt = GREATEST(attempt - 1, 0),
-                next_attempt_at = NOW() + INTERVAL '5 seconds',
-                updated_at = NOW()
-            WHERE id = :id
-            """)
-        .param("status", status.name())
-        .param("id", id)
-        .update();
-  }
-
   public void markSuccess(long id) {
     jdbcClient
         .sql(
@@ -128,27 +72,6 @@ public class CollectionJobJdbcRepository {
             WHERE id = :id
             """)
         .param("id", id)
-        .update();
-  }
-
-  public void markRetry(long id, Instant nextAttemptAt, String errorCode, String errorMessage) {
-    jdbcClient
-        .sql(
-            """
-            UPDATE collection_job
-            SET status = 'RETRY',
-                locked_by = NULL,
-                locked_until = NULL,
-                next_attempt_at = :nextAttemptAt,
-                error_code = :errorCode,
-                error_message = :errorMessage,
-                updated_at = NOW()
-            WHERE id = :id
-            """)
-        .param("id", id)
-        .param("nextAttemptAt", SqlTime.ts(nextAttemptAt))
-        .param("errorCode", errorCode)
-        .param("errorMessage", truncate(errorMessage))
         .update();
   }
 
@@ -194,42 +117,6 @@ public class CollectionJobJdbcRepository {
         .param("runIds", runIds)
         .query(MAPPER)
         .list();
-  }
-
-  public int requeueFailed(long runId) {
-    return jdbcClient
-        .sql(
-            """
-            UPDATE collection_job
-            SET status = 'READY',
-                locked_by = NULL,
-                locked_until = NULL,
-                next_attempt_at = NOW(),
-                updated_at = NOW()
-            WHERE collection_run_id = :runId
-              AND status = 'FAILED'
-            """)
-        .param("runId", runId)
-        .update();
-  }
-
-  public int requeueCompleted(long runId, CollectionJobType type) {
-    return jdbcClient
-        .sql(
-            """
-            UPDATE collection_job
-            SET status = 'READY',
-                locked_by = NULL,
-                locked_until = NULL,
-                next_attempt_at = NOW(),
-                updated_at = NOW()
-            WHERE collection_run_id = :runId
-              AND job_type = :jobType
-              AND status IN ('SUCCESS', 'FAILED')
-            """)
-        .param("runId", runId)
-        .param("jobType", type.name())
-        .update();
   }
 
   public int countByStatus(CollectionJobStatus status) {

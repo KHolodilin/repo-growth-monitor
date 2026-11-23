@@ -9,7 +9,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableConfigurationProperties({
   OrchestrationProperties.class,
   RecoveryProperties.class,
-  com.kholodilin.collector.configuration.SearchProperties.class
+  com.kholodilin.repogrowth.common.config.CollectorSearchProperties.class
 })
 public class OrchestrationConfiguration {
   @org.springframework.context.annotation.Bean
