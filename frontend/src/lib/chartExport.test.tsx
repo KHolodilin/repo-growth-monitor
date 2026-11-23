@@ -54,12 +54,16 @@ describe("chartExport", () => {
       [{ date: "2026-09-23", views: 8, uniqueVisitors: 3, clones: 2, uniqueCloners: 1 }],
       [event],
     );
-    expect(chartCsv(traffic)).toBe("date,Views,Visitors,Clones,Unique Cloners\n2026-09-21,,,,\n2026-09-23,8,3,2,1");
+    expect(chartCsv(traffic)).toBe(
+      "date,Views,Visitors,Clones,Unique Cloners\n2026-09-21,,,,\n2026-09-23,8,3,2,1",
+    );
     expect(chartCsv(traffic)).not.toContain("Events");
 
     expect(
       chartCsv(
-        statsChartOption([{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 }]),
+        statsChartOption([
+          { date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 },
+        ]),
       ),
     ).toBe("date,Stars,Forks,Watchers,Contributors\n2026-09-23,21,16,0,7");
 
@@ -71,17 +75,21 @@ describe("chartExport", () => {
         ]),
       ),
     ).toBe("date,Views,Visitors,Clones,Unique Cloners\n2026-10-08,,3,1,\n2026-10-09,2,,,");
-    expect(chartCsv({
-      xAxis: { data: ["2026-10-18"] },
-      series: [
-        { name: "Views", type: "line", data: [null] },
-        { name: "Views", type: "line", data: [{ value: 7 }] },
-      ],
-    })).toBe("date,Views\n2026-10-18,7");
-    expect(chartCsv({
-      xAxis: { data: ["2026-10-18"] },
-      series: [{ name: "Views", type: "line" }],
-    })).toBe("date,Views\n2026-10-18,");
+    expect(
+      chartCsv({
+        xAxis: { data: ["2026-10-18"] },
+        series: [
+          { name: "Views", type: "line", data: [null] },
+          { name: "Views", type: "line", data: [{ value: 7 }] },
+        ],
+      }),
+    ).toBe("date,Views\n2026-10-18,7");
+    expect(
+      chartCsv({
+        xAxis: { data: ["2026-10-18"] },
+        series: [{ name: "Views", type: "line" }],
+      }),
+    ).toBe("date,Views\n2026-10-18,");
   });
 
   it("keeps hidden series, escapes cells, and ignores marker-only shapes", () => {
@@ -105,14 +113,19 @@ describe("chartExport", () => {
     expect(chartCsv({ xAxis: {} })).toBe("date");
     expect(chartCsv({ xAxis: { data: ["2026-09-23"] } })).toBe("date\n2026-09-23");
     expect(chartCsv({})).toBe("date");
-    expect(chartCsv({ xAxis: [{ data: ["2026-09-23"] }], series: [{ name: "Rank", type: "line", data: [{ value: null }] }] })).toBe(
-      "date,Rank\n2026-09-23,",
-    );
+    expect(
+      chartCsv({
+        xAxis: [{ data: ["2026-09-23"] }],
+        series: [{ name: "Rank", type: "line", data: [{ value: null }] }],
+      }),
+    ).toBe("date,Rank\n2026-09-23,");
   });
 
   it("downloads the drawn png and a csv file", () => {
     const downloads: { href: string; download: string }[] = [];
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
       downloads.push({ href: this.href, download: this.download });
     });
     const blobs: Blob[] = [];
@@ -127,7 +140,11 @@ describe("chartExport", () => {
 
     const getDataURL = vi.fn(() => "data:image/png;base64,AAAA");
     downloadChartPng({ getEchartsInstance: () => ({ getDataURL }) }, "13-traffic.png");
-    expect(getDataURL).toHaveBeenCalledWith({ type: "png", pixelRatio: 2, backgroundColor: "#fff" });
+    expect(getDataURL).toHaveBeenCalledWith({
+      type: "png",
+      pixelRatio: 2,
+      backgroundColor: "#fff",
+    });
     expect(downloads).toEqual([{ href: "blob:chart", download: "13-traffic.png" }]);
 
     downloadChartCsv("13-traffic.csv", "date,Views\n2026-09-23,4");
@@ -145,7 +162,9 @@ describe("chartExport", () => {
   it("offers png and csv on the chart", async () => {
     const user = userEvent.setup();
     const downloads: string[] = [];
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
       downloads.push(this.download);
     });
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:chart");

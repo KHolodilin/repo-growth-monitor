@@ -24,7 +24,8 @@ describe("utils", () => {
   });
 
   it("merges class names", () => {
-    expect(cn("a", false && "b", "c")).toContain("a");
+    const skip = false;
+    expect(cn("a", skip && "b", "c")).toContain("a");
   });
 
   it("formats numbers ranks growth and deltas", () => {
@@ -58,9 +59,18 @@ describe("utils", () => {
   it("formats query rank changes and activity", () => {
     expect(formatQueryRankChange(null).label).toBe("—");
     expect(formatQueryRankChange({ kind: "UNCHANGED", amount: 0, rank: 1 }).label).toBe("—");
-    expect(formatQueryRankChange({ kind: "IMPROVED", amount: 2, rank: 3 })).toEqual({ label: "↑ 2", direction: "up" });
-    expect(formatQueryRankChange({ kind: "DECLINED", amount: 1, rank: 5 })).toEqual({ label: "↓ 1", direction: "down" });
-    expect(formatQueryRankChange({ kind: "ENTERED", amount: 0, rank: 8 })).toEqual({ label: "NEW #8", direction: "up" });
+    expect(formatQueryRankChange({ kind: "IMPROVED", amount: 2, rank: 3 })).toEqual({
+      label: "↑ 2",
+      direction: "up",
+    });
+    expect(formatQueryRankChange({ kind: "DECLINED", amount: 1, rank: 5 })).toEqual({
+      label: "↓ 1",
+      direction: "down",
+    });
+    expect(formatQueryRankChange({ kind: "ENTERED", amount: 0, rank: 8 })).toEqual({
+      label: "NEW #8",
+      direction: "up",
+    });
     expect(formatQueryRankChange({ kind: "EXITED", amount: 50, rank: null })).toEqual({
       label: "↓ >50",
       direction: "down",
@@ -100,6 +110,10 @@ describe("utils", () => {
 
   it("fills calendar gaps", () => {
     expect(calendarDates([])).toEqual([]);
-    expect(calendarDates(["2026-09-23", "2026-09-21"])).toEqual(["2026-09-21", "2026-09-22", "2026-09-23"]);
+    expect(calendarDates(["2026-09-23", "2026-09-21"])).toEqual([
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+    ]);
   });
 });

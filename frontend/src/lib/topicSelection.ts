@@ -12,17 +12,28 @@ export function readTopicSelection(repositoryId: number): string[] | null {
     return null;
   }
   try {
-    const parsed = JSON.parse(decodeURIComponent(match[1])) as unknown;
-    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+    const parsed: unknown = JSON.parse(decodeURIComponent(match[1]));
+    if (!Array.isArray(parsed)) {
       return null;
     }
-    return parsed;
+    const slugs: string[] = [];
+    for (const item of parsed) {
+      if (typeof item !== "string") {
+        return null;
+      }
+      slugs.push(item);
+    }
+    return slugs;
   } catch {
     return null;
   }
 }
 
-export function writeTopicSelection(repositoryId: number, slugs: string[], protocol = currentProtocol()) {
+export function writeTopicSelection(
+  repositoryId: number,
+  slugs: string[],
+  protocol = currentProtocol(),
+) {
   const secure = protocol === "https:" ? "; Secure" : "";
   const value = encodeURIComponent(JSON.stringify(slugs));
   document.cookie = `${topicSelectionCookie(repositoryId)}=${value}; path=/; max-age=${MAX_AGE}; SameSite=Lax${secure}`;

@@ -33,10 +33,17 @@ function shareLines(total: number | null | undefined, leaders: StatsLeader[] | n
   if (rows.length === 0) {
     return "";
   }
-  return rows.map((leader) => `<div>${leader.fullName} - ${formatNumber(leader.value)}</div>`).join("");
+  return rows
+    .map((leader) => `<div>${leader.fullName} - ${formatNumber(leader.value)}</div>`)
+    .join("");
 }
 
-type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | { value?: number | null } | null };
+type TooltipItem = {
+  axisValue?: string;
+  name?: string;
+  seriesName: string;
+  data: number | { value?: number | null } | null;
+};
 
 function pointValue(data: TooltipItem["data"]) {
   if (data == null) {
@@ -67,8 +74,18 @@ export function statsChartOption(
   const byDate = new Map(seriesPoints.map((point) => [point.date, point]));
   const dates = seriesPoints.map((point) => point.date);
   return {
-    collectionDates: seriesPoints.filter(point => point.stars != null || point.forks != null || point.watchers != null || point.contributors != null).map(point => point.date),
-    partialCollectionDates: seriesPoints.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
+    collectionDates: seriesPoints
+      .filter(
+        (point) =>
+          point.stars != null ||
+          point.forks != null ||
+          point.watchers != null ||
+          point.contributors != null,
+      )
+      .map((point) => point.date),
+    partialCollectionDates: seriesPoints
+      .filter((point) => (point.missingRepositories ?? 0) > 0)
+      .map((point) => point.date),
     animation: false,
     tooltip: {
       trigger: "item" as const,
@@ -84,9 +101,10 @@ export function statsChartOption(
         }
         const point = byDate.get(dateKey);
         const missing = point?.missingRepositories ?? 0;
-        const partial = missing > 0 && point?.stars != null
-          ? `<div>${partialDayTooltip(missing, dateKey, "stats")}</div>`
-          : "";
+        const partial =
+          missing > 0 && point?.stars != null
+            ? `<div>${partialDayTooltip(missing, dateKey, "stats")}</div>`
+            : "";
         const rows = items
           .map((item) => {
             const value = pointValue(item.data);

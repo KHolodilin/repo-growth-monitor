@@ -11,6 +11,11 @@ describe("portfolioTipDay", () => {
     expect(chartYesterday("2026-03-01")).toBe("2026-02-28");
   });
 
+  it("defaults chartYesterday to the system UTC date", () => {
+    vi.setSystemTime(new Date("2026-11-18T12:00:00Z"));
+    expect(chartYesterday()).toBe("2026-11-17");
+  });
+
   it("drops only incomplete T−1 and keeps earlier partial days", () => {
     vi.setSystemTime(new Date("2026-11-18T12:00:00Z"));
     const points = [

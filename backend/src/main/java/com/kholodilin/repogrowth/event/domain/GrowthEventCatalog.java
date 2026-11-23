@@ -106,7 +106,7 @@ public final class GrowthEventCatalog {
   private GrowthEventCatalog() {}
 
   public static Map<String, Boolean> automaticDefaults() {
-    return AUTOMATIC_DEFAULTS;
+    return Map.copyOf(AUTOMATIC_DEFAULTS);
   }
 
   public static boolean isManualType(String type) {

@@ -8,18 +8,41 @@ export type ChartAxis = "calendar" | "timeline";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-type MarkItem = { xAxis?: string | number; yAxis?: number; y?: number };
-type Series = {
-  [key: string]: unknown;
+export type MarkItem = { xAxis?: string | number; yAxis?: number; y?: number };
+export type Series = {
   type?: string;
   showSymbol?: boolean;
   showAllSymbol?: boolean;
   name?: string;
   data?: unknown;
+  tooltip?: unknown;
+  lineStyle?: { opacity?: number; width?: number; [key: string]: unknown };
   markLine?: { data?: MarkItem[] };
-  markPoint?: { data?: MarkItem[]; [key: string]: unknown };
+  markPoint?: {
+    data?: MarkItem[];
+    label?: {
+      show?: boolean;
+      formatter?: unknown;
+      color?: string;
+      fontSize?: number;
+      [key: string]: unknown;
+    };
+    tooltip?: {
+      formatter?: (() => string) | string;
+      confine?: boolean;
+      triggerOn?: string;
+      [key: string]: unknown;
+    };
+    symbol?: string;
+    symbolSize?: number;
+    symbolOffset?: number[];
+    itemStyle?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  connectNulls?: boolean;
+  symbol?: string;
 };
-type ChartOption = {
+export type ChartOption = {
   snapshotHistory?: boolean;
   /** Public saved data does not assert that a planner was expected to run yesterday. */
   collectionExpected?: boolean;
@@ -34,7 +57,11 @@ type ChartOption = {
   yAxis?: { name?: string; inverse?: boolean } | unknown[];
   xAxis?: { data?: unknown; axisLabel?: Record<string, unknown> } | unknown[];
   series?: Series[];
-  tooltip?: { formatter?: (params: unknown) => unknown };
+  tooltip?: {
+    formatter?: unknown;
+    position?: unknown;
+    [key: string]: unknown;
+  };
   grid?: Record<string, unknown>;
 };
 
@@ -57,7 +84,9 @@ export function timelineColumns(dates: string[], columns: (number | null | undef
   const labels = Array.from({ length: longest.dates.length }, (_, index) => String(index + 1));
   return {
     labels,
-    columns: spans.map((span) => labels.map((_, index) => (index < span.values.length ? span.values[index] : null))),
+    columns: spans.map((span) =>
+      labels.map((_, index) => (index < span.values.length ? span.values[index] : null)),
+    ),
     dateToDay: new Map(longest.dates.map((date, index) => [date, String(index + 1)])),
     dayToDate: new Map(longest.dates.map((date, index) => [String(index + 1), date])),
   };
@@ -85,7 +114,10 @@ function stripEventMarks(option: ChartOption): ChartOption {
   };
 }
 
-function remapMarks<T extends { data?: MarkItem[] }>(mark: T | undefined, dateToDay: Map<string, string>) {
+function remapMarks<T extends { data?: MarkItem[] }>(
+  mark: T | undefined,
+  dateToDay: Map<string, string>,
+) {
   if (!mark || !Array.isArray(mark.data)) {
     return mark;
   }
@@ -113,17 +145,25 @@ function rewriteTooltipItem(item: unknown, day: string, date: string) {
   };
 }
 
-function wrapTooltip(tooltip: ChartOption["tooltip"], dayToDate: Map<string, string>, preserveSnapshotDate = false) {
+function wrapTooltip(
+  tooltip: ChartOption["tooltip"],
+  dayToDate: Map<string, string>,
+  preserveSnapshotDate = false,
+) {
   if (!tooltip || typeof tooltip.formatter !== "function") {
     return tooltip;
   }
-  const original = tooltip.formatter;
+  const original = tooltip.formatter as (params: unknown) => unknown;
   return {
     ...tooltip,
     formatter: (params: unknown) => {
       const list = Array.isArray(params) ? params : [params];
       const first = list[0] as { axisValue?: unknown; name?: unknown } | undefined;
-      const day = String(first?.axisValue ?? first?.name ?? "");
+      const raw = first?.axisValue ?? first?.name ?? "";
+      const day =
+        typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean"
+          ? String(raw)
+          : "";
       const date = dayToDate.get(day);
       if (!date) {
         return original(params);
@@ -136,7 +176,9 @@ function wrapTooltip(tooltip: ChartOption["tooltip"], dayToDate: Map<string, str
         return html;
       }
       if (preserveSnapshotDate) return `<div>Day ${day}</div>${html}`;
-      return html.replaceAll(formatChartAxisDate(date), `Day ${day}`).replaceAll(date, `Day ${day}`);
+      return html
+        .replaceAll(formatChartAxisDate(date), `Day ${day}`)
+        .replaceAll(date, `Day ${day}`);
     },
   };
 }
@@ -179,18 +221,21 @@ function toTimeline(option: ChartOption): ChartOption {
   const columns = series.map((item) =>
     Array.isArray(item.data) ? (item.data as (number | null)[]) : dates.map(() => null),
   );
-  const framed = option.snapshotHistory ? {
-    labels: dates.map((_, index) => String(index + 1)), columns,
-    dateToDay: new Map(dates.map((date, index) => [date, String(index + 1)])),
-    dayToDate: new Map(dates.map((date, index) => [String(index + 1), date])),
-  } : timelineColumns(dates, columns);
+  const framed = option.snapshotHistory
+    ? {
+        labels: dates.map((_, index) => String(index + 1)),
+        columns,
+        dateToDay: new Map(dates.map((date, index) => [date, String(index + 1)])),
+        dayToDate: new Map(dates.map((date, index) => [String(index + 1), date])),
+      }
+    : timelineColumns(dates, columns);
   if (framed.labels.length === 0) {
     return option;
   }
   const axis = option.xAxis as { data?: unknown; axisLabel?: Record<string, unknown> };
   return {
     ...option,
-    eventAxisDates: framed.labels.map(day => framed.dayToDate.get(day)!),
+    eventAxisDates: framed.labels.map((day) => framed.dayToDate.get(day)!),
     tooltip: wrapTooltip(option.tooltip, framed.dayToDate, option.snapshotHistory),
     xAxis: {
       ...axis,
@@ -210,52 +255,99 @@ function toTimeline(option: ChartOption): ChartOption {
 }
 
 /** Missing snapshots are metadata, never numeric zero or a fake rank. */
-export function withCollectionWarning(source: object, today = new Date().toISOString().slice(0, 10), extend = false): ChartOption {
+export function withCollectionWarning(
+  source: object,
+  today = new Date().toISOString().slice(0, 10),
+  extend = false,
+): ChartOption {
   const option = source as ChartOption;
   if (option.collectionExpected === false) return option;
-  if (option.series?.some(item => item.name === "Collection warning")) return option;
+  if (option.series?.some((item) => item.name === "Collection warning")) return option;
   const dates = categoryDates(option);
   if (!dates?.length) return option;
   const yesterday = new Date(`${today}T00:00:00Z`);
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   const date = yesterday.toISOString().slice(0, 10);
   const observed = option.collectionDates ?? [];
-  const absentSeries = option.collectionSeries?.filter(item => item.dates.some(day => day < date) && !item.dates.includes(date)).map(item => item.name) ?? [];
+  const absentSeries =
+    option.collectionSeries
+      ?.filter((item) => item.dates.some((day) => day < date) && !item.dates.includes(date))
+      .map((item) => item.name) ?? [];
   const partial = option.partialCollectionDates?.includes(date) || absentSeries.length > 0;
-  const absent = option.missedCollectionDates?.includes(date) || (observed.some(day => day < date) && !observed.includes(date));
-  const warning = option.collectionWarning ?? (partial ? { date, text: `Partial data for ${date}: ${absentSeries.length ? absentSeries.join(", ") : "one or more repositories"} — no stored snapshot.` } : absent ? { date, text: `No stored snapshot for ${date} (T-1).` } : null);
+  const absent =
+    option.missedCollectionDates?.includes(date) ||
+    (observed.some((day) => day < date) && !observed.includes(date));
+  const warning =
+    option.collectionWarning ??
+    (partial
+      ? {
+          date,
+          text: `Partial data for ${date}: ${absentSeries.length ? absentSeries.join(", ") : "one or more repositories"} — no stored snapshot.`,
+        }
+      : absent
+        ? { date, text: `No stored snapshot for ${date} (T-1).` }
+        : null);
   if (!warning) return option;
   // Finite windows already include yesterday. All-history axes may end at the last snapshot.
   const axisDates = option.eventAxisDates ?? dates;
   let slot = axisDates.indexOf(warning.date);
-  if (slot < 0 && (extend || option.collectionWarning) && /^\d{4}-/.test(dates[0]) && warning.date > dates[dates.length - 1]) {
-    dates.push(warning.date); slot = dates.length - 1;
+  if (
+    slot < 0 &&
+    (extend || option.collectionWarning) &&
+    /^\d{4}-/.test(dates[0]) &&
+    warning.date > dates[dates.length - 1]
+  ) {
+    dates.push(warning.date);
+    slot = dates.length - 1;
   }
   if (slot < 0) return option;
   // Pixel height stays inside the plot even when hidden series have much larger values.
   // Keep the date in axis coordinates so calendar/timeline placement still follows the day.
   const top = typeof option.grid?.top === "number" ? option.grid.top : 40;
-  return { ...option, xAxis: { ...option.xAxis, data: dates }, eventAxisDates: dates.every(day => /^\d{4}-/.test(day)) ? dates : option.eventAxisDates,
-    series: [...(option.series ?? []).map(item => ({ ...item, data: Array.isArray(item.data) ? [...item.data, ...Array(Math.max(0, dates.length - item.data.length)).fill(null)] : item.data })), {
-      name: "Collection warning", type: "scatter", data: [],
-      markPoint: { symbol: "triangle", symbolSize: 22, symbolOffset: [0, -14],
-        itemStyle: { color: "#fef3c7", borderColor: "#d97706", borderWidth: 1 },
-        label: { show: true, formatter: "!", color: "#92400e", fontSize: 13 },
-        tooltip: { trigger: "item", formatter: () => warning.text },
-        data: [{ xAxis: dates[slot], yAxis: 0, y: top + 14 }],
+  return {
+    ...option,
+    xAxis: { ...option.xAxis, data: dates },
+    eventAxisDates: dates.every((day) => /^\d{4}-/.test(day)) ? dates : option.eventAxisDates,
+    series: [
+      ...(option.series ?? []).map((item) => ({
+        ...item,
+        data: Array.isArray(item.data)
+          ? [
+              ...(item.data as unknown[]),
+              ...Array.from({ length: Math.max(0, dates.length - item.data.length) }, () => null),
+            ]
+          : item.data,
+      })),
+      {
+        name: "Collection warning",
+        type: "scatter",
+        data: [],
+        markPoint: {
+          symbol: "triangle",
+          symbolSize: 22,
+          symbolOffset: [0, -14],
+          itemStyle: { color: "#fef3c7", borderColor: "#d97706", borderWidth: 1 },
+          label: { show: true, formatter: "!", color: "#92400e", fontSize: 13 },
+          tooltip: { trigger: "item", formatter: () => warning.text },
+          data: [{ xAxis: dates[slot], yAxis: 0, y: top + 14 }],
+        },
       },
-    } as Series],
+    ],
   };
 }
 
 /** Confine both normal and marker tooltips; explicit wrapping beats ECharts' nowrap default. */
 function safeTooltip(tooltip: unknown, mobile: boolean): Record<string, unknown> {
-  return { ...(tooltip as Record<string, unknown>), confine: true, appendToBody: false,
+  return {
+    ...(tooltip as Record<string, unknown>),
+    confine: true,
+    appendToBody: false,
     ...(mobile ? { triggerOn: "click" } : {}),
     // Prefer above the pointer near the chart bottom so long Referrers/Paths tips stay in view at 390px.
     position: tooltipPosition,
     // Leave room above the home-indicator / browser chrome; scroll inside the tip if needed.
-    extraCssText: "max-width: min(360px, calc(100vw - 48px)); max-height: min(220px, calc(100vh - 96px)); overflow-y: auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
+    extraCssText:
+      "max-width: min(360px, calc(100vw - 48px)); max-height: min(220px, calc(100vh - 96px)); overflow-y: auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; box-sizing: border-box;",
   };
 }
 
@@ -294,26 +386,76 @@ export function presentChartOption<T>(
     return option;
   }
   const input = option as ChartOption;
-  const windowStart = mode.period ? periodDates(mode.period, new Date().toISOString().slice(0, 10))?.[0] : null;
-  const extend = mode.period === "all" || Boolean(windowStart && (input.eventAxisDates ?? categoryDates(input) ?? []).some(date => date >= windowStart));
+  const windowStart = mode.period
+    ? periodDates(mode.period, new Date().toISOString().slice(0, 10))?.[0]
+    : null;
+  const extend =
+    mode.period === "all" ||
+    Boolean(
+      windowStart &&
+      (input.eventAxisDates ?? categoryDates(input) ?? []).some((date) => date >= windowStart),
+    );
   let next = withCollectionWarning(input, undefined, extend);
-  if (next.tooltip || next.series?.some(item => item.type === "line" || item.markPoint)) next = { ...next, ...(next.tooltip ? { tooltip: safeTooltip(next.tooltip, Boolean(mode.mobile)) } : {}), series: next.series?.map(item => ({
-    ...item,
-    ...(item.type === "line" && item.name !== "Events" ? { showSymbol: true, showAllSymbol: true } : {}),
-    ...("tooltip" in item ? { tooltip: safeTooltip(item.tooltip, Boolean(mode.mobile)) } : {}),
-    ...(item.markPoint ? { markPoint: { ...item.markPoint, tooltip: safeTooltip((item.markPoint as { tooltip?: unknown }).tooltip, Boolean(mode.mobile)) } } : {}),
-  })) };
+  if (next.tooltip || next.series?.some((item) => item.type === "line" || item.markPoint))
+    next = {
+      ...next,
+      ...(next.tooltip ? { tooltip: safeTooltip(next.tooltip, Boolean(mode.mobile)) } : {}),
+      series: next.series?.map((item) => ({
+        ...item,
+        ...(item.type === "line" && item.name !== "Events"
+          ? { showSymbol: true, showAllSymbol: true }
+          : {}),
+        ...("tooltip" in item ? { tooltip: safeTooltip(item.tooltip, Boolean(mode.mobile)) } : {}),
+        ...(item.markPoint
+          ? {
+              markPoint: {
+                ...item.markPoint,
+                tooltip: safeTooltip(
+                  (item.markPoint as { tooltip?: unknown }).tooltip,
+                  Boolean(mode.mobile),
+                ),
+              },
+            }
+          : {}),
+      })),
+    };
   if (mode.mobile) {
     next = stripEventMarks(next);
     // Reserve space for labels dynamically instead of the desktop legend and gutters.
-    next = { ...next, grid: { ...next.grid, left: 4, right: next.series?.some(item => item.name === "Collection warning") ? 20 : 4, top: next.series?.some(item => item.name === "Collection warning") ? 40 : next.yAxis && !Array.isArray(next.yAxis) && next.yAxis.name ? 32 : 12, bottom: 8, containLabel: true } };
+    next = {
+      ...next,
+      grid: {
+        ...next.grid,
+        left: 4,
+        right: next.series?.some((item) => item.name === "Collection warning") ? 20 : 4,
+        top: next.series?.some((item) => item.name === "Collection warning")
+          ? 40
+          : next.yAxis && !Array.isArray(next.yAxis) && next.yAxis.name
+            ? 32
+            : 12,
+        bottom: 8,
+        containLabel: true,
+      },
+    };
   } else if (mode.events.length > 0 && !hasEvents(next)) {
     next = withEvents(next, mode.events, mode.period);
   }
   const warningTop = typeof next.grid?.top === "number" ? next.grid.top : 40;
-  if (next.series?.some(item => item.name === "Collection warning")) next = { ...next, series: next.series.map(item => item.name === "Collection warning"
-    ? { ...item, markPoint: { ...item.markPoint, data: item.markPoint?.data?.map(point => ({ ...point, y: warningTop + 14 })) } }
-    : item) };
+  if (next.series?.some((item) => item.name === "Collection warning"))
+    next = {
+      ...next,
+      series: next.series.map((item) =>
+        item.name === "Collection warning"
+          ? {
+              ...item,
+              markPoint: {
+                ...item.markPoint,
+                data: item.markPoint?.data?.map((point) => ({ ...point, y: warningTop + 14 })),
+              },
+            }
+          : item,
+      ),
+    };
   if (mode.axis === "timeline") {
     next = toTimeline(next);
   }

@@ -14,7 +14,11 @@ export type DashboardViewOptions = {
 };
 export const DashboardViewContext = createContext<DashboardViewOptions>({});
 export const useDashboardView = () => useContext(DashboardViewContext);
-export function repositoryHref(view: DashboardViewOptions, id: number | string, fullName?: string | null) {
+export function repositoryHref(
+  view: DashboardViewOptions,
+  id: number | string,
+  fullName?: string | null,
+) {
   if (view.repositoryHref) {
     return view.repositoryHref(id);
   }

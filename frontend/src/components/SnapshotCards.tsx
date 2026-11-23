@@ -76,7 +76,9 @@ export function SnapshotCards({
         rows={pathRows}
         snapshotAt={pathSnapshotAt}
         historyTo={`${historyRoot}/traffic/history?kind=paths`}
-        toolbar={<ServicePathToggle checked={showServicePaths} onChange={onShowServicePathsChange} />}
+        toolbar={
+          <ServicePathToggle checked={showServicePaths} onChange={onShowServicePathsChange} />
+        }
       />
     </div>
   );
@@ -134,7 +136,11 @@ export function SnapshotCard({
         </Link>
       </div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{snapshotAt ? `Snapshot: ${formatSyncTime(snapshotAt)}` : snapshotLabel ?? "No snapshot yet"}</span>
+        <span>
+          {snapshotAt
+            ? `Snapshot: ${formatSyncTime(snapshotAt)}`
+            : (snapshotLabel ?? "No snapshot yet")}
+        </span>
         {toolbar}
       </div>
       <div className="overflow-x-auto">
@@ -166,7 +172,13 @@ export function SnapshotCard({
             </tr>
           </thead>
           <tbody>
-            {sorted.length === 0 && <tr><td colSpan={3} className="py-6 text-center text-muted-foreground">No recorded sources or paths.</td></tr>}
+            {sorted.length === 0 && (
+              <tr>
+                <td colSpan={3} className="py-6 text-center text-muted-foreground">
+                  No recorded sources or paths.
+                </td>
+              </tr>
+            )}
             {sorted.map((row) => (
               <tr key={row.key} className="border-t">
                 <td className="max-w-0 py-2 pr-3 align-top">
@@ -177,12 +189,18 @@ export function SnapshotCard({
                         {wrapPath(row.title)}
                         {row.servicePath && <ServicePathBadge />}
                       </div>
-                      {row.subtitle && <div className="text-xs text-muted-foreground">{row.subtitle}</div>}
+                      {row.subtitle && (
+                        <div className="text-xs text-muted-foreground">{row.subtitle}</div>
+                      )}
                     </div>
                   </div>
                 </td>
-                <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.visitors)}</td>
-                <td className="whitespace-nowrap pl-2 text-right align-top">{formatNumber(row.views)}</td>
+                <td className="whitespace-nowrap pl-2 text-right align-top">
+                  {formatNumber(row.visitors)}
+                </td>
+                <td className="whitespace-nowrap pl-2 text-right align-top">
+                  {formatNumber(row.views)}
+                </td>
               </tr>
             ))}
           </tbody>

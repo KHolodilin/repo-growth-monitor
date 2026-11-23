@@ -15,7 +15,16 @@ import { useTableSort } from "../lib/tableSortPrefs";
 
 type ResultRow = SearchRunResults["rows"][number];
 
-const SORT_KEYS = ["position", "fullName", "stars", "watchers", "forks", "contributors", "activity", "delta"] as const;
+const SORT_KEYS = [
+  "position",
+  "fullName",
+  "stars",
+  "watchers",
+  "forks",
+  "contributors",
+  "activity",
+  "delta",
+] as const;
 const ASC_FIRST_KEYS = ["position", "fullName"] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
@@ -68,13 +77,52 @@ export function SearchResultsTable({
     return copy;
   }, [rows, sortKey, sortDir]);
 
-  if (mobile) return <ResultCards fields={SORT_KEYS} sortKey={sortKey} sortDir={sortDir} toggle={key => toggle(key as SortKey)} rows={sorted.map(row => {
-    const mine = trackedGithubId != null ? row.result.githubRepositoryId === trackedGithubId : trackedPosition != null && row.result.position === trackedPosition;
-    return { id: row.result.githubRepositoryId, position: row.result.position, tracked: mine,
-      name: <RepositoryName row={row} to={nameTo?.(row) ?? null} />,
-      metrics: [{ label: "Stars", value: formatNumber(row.result.stars) }, { label: "Forks", value: formatNumber(row.result.forks) }, { label: "Change", value: formatPositionDelta(row.positionDelta) },{ label: "Watchers", value: enrichedMetric(row.result.watchers, row.result.metadataUpdatedAt) }, { label: "Contributors", value: enrichedMetric(row.result.contributors, row.result.metadataUpdatedAt) }, { label: "Activity", value: formatActivityPresentation(row.result.activityStatus, row.result.activityAt) }],
-      selection: onToggle && !mine ? <ChartSelection name={row.result.fullName} checked={selectedIds.includes(row.result.githubRepositoryId)} onChange={() => onToggle(row.result.githubRepositoryId)} /> : undefined };
-  })} />;
+  if (mobile)
+    return (
+      <ResultCards
+        fields={SORT_KEYS}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        toggle={(key) => toggle(key as SortKey)}
+        rows={sorted.map((row) => {
+          const mine =
+            trackedGithubId != null
+              ? row.result.githubRepositoryId === trackedGithubId
+              : trackedPosition != null && row.result.position === trackedPosition;
+          return {
+            id: row.result.githubRepositoryId,
+            position: row.result.position,
+            tracked: mine,
+            name: <RepositoryName row={row} to={nameTo?.(row) ?? null} />,
+            metrics: [
+              { label: "Stars", value: formatNumber(row.result.stars) },
+              { label: "Forks", value: formatNumber(row.result.forks) },
+              { label: "Change", value: formatPositionDelta(row.positionDelta) },
+              {
+                label: "Watchers",
+                value: enrichedMetric(row.result.watchers, row.result.metadataUpdatedAt),
+              },
+              {
+                label: "Contributors",
+                value: enrichedMetric(row.result.contributors, row.result.metadataUpdatedAt),
+              },
+              {
+                label: "Activity",
+                value: formatActivityPresentation(row.result.activityStatus, row.result.activityAt),
+              },
+            ],
+            selection:
+              onToggle && !mine ? (
+                <ChartSelection
+                  name={row.result.fullName}
+                  checked={selectedIds.includes(row.result.githubRepositoryId)}
+                  onChange={() => onToggle(row.result.githubRepositoryId)}
+                />
+              ) : undefined,
+          };
+        })}
+      />
+    );
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] table-fixed text-sm">
@@ -173,14 +221,29 @@ export function SearchResultsTable({
                 <td className="max-w-0 px-4 py-2.5 align-top">
                   <RepositoryName row={row} to={nameTo?.(row) ?? null} />
                 </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.stars)}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{enrichedMetric(row.result.watchers, row.result.metadataUpdatedAt)}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatNumber(row.result.forks)}</td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{enrichedMetric(row.result.contributors, row.result.metadataUpdatedAt)}</td>
-                <td className={activityClass(row.result.activityStatus) + " whitespace-nowrap px-4 py-2.5 align-top"}>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">
+                  {formatNumber(row.result.stars)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">
+                  {enrichedMetric(row.result.watchers, row.result.metadataUpdatedAt)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">
+                  {formatNumber(row.result.forks)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">
+                  {enrichedMetric(row.result.contributors, row.result.metadataUpdatedAt)}
+                </td>
+                <td
+                  className={
+                    activityClass(row.result.activityStatus) +
+                    " whitespace-nowrap px-4 py-2.5 align-top"
+                  }
+                >
                   {formatActivityPresentation(row.result.activityStatus, row.result.activityAt)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">{formatPositionDelta(row.positionDelta)}</td>
+                <td className="whitespace-nowrap px-4 py-2.5 text-right align-top">
+                  {formatPositionDelta(row.positionDelta)}
+                </td>
               </tr>
             );
           })}
@@ -242,7 +305,9 @@ function SortHeader({
 
 function compareRows(left: ResultRow, right: ResultRow, key: SortKey, dir: "asc" | "desc"): number {
   if (key === "fullName") {
-    const compared = left.result.fullName.localeCompare(right.result.fullName, undefined, { sensitivity: "base" });
+    const compared = left.result.fullName.localeCompare(right.result.fullName, undefined, {
+      sensitivity: "base",
+    });
     return dir === "desc" ? -compared : compared;
   }
   if (key === "activity") {
@@ -269,7 +334,11 @@ function compareRows(left: ResultRow, right: ResultRow, key: SortKey, dir: "asc"
   return compareNumbers(left.result[key], right.result[key], dir);
 }
 
-function compareNumbers(left: number | null | undefined, right: number | null | undefined, dir: "asc" | "desc"): number {
+function compareNumbers(
+  left: number | null | undefined,
+  right: number | null | undefined,
+  dir: "asc" | "desc",
+): number {
   if (left == null && right == null) {
     return 0;
   }

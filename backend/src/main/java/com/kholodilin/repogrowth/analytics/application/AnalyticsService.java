@@ -754,11 +754,12 @@ public class AnalyticsService {
     LocalDate expectedEnd = to.isBefore(today.minusDays(1)) ? to : today.minusDays(1);
     LocalDate first = null;
     LocalDate last = null;
-    for (LocalDate day : byDate.keySet()) {
+    for (var entry : byDate.entrySet()) {
+      LocalDate day = entry.getKey();
       if (day.isBefore(from) || day.isAfter(expectedEnd)) {
         continue;
       }
-      if (byDate.get(day).isEmpty()) {
+      if (entry.getValue().isEmpty()) {
         continue;
       }
       if (first == null || day.isBefore(first)) {
@@ -844,8 +845,9 @@ public class AnalyticsService {
     LocalDate expectedEnd = to.isBefore(today.minusDays(1)) ? to : today.minusDays(1);
     LocalDate first = null;
     LocalDate last = null;
-    for (LocalDate day : byDate.keySet()) {
-      if (day.isBefore(from) || day.isAfter(expectedEnd) || byDate.get(day).isEmpty()) {
+    for (var entry : byDate.entrySet()) {
+      LocalDate day = entry.getKey();
+      if (day.isBefore(from) || day.isAfter(expectedEnd) || entry.getValue().isEmpty()) {
         continue;
       }
       if (first == null || day.isBefore(first)) {

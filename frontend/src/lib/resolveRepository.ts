@@ -29,8 +29,9 @@ export async function resolveRepository(owner: string, repository: string): Prom
     const list = await api<Repository[]>("/api/v1/admin/repositories?refresh=false");
     const match = list.find(
       (row) =>
-        row.fullName.toLowerCase() === fullName.toLowerCase()
-        || (row.owner.login.toLowerCase() === owner.toLowerCase() && row.name.toLowerCase() === repository.toLowerCase()),
+        row.fullName.toLowerCase() === fullName.toLowerCase() ||
+        (row.owner.login.toLowerCase() === owner.toLowerCase() &&
+          row.name.toLowerCase() === repository.toLowerCase()),
     );
     if (match) {
       return match;

@@ -11,22 +11,29 @@ export function useResolvedRepositoryId(owner?: string, repository?: string) {
   const directId = params.id ?? params.repositoryId;
   const pathOwner = owner ?? params.owner;
   const pathRepository = repository ?? params.repository;
+  const resolveKey = directId ?? `${pathOwner ?? ""}/${pathRepository ?? ""}`;
+  const [seenKey, setSeenKey] = useState(resolveKey);
   const [id, setId] = useState<string | undefined>(directId);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  if (resolveKey !== seenKey) {
+    setSeenKey(resolveKey);
     if (directId) {
       setId(directId);
       setError(null);
-      return;
-    }
-    if (!pathOwner || !pathRepository) {
+    } else if (!pathOwner || !pathRepository) {
       setId(undefined);
+    } else {
+      setId(undefined);
+      setError(null);
+    }
+  }
+
+  useEffect(() => {
+    if (directId || !pathOwner || !pathRepository) {
       return;
     }
     let cancelled = false;
-    setId(undefined);
-    setError(null);
     resolveRepository(pathOwner, pathRepository)
       .then((repo) => {
         if (!cancelled) {

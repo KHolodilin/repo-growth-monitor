@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.Yaml;
 
 @Component
-public class MockUserCatalog {
+public final class MockUserCatalog {
 
   public static final String ISSUER = "mock";
 

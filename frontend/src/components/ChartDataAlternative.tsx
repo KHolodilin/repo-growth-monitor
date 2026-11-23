@@ -108,10 +108,16 @@ function SortHeader({
   onClick: () => void;
 }) {
   return (
-    <th scope="col" className={cn("p-2 font-medium", align === "left" ? "text-left" : "text-right")}>
+    <th
+      scope="col"
+      className={cn("p-2 font-medium", align === "left" ? "text-left" : "text-right")}
+    >
       <button
         type="button"
-        className={cn("inline-flex min-h-11 items-center gap-1 rounded px-1", align === "right" && "flex-row-reverse")}
+        className={cn(
+          "inline-flex min-h-11 items-center gap-1 rounded px-1",
+          align === "right" && "flex-row-reverse",
+        )}
         aria-pressed={active}
         onClick={onClick}
       >

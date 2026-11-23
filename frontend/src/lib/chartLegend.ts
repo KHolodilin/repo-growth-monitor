@@ -60,12 +60,12 @@ function parseAll(parsed: unknown): Record<string, Record<string, boolean>> | nu
     return null;
   }
   const result: Record<string, Record<string, boolean>> = {};
-  for (const [chartId, value] of Object.entries(parsed)) {
+  for (const [chartId, value] of Object.entries(parsed as Record<string, unknown>)) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       continue;
     }
     const selected: Record<string, boolean> = {};
-    for (const [key, flag] of Object.entries(value)) {
+    for (const [key, flag] of Object.entries(value as Record<string, unknown>)) {
       if (typeof flag === "boolean") {
         selected[key] = flag;
       }
@@ -80,13 +80,23 @@ function readAll(): Record<string, Record<string, boolean>> {
 }
 
 export function readChartSelection(chartId: string): Record<string, boolean> | null {
-  if (publicContext(chartId)) return readPublicPreference(chartId, "legend", (v): v is Record<string, boolean> => Boolean(v && typeof v === "object" && Object.values(v).every(item => typeof item === "boolean"))) ?? null;
+  if (publicContext(chartId))
+    return (
+      readPublicPreference(chartId, "legend", (v): v is Record<string, boolean> =>
+        Boolean(
+          v && typeof v === "object" && Object.values(v).every((item) => typeof item === "boolean"),
+        ),
+      ) ?? null
+    );
   const stored = readAll()[chartId];
   return stored && Object.keys(stored).length > 0 ? stored : null;
 }
 
 export function writeChartSelection(chartId: string, selected: Record<string, boolean>) {
-  if (publicContext(chartId)) { writePublicPreference(chartId, "legend", selected); return; }
+  if (publicContext(chartId)) {
+    writePublicPreference(chartId, "legend", selected);
+    return;
+  }
   const all = readAll();
   const cleaned: Record<string, boolean> = {};
   for (const [key, flag] of Object.entries(selected)) {
@@ -125,10 +135,7 @@ export function defaultChartSelection(keys: string[]): Record<string, boolean> {
   return selected;
 }
 
-export function resolveChartSelection(
-  chartId: string,
-  keys: string[],
-): Record<string, boolean> {
+export function resolveChartSelection(chartId: string, keys: string[]): Record<string, boolean> {
   const stored = readChartSelection(chartId);
   if (!stored) {
     return defaultChartSelection(keys);

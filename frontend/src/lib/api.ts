@@ -26,6 +26,17 @@ export class ApiError extends Error {
   }
 }
 
+function errorMessageFromBody(body: unknown, fallback: string): string {
+  if (body && typeof body === "object" && "message" in body) {
+    const { message } = body;
+    if (typeof message === "string") {
+      // Keep empty string so 401/403 can apply their status-specific defaults.
+      return message;
+    }
+  }
+  return fallback || "Request failed";
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!headers.has("Content-Type") && init?.body != null) {
@@ -43,8 +54,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     credentials: path.startsWith("/api/v1/public/") ? "omit" : "include",
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ message: response.statusText }));
-    const message = body.message ?? "Request failed";
+    let body: unknown;
+    try {
+      // Real Response.json() is thenable; some mocks return a plain value.
+      body = await response.json();
+    } catch {
+      body = { message: response.statusText };
+    }
+    const message = errorMessageFromBody(body, response.statusText);
     if (response.status === 401) {
       throw new ApiError(401, message || "Sign in required");
     }
@@ -110,7 +127,12 @@ export type RepositoryHealth = {
 };
 
 export type TrafficCoverage = { observedDays: number; expectedDays: number };
-export type TrafficMetric = { value: number | null; growthPercent: number | null; coverage?: TrafficCoverage | null; previousCoverage?: TrafficCoverage | null };
+export type TrafficMetric = {
+  value: number | null;
+  growthPercent: number | null;
+  coverage?: TrafficCoverage | null;
+  previousCoverage?: TrafficCoverage | null;
+};
 
 export type Dashboard = {
   period: string;
@@ -361,7 +383,7 @@ export type GrowthEvent = {
   title: string;
   description?: string;
   url?: string;
-  source: "GITHUB" | "MANUAL" | "SYSTEM" | string;
+  source: "GITHUB" | "MANUAL" | "SYSTEM" | (string & {});
   externalId?: string;
   createdAt?: string;
   updatedAt?: string;

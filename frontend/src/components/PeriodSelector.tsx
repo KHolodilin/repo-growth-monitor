@@ -103,7 +103,9 @@ export function PeriodSelector({
       className={cn(
         "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium",
         fitMobile && "min-h-11 min-w-0 px-0 md:min-h-0 md:px-3",
-        period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+        period === item
+          ? "bg-card text-foreground shadow-xs"
+          : "text-muted-foreground hover:text-foreground",
       )}
       aria-pressed={period === item}
       onClick={() => onPeriod(item)}

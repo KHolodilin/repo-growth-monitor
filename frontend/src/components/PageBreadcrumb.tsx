@@ -14,9 +14,15 @@ export type BreadcrumbItem = {
 
 export function PageBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
   return (
-    <nav className="flex min-w-0 flex-wrap items-center gap-y-1 text-sm md:block" aria-label="Breadcrumb">
+    <nav
+      className="flex min-w-0 flex-wrap items-center gap-y-1 text-sm md:block"
+      aria-label="Breadcrumb"
+    >
       {items.map((item, index) => (
-        <span key={`${item.label}-${index}`} className="inline-flex min-w-0 max-w-full items-center md:inline">
+        <span
+          key={`${item.label}-${index}`}
+          className="inline-flex min-w-0 max-w-full items-center md:inline"
+        >
           {index > 0 && (
             <span className="mx-2 shrink-0 text-muted-foreground" aria-hidden="true">
               ›
@@ -34,9 +40,13 @@ export function PageBreadcrumb({ items }: { items: BreadcrumbItem[] }) {
               {item.label}
             </Link>
           ) : index === items.length - 1 ? (
-            <h1 className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">{item.label}</h1>
+            <h1 className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">
+              {item.label}
+            </h1>
           ) : (
-            <span className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">{item.label}</span>
+            <span className="inline min-w-0 break-normal text-sm font-medium text-muted-foreground">
+              {item.label}
+            </span>
           )}
         </span>
       ))}

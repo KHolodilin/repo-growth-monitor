@@ -1,7 +1,16 @@
 import type { SearchHistory, TopicHistory } from "./api";
 import type { SortDirection } from "./tableSortPrefs";
 
-export const QUERY_SORT_KEYS = ["name", "rank", "change", "change7d", "change30d", "best", "results", "updated"] as const;
+export const QUERY_SORT_KEYS = [
+  "name",
+  "rank",
+  "change",
+  "change7d",
+  "change30d",
+  "best",
+  "results",
+  "updated",
+] as const;
 
 export type QuerySortKey = (typeof QUERY_SORT_KEYS)[number];
 
@@ -22,17 +31,31 @@ export function sortTopicHistories(
   });
 }
 
-export function compareTopicRows(left: TopicHistory, right: TopicHistory, key: QuerySortKey, dir: SortDirection): number {
+export function compareTopicRows(
+  left: TopicHistory,
+  right: TopicHistory,
+  key: QuerySortKey,
+  dir: SortDirection,
+): number {
   if (key === "name") {
-    const compared = left.watch.topic.localeCompare(right.watch.topic, undefined, { sensitivity: "base" });
+    const compared = left.watch.topic.localeCompare(right.watch.topic, undefined, {
+      sensitivity: "base",
+    });
     return dir === "desc" ? -compared : compared;
   }
   return compareQueryRows(topicAsSearchHistory(left), topicAsSearchHistory(right), key, dir);
 }
 
-export function compareQueryRows(left: SearchHistory, right: SearchHistory, key: QuerySortKey, dir: SortDirection): number {
+export function compareQueryRows(
+  left: SearchHistory,
+  right: SearchHistory,
+  key: QuerySortKey,
+  dir: SortDirection,
+): number {
   if (key === "name") {
-    const compared = left.query.name.localeCompare(right.query.name, undefined, { sensitivity: "base" });
+    const compared = left.query.name.localeCompare(right.query.name, undefined, {
+      sensitivity: "base",
+    });
     return dir === "desc" ? -compared : compared;
   }
   const leftValue = querySortValue(left, key);
@@ -64,7 +87,11 @@ function topicAsSearchHistory(item: TopicHistory): SearchHistory {
     change7d: item.change7d,
     change30d: item.change30d,
     bestRank: item.bestRank,
-    points: item.points.map((point) => ({ date: point.date, position: point.position, searchRunId: point.topicRunId })),
+    points: item.points.map((point) => ({
+      date: point.date,
+      position: point.position,
+      searchRunId: point.topicRunId,
+    })),
     lastChecked: item.lastChecked,
     searchStatus: item.searchStatus,
     totalResults: item.totalResults,

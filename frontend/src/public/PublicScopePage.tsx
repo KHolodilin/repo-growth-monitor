@@ -35,36 +35,58 @@ export function PublicScopePage() {
   const [busy, setBusy] = useState(true);
   const [retry, setRetry] = useState(0);
   const scope = overview ? publicScope(overview) : "";
-  const stored = scope ? readPublicPreference(scope, "period", (v): v is Period => PERIODS.includes(v as Period)) : undefined;
-  const period: Period = PERIODS.includes(params.get("period") as Period) ? (params.get("period") as Period) : stored ?? "30d";
+  const stored = scope
+    ? readPublicPreference(scope, "period", (v): v is Period => PERIODS.includes(v as Period))
+    : undefined;
+  const period: Period = PERIODS.includes(params.get("period") as Period)
+    ? (params.get("period") as Period)
+    : (stored ?? "30d");
   const rawTab = params.get("tab");
   const tab = rawTab === "stats" ? "stats" : "traffic";
-
-  useEffect(() => {
-    const abort = new AbortController();
+  const ownerLoadKey = `${owner}:${retry}:${location.pathname}:${location.search}`;
+  const [seenOwnerLoadKey, setSeenOwnerLoadKey] = useState(ownerLoadKey);
+  if (ownerLoadKey !== seenOwnerLoadKey) {
+    setSeenOwnerLoadKey(ownerLoadKey);
     setOverview(null);
     setModel(null);
     setRows([]);
     setError(null);
     setBusy(true);
+  }
+  const detailLoadKey = overview ? `${publicScope(overview)}:${period}:${retry}` : null;
+  const [seenDetailLoadKey, setSeenDetailLoadKey] = useState(detailLoadKey);
+  if (detailLoadKey !== seenDetailLoadKey) {
+    setSeenDetailLoadKey(detailLoadKey);
+    if (overview) {
+      setBusy(true);
+      setError(null);
+      setModel(null);
+    }
+  }
+
+  useEffect(() => {
+    const abort = new AbortController();
     api<PublicOverview>(publicBase(owner), { signal: abort.signal })
       .then((next) => {
         if (abort.signal.aborted) return;
         if (next.repository) {
-          navigate(`/${encodeURIComponent(next.owner.login)}/${encodeURIComponent(next.repository.name)}${location.search}`, {
-            replace: true,
-          });
+          void navigate(
+            `/${encodeURIComponent(next.owner.login)}/${encodeURIComponent(next.repository.name)}${location.search}`,
+            {
+              replace: true,
+            },
+          );
           return;
         }
         if (next.canonicalPath !== location.pathname.replace(/\/$/, "")) {
-          navigate(next.canonicalPath + location.search, { replace: true });
+          void navigate(next.canonicalPath + location.search, { replace: true });
           return;
         }
         setOverview(next);
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         if (!abort.signal.aborted) {
-          setError(err);
+          setError(err instanceof Error ? err : new Error(String(err)));
           setBusy(false);
         }
       });
@@ -75,14 +97,15 @@ export function PublicScopePage() {
     if (!overview) return;
     const abort = new AbortController();
     const base = publicBase(overview.owner.login);
-    setBusy(true);
-    setError(null);
-    setModel(null);
     Promise.all([
       api<StatsResponse>(`${base}/stats?period=${period}`, { signal: abort.signal }),
       historyRows(`${base}/stats-history?period=${period}`, abort.signal),
-      overview.modules.traffic ? api<TrafficResponse>(`${base}/traffic?period=${period}`, { signal: abort.signal }) : Promise.resolve(null),
-      overview.modules.traffic ? historyRows(`${base}/traffic-history?period=${period}`, abort.signal) : Promise.resolve([]),
+      overview.modules.traffic
+        ? api<TrafficResponse>(`${base}/traffic?period=${period}`, { signal: abort.signal })
+        : Promise.resolve(null),
+      overview.modules.traffic
+        ? historyRows(`${base}/traffic-history?period=${period}`, abort.signal)
+        : Promise.resolve([]),
       publicRepositoryRows(base, period, abort.signal),
       publicEvents(base, abort.signal),
     ])
@@ -90,10 +113,14 @@ export function PublicScopePage() {
         if (abort.signal.aborted) return;
         setRows(repositories);
         setEvents(loadedEvents);
-        setModel(adaptPublicDashboard(overview, stats, statsRows, traffic, trafficRows, repositories));
+        setModel(
+          adaptPublicDashboard(overview, stats, statsRows, traffic, trafficRows, repositories),
+        );
       })
-      .catch((err) => {
-        if (!abort.signal.aborted) setError(err);
+      .catch((err: unknown) => {
+        if (!abort.signal.aborted) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+        }
       })
       .finally(() => {
         if (!abort.signal.aborted) setBusy(false);
@@ -119,22 +146,30 @@ export function PublicScopePage() {
       <section role="alert" className="space-y-3">
         <h1 className="text-xl font-semibold">Data unavailable</h1>
         <p>{error.message}</p>
-        <button className="min-h-11 rounded border px-4" onClick={() => setRetry((value) => value + 1)}>
+        <button
+          className="min-h-11 rounded border px-4"
+          onClick={() => setRetry((value) => value + 1)}
+        >
           Retry
         </button>
       </section>
     );
-  if (!overview) return <p role="status" className="py-10">Loading dashboard…</p>;
+  if (!overview)
+    return (
+      <p role="status" className="py-10">
+        Loading dashboard…
+      </p>
+    );
 
   const heading = overview.owner.login;
   const breadcrumb = (
     <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap gap-2 text-sm">
-          <Link to="/" className="text-primary">
-            Home
-          </Link>
-          <span aria-hidden="true">›</span>
-          <span aria-current="page">{overview.owner.login}</span>
-        </nav>
+      <Link to="/" className="text-primary">
+        Home
+      </Link>
+      <span aria-hidden="true">›</span>
+      <span aria-current="page">{overview.owner.login}</span>
+    </nav>
   );
   const href = (id: number | string) =>
     `/${encodeURIComponent(overview.owner.login)}/${encodeURIComponent(rows.find((row) => row.id === String(id))?.name ?? "")}`;
@@ -154,7 +189,6 @@ export function PublicScopePage() {
       }}
     >
       <div className="space-y-4" key={scope}>
-
         {overview.freshness.state === "EMPTY" && (
           <p role="status" className="text-sm text-muted-foreground">
             No saved snapshots yet.
@@ -175,7 +209,13 @@ export function PublicScopePage() {
             events={events}
           />
         ) : model ? (
-          <PublicModules overview={overview} rows={rows} tab={tab} period={period} events={events} />
+          <PublicModules
+            overview={overview}
+            rows={rows}
+            tab={tab}
+            period={period}
+            events={events}
+          />
         ) : null}
       </div>
     </DashboardViewContext.Provider>

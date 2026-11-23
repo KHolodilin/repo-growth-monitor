@@ -57,9 +57,17 @@ export function RankSummary({
         {(["Current Rank", bestLabel, "7d Change", "30d Change"] as const).map((label) => (
           <div key={label} className="min-w-0">
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className={label.includes("Rank") ? "mt-1 text-xl font-semibold" : "mt-1 text-sm font-medium"}>
+            <dd
+              className={
+                label.includes("Rank") ? "mt-1 text-xl font-semibold" : "mt-1 text-sm font-medium"
+              }
+            >
               {values[label]}
-              {(label === "7d Change" ? change7d : label === "30d Change" ? change30d : undefined) === 0 && (
+              {(label === "7d Change"
+                ? change7d
+                : label === "30d Change"
+                  ? change30d
+                  : undefined) === 0 && (
                 <span className="ml-1 text-xs font-normal text-muted-foreground">No change</span>
               )}
             </dd>

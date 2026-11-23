@@ -10,7 +10,12 @@ const CHART_HEIGHT = 360;
 const TOP_BAND = 40;
 
 function legendTop(option: object) {
-  const chart = echarts.init(null, null, { renderer: "svg", ssr: true, width: 800, height: CHART_HEIGHT });
+  const chart = echarts.init(null, null, {
+    renderer: "svg",
+    ssr: true,
+    width: 800,
+    height: CHART_HEIGHT,
+  });
   chart.setOption(option as never);
   const laidOut = chart as unknown as {
     getModel: () => { getComponent: (mainType: string, index: number) => object };
@@ -31,9 +36,13 @@ describe("chart legend layout", () => {
           [],
         ),
       ),
-      dashboard: legendTop(dashboardTrafficOption([{ date: "2026-10-08", views: 5, visitors: 3, clones: 1 }])),
+      dashboard: legendTop(
+        dashboardTrafficOption([{ date: "2026-10-08", views: 5, visitors: 3, clones: 1 }]),
+      ),
       stats: legendTop(
-        statsChartOption([{ date: "2026-10-08", stars: 21, forks: 16, watchers: 0, contributors: 7 }]),
+        statsChartOption([
+          { date: "2026-10-08", stars: 21, forks: 16, watchers: 0, contributors: 7 },
+        ]),
       ),
       rank: legendTop(
         rankHistoryOption({

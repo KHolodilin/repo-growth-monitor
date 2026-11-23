@@ -50,7 +50,8 @@ export function parsePlannerWindow(value: unknown): PlannerWindow | null {
   if (typeof record.open !== "boolean") {
     return null;
   }
-  const timezone = typeof record.timezone === "string" && record.timezone.length > 0 ? record.timezone : "UTC";
+  const timezone =
+    typeof record.timezone === "string" && record.timezone.length > 0 ? record.timezone : "UTC";
   return { timezone, from: record.from, to: record.to, open: record.open };
 }
 
@@ -72,10 +73,18 @@ export function parseGitHubAccess(value: unknown): GitHubAccess {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { tokenState: "OK", rateLimitReset: null, planner: null };
   }
-  const record = value as { tokenState?: string; rateLimitReset?: string | null; planner?: unknown };
+  const record = value as {
+    tokenState?: string;
+    rateLimitReset?: string | null;
+    planner?: unknown;
+  };
   const planner = parsePlannerWindow(record.planner);
   if (isTokenState(record.tokenState)) {
-    return { tokenState: record.tokenState, rateLimitReset: record.rateLimitReset ?? null, planner };
+    return {
+      tokenState: record.tokenState,
+      rateLimitReset: record.rateLimitReset ?? null,
+      planner,
+    };
   }
   return { tokenState: "OK", rateLimitReset: null, planner };
 }
@@ -114,7 +123,11 @@ export function tokenBanner(access: GitHubAccess | null): string | null {
 
 /** A credential exists and collection is possible; GitHub may not have confirmed it yet. */
 export function credentialConfigured(access: GitHubAccess | null): boolean {
-  return access?.tokenState === "OK" || access?.tokenState === "RATE_LIMITED" || access?.tokenState === "UNVERIFIED";
+  return (
+    access?.tokenState === "OK" ||
+    access?.tokenState === "RATE_LIMITED" ||
+    access?.tokenState === "UNVERIFIED"
+  );
 }
 
 export function collectionBlocked(access: GitHubAccess | null): boolean {

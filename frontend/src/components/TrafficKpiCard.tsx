@@ -40,7 +40,9 @@ export function TrafficKpiCard({
       : absoluteChange === undefined
         ? formatGrowth(growthPercent)
         : formatAbsoluteGrowth(absoluteChange, growthPercent);
-  const sparklineValues = preserveGaps ? (series ?? []) : (series ?? []).filter((point): point is number => point != null);
+  const sparklineValues = preserveGaps
+    ? (series ?? [])
+    : (series ?? []).filter((point): point is number => point != null);
   const hasSparkline = sparklineValues.some((point) => point != null);
   return (
     <Card className={cn("flex h-full min-w-0 flex-col p-3", className)}>
@@ -48,16 +50,36 @@ export function TrafficKpiCard({
         {label}
         {note && <div className="text-xs">{note}</div>}
       </div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{missingHistory && value == null ? "N/A" : formatNumber(value)}</div>
-      {period !== "all" && previousCoverage && (!previousCoverage.expectedDays || previousCoverage.observedDays < previousCoverage.expectedDays) && <div className="mt-1 text-xs text-muted-foreground">Comparison unavailable: incomplete previous period</div>}
+      <div className="mt-1 text-2xl font-semibold tabular-nums">
+        {missingHistory && value == null ? "N/A" : formatNumber(value)}
+      </div>
+      {period !== "all" &&
+        previousCoverage &&
+        (!previousCoverage.expectedDays ||
+          previousCoverage.observedDays < previousCoverage.expectedDays) && (
+          <div className="mt-1 text-xs text-muted-foreground">
+            Comparison unavailable: incomplete previous period
+          </div>
+        )}
       {period !== "all" && (
         <div className="mt-1 flex flex-wrap items-end justify-between gap-x-2 gap-y-1">
-          <div className={cn("min-w-0 max-w-full break-words text-sm font-medium", growth ? growthClass(growth.direction) : "text-muted-foreground")}>
+          <div
+            className={cn(
+              "min-w-0 max-w-full break-words text-sm font-medium",
+              growth ? growthClass(growth.direction) : "text-muted-foreground",
+            )}
+          >
             {missingHistory && !growth ? "N/A" : (growth?.label ?? "—")}
-            {growth && <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>}
+            {growth && (
+              <div className="text-xs font-normal text-muted-foreground">vs prev {period}</div>
+            )}
           </div>
           {hasSparkline && (
-            <Sparkline values={sparklineValues} direction={growth?.direction} color={metricColor(label) ?? sparklineColor} />
+            <Sparkline
+              values={sparklineValues}
+              direction={growth?.direction}
+              color={metricColor(label) ?? sparklineColor}
+            />
           )}
         </div>
       )}
@@ -97,9 +119,19 @@ function Sparkline({
   if (current.length > 0) {
     segments.push(current.join(" "));
   }
-  const stroke = color ?? (direction === "down" ? "#b91c1c" : direction === "flat" || direction == null ? "#6b7280" : "#047857");
+  const stroke =
+    color ??
+    (direction === "down"
+      ? "#b91c1c"
+      : direction === "flat" || direction == null
+        ? "#6b7280"
+        : "#047857");
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="ml-auto h-6 w-16 max-w-full shrink-0" aria-hidden="true">
+    <svg
+      viewBox={`0 0 ${width} ${height}`}
+      className="ml-auto h-6 w-16 max-w-full shrink-0"
+      aria-hidden="true"
+    >
       {segments.map((points) => (
         <polyline key={points} fill="none" stroke={stroke} strokeWidth="1.5" points={points} />
       ))}

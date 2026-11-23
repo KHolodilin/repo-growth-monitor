@@ -28,34 +28,57 @@ describe("sortTopicHistories rank", () => {
     const omitted = topicFromApi({ id: 2, topic: "omitted" });
     const explicitNull = topic({ id: 3, topic: "explicit-null", currentRank: null });
 
-    expect(sortTopicHistories([omitted, inTop, explicitNull], "rank", "asc").map(topicName)).toEqual([
-      "in-top",
-      "omitted",
-      "explicit-null",
-    ]);
-    expect(sortTopicHistories([omitted, inTop, explicitNull], "rank", "desc").map(topicName)).toEqual([
-      "in-top",
-      "omitted",
-      "explicit-null",
-    ]);
+    expect(
+      sortTopicHistories([omitted, inTop, explicitNull], "rank", "asc").map(topicName),
+    ).toEqual(["in-top", "omitted", "explicit-null"]);
+    expect(
+      sortTopicHistories([omitted, inTop, explicitNull], "rank", "desc").map(topicName),
+    ).toEqual(["in-top", "omitted", "explicit-null"]);
   });
 
   it("sorts by name and leaves the list untouched without a key", () => {
     const beta = topic({ id: 2, topic: "beta", currentRank: 2 });
     const alpha = topic({ id: 1, topic: "alpha", currentRank: 1 });
-    expect(sortTopicHistories([beta, alpha], null, "asc").map(topicName)).toEqual(["beta", "alpha"]);
-    expect(sortTopicHistories([beta, alpha], "name", "asc").map(topicName)).toEqual(["alpha", "beta"]);
-    expect(sortTopicHistories([beta, alpha], "name", "desc").map(topicName)).toEqual(["beta", "alpha"]);
+    expect(sortTopicHistories([beta, alpha], null, "asc").map(topicName)).toEqual([
+      "beta",
+      "alpha",
+    ]);
+    expect(sortTopicHistories([beta, alpha], "name", "asc").map(topicName)).toEqual([
+      "alpha",
+      "beta",
+    ]);
+    expect(sortTopicHistories([beta, alpha], "name", "desc").map(topicName)).toEqual([
+      "beta",
+      "alpha",
+    ]);
     expect(compareTopicRows(alpha, beta, "name", "asc")).toBeLessThan(0);
   });
 
   it("sorts search rows by change results and timestamps", () => {
-    const improved = search({ id: 1, name: "a", change: { kind: "IMPROVED", amount: 2, rank: 3 }, totalResults: 10 });
-    const declined = search({ id: 2, name: "b", change: { kind: "DECLINED", amount: 1, rank: 8 }, totalResults: 20 });
+    const improved = search({
+      id: 1,
+      name: "a",
+      change: { kind: "IMPROVED", amount: 2, rank: 3 },
+      totalResults: 10,
+    });
+    const declined = search({
+      id: 2,
+      name: "b",
+      change: { kind: "DECLINED", amount: 1, rank: 8 },
+      totalResults: 20,
+    });
     const entered = search({ id: 3, name: "c", change: { kind: "ENTERED", amount: 0, rank: 4 } });
-    const enteredNone = search({ id: 4, name: "d", change: { kind: "ENTERED", amount: 0, rank: null } });
+    const enteredNone = search({
+      id: 4,
+      name: "d",
+      change: { kind: "ENTERED", amount: 0, rank: null },
+    });
     const exited = search({ id: 5, name: "e", change: { kind: "EXITED", amount: 50, rank: null } });
-    const unchanged = search({ id: 6, name: "f", change: { kind: "UNCHANGED", amount: 0, rank: 1 } });
+    const unchanged = search({
+      id: 6,
+      name: "f",
+      change: { kind: "UNCHANGED", amount: 0, rank: 1 },
+    });
     const none = search({ id: 7, name: "g", change: { kind: "NONE", amount: 0, rank: 1 } });
     expect(compareQueryRows(improved, declined, "change", "desc")).toBeLessThan(0);
     expect(compareQueryRows(entered, enteredNone, "change", "asc")).not.toBe(0);
@@ -64,10 +87,23 @@ describe("sortTopicHistories rank", () => {
     expect(compareQueryRows(improved, declined, "results", "asc")).toBeLessThan(0);
     expect(compareQueryRows(entered, improved, "results", "asc")).not.toBe(0);
     expect(compareQueryRows(improved, declined, "name", "desc")).toBeGreaterThan(0);
-    expect(compareQueryRows(improved, { ...declined, change7d: 4 }, "change7d", "asc")).toBeLessThan(0);
-    expect(compareQueryRows(improved, { ...declined, change30d: 9 }, "change30d", "asc")).toBeLessThan(0);
-    expect(compareQueryRows(improved, { ...declined, bestRank: 1 }, "best", "asc")).toBeGreaterThan(0);
-    expect(compareQueryRows({ ...improved, lastChecked: null }, { ...declined, lastChecked: null }, "updated", "asc")).toBe(0);
+    expect(
+      compareQueryRows(improved, { ...declined, change7d: 4 }, "change7d", "asc"),
+    ).toBeLessThan(0);
+    expect(
+      compareQueryRows(improved, { ...declined, change30d: 9 }, "change30d", "asc"),
+    ).toBeLessThan(0);
+    expect(compareQueryRows(improved, { ...declined, bestRank: 1 }, "best", "asc")).toBeGreaterThan(
+      0,
+    );
+    expect(
+      compareQueryRows(
+        { ...improved, lastChecked: null },
+        { ...declined, lastChecked: null },
+        "updated",
+        "asc",
+      ),
+    ).toBe(0);
     expect(compareQueryRows(improved, declined, "updated", "desc")).not.toBe(0);
   });
 });

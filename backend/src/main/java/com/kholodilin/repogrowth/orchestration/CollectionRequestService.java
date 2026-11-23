@@ -149,28 +149,8 @@ public class CollectionRequestService {
         appendCredentialDiscovery(request, authority, date);
         return response(request, (UUID) row.get("public_id"), true);
       }
-      String pool = properties.defaultPool();
-      var candidates =
-          properties.nodes().stream()
-              .filter(n ->
-                  n.enabled()
-                      && n.pool().equals(pool)
-                      && (nodeMonitor == null || nodeMonitor.eligible(n.key())))
-              .sorted(Comparator.comparing(OrchestrationProperties.Node::key))
-              .toList();
-      if (candidates.isEmpty())
-        throw new ApiException(
-            ErrorCode.INTERNAL_ERROR,
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "No collector is configured for the repository pool");
-      var node = candidates.get(Math.floorMod(credentialRef.hashCode(), candidates.size()));
-      Long nodeId =
-          jdbc.queryForObject(
-              "INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true,updated_at=clock_timestamp() RETURNING id",
-              Long.class,
-              node.key(),
-              node.pool(),
-              OrchestrationProperties.endpoint(node));
+      AssignedNode assigned = ensureCollectorNode(properties.defaultPool(), credentialRef);
+      Long nodeId = assigned.id();
       UUID requestId = UUID.randomUUID();
       Long request =
           jdbc.queryForObject(
@@ -226,7 +206,7 @@ public class CollectionRequestService {
       jdbc.update(
           "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
           attemptId,
-          OrchestrationProperties.endpoint(node),
+          OrchestrationProperties.endpoint(assigned.node()),
           json.writeValueAsString(envelope),
           Timestamp.from(deadline));
       return response(request, requestId, false);
@@ -408,7 +388,7 @@ public class CollectionRequestService {
                     "SELECT state FROM collection_request WHERE id=? FOR UPDATE",
                     String.class,
                     request);
-            if (!state.equals("ACTIVE")) {
+            if (!"ACTIVE".equals(state)) {
               if (triggerKey != null) return response(request, (UUID) row.get("public_id"), true);
               return create(repositoryId, date, triggerKey, false, null);
             }
@@ -539,29 +519,9 @@ public class CollectionRequestService {
       AuthorizationScope authorization =
           credentialVault == null ? null : credentialVault.scope(repositoryId);
       if (refresh && authorization == null) throw discoveryCredentialRequired();
-      String pool = properties.poolFor(owner, githubId);
-      var candidates =
-          properties.nodes().stream()
-              .filter(n ->
-                  n.enabled()
-                      && n.pool().equals(pool)
-                      && (nodeMonitor == null || nodeMonitor.eligible(n.key())))
-              .sorted(Comparator.comparing(OrchestrationProperties.Node::key))
-              .toList();
-      if (candidates.isEmpty())
-        throw new ApiException(
-            ErrorCode.INTERNAL_ERROR,
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "No collector is configured for the repository pool");
       // Stable spread within a pool. Repeated sends use the persisted assignment, never re-route.
-      var node = candidates.get(Math.floorMod(githubId.hashCode(), candidates.size()));
-      Long nodeId =
-          jdbc.queryForObject(
-              "INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true,updated_at=clock_timestamp() RETURNING id",
-              Long.class,
-              node.key(),
-              node.pool(),
-              OrchestrationProperties.endpoint(node));
+      AssignedNode assigned = ensureCollectorNode(properties.poolFor(owner, githubId), githubId);
+      Long nodeId = assigned.id();
       UUID requestId = UUID.randomUUID();
       Long request =
           jdbc.queryForObject(
@@ -671,12 +631,39 @@ public class CollectionRequestService {
         jdbc.update(
             "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
             attemptId,
-            OrchestrationProperties.endpoint(node),
+            OrchestrationProperties.endpoint(assigned.node()),
             json.writeValueAsString(envelope),
             Timestamp.from(deadline));
       }
       return response(request, requestId, false);
     });
+  }
+
+  private record AssignedNode(long id, OrchestrationProperties.Node node) {}
+
+  private AssignedNode ensureCollectorNode(String pool, String routingKey) {
+    var candidates =
+        properties.nodes().stream()
+            .filter(n ->
+                n.enabled()
+                    && n.pool().equals(pool)
+                    && (nodeMonitor == null || nodeMonitor.eligible(n.key())))
+            .sorted(Comparator.comparing(OrchestrationProperties.Node::key))
+            .toList();
+    if (candidates.isEmpty())
+      throw new ApiException(
+          ErrorCode.INTERNAL_ERROR,
+          HttpStatus.SERVICE_UNAVAILABLE,
+          "No collector is configured for the repository pool");
+    var node = candidates.get(Math.floorMod(routingKey.hashCode(), candidates.size()));
+    Long id =
+        jdbc.queryForObject(
+            "INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true,updated_at=clock_timestamp() RETURNING id",
+            Long.class,
+            node.key(),
+            node.pool(),
+            OrchestrationProperties.endpoint(node));
+    return new AssignedNode(id, node);
   }
 
   private void append(long request, long repository, Spec spec, LocalDate date) {

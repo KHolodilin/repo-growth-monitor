@@ -7,7 +7,12 @@ import {
   type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
-import { eventWindowComparison, signedCount, type EventWindowComparison, type RankComparison } from "../lib/eventWindow";
+import {
+  eventWindowComparison,
+  signedCount,
+  type EventWindowComparison,
+  type RankComparison,
+} from "../lib/eventWindow";
 import {
   eventCategoryIcon,
   eventTypeLabel,
@@ -22,6 +27,57 @@ import { formatChartAxisDate, formatNumber } from "../lib/utils";
 import { Button, Card } from "./ui";
 
 const RECENT = 5;
+
+/** Shared loading/error chrome for growth-event consumers (tab + chart panels). */
+export function GrowthEventsStatus({
+  loading,
+  error,
+  hasEvents,
+  onRetry,
+}: {
+  loading: boolean;
+  error: string | null;
+  hasEvents: boolean;
+  onRetry: () => void;
+}) {
+  if (loading && !hasEvents && !error) {
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Loading growth events…
+      </p>
+    );
+  }
+  if (!error) {
+    return null;
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-sm">
+      <p role="alert" className="text-red-600">
+        {error}
+      </p>
+      <Button
+        type="button"
+        className="bg-muted text-foreground"
+        disabled={loading}
+        onClick={onRetry}
+      >
+        Try again
+      </Button>
+    </div>
+  );
+}
+
+/** Hide the events list while the first load is pending or failed with no rows. */
+export function canShowGrowthEventsList(
+  loading: boolean,
+  error: string | null,
+  hasEvents: boolean,
+) {
+  if (hasEvents) {
+    return true;
+  }
+  return !loading && !error;
+}
 
 export function GrowthEventsPanel({
   repositoryId,
@@ -53,7 +109,11 @@ export function GrowthEventsPanel({
         <h2 className="font-medium">Recent Growth Events</h2>
         <div className="flex items-center gap-3">
           {events.length > 0 && (
-            <button type="button" className="text-sm font-medium text-primary" onClick={() => setViewAll(true)}>
+            <button
+              type="button"
+              className="text-sm font-medium text-primary"
+              onClick={() => setViewAll(true)}
+            >
               View all →
             </button>
           )}
@@ -66,7 +126,10 @@ export function GrowthEventsPanel({
       </div>
       {recent.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No growth events in this period. {allowMutations ? "Markers appear after collection or when you add a promotion event." : "An administrator can configure collection and add promotion events."}
+          No growth events in this period.{" "}
+          {allowMutations
+            ? "Markers appear after collection or when you add a promotion event."
+            : "An administrator can configure collection and add promotion events."}
         </p>
       ) : (
         <EventRows
@@ -78,14 +141,25 @@ export function GrowthEventsPanel({
         />
       )}
       <p className="mt-3 text-xs text-muted-foreground">
-        Events mark observed repository changes in the selected period. They do not imply that a change caused traffic.
+        Events mark observed repository changes in the selected period. They do not imply that a
+        change caused traffic.
       </p>
       {viewAll && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={() => setViewAll(false)}>
-          <Card className="max-h-[80vh] w-full max-w-xl overflow-hidden" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setViewAll(false)}
+        >
+          <Card
+            className="max-h-[80vh] w-full max-w-xl overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-medium">All Growth Events</h2>
-              <Button type="button" className="bg-muted text-foreground" onClick={() => setViewAll(false)}>
+              <Button
+                type="button"
+                className="bg-muted text-foreground"
+                onClick={() => setViewAll(false)}
+              >
                 Close
               </Button>
             </div>
@@ -144,11 +218,20 @@ function EventRows({
   return (
     <div className="space-y-2 text-sm">
       {events.map((event) => (
-        <div key={event.id} className="flex items-start justify-between gap-3 border-t pt-2 first:border-t-0 first:pt-0">
-          <button type="button" className="min-w-0 flex-1 text-left" onClick={() => onOpen([event])}>
+        <div
+          key={event.id}
+          className="flex items-start justify-between gap-3 border-t pt-2 first:border-t-0 first:pt-0"
+        >
+          <button
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            onClick={() => onOpen([event])}
+          >
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">{eventCategoryIcon(event.category)}</span>
-              <span className="text-xs text-muted-foreground">{formatChartAxisDate(eventUtcDate(event))}</span>
+              <span className="text-xs text-muted-foreground">
+                {formatChartAxisDate(eventUtcDate(event))}
+              </span>
               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
                 {sourceBadge(event.source)}
               </span>
@@ -158,14 +241,20 @@ function EventRows({
           </button>
           {event.source === "MANUAL" && allowMutations && (
             <div className="flex shrink-0 gap-2">
-              <button type="button" className="text-xs font-medium text-primary" onClick={() => onEdit(event)}>
+              <button
+                type="button"
+                className="text-xs font-medium text-primary"
+                onClick={() => onEdit(event)}
+              >
                 Edit
               </button>
               <button
                 type="button"
                 className="text-xs font-medium text-red-700"
                 onClick={() => {
-                  void api(`/api/v1/admin/growth-events/${event.id}`, { method: "DELETE" }).then(onChanged);
+                  void api(`/api/v1/admin/growth-events/${event.id}`, { method: "DELETE" }).then(
+                    onChanged,
+                  );
                 }}
               >
                 Delete
@@ -235,15 +324,21 @@ export function EventDetailsDialog({
     const day = today ?? new Date().toISOString().slice(0, 10);
     Promise.all([
       api<RepositoryTraffic>(`/api/v1/admin/repositories/${repositoryId}/traffic?period=all`),
-      api<RepositoryStatsHistory>(`/api/v1/admin/repositories/${repositoryId}/stats-history?period=all`),
+      api<RepositoryStatsHistory>(
+        `/api/v1/admin/repositories/${repositoryId}/stats-history?period=all`,
+      ),
       api<SearchHistory[]>(`/api/v1/admin/repositories/${repositoryId}/search-visibility`),
     ])
       .then(([traffic, stats, queries]) => {
         if (cancelled) {
           return;
         }
-        const trafficDays = traffic && typeof traffic === "object" && Array.isArray(traffic.traffic) ? traffic.traffic : [];
-        const starDays = stats && typeof stats === "object" && Array.isArray(stats.points) ? stats.points : [];
+        const trafficDays =
+          traffic && typeof traffic === "object" && Array.isArray(traffic.traffic)
+            ? traffic.traffic
+            : [];
+        const starDays =
+          stats && typeof stats === "object" && Array.isArray(stats.points) ? stats.points : [];
         setComparison(
           eventWindowComparison({
             eventDate,
@@ -274,10 +369,18 @@ export function EventDetailsDialog({
   }, [repositoryId, eventDate, today]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <Card className="max-h-[80vh] w-full max-w-lg overflow-auto" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="max-h-[80vh] w-full max-w-lg overflow-auto"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-medium">{events.length === 1 ? "Growth event" : `${events.length} events`}</h2>
+          <h2 className="font-medium">
+            {events.length === 1 ? "Growth event" : `${events.length} events`}
+          </h2>
           <Button type="button" className="bg-muted text-foreground" onClick={onClose}>
             Close
           </Button>
@@ -287,24 +390,36 @@ export function EventDetailsDialog({
             <div key={event.id} className="space-y-1 text-sm">
               <div className="font-medium">{event.title}</div>
               <div className="text-muted-foreground">
-                {formatChartAxisDate(eventUtcDate(event))} · {eventTypeLabel(event.type)} · {sourceBadge(event.source)}
+                {formatChartAxisDate(eventUtcDate(event))} · {eventTypeLabel(event.type)} ·{" "}
+                {sourceBadge(event.source)}
               </div>
               {event.description && <p>{event.description}</p>}
               {event.url && (
-                <a className="text-primary hover:underline" href={event.url} target="_blank" rel="noreferrer">
+                <a
+                  className="text-primary hover:underline"
+                  href={event.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   Open link
                 </a>
               )}
               {event.source === "MANUAL" && allowMutations && (
                 <div className="flex gap-3 pt-1">
-                  <button type="button" className="text-xs font-medium text-primary" onClick={() => onEdit(event)}>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary"
+                    onClick={() => onEdit(event)}
+                  >
                     Edit
                   </button>
                   <button
                     type="button"
                     className="text-xs font-medium text-red-700"
                     onClick={() => {
-                      void api(`/api/v1/admin/growth-events/${event.id}`, { method: "DELETE" }).then(() => {
+                      void api(`/api/v1/admin/growth-events/${event.id}`, {
+                        method: "DELETE",
+                      }).then(() => {
                         onChanged();
                         onClose();
                       });
@@ -345,7 +460,9 @@ export function EventDetailsDialog({
                 </tr>
               </tbody>
             </table>
-            <p className="mt-3 text-xs text-muted-foreground">A match in time does not prove a cause.</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              A match in time does not prove a cause.
+            </p>
           </div>
         )}
       </Card>
@@ -385,7 +502,9 @@ function EventFormDialog({
   onSaved: () => void;
 }) {
   const [type, setType] = useState(event?.type ?? "CUSTOM");
-  const [eventAt, setEventAt] = useState(toDateTimeLocal(event?.eventAt ?? new Date().toISOString()));
+  const [eventAt, setEventAt] = useState(
+    toDateTimeLocal(event?.eventAt ?? new Date().toISOString()),
+  );
   const [title, setTitle] = useState(event?.title ?? "");
   const [url, setUrl] = useState(event?.url ?? "");
   const [description, setDescription] = useState(event?.description ?? "");
@@ -404,7 +523,10 @@ function EventFormDialog({
     };
     try {
       if (event) {
-        await api(`/api/v1/admin/growth-events/${event.id}`, { method: "PUT", body: JSON.stringify(body) });
+        await api(`/api/v1/admin/growth-events/${event.id}`, {
+          method: "PUT",
+          body: JSON.stringify(body),
+        });
       } else {
         await api(`/api/v1/admin/repositories/${repositoryId}/growth-events`, {
           method: "POST",
@@ -420,13 +542,20 @@ function EventFormDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
       <Card className="w-full max-w-lg" onClick={(click) => click.stopPropagation()}>
         <h2 className="mb-4 font-medium">{event ? "Edit event" : "Add event"}</h2>
         <div className="space-y-3">
           <label className="block text-sm">
             <span className="mb-1 block text-muted-foreground">Type</span>
-            <select className="w-full rounded-md border px-3 py-2" value={type} onChange={(change) => setType(change.target.value)}>
+            <select
+              className="w-full rounded-md border px-3 py-2"
+              value={type}
+              onChange={(change) => setType(change.target.value)}
+            >
               {MANUAL_EVENT_TYPES.map((item) => (
                 <option key={item.type} value={item.type}>
                   {item.label}
@@ -445,11 +574,19 @@ function EventFormDialog({
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-muted-foreground">Title</span>
-            <input className="w-full rounded-md border px-3 py-2" value={title} onChange={(change) => setTitle(change.target.value)} />
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              value={title}
+              onChange={(change) => setTitle(change.target.value)}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-muted-foreground">URL</span>
-            <input className="w-full rounded-md border px-3 py-2" value={url} onChange={(change) => setUrl(change.target.value)} />
+            <input
+              className="w-full rounded-md border px-3 py-2"
+              value={url}
+              onChange={(change) => setUrl(change.target.value)}
+            />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-muted-foreground">Description</span>

@@ -86,14 +86,9 @@ public class TopicWatchJdbcRepository {
     String languageClause = allLanguages ? "language IS NULL" : "language IS NOT NULL";
     return jdbcClient
         .sql(
-            """
-            SELECT * FROM topic_watch
-            WHERE repository_id = :repositoryId
-              AND enabled = TRUE
-              AND %s
-            ORDER BY topic
-            """
-                .formatted(languageClause))
+            "SELECT * FROM topic_watch WHERE repository_id = :repositoryId AND enabled = TRUE AND "
+                + languageClause
+                + " ORDER BY topic")
         .param("repositoryId", repositoryId)
         .query(MAPPER)
         .list();

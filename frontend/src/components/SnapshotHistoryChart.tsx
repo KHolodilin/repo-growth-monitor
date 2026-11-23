@@ -4,23 +4,22 @@ import { useChartVisibility } from "../lib/chartVisibility";
 import { useMemo, useState } from "react";
 import type { SnapshotHistory } from "../lib/api";
 import { snapshotChartOption, snapshotSeriesKey } from "../lib/snapshotChart";
-import {
-  type SnapshotChartKind,
-  type SnapshotMetric,
-} from "../lib/snapshotChartPrefs";
+import { type SnapshotChartKind, type SnapshotMetric } from "../lib/snapshotChartPrefs";
 import { OTHER_KEY, chartValue } from "../lib/snapshotHistory";
 import { cn } from "../lib/utils";
 import { ChartCard } from "./ChartDownloadMenu";
 import { PersistentECharts } from "./PersistentECharts";
 import { ReferrerSourceIcon } from "./ReferrerSourceIcon";
 
-
 export function SnapshotHistoryChart({
   title,
   period = "all",
   kind,
   history,
-  selected, metric, onChange, displayLabel = (key: string) => key,
+  selected,
+  metric,
+  onChange,
+  displayLabel = (key: string) => key,
 }: {
   displayLabel?: (key: string) => string;
   title: string;
@@ -33,7 +32,9 @@ export function SnapshotHistoryChart({
 }) {
   const view = useDashboardView();
   const repositoryId = history.repositoryId;
-  const context = view.public ? `${view.scopeKey}:snapshot-${kind}` : `${repositoryId}:snapshot-${kind}`;
+  const context = view.public
+    ? `${view.scopeKey}:snapshot-${kind}`
+    : `${repositoryId}:snapshot-${kind}`;
   const visibility = useChartVisibility(context);
   const [pickerOpen, setPickerOpen] = useState(false);
   const persist = onChange;
@@ -45,7 +46,10 @@ export function SnapshotHistoryChart({
   const legend = [...selected, OTHER_KEY];
   const moreCount = Math.max(0, history.rows.length - selected.length);
   const enoughHistory = history.dates.length >= 1;
-  const hasData = history.rows.some(row => selected.includes(row.key) && row.cells.some(cell => chartValue(cell, metric) !== null));
+  const hasData = history.rows.some(
+    (row) =>
+      selected.includes(row.key) && row.cells.some((cell) => chartValue(cell, metric) !== null),
+  );
   // Separate element trees: ChartCard mounts either desktop or mobile slot, never both.
   const metricSwitcher = () => (
     <div className="inline-flex rounded-lg border bg-muted p-1">
@@ -69,7 +73,10 @@ export function SnapshotHistoryChart({
       mobileControls={metricSwitcher()}
       mobileSeries={[]}
     >
-      <p className="mb-3 text-xs text-muted-foreground">Values reported for GitHub’s rolling window at each snapshot date, not exact daily traffic. Other sums the remaining sources/paths; Visitors are not deduplicated across sources.</p>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Values reported for GitHub’s rolling window at each snapshot date, not exact daily traffic.
+        Other sums the remaining sources/paths; Visitors are not deduplicated across sources.
+      </p>
       {!enoughHistory && (
         <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
           <div className="font-medium text-foreground">No recorded snapshot values.</div>
@@ -78,19 +85,34 @@ export function SnapshotHistoryChart({
       )}
       {enoughHistory && (
         <>
-          {selected.length === 0 ? <p className="py-6 text-sm text-muted-foreground">No {kind === "referrers" ? "sources" : "paths"} selected. Select items to display history.</p> : !hasData ? <p className="py-6 text-sm text-muted-foreground">No data for the selected period.</p> : (
-
-        <>
-          <PersistentECharts
-            chartId={context}
-            accessibleTitle={title}
-            series={legend.map((name) => ({ key: snapshotSeriesKey(history, name), name, label: displayLabel(name), icon: kind === "referrers" || name === OTHER_KEY ? <ReferrerSourceIcon source={name} /> : undefined }))}
-            option={option}
-            exportTitle={title}
-            persistSelection={false}
-            style={{ height: 320, width: "100%" }}
-          />
-        </>)}
+          {selected.length === 0 ? (
+            <p className="py-6 text-sm text-muted-foreground">
+              No {kind === "referrers" ? "sources" : "paths"} selected. Select items to display
+              history.
+            </p>
+          ) : !hasData ? (
+            <p className="py-6 text-sm text-muted-foreground">No data for the selected period.</p>
+          ) : (
+            <>
+              <PersistentECharts
+                chartId={context}
+                accessibleTitle={title}
+                series={legend.map((name) => ({
+                  key: snapshotSeriesKey(history, name),
+                  name,
+                  label: displayLabel(name),
+                  icon:
+                    kind === "referrers" || name === OTHER_KEY ? (
+                      <ReferrerSourceIcon source={name} />
+                    ) : undefined,
+                }))}
+                option={option}
+                exportTitle={title}
+                persistSelection={false}
+                style={{ height: 320, width: "100%" }}
+              />
+            </>
+          )}
           <div className="relative mt-3">
             <button
               type="button"
@@ -116,9 +138,18 @@ export function SnapshotHistoryChart({
                     >
                       <input
                         type="checkbox"
-                        checked={selected.includes(row.key) && visibility.isVisible(snapshotSeriesKey(history, row.key))}
+                        checked={
+                          selected.includes(row.key) &&
+                          visibility.isVisible(snapshotSeriesKey(history, row.key))
+                        }
                         onChange={() => {
-                          if (selected.includes(row.key) && !visibility.isVisible(snapshotSeriesKey(history, row.key))) { visibility.reveal([snapshotSeriesKey(history, row.key)]); return; }
+                          if (
+                            selected.includes(row.key) &&
+                            !visibility.isVisible(snapshotSeriesKey(history, row.key))
+                          ) {
+                            visibility.reveal([snapshotSeriesKey(history, row.key)]);
+                            return;
+                          }
                           const next = selected.includes(row.key)
                             ? selected.filter((key) => key !== row.key)
                             : [...selected, row.key];
@@ -153,7 +184,9 @@ function MetricButton({
       type="button"
       className={cn(
         "rounded-md px-3 py-1.5 text-sm font-medium",
-        active ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+        active
+          ? "bg-card text-foreground shadow-xs"
+          : "text-muted-foreground hover:text-foreground",
       )}
       onClick={onClick}
     >

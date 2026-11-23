@@ -35,7 +35,10 @@ export function formatGrowth(value?: number | null) {
   return { direction: "flat" as const, label: "→ 0%" };
 }
 
-export function formatAbsoluteGrowth(absoluteChange?: number | null, growthPercent?: number | null) {
+export function formatAbsoluteGrowth(
+  absoluteChange?: number | null,
+  growthPercent?: number | null,
+) {
   if (absoluteChange === null || absoluteChange === undefined || Number.isNaN(absoluteChange)) {
     return null;
   }
@@ -97,11 +100,13 @@ export function formatDelta(value: number | null | undefined) {
   return "0";
 }
 
-export function formatQueryRankChange(change?: {
-  kind: "NONE" | "UNCHANGED" | "IMPROVED" | "DECLINED" | "ENTERED" | "EXITED";
-  amount: number;
-  rank: number | null;
-} | null) {
+export function formatQueryRankChange(
+  change?: {
+    kind: "NONE" | "UNCHANGED" | "IMPROVED" | "DECLINED" | "ENTERED" | "EXITED";
+    amount: number;
+    rank: number | null;
+  } | null,
+) {
   if (!change || change.kind === "NONE" || change.kind === "UNCHANGED") {
     return { label: "—", direction: "flat" as const };
   }

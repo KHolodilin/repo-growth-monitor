@@ -135,13 +135,23 @@ export function PublicHomePage() {
     writeLandingDirectoryPrefs(prefs);
   }, [prefs]);
 
+  const loadKey = normalized ? `${JSON.stringify(prefs)}:${after}:${reloadKey}` : "pending";
+  const [seenLoadKey, setSeenLoadKey] = useState(loadKey);
+  if (loadKey !== seenLoadKey) {
+    setSeenLoadKey(loadKey);
+    if (normalized) {
+      setLoading(true);
+      setError(null);
+      setItems([]);
+      setNextCursor(null);
+    }
+  }
+
   useEffect(() => {
     if (!normalized) {
       return;
     }
     const abort = new AbortController();
-    setLoading(true);
-    setError(null);
     api<PublicPage<PublicOwnerRow>>(ownersUrl(prefs, after), { signal: abort.signal })
       .then((page) => {
         if (abort.signal.aborted) {
@@ -171,7 +181,13 @@ export function PublicHomePage() {
 
   function toggleSort(column: OwnerSort) {
     const order: OwnerOrder =
-      prefs.sort === column ? (prefs.order === "asc" ? "desc" : "asc") : column === "owner" ? "asc" : "desc";
+      prefs.sort === column
+        ? prefs.order === "asc"
+          ? "desc"
+          : "asc"
+        : column === "owner"
+          ? "asc"
+          : "desc";
     updateDirectory({ ...prefs, sort: column, order });
   }
 
@@ -202,7 +218,8 @@ export function PublicHomePage() {
             Understand how your open source projects grow
           </h1>
           <p className="text-base text-muted-foreground sm:text-lg">
-            Browse published owner dashboards with saved traffic, community stats, search visibility and topic rankings.
+            Browse published owner dashboards with saved traffic, community stats, search visibility
+            and topic rankings.
           </p>
           <Button type="button" onClick={scrollToOwners}>
             Explore dashboards
@@ -218,13 +235,19 @@ export function PublicHomePage() {
         </div>
       </section>
 
-      <section id={ownersId} className="space-y-4 scroll-mt-4" aria-labelledby={`${ownersId}-heading`}>
+      <section
+        id={ownersId}
+        className="space-y-4 scroll-mt-4"
+        aria-labelledby={`${ownersId}-heading`}
+      >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id={`${ownersId}-heading`} className="text-xl font-semibold">
               Owners
             </h2>
-            <p className="text-sm text-muted-foreground">Published owners sorted from saved repository snapshots.</p>
+            <p className="text-sm text-muted-foreground">
+              Published owners sorted from saved repository snapshots.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Rows</span>
@@ -261,11 +284,17 @@ export function PublicHomePage() {
                   const active = prefs.sort === column;
                   const numeric = column !== "owner";
                   return (
-                    <th key={column} scope="col" className={cn("p-3 font-medium", numeric && "text-right")}>
+                    <th
+                      key={column}
+                      scope="col"
+                      className={cn("p-3 font-medium", numeric && "text-right")}
+                    >
                       <button
                         type="button"
                         className="inline-flex min-h-11 items-center gap-1"
-                        aria-sort={active ? (prefs.order === "asc" ? "ascending" : "descending") : "none"}
+                        aria-sort={
+                          active ? (prefs.order === "asc" ? "ascending" : "descending") : "none"
+                        }
                         onClick={() => toggleSort(column)}
                       >
                         {COLUMN_LABELS[column]}
@@ -295,7 +324,10 @@ export function PublicHomePage() {
                 items.map((row) => (
                   <tr key={row.id} className="border-t">
                     <th scope="row" className="p-3 text-left font-normal">
-                      <Link className="font-medium text-primary hover:underline" to={row.canonicalPath || `/${row.login}`}>
+                      <Link
+                        className="font-medium text-primary hover:underline"
+                        to={row.canonicalPath || `/${row.login}`}
+                      >
                         {row.login}
                       </Link>
                     </th>
@@ -314,15 +346,26 @@ export function PublicHomePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             {after === 0 ? "First page" : `After ${after}`}
-            {prefs.sort !== DEFAULT_LANDING_DIRECTORY.sort || prefs.order !== DEFAULT_LANDING_DIRECTORY.order
+            {prefs.sort !== DEFAULT_LANDING_DIRECTORY.sort ||
+            prefs.order !== DEFAULT_LANDING_DIRECTORY.order
               ? ` · sorted by ${COLUMN_LABELS[prefs.sort]} ${prefs.order.toUpperCase()}`
               : null}
           </p>
           <div className="flex gap-2">
-            <Button type="button" className="bg-card text-foreground border" disabled={after === 0 || loading} onClick={goPrev}>
+            <Button
+              type="button"
+              className="bg-card text-foreground border"
+              disabled={after === 0 || loading}
+              onClick={goPrev}
+            >
               Previous
             </Button>
-            <Button type="button" className="bg-card text-foreground border" disabled={!nextCursor || loading} onClick={goNext}>
+            <Button
+              type="button"
+              className="bg-card text-foreground border"
+              disabled={!nextCursor || loading}
+              onClick={goNext}
+            >
               Next
             </Button>
           </div>

@@ -31,7 +31,12 @@ export function periodDates(period: Period, today: string): string[] | null {
   return periodWindow(period, today, []).days;
 }
 
-export function bandKpi(queries: RankSample[], band: number, period: Period, today: string): BandKpi {
+export function bandKpi(
+  queries: RankSample[],
+  band: number,
+  period: Period,
+  today: string,
+): BandKpi {
   const active = queries.filter((query) => query.enabled);
   const window = periodWindow(period, today, active);
   const series = window.days.map((day) => countOnDay(active, band, day));
@@ -50,20 +55,25 @@ export function bandKpi(queries: RankSample[], band: number, period: Period, tod
 
 function periodWindow(period: Period, today: string, queries: RankSample[]) {
   if (period === "all") {
-    const first = queries.map(firstDate).filter((date): date is string => date != null).sort()[0] ?? today;
+    const first =
+      queries
+        .map(firstDate)
+        .filter((date): date is string => date != null)
+        .sort()[0] ?? today;
     return { days: eachDate(first, today), previousTo: null as string | null };
   }
   if (period === "1d") {
     const day = shiftDays(today, -1);
     return { days: [day], previousTo: shiftDays(day, -1) };
   }
-  const from = period === "7d"
-    ? shiftDays(today, -6)
-    : period === "90d"
-      ? shiftDays(today, -89)
-      : period === "1y"
-        ? shiftDays(shiftYears(today, -1), 1)
-        : shiftDays(today, -29);
+  const from =
+    period === "7d"
+      ? shiftDays(today, -6)
+      : period === "90d"
+        ? shiftDays(today, -89)
+        : period === "1y"
+          ? shiftDays(shiftYears(today, -1), 1)
+          : shiftDays(today, -29);
   return { days: eachDate(from, today), previousTo: shiftDays(from, -1) };
 }
 
@@ -123,7 +133,10 @@ function firstDate(query: RankSample) {
   if (query.points.length === 0) {
     return null;
   }
-  return query.points.reduce((min, point) => (point.date < min ? point.date : min), query.points[0].date);
+  return query.points.reduce(
+    (min, point) => (point.date < min ? point.date : min),
+    query.points[0].date,
+  );
 }
 
 function latestOnOrBefore(query: RankSample, date: string) {

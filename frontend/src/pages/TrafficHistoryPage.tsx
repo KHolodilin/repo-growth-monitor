@@ -13,7 +13,6 @@ import { useMutationAccess } from "../lib/mutationAccess";
 import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
 import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
-
 const KIND_LABEL: Record<SnapshotChartKind, string> = {
   referrers: "Referrers",
   paths: "Popular Paths",
@@ -29,7 +28,7 @@ function parseKind(value: string | null): SnapshotChartKind {
 }
 
 function historyPeriod(raw: string | null, days: string | null, saved: Period): Period {
-  if (raw) return PERIODS.includes(raw as Period) ? raw as Period : saved;
+  if (raw) return PERIODS.includes(raw as Period) ? (raw as Period) : saved;
   if (days === "1") return "1d";
   if (days === "7") return "7d";
   if (days === "14") return "30d";
@@ -54,14 +53,29 @@ export function TrafficHistoryPage() {
   const [history, setHistory] = useState<SnapshotHistory | null>(null);
   const [loadedContext, setLoadedContext] = useState<string | null>(null);
   const context = `${id}:${kind}`;
+  const loadKey = `${id}:${kind}:${period}:${includeService}`;
+  const [seenIdentity, setSeenIdentity] = useState(context);
+  const [seenLoadKey, setSeenLoadKey] = useState(loadKey);
   const [error, setError] = useState<string | null>(null);
+
+  // Identity (repo/kind) changes clear stale charts; period/filter changes keep the prior
+  // snapshot visible until the new response arrives (stale-while-revalidate).
+  if (context !== seenIdentity) {
+    setSeenIdentity(context);
+    setError(null);
+    setHistory(null);
+    setLoadedContext(null);
+  }
+  if (loadKey !== seenLoadKey) {
+    setSeenLoadKey(loadKey);
+    setError(null);
+  }
 
   useEffect(() => {
     if (!id) {
       return;
     }
     let cancelled = false;
-    setError(null);
     Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${id}`),
       api<SnapshotHistory>(
@@ -130,7 +144,9 @@ export function TrafficHistoryPage() {
               type="button"
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium",
-                kind === option ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                kind === option
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setSearchParams({ kind: option, period }, { replace: true })}
             >
@@ -144,10 +160,18 @@ export function TrafficHistoryPage() {
               <ServicePathToggle checked={showServicePaths} onChange={setShowServicePaths} />
             </div>
           )}
-          <div role="group" aria-label="History period" className="w-full md:w-auto"><PeriodSelector fitMobile period={period} onPeriod={selectPeriod} /></div>
+          <div role="group" aria-label="History period" className="w-full md:w-auto">
+            <PeriodSelector fitMobile period={period} onPeriod={selectPeriod} />
+          </div>
         </div>
       </div>
-      <SnapshotHistoryView key={`${repo.id}:${kind}`} title={CHART_TITLE[kind]} kind={kind} history={history} period={period} />
+      <SnapshotHistoryView
+        key={`${repo.id}:${kind}`}
+        title={CHART_TITLE[kind]}
+        kind={kind}
+        history={history}
+        period={period}
+      />
     </div>
   );
 }

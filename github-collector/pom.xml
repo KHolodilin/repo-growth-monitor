@@ -66,47 +66,9 @@
       <plugin>
         <groupId>com.github.spotbugs</groupId>
         <artifactId>spotbugs-maven-plugin</artifactId>
-        <version>4.10.5.0</version>
         <configuration>
-          <effort>Max</effort>
-          <threshold>Medium</threshold>
-          <failOnError>true</failOnError>
           <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
-          <xmlOutput>true</xmlOutput>
         </configuration>
-        <executions>
-          <execution>
-            <id>spotbugs-check</id>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>verify</phase>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-pmd-plugin</artifactId>
-        <version>3.28.0</version>
-        <configuration>
-          <targetJdk>${java.version}</targetJdk>
-          <failOnViolation>true</failOnViolation>
-          <printFailingErrors>true</printFailingErrors>
-          <linkXRef>false</linkXRef>
-          <excludeRoots>
-            <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
-          </excludeRoots>
-        </configuration>
-        <executions>
-          <execution>
-            <id>pmd-check</id>
-            <goals>
-              <goal>check</goal>
-              <goal>cpd-check</goal>
-            </goals>
-            <phase>verify</phase>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.pitest</groupId>

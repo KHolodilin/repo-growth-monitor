@@ -19,10 +19,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
   protected void doFilterInternal(
       HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
-    String traceId = request.getHeader(AppHttpHeaders.TRACE_ID);
-    if (traceId == null || traceId.isBlank()) {
-      traceId = UUID.randomUUID().toString();
-    }
+    String traceId = sanitizeTraceId(request.getHeader(AppHttpHeaders.TRACE_ID));
     MDC.put(TRACE_ID, traceId);
     response.setHeader(AppHttpHeaders.TRACE_ID, traceId);
     try {
@@ -30,5 +27,16 @@ public class TraceIdFilter extends OncePerRequestFilter {
     } finally {
       MDC.clear();
     }
+  }
+
+  private static String sanitizeTraceId(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return UUID.randomUUID().toString();
+    }
+    String cleaned = raw.replace("\r", "").replace("\n", "").trim();
+    if (cleaned.isEmpty() || cleaned.length() > 128) {
+      return UUID.randomUUID().toString();
+    }
+    return cleaned;
   }
 }

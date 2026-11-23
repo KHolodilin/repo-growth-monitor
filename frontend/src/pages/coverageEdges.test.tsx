@@ -52,7 +52,13 @@ describe("remaining coverage edges", () => {
             topicRow,
             {
               positionDelta: 3,
-              result: { ...topicRow.result, githubRepositoryId: 3, language: undefined, htmlUrl: undefined, stars: 1 },
+              result: {
+                ...topicRow.result,
+                githubRepositoryId: 3,
+                language: undefined,
+                htmlUrl: undefined,
+                stars: 1,
+              },
             },
           ]}
         />
@@ -89,7 +95,9 @@ describe("remaining coverage edges", () => {
                 githubRepositoryId: 5,
                 fullName: "other/repo",
                 activityAt: null,
-                activityStatus: "BOGUS",
+                activityStatus: "BOGUS" as unknown as NonNullable<
+                  (typeof searchResults.rows)[number]["result"]["activityStatus"]
+                >,
               },
             },
           ]}
@@ -113,7 +121,21 @@ describe("remaining coverage edges", () => {
         />
       </MemoryRouter>,
     );
-    for (const name of ["#", "Repository", "Stars", "Forks", "Language", "Δ", "Watchers", "Contributors", "Activity", "Source", "Path", "Visitors", "Views"]) {
+    for (const name of [
+      "#",
+      "Repository",
+      "Stars",
+      "Forks",
+      "Language",
+      "Δ",
+      "Watchers",
+      "Contributors",
+      "Activity",
+      "Source",
+      "Path",
+      "Visitors",
+      "Views",
+    ]) {
       for (const button of screen.queryAllByRole("button", { name: new RegExp(`^${name}`) })) {
         await user.click(button);
         await user.click(button);
@@ -130,8 +152,20 @@ describe("remaining coverage edges", () => {
     api.mockResolvedValue({
       ...dashboardReady,
       repositories: [
-        { ...base, growthPercent: null, discoverabilityPassed: null, jobs: [...base.jobs, { jobType: "MYSTERY", status: "RUNNING" }] },
-        { ...base, id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null, discoverabilityPassed: 5 },
+        {
+          ...base,
+          growthPercent: null,
+          discoverabilityPassed: null,
+          jobs: [...base.jobs, { jobType: "MYSTERY", status: "RUNNING" }],
+        },
+        {
+          ...base,
+          id: 8,
+          fullName: "KHolodilin/other",
+          visitors: 1,
+          growthPercent: null,
+          discoverabilityPassed: 5,
+        },
       ],
     });
     render(
@@ -145,20 +179,30 @@ describe("remaining coverage edges", () => {
     );
     expect(await screen.findByText("KHolodilin/other")).toBeInTheDocument();
     const originalSort = Array.prototype.sort;
-    const sortSpy = vi.spyOn(Array.prototype, "sort").mockImplementation(function (compareFn) {
+    const sortSpy = vi.spyOn(Array.prototype, "sort").mockImplementation(function (
+      this: Array<{ discoverabilityPassed?: number | null }>,
+      compareFn?: (
+        a: { discoverabilityPassed?: number | null },
+        b: { discoverabilityPassed?: number | null },
+      ) => number,
+    ) {
       if (typeof compareFn === "function") {
-        const rows = this as Array<{ discoverabilityPassed?: number | null }>;
-        const comparable = rows.length > 0 && rows.every((row) => row != null && typeof row === "object" && "discoverabilityPassed" in row);
+        const comparable =
+          this.length > 0 &&
+          this.every(
+            (row) => row != null && typeof row === "object" && "discoverabilityPassed" in row,
+          );
         if (comparable) {
-          const filled = rows.find((row) => row.discoverabilityPassed != null);
-          const empty = rows.find((row) => row.discoverabilityPassed == null);
+          const filled = this.find((row) => row.discoverabilityPassed != null);
+          const empty = this.find((row) => row.discoverabilityPassed == null);
           if (filled && empty) {
             compareFn(empty, filled);
             compareFn(filled, empty);
           }
         }
       }
-      return originalSort.call(this, compareFn);
+      originalSort.call(this, compareFn);
+      return this;
     });
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
     sortSpy.mockRestore();
@@ -181,23 +225,32 @@ describe("remaining coverage edges", () => {
       });
       return 1;
     });
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/admin/repositories/13")) {
-        return repository;
+        return Promise.resolve(repository);
       }
       if (url.includes("/topics/") && url.includes("/history")) {
-        return { ...topicHistory, searchStatus: "READY" };
+        return Promise.resolve({ ...topicHistory, searchStatus: "READY" });
       }
       if (url.includes("/history")) {
-        return { ...searchHistory, searchStatus: "RETRY", bestRank: null, totalResults: null, lastChecked: null };
+        return Promise.resolve({
+          ...searchHistory,
+          searchStatus: "RETRY",
+          bestRank: null,
+          totalResults: null,
+          lastChecked: null,
+        });
       }
-      throw new Error("none");
+      return Promise.reject(new Error("none"));
     });
     const query = render(
       <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
         <Routes>
-          <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route
+            path="/admin/repositories/:repositoryId/search-queries/:queryId"
+            element={<QueryDetailsPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -208,7 +261,10 @@ describe("remaining coverage edges", () => {
     const topic = render(
       <MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox?scope=language"]}>
         <Routes>
-          <Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
+          <Route
+            path="/admin/repositories/:repositoryId/topics/:topic"
+            element={<TopicDetailsPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -232,12 +288,7 @@ describe("remaining coverage edges", () => {
       "asc",
     );
     compareQueryRows(searchHistory, searchHistory, "results", "desc");
-    compareQueryRows(
-      { ...searchHistory, lastChecked: null },
-      searchHistory,
-      "updated",
-      "asc",
-    );
+    compareQueryRows({ ...searchHistory, lastChecked: null }, searchHistory, "updated", "asc");
   });
 
   it("covers layout, switcher, settings save and manual event edits", async () => {
@@ -270,7 +321,13 @@ describe("remaining coverage edges", () => {
         <Routes>
           <Route
             path="/admin/repositories/:id"
-            element={<RepoSwitcher currentId={13} currentLabel="current" hrefFor={() => "/admin/repositories/13"} />}
+            element={
+              <RepoSwitcher
+                currentId={13}
+                currentLabel="current"
+                hrefFor={() => "/admin/repositories/13"}
+              />
+            }
           />
         </Routes>
       </MemoryRouter>,
@@ -310,7 +367,13 @@ describe("remaining coverage edges", () => {
         <Routes>
           <Route
             path="/admin/repositories/:id"
-            element={<RepoSwitcher currentId={13} currentLabel="empty" hrefFor={() => "/admin/repositories/13"} />}
+            element={
+              <RepoSwitcher
+                currentId={13}
+                currentLabel="empty"
+                hrefFor={() => "/admin/repositories/13"}
+              />
+            }
           />
         </Routes>
       </MemoryRouter>,
@@ -320,16 +383,22 @@ describe("remaining coverage edges", () => {
     fireEvent.keyDown(screen.getByPlaceholderText("Search repositories"), { key: "Enter" });
 
     let resolveSettings: (value: unknown) => void = () => undefined;
-    api.mockImplementation(() => new Promise((resolve) => {
-      resolveSettings = resolve;
-    }));
+    api.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSettings = resolve;
+        }),
+    );
     const pending = render(<GrowthEventSettingsCard repositoryId={13} />);
     pending.unmount();
     resolveSettings([]);
     let rejectSettings: (reason?: unknown) => void = () => undefined;
-    api.mockImplementation(() => new Promise((_resolve, reject) => {
-      rejectSettings = reject;
-    }));
+    api.mockImplementation(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectSettings = reject;
+        }),
+    );
     const pendingError = render(<GrowthEventSettingsCard repositoryId={13} />);
     pendingError.unmount();
     rejectSettings(new Error("late"));
@@ -371,6 +440,8 @@ describe("remaining coverage edges", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByRole("link", { name: "GitHub Traffic" })).toBeInTheDocument();
+    expect(await screen.findByText("events down")).toBeInTheDocument();
+    expect(screen.queryByText(/No growth events/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Discoverability/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Overview" }));
     expect(await screen.findByText(/MYSTERY/)).toBeInTheDocument();
@@ -380,7 +451,9 @@ describe("remaining coverage edges", () => {
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));
     expect(await screen.findByText(/No topics yet/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Growth Events" }));
-    expect(await screen.findByText(/No growth events/)).toBeInTheDocument();
+    expect(await screen.findByText("events down")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByText(/No growth events/)).not.toBeInTheDocument();
   });
 
   it("covers empty events, result metadata and the first-collection poll", async () => {
@@ -403,7 +476,9 @@ describe("remaining coverage edges", () => {
     }
     await user.click(screen.getByText("LinkedIn launch"));
     await user.click(screen.getAllByRole("button", { name: "Edit" }).at(-1)!);
-    fireEvent.change(screen.getByLabelText("Date / Time"), { target: { value: "2026-09-23T12:00" } });
+    fireEvent.change(screen.getByLabelText("Date / Time"), {
+      target: { value: "2026-09-23T12:00" },
+    });
 
     api.mockResolvedValue({
       ...searchResults,

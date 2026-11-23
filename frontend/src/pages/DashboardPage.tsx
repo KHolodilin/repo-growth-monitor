@@ -1,11 +1,23 @@
 import { RepositoryWarningSheet } from "../components/RepositoryWarningSheet";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, type Dashboard as ApiDashboard, type GrowthEvent, type RankHighlight } from "../lib/api";
+import {
+  api,
+  type Dashboard as ApiDashboard,
+  type GrowthEvent,
+  type RankHighlight,
+} from "../lib/api";
 import { dashboardTrafficOption } from "../lib/dashboardChart";
 import { statsChartOption } from "../lib/statsChart";
 import { asGrowthEvents } from "../lib/growthEvents";
-import { activityClass, cn, formatActivityPresentation, formatGrowth, formatNumber, growthClass } from "../lib/utils";
+import {
+  activityClass,
+  cn,
+  formatActivityPresentation,
+  formatGrowth,
+  formatNumber,
+  growthClass,
+} from "../lib/utils";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card, Skeleton } from "../components/ui";
 import {
@@ -23,16 +35,36 @@ import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/P
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
-import { dashboardStatsChartId, dashboardTrafficChartId, DASHBOARD_STATS_SERIES, TRAFFIC_SERIES } from "../lib/chartLegend";
+import {
+  dashboardStatsChartId,
+  dashboardTrafficChartId,
+  DASHBOARD_STATS_SERIES,
+  TRAFFIC_SERIES,
+} from "../lib/chartLegend";
 import { useTableSort } from "../lib/tableSortPrefs";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 
 import { readPublicPreference, writePublicPreference } from "../lib/publicPrefs";
 import { DashboardViewContext, useDashboardView, repositoryHref } from "../lib/dashboardView";
-type Dashboard = Omit<ApiDashboard, "repositories" | "summary"> & { summary: ApiDashboard["summary"] & { clones?: ApiDashboard["summary"]["views"] }; repositories: (Omit<ApiDashboard["repositories"][number], "id" | "stars" | "forks"> & { id: number | string; stars: number | null; forks: number | null })[] };
+type Dashboard = Omit<ApiDashboard, "repositories" | "summary"> & {
+  summary: ApiDashboard["summary"] & { clones?: ApiDashboard["summary"]["views"] };
+  repositories: (Omit<ApiDashboard["repositories"][number], "id" | "stars" | "forks"> & {
+    id: number | string;
+    stars: number | null;
+    forks: number | null;
+  })[];
+};
 export type DashboardViewData = Dashboard;
 
-const SORT_KEYS = ["visitors", "views", "clones", "stars", "forks", "growth", "discoverability"] as const;
+const SORT_KEYS = [
+  "visitors",
+  "views",
+  "clones",
+  "stars",
+  "forks",
+  "growth",
+  "discoverability",
+] as const;
 
 type SortKey = (typeof SORT_KEYS)[number];
 
@@ -56,36 +88,53 @@ const PORTFOLIO_STATS = [
 export function DashboardPage() {
   const { owner: ownerRoute } = useParams();
   const owner = ownerRoute?.trim() || null;
-  const [trafficSeries,setTrafficSeries]=useState("Visitors");
-  const [statsSeries,setStatsSeries]=useState("Stars");
+  const [trafficSeries, setTrafficSeries] = useState("Visitors");
+  const [statsSeries, setStatsSeries] = useState("Stars");
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = searchParams.get("tab") === "stats" ? "stats" : "traffic";
   const periodParam = searchParams.get("period");
   const [period, setPeriod] = usePeriod();
   useEffect(() => {
-    if (periodParam && (PERIODS as readonly string[]).includes(periodParam) && periodParam !== period) {
+    if (
+      periodParam &&
+      (PERIODS as readonly string[]).includes(periodParam) &&
+      periodParam !== period
+    ) {
       setPeriod(periodParam as Period);
     }
-  }, [periodParam]);
+  }, [periodParam, period, setPeriod]);
   const requestVersion = useRef(0);
+  const loadKey = `${period}:${owner ?? ""}`;
+  const [seenKey, setSeenKey] = useState(loadKey);
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const access = useGitHubAccess();
 
-  async function load() {
+  if (loadKey !== seenKey) {
+    setSeenKey(loadKey);
+    setLoading(true);
+    setError(null);
+  }
+
+  const load = useCallback(async () => {
     const version = ++requestVersion.current;
     const ownerQuery = owner ? `&owner=${encodeURIComponent(owner)}` : "";
     const dashboard = await api<Dashboard>(`/api/v1/admin/dashboard?period=${period}${ownerQuery}`);
     if (version === requestVersion.current) setData(dashboard);
     return dashboard;
-  }
+  }, [period, owner]);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    load()
+    const version = ++requestVersion.current;
+    const ownerQuery = owner ? `&owner=${encodeURIComponent(owner)}` : "";
+    api<Dashboard>(`/api/v1/admin/dashboard?period=${period}${ownerQuery}`)
+      .then((dashboard) => {
+        if (!cancelled && version === requestVersion.current) {
+          setData(dashboard);
+        }
+      })
       .catch((err: Error) => {
         if (!cancelled) {
           setError(err.message);
@@ -99,7 +148,7 @@ export function DashboardPage() {
       });
     return () => {
       cancelled = true;
-      requestVersion.current++;
+      requestVersion.current += 1;
     };
   }, [period, owner]);
 
@@ -114,7 +163,7 @@ export function DashboardPage() {
       void load().catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [collectingFirst, period, owner]);
+  }, [collectingFirst, load]);
 
   useEffect(() => {
     function onCollected() {
@@ -122,7 +171,7 @@ export function DashboardPage() {
     }
     window.addEventListener("repos-collected", onCollected);
     return () => window.removeEventListener("repos-collected", onCollected);
-  }, [period, owner]);
+  }, [load]);
 
   function setTab(next: "traffic" | "stats") {
     const params = new URLSearchParams(searchParams);
@@ -144,7 +193,22 @@ export function DashboardPage() {
     if (data.state === "NO_REPOSITORIES") {
       return <SetupChecklist period={period} onPeriod={setPeriod} access={access} />;
     }
-    return <DashboardPresentation data={data} period={period} onPeriod={setPeriod} tab={tab} onTab={setTab} events={portfolioEvents} mobileSelection={{traffic:trafficSeries,stats:statsSeries,onTraffic:setTrafficSeries,onStats:setStatsSeries}} />;
+    return (
+      <DashboardPresentation
+        data={data}
+        period={period}
+        onPeriod={setPeriod}
+        tab={tab}
+        onTab={setTab}
+        events={portfolioEvents}
+        mobileSelection={{
+          traffic: trafficSeries,
+          stats: statsSeries,
+          onTraffic: setTrafficSeries,
+          onStats: setStatsSeries,
+        }}
+      />
+    );
   })();
 
   if (!owner) {
@@ -157,19 +221,77 @@ export function DashboardPage() {
   );
 }
 
-export function DashboardPresentation({ data, period, onPeriod, tab, onTab, events = [], mobileSelection }: { data: Dashboard; period: Period; onPeriod: (period: Period) => void; tab: "traffic" | "stats"; onTab: (tab: "traffic" | "stats") => void; events?: GrowthEvent[]; mobileSelection?: {traffic:string;stats:string;onTraffic:(name:string)=>void;onStats:(name:string)=>void} }) {
+export function DashboardPresentation({
+  data,
+  period,
+  onPeriod,
+  tab,
+  onTab,
+  events = [],
+  mobileSelection,
+}: {
+  data: Dashboard;
+  period: Period;
+  onPeriod: (period: Period) => void;
+  tab: "traffic" | "stats";
+  onTab: (tab: "traffic" | "stats") => void;
+  events?: GrowthEvent[];
+  mobileSelection?: {
+    traffic: string;
+    stats: string;
+    onTraffic: (name: string) => void;
+    onStats: (name: string) => void;
+  };
+}) {
   const view = useDashboardView();
-  const [trafficSeries, changeTrafficSeries] = useState(() => view.public ? readPublicPreference(view.scopeKey!, "mobile:traffic", (v):v is string => typeof v === "string") ?? "Visitors" : "Visitors");
-  const [statsSeries, changeStatsSeries] = useState(() => view.public ? readPublicPreference(view.scopeKey!, "mobile:stats", (v):v is string => typeof v === "string") ?? "Stars" : "Stars");
-  const setTrafficSeries=(next:string)=>{changeTrafficSeries(next);mobileSelection?.onTraffic(next);if(view.public)writePublicPreference(view.scopeKey!,"mobile:traffic",next);};
-  const setStatsSeries=(next:string)=>{changeStatsSeries(next);mobileSelection?.onStats(next);if(view.public)writePublicPreference(view.scopeKey!,"mobile:stats",next);};
+  const [trafficSeries, changeTrafficSeries] = useState(() =>
+    view.public
+      ? (readPublicPreference(
+          view.scopeKey!,
+          "mobile:traffic",
+          (v): v is string => typeof v === "string",
+        ) ?? "Visitors")
+      : "Visitors",
+  );
+  const [statsSeries, changeStatsSeries] = useState(() =>
+    view.public
+      ? (readPublicPreference(
+          view.scopeKey!,
+          "mobile:stats",
+          (v): v is string => typeof v === "string",
+        ) ?? "Stars")
+      : "Stars",
+  );
+  const setTrafficSeries = (next: string) => {
+    changeTrafficSeries(next);
+    mobileSelection?.onTraffic(next);
+    if (view.public) writePublicPreference(view.scopeKey!, "mobile:traffic", next);
+  };
+  const setStatsSeries = (next: string) => {
+    changeStatsSeries(next);
+    mobileSelection?.onStats(next);
+    if (view.public) writePublicPreference(view.scopeKey!, "mobile:stats", next);
+  };
   const repoPublicChrome = view.public && view.showRepositories === false;
   return (
     <div className="space-y-4">
-      {!repoPublicChrome && <DashboardHeader data={data} period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />}
+      {!repoPublicChrome && (
+        <DashboardHeader data={data} period={period} onPeriod={onPeriod} tab={tab} onTab={onTab} />
+      )}
       {tab === "traffic" ? (
         <div className="grid auto-rows-fr grid-cols-2 gap-3 lg:grid-cols-4">
-          {view.showRepositories === false && data.summary.clones ? <TrafficKpiCard label="Clones" value={data.summary.clones.value} growthPercent={data.summary.clones.growthPercent} coverage={data.summary.clones.coverage} period={period} series={data.traffic.map(point=>point.clones)}/> : <KpiCard label="Repositories" value={data.summary.repositories} />}
+          {view.showRepositories === false && data.summary.clones ? (
+            <TrafficKpiCard
+              label="Clones"
+              value={data.summary.clones.value}
+              growthPercent={data.summary.clones.growthPercent}
+              coverage={data.summary.clones.coverage}
+              period={period}
+              series={data.traffic.map((point) => point.clones)}
+            />
+          ) : (
+            <KpiCard label="Repositories" value={data.summary.repositories} />
+          )}
           <TrafficKpiCard
             label="Views"
             coverage={data.summary.views.coverage}
@@ -225,11 +347,25 @@ export function DashboardPresentation({ data, period, onPeriod, tab, onTab, even
       {data.state === "FIRST_COLLECTION" ? (
         <CollectingCard rows={data.repositories} />
       ) : tab === "traffic" ? (
-        <TrafficChart traffic={data.traffic} events={events} period={period} selectedMobileSeries={mobileSelection?.traffic ?? trafficSeries} onMobileSeriesChange={setTrafficSeries} />
+        <TrafficChart
+          traffic={data.traffic}
+          events={events}
+          period={period}
+          selectedMobileSeries={mobileSelection?.traffic ?? trafficSeries}
+          onMobileSeriesChange={setTrafficSeries}
+        />
       ) : (
-        <StatsChart points={data.stats.points} events={events} period={period} selectedMobileSeries={mobileSelection?.stats ?? statsSeries} onMobileSeriesChange={setStatsSeries} />
+        <StatsChart
+          points={data.stats.points}
+          events={events}
+          period={period}
+          selectedMobileSeries={mobileSelection?.stats ?? statsSeries}
+          onMobileSeriesChange={setStatsSeries}
+        />
       )}
-      {view.showRepositories !== false && <PeriodHighlights highlights={data.highlights} period={period} />}
+      {view.showRepositories !== false && (
+        <PeriodHighlights highlights={data.highlights} period={period} />
+      )}
       {view.showRepositories !== false && <RepositoryTable rows={data.repositories} />}
     </div>
   );
@@ -276,13 +412,36 @@ function DashboardHeader({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open, mobile]);
-  const warningList = problems.map(({ row, lines }) => <div key={row.id} className="border-b py-3 text-sm last:border-0"><Link className="inline-block min-h-11 max-w-full break-words py-2 text-primary hover:underline [overflow-wrap:anywhere]" to={repositoryHref(view, row.id, row.fullName)} onClick={() => setOpen(false)}>{row.fullName}</Link>{lines.map(line => <div key={line} className="break-words text-muted-foreground">{line}</div>)}</div>);
+  const warningList = problems.map(({ row, lines }) => (
+    <div key={row.id} className="border-b py-3 text-sm last:border-0">
+      <Link
+        className="inline-block min-h-11 max-w-full break-words py-2 text-primary hover:underline [overflow-wrap:anywhere]"
+        to={repositoryHref(view, row.id, row.fullName)}
+        onClick={() => setOpen(false)}
+      >
+        {row.fullName}
+      </Link>
+      {lines.map((line) => (
+        <div key={line} className="break-words text-muted-foreground">
+          {line}
+        </div>
+      ))}
+    </div>
+  ));
   return (
-    <div className={cn("space-y-3", view.headerLeading && "md:flex md:flex-wrap md:items-center md:justify-between md:gap-3 md:space-y-0")}>
+    <div
+      className={cn(
+        "space-y-3",
+        view.headerLeading &&
+          "md:flex md:flex-wrap md:items-center md:justify-between md:gap-3 md:space-y-0",
+      )}
+    >
       <div className="flex min-w-0 flex-wrap items-center gap-3">
         {view.headerLeading}
         {!view.headerLeading && (view.heading || !view.public) && (
-          <h1 className="min-w-0 break-words text-2xl font-semibold [overflow-wrap:anywhere]">{view.heading ?? "Portfolio"}</h1>
+          <h1 className="min-w-0 break-words text-2xl font-semibold [overflow-wrap:anywhere]">
+            {view.heading ?? "Portfolio"}
+          </h1>
         )}
         {problems.length > 0 && (
           <div ref={rootRef} className="relative">
@@ -294,16 +453,25 @@ function DashboardHeader({
             >
               ⚠ {repositoryProblemBadge(problems.length)}
             </button>
-            {open && mobile && <RepositoryWarningSheet count={problems.length} onClose={() => setOpen(false)}>{warningList}</RepositoryWarningSheet>}
+            {open && mobile && (
+              <RepositoryWarningSheet count={problems.length} onClose={() => setOpen(false)}>
+                {warningList}
+              </RepositoryWarningSheet>
+            )}
             {open && !mobile && (
               <div className="absolute left-0 z-10 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border bg-card p-3 text-left shadow-lg">
                 {problems.map(({ row, lines }) => (
                   <div key={row.id} className="py-1 text-sm">
-                    <Link className="text-primary hover:underline" to={repositoryHref(view, row.id, row.fullName)}>
+                    <Link
+                      className="text-primary hover:underline"
+                      to={repositoryHref(view, row.id, row.fullName)}
+                    >
                       {row.fullName}
                     </Link>
                     {lines.map((line) => (
-                      <div key={line} className="text-muted-foreground">{line}</div>
+                      <div key={line} className="text-muted-foreground">
+                        {line}
+                      </div>
                     ))}
                   </div>
                 ))}
@@ -322,18 +490,28 @@ function DashboardHeader({
         data-testid="portfolio-controls"
       >
         {tab != null && onTab != null && (
-          <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label={view.public ? `${view.heading ?? "Owner"} analytics` : "Portfolio analytics"}>
-            {([
-              ["traffic", "Traffic"],
-              ["stats", "Stats"],
-            ] as const).map(([key, label]) => (
+          <div
+            className="inline-flex rounded-lg border bg-muted p-1"
+            role="group"
+            aria-label={
+              view.public ? `${view.heading ?? "Owner"} analytics` : "Portfolio analytics"
+            }
+          >
+            {(
+              [
+                ["traffic", "Traffic"],
+                ["stats", "Stats"],
+              ] as const
+            ).map(([key, label]) => (
               <button
                 hidden={view.public && key === "traffic" && view.trafficEnabled === false}
                 key={key}
                 type="button"
                 className={cn(
                   "rounded-md px-3 py-1.5 text-sm font-medium",
-                  tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                  tab === key
+                    ? "bg-card text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 onClick={() => onTab(key)}
               >
@@ -357,15 +535,20 @@ function DashboardHeader({
 
 function useTrackedEvents(repositoryIds: number[], period: string) {
   const key = repositoryIds.join(",");
+  const storeKey = `${key}:${period}`;
+  const [seenKey, setSeenKey] = useState(storeKey);
   const [events, setEvents] = useState<GrowthEvent[]>([]);
+  if (storeKey !== seenKey) {
+    setSeenKey(storeKey);
+    setEvents([]);
+  }
   useEffect(() => {
     const ids = key ? key.split(",").map(Number) : [];
     if (ids.length === 0) {
-      setEvents([]);
       return;
     }
     let cancelled = false;
-    Promise.all(
+    void Promise.all(
       ids.map((id) =>
         api<GrowthEvent[]>(`/api/v1/admin/repositories/${id}/growth-events?period=${period}`)
           .then((rows) => asGrowthEvents(rows))
@@ -418,14 +601,26 @@ function TrafficChart({
       onMobileSeriesChange={onMobileSeriesChange}
       mobileSeries={TRAFFIC_SERIES}
     >
-      {!traffic.some(point => point.views != null || point.visitors != null || point.clones != null || point.uniqueCloners != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <PersistentECharts
-        accessibleTitle={`${view.heading ?? "Portfolio"} Traffic`}
-        chartId={view.scopeKey ? `${view.scopeKey}:traffic` : dashboardTrafficChartId()}
-        series={TRAFFIC_SERIES}
-        option={option}
-        style={{ height: 360, width: "100%" }}
-        opts={{ renderer: "canvas" }}
-      />}
+      {!traffic.some(
+        (point) =>
+          point.views != null ||
+          point.visitors != null ||
+          point.clones != null ||
+          point.uniqueCloners != null,
+      ) ? (
+        <p role="status" className="py-12 text-center text-sm text-muted-foreground">
+          No traffic data for selected period
+        </p>
+      ) : (
+        <PersistentECharts
+          accessibleTitle={`${view.heading ?? "Portfolio"} Traffic`}
+          chartId={view.scopeKey ? `${view.scopeKey}:traffic` : dashboardTrafficChartId()}
+          series={TRAFFIC_SERIES}
+          option={option}
+          style={{ height: 360, width: "100%" }}
+          opts={{ renderer: "canvas" }}
+        />
+      )}
     </ChartCard>
   );
 }
@@ -469,7 +664,13 @@ function StatsChart({
   );
 }
 
-function PeriodHighlights({ highlights, period }: { highlights: Dashboard["highlights"]; period: Period }) {
+function PeriodHighlights({
+  highlights,
+  period,
+}: {
+  highlights: Dashboard["highlights"];
+  period: Period;
+}) {
   const view = useDashboardView();
   const rise = highlights?.rankRise;
   const drop = highlights?.rankDrop;
@@ -493,7 +694,9 @@ function PeriodHighlights({ highlights, period }: { highlights: Dashboard["highl
             <div className="text-base font-semibold text-foreground">
               {events.count} {events.count === 1 ? "promotion event" : "promotion events"}
             </div>
-            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{events.repositoryNames.join(", ")}</div>
+            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {events.repositoryNames.join(", ")}
+            </div>
           </Link>
         ) : (
           <span className="text-sm text-muted-foreground">No promotion events</span>
@@ -506,8 +709,12 @@ function PeriodHighlights({ highlights, period }: { highlights: Dashboard["highl
             to={repositoryHref(view, visitors.repositoryId, visitors.fullName)}
             aria-label={`${visitors.fullName} ${growth.label}`}
           >
-            <div className={cn("text-base font-semibold", growthClass(growth.direction))}>{growth.label}</div>
-            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{visitors.fullName}</div>
+            <div className={cn("text-base font-semibold", growthClass(growth.direction))}>
+              {growth.label}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {visitors.fullName}
+            </div>
           </Link>
         ) : (
           <span className="text-sm text-muted-foreground">No visitor growth</span>
@@ -549,7 +756,8 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
   const mobile = useIsMobileChart();
   const [tokenState, setTokenState] = useState<TokenState | null>(null);
   const sortKeys = SORT_KEYS;
-  const needsAccess = !view.public && rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
+  const needsAccess =
+    !view.public && rows.some((row) => row.accessible === false || row.trafficPermissionMissing);
   useEffect(() => {
     if (!needsAccess) {
       return;
@@ -571,7 +779,7 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
     keys: sortKeys,
     initial: { key: "visitors", dir: "desc" },
   });
-  const activeSortKey = (sortKeys.includes(sortKey as SortKey) ? sortKey : "visitors") as SortKey;
+  const activeSortKey = sortKeys.includes(sortKey) ? sortKey : "visitors";
 
   const sorted = useMemo(() => {
     const copy = [...rows];
@@ -626,7 +834,9 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
               <RepositoryCard
                 row={row}
                 tokenState={tokenState}
-                onOpen={() => navigate(repositoryHref(view, row.id, row.fullName))}
+                onOpen={() => {
+                  void navigate(repositoryHref(view, row.id, row.fullName));
+                }}
               />
             </li>
           ))}
@@ -642,13 +852,48 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
           <thead className="text-left text-muted-foreground">
             <tr>
               <th className="px-5 py-2 font-medium">Repository</th>
-              <SortHeader label="Visitors" active={activeSortKey === "visitors"} dir={sortDir} onClick={() => toggle("visitors")} />
-              <SortHeader label="Views" active={activeSortKey === "views"} dir={sortDir} onClick={() => toggle("views")} />
-              <SortHeader label="Clones" active={activeSortKey === "clones"} dir={sortDir} onClick={() => toggle("clones")} />
-              <SortHeader label="Stars" active={activeSortKey === "stars"} dir={sortDir} onClick={() => toggle("stars")} />
-              <SortHeader label="Forks" active={activeSortKey === "forks"} dir={sortDir} onClick={() => toggle("forks")} />
-              <SortHeader label="Growth" active={activeSortKey === "growth"} dir={sortDir} onClick={() => toggle("growth")} />
-              <SortHeader label="Disc." active={activeSortKey === "discoverability"} dir={sortDir} onClick={() => toggle("discoverability")} />
+              <SortHeader
+                label="Visitors"
+                active={activeSortKey === "visitors"}
+                dir={sortDir}
+                onClick={() => toggle("visitors")}
+              />
+              <SortHeader
+                label="Views"
+                active={activeSortKey === "views"}
+                dir={sortDir}
+                onClick={() => toggle("views")}
+              />
+              <SortHeader
+                label="Clones"
+                active={activeSortKey === "clones"}
+                dir={sortDir}
+                onClick={() => toggle("clones")}
+              />
+              <SortHeader
+                label="Stars"
+                active={activeSortKey === "stars"}
+                dir={sortDir}
+                onClick={() => toggle("stars")}
+              />
+              <SortHeader
+                label="Forks"
+                active={activeSortKey === "forks"}
+                dir={sortDir}
+                onClick={() => toggle("forks")}
+              />
+              <SortHeader
+                label="Growth"
+                active={activeSortKey === "growth"}
+                dir={sortDir}
+                onClick={() => toggle("growth")}
+              />
+              <SortHeader
+                label="Disc."
+                active={activeSortKey === "discoverability"}
+                dir={sortDir}
+                onClick={() => toggle("discoverability")}
+              />
               <th className="px-5 py-2 font-medium">Activity</th>
             </tr>
           </thead>
@@ -660,11 +905,18 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                 <tr
                   key={row.id}
                   className="cursor-pointer border-t hover:bg-muted/60"
-                  onClick={() => navigate(repositoryHref(view, row.id, row.fullName))}
+                  onClick={() => {
+                    void navigate(repositoryHref(view, row.id, row.fullName));
+                  }}
                 >
                   <td className="max-w-0 px-5 py-3 align-top">
                     {problems && (
-                      <span role="img" className="mr-1 text-amber-700" title={problems} aria-label={problems}>
+                      <span
+                        role="img"
+                        className="mr-1 text-amber-700"
+                        title={problems}
+                        aria-label={problems}
+                      >
                         !
                       </span>
                     )}
@@ -688,7 +940,12 @@ function RepositoryTable({ rows }: { rows: Dashboard["repositories"] }) {
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.clones)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.stars)}</td>
                   <td className="px-5 text-right tabular-nums">{formatNumber(row.forks)}</td>
-                  <td className={cn("px-5 text-right tabular-nums font-medium", growthClass(growth?.direction))}>
+                  <td
+                    className={cn(
+                      "px-5 text-right tabular-nums font-medium",
+                      growthClass(growth?.direction),
+                    )}
+                  >
                     {growth?.label ?? "—"}
                   </td>
                   <td className="px-5 text-right tabular-nums">
@@ -727,19 +984,32 @@ function RepositoryCard({
     { label: "Forks", value: formatNumber(row.forks) },
     {
       label: "Growth",
-      value: <span className={cn("font-medium", growthClass(growth?.direction))}>{growth?.label ?? "—"}</span>,
+      value: (
+        <span className={cn("font-medium", growthClass(growth?.direction))}>
+          {growth?.label ?? "—"}
+        </span>
+      ),
     },
     { label: "Disc.", value: <DiscoverabilityCell row={row} /> },
     {
       label: "Activity",
-      value: <span className={activityClass(row.activityStatus)}>{formatActivityPresentation(row.activityStatus, row.activityAt)}</span>,
+      value: (
+        <span className={activityClass(row.activityStatus)}>
+          {formatActivityPresentation(row.activityStatus, row.activityAt)}
+        </span>
+      ),
     },
   ];
   return (
     <Card className="cursor-pointer p-4 hover:bg-muted/40" onClick={onOpen}>
       <div className="flex items-start gap-2">
         {!view.public && problems ? (
-          <span role="img" className="mt-0.5 shrink-0 text-amber-700" title={problems} aria-label={problems}>
+          <span
+            role="img"
+            className="mt-0.5 shrink-0 text-amber-700"
+            title={problems}
+            aria-label={problems}
+          >
             !
           </span>
         ) : null}
@@ -763,7 +1033,9 @@ function RepositoryCard({
         {metrics.map((metric) => (
           <div key={metric.label} className="min-w-0">
             <dt className="text-muted-foreground">{metric.label}</dt>
-            <dd className="mt-0.5 break-words tabular-nums [overflow-wrap:anywhere]">{metric.value}</dd>
+            <dd className="mt-0.5 break-words tabular-nums [overflow-wrap:anywhere]">
+              {metric.value}
+            </dd>
           </div>
         ))}
       </dl>
@@ -815,7 +1087,11 @@ function SortHeader({
 }) {
   return (
     <th className="px-5 py-2 text-right">
-      <button type="button" className={cn("font-medium hover:text-foreground", active && "text-foreground")} onClick={onClick}>
+      <button
+        type="button"
+        className={cn("font-medium hover:text-foreground", active && "text-foreground")}
+        onClick={onClick}
+      >
         {label}
         {active ? (dir === "desc" ? " ↓" : " ↑") : ""}
       </button>
@@ -889,8 +1165,8 @@ function SetupChecklist({
           {!accepted &&
             access?.tokenState !== "COLLECTOR_UNAVAILABLE" &&
             access?.tokenState !== "ORCHESTRATION_DISABLED" && (
-            <TokenHelp rejected={access?.tokenState === "REJECTED"} />
-          )}
+              <TokenHelp rejected={access?.tokenState === "REJECTED"} />
+            )}
         </ChecklistRow>
         <ChecklistRow done={false} title="Repositories are selected." muted={!accepted}>
           {accepted && (
@@ -918,7 +1194,12 @@ function ChecklistRow({
 }) {
   return (
     <div>
-      <div className={cn("text-sm font-medium", done ? "text-emerald-700" : muted ? "text-muted-foreground" : "text-foreground")}>
+      <div
+        className={cn(
+          "text-sm font-medium",
+          done ? "text-emerald-700" : muted ? "text-muted-foreground" : "text-foreground",
+        )}
+      >
         <span className="mr-2" aria-hidden="true">
           {done ? "✓" : "○"}
         </span>
@@ -933,7 +1214,9 @@ function TokenHelp({ rejected }: { rejected: boolean }) {
   return (
     <div className="mt-2 max-w-xl space-y-2 text-sm text-muted-foreground">
       {rejected && (
-        <p>GitHub rejected the token. Stored data is kept. Update GITHUB_TOKEN in .env and restart.</p>
+        <p>
+          GitHub rejected the token. Stored data is kept. Update GITHUB_TOKEN in .env and restart.
+        </p>
       )}
       <p>
         <a
@@ -949,7 +1232,8 @@ function TokenHelp({ rejected }: { rejected: boolean }) {
       <p>Without Administration, traffic stays empty and the rest still collects.</p>
       <p>
         Write the token to <code className="text-foreground">.env</code> as GITHUB_TOKEN, then run{" "}
-        <code className="text-foreground">docker compose up -d</code>. There is no token field in the browser.
+        <code className="text-foreground">docker compose up -d</code>. There is no token field in
+        the browser.
       </p>
     </div>
   );

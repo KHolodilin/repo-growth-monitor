@@ -48,65 +48,59 @@ public class SearchResultJdbcRepository {
         .param("searchRunId", searchRunId)
         .update();
     for (SearchResult result : results) {
-      jdbcClient
-          .sql(
-              """
-              INSERT INTO search_result (
-                  search_run_id, position, github_repository_id, full_name, owner,
-                  stars, watchers, forks, contributors, language, description, html_url,
-                  repository_created_at, repository_updated_at, activity_at, activity_status,
-                  metadata_updated_at
-              ) VALUES (
-                  :searchRunId, :position, :githubRepositoryId, :fullName, :owner,
-                  :stars, :watchers, :forks, :contributors, :language, :description, :htmlUrl,
-                  :repositoryCreatedAt, :repositoryUpdatedAt, :activityAt, :activityStatus,
-                  :metadataUpdatedAt
-              )
-              """)
-          .param("searchRunId", searchRunId)
-          .param("position", result.position())
-          .param("githubRepositoryId", result.githubRepositoryId())
-          .param("fullName", result.fullName())
-          .param("owner", result.owner())
-          .param("stars", result.stars())
-          .param("watchers", result.watchers())
-          .param("forks", result.forks())
-          .param("contributors", result.contributors())
-          .param("language", result.language())
-          .param("description", result.description())
-          .param("htmlUrl", result.htmlUrl())
-          .param("repositoryCreatedAt", SqlTime.ts(result.repositoryCreatedAt()))
-          .param("repositoryUpdatedAt", SqlTime.ts(result.repositoryUpdatedAt()))
-          .param("activityAt", SqlTime.ts(result.activityAt()))
-          .param(
-              "activityStatus",
-              result.activityStatus() == null ? null : result.activityStatus().name())
-          .param("metadataUpdatedAt", SqlTime.ts(result.metadataUpdatedAt()))
-          .update();
+      var spec =
+          jdbcClient
+              .sql(
+                  """
+                  INSERT INTO search_result (
+                      search_run_id, position, github_repository_id, full_name, owner,
+                      stars, watchers, forks, contributors, language, description, html_url,
+                      repository_created_at, repository_updated_at, activity_at, activity_status,
+                      metadata_updated_at
+                  ) VALUES (
+                      :searchRunId, :position, :githubRepositoryId, :fullName, :owner,
+                      :stars, :watchers, :forks, :contributors, :language, :description, :htmlUrl,
+                      :repositoryCreatedAt, :repositoryUpdatedAt, :activityAt, :activityStatus,
+                      :metadataUpdatedAt
+                  )
+                  """)
+              .param("searchRunId", searchRunId)
+              .param("position", result.position())
+              .param("githubRepositoryId", result.githubRepositoryId())
+              .param("fullName", result.fullName())
+              .param("owner", result.owner());
+      bindSnapshot(spec, result).update();
     }
   }
 
   public void updateSnapshot(SearchResult result) {
-    jdbcClient
-        .sql(
-            """
-            UPDATE search_result
-            SET stars = :stars,
-                watchers = :watchers,
-                forks = :forks,
-                contributors = :contributors,
-                language = :language,
-                description = :description,
-                html_url = :htmlUrl,
-                repository_created_at = :repositoryCreatedAt,
-                repository_updated_at = :repositoryUpdatedAt,
-                activity_at = :activityAt,
-                activity_status = :activityStatus,
-                metadata_updated_at = :metadataUpdatedAt
-            WHERE id = :id
-            """)
-        .param("id", result.id())
-        .param("stars", result.stars())
+    bindSnapshot(
+            jdbcClient
+                .sql(
+                    """
+                    UPDATE search_result
+                    SET stars = :stars,
+                        watchers = :watchers,
+                        forks = :forks,
+                        contributors = :contributors,
+                        language = :language,
+                        description = :description,
+                        html_url = :htmlUrl,
+                        repository_created_at = :repositoryCreatedAt,
+                        repository_updated_at = :repositoryUpdatedAt,
+                        activity_at = :activityAt,
+                        activity_status = :activityStatus,
+                        metadata_updated_at = :metadataUpdatedAt
+                    WHERE id = :id
+                    """)
+                .param("id", result.id()),
+            result)
+        .update();
+  }
+
+  private static JdbcClient.StatementSpec bindSnapshot(
+      JdbcClient.StatementSpec spec, SearchResult result) {
+    return spec.param("stars", result.stars())
         .param("watchers", result.watchers())
         .param("forks", result.forks())
         .param("contributors", result.contributors())
@@ -119,8 +113,7 @@ public class SearchResultJdbcRepository {
         .param(
             "activityStatus",
             result.activityStatus() == null ? null : result.activityStatus().name())
-        .param("metadataUpdatedAt", SqlTime.ts(result.metadataUpdatedAt()))
-        .update();
+        .param("metadataUpdatedAt", SqlTime.ts(result.metadataUpdatedAt()));
   }
 
   public List<SearchResult> findByRun(long searchRunId) {

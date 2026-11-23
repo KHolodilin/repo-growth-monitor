@@ -106,9 +106,9 @@ public final class GrowthEventDetections {
             : previous.customSocialPreview(),
         current.customSocialPreview() == null
             ? previous.socialPreviewUrl()
-            : (Boolean.TRUE.equals(current.customSocialPreview())
+            : Boolean.TRUE.equals(current.customSocialPreview())
                 ? blankToNull(current.socialPreviewUrl())
-                : null));
+                : null);
   }
 
   static List<CandidateEvent> discoverability(

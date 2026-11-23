@@ -20,7 +20,7 @@ export type EventWindowComparison = {
 };
 
 type TrafficDay = { date: string; uniqueVisitors: number | null; clones: number | null };
-type StarDay = { date: string; stars: number };
+type StarDay = { date: string; stars: number | null };
 type RankPoint = { date: string; position: number | null };
 type RankQuery = { name: string; points: RankPoint[] };
 
@@ -51,7 +51,13 @@ function sumInRange(points: { date: string; value: number | null }[], from: stri
   }, 0);
 }
 
-function metric(points: { date: string; value: number | null }[], beforeFrom: string, beforeTo: string, afterFrom: string, afterTo: string): WindowMetric {
+function metric(
+  points: { date: string; value: number | null }[],
+  beforeFrom: string,
+  beforeTo: string,
+  afterFrom: string,
+  afterTo: string,
+): WindowMetric {
   const before = sumInRange(points, beforeFrom, beforeTo);
   const after = sumInRange(points, afterFrom, afterTo);
   return { before, after, difference: after - before };
@@ -73,7 +79,7 @@ function starGain(points: StarDay[], from: string, to: string) {
   if (start.date === end.date) {
     return 0;
   }
-  return end.stars - start.stars;
+  return (end.stars ?? 0) - (start.stars ?? 0);
 }
 
 function lastPosition(points: RankPoint[], from: string, to: string) {
@@ -83,7 +89,12 @@ function lastPosition(points: RankPoint[], from: string, to: string) {
     .at(-1);
 }
 
-function strongestRank(queries: RankQuery[], beforeTo: string, afterFrom: string, afterTo: string): RankComparison {
+function strongestRank(
+  queries: RankQuery[],
+  beforeTo: string,
+  afterFrom: string,
+  afterTo: string,
+): RankComparison {
   if (queries.length === 0) {
     return { kind: "no-queries" };
   }

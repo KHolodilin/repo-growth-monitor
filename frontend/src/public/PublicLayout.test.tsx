@@ -121,15 +121,25 @@ describe("PublicLayout", () => {
     expect(api.mock.calls.every(([url]) => !String(url).includes("/admin"))).toBe(true);
   });
 
-  it("ignores aborted sync success and failure after unmount", async () => {
+  it("ignores aborted sync success and failure after unmount", () => {
     let finish!: (value: unknown) => void;
-    api.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    api.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     const first = mount("/Alpha/project");
     first.unmount();
     finish({ freshness: { lastSuccessfulSnapshotAt: "2026-11-01T12:00:00Z" } });
 
     let fail!: (error: Error) => void;
-    api.mockImplementation(() => new Promise((_, reject) => { fail = reject; }));
+    api.mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
     const second = mount("/Alpha/project");
     second.unmount();
     fail(new Error("cancelled"));

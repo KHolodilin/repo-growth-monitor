@@ -67,8 +67,18 @@ export const traffic: RepositoryTraffic = {
   referrers: [{ referrer: "github.com", views: 8, uniqueVisitors: 3 }],
   referrerSnapshotAt: "2026-09-23T06:00:00Z",
   paths: [
-    { path: "/KHolodilin/spring-transactional-outbox-kafka", views: 6, uniqueVisitors: 3, servicePath: false },
-    { path: "/KHolodilin/spring-transactional-outbox-kafka/issues", views: 1, uniqueVisitors: 1, servicePath: true },
+    {
+      path: "/KHolodilin/spring-transactional-outbox-kafka",
+      views: 6,
+      uniqueVisitors: 3,
+      servicePath: false,
+    },
+    {
+      path: "/KHolodilin/spring-transactional-outbox-kafka/issues",
+      views: 1,
+      uniqueVisitors: 1,
+      servicePath: true,
+    },
   ],
   pathSnapshotAt: "2026-09-23T06:00:00Z",
   lastCollection: {
@@ -189,8 +199,22 @@ export const dashboardReady: Dashboard = {
       contributors: { value: 4, absoluteChange: 4, growthPercent: null },
     },
     points: [
-      { date: "2026-09-22", stars: 18, forks: 16, watchers: 0, contributors: 0, missingRepositories: 0 },
-      { date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 4, missingRepositories: 1 },
+      {
+        date: "2026-09-22",
+        stars: 18,
+        forks: 16,
+        watchers: 0,
+        contributors: 0,
+        missingRepositories: 0,
+      },
+      {
+        date: "2026-09-23",
+        stars: 21,
+        forks: 16,
+        watchers: 0,
+        contributors: 4,
+        missingRepositories: 1,
+      },
     ],
   },
 };

@@ -18,20 +18,30 @@ const STATS_CARDS = [
 export function RepositoryStatsPanel({
   repositoryId,
   period,
-  selectedMobileSeries, onMobileSeriesChange,
+  selectedMobileSeries,
+  onMobileSeriesChange,
 }: {
   repositoryId: number;
   period: Period;
   selectedMobileSeries?: string;
   onMobileSeriesChange?: (name: string) => void;
 }) {
+  const loadKey = `${repositoryId}:${period}`;
+  const [seenKey, setSeenKey] = useState(loadKey);
   const [history, setHistory] = useState<RepositoryStatsHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  if (loadKey !== seenKey) {
+    setSeenKey(loadKey);
+    setError(null);
+    setHistory(null);
+  }
+
   useEffect(() => {
     let cancelled = false;
-    setError(null);
-    api<RepositoryStatsHistory>(`/api/v1/admin/repositories/${repositoryId}/stats-history?period=${period}`)
+    api<RepositoryStatsHistory>(
+      `/api/v1/admin/repositories/${repositoryId}/stats-history?period=${period}`,
+    )
       .then((data) => {
         if (!cancelled) {
           setHistory(data);
@@ -76,7 +86,6 @@ export function RepositoryStatsPanel({
               absoluteChange={total.absoluteChange}
               period={period}
               series={history.points.map((point) => point[card.key])}
-
             />
           );
         })}

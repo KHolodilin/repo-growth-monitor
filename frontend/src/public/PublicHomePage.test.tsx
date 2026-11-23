@@ -8,12 +8,36 @@ import { readLandingDirectoryPrefs, writeLandingDirectoryPrefs } from "../lib/la
 
 const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
 
-vi.mock("../lib/api", async (original) => ({ ...(await original<typeof import("../lib/api")>()), api }));
-vi.mock("../lib/auth", async (original) => ({ ...(await original<typeof import("../lib/auth")>()), loadMe }));
+vi.mock("../lib/api", async (original) => ({
+  ...(await original<typeof import("../lib/api")>()),
+  api,
+}));
+vi.mock("../lib/auth", async (original) => ({
+  ...(await original<typeof import("../lib/auth")>()),
+  loadMe,
+}));
 
 const owners = [
-  { id: "2", login: "Beta", canonicalPath: "/Beta", repositories: 1, stars: 40, forks: 4, watchers: 2, contributors: 5 },
-  { id: "1", login: "Alpha", canonicalPath: "/Alpha", repositories: 2, stars: 30, forks: 3, watchers: 1, contributors: null },
+  {
+    id: "2",
+    login: "Beta",
+    canonicalPath: "/Beta",
+    repositories: 1,
+    stars: 40,
+    forks: 4,
+    watchers: 2,
+    contributors: 5,
+  },
+  {
+    id: "1",
+    login: "Alpha",
+    canonicalPath: "/Alpha",
+    repositories: 2,
+    stars: 30,
+    forks: 3,
+    watchers: 1,
+    contributors: null,
+  },
 ];
 
 function page(path = "/?sort=stars&order=desc&limit=25") {
@@ -31,7 +55,7 @@ beforeEach(() => {
   loadMe.mockResolvedValue(anonymousMe);
   api.mockImplementation((path: string) => {
     if (!path.startsWith("/api/v1/public/owners?")) {
-      throw new Error("Unexpected private request: " + path);
+      return Promise.reject(new Error("Unexpected private request: " + path));
     }
     const url = new URL(path, "http://local.test");
     const sort = url.searchParams.get("sort") ?? "stars";
@@ -40,8 +64,8 @@ beforeEach(() => {
     const limit = Number(url.searchParams.get("limit") ?? "25");
     const key = sort === "owner" ? "login" : sort;
     const sorted = [...owners].sort((left, right) => {
-      const leftValue = left[key as keyof (typeof owners)[number]] as string | number | null;
-      const rightValue = right[key as keyof (typeof owners)[number]] as string | number | null;
+      const leftValue = left[key as keyof (typeof owners)[number]];
+      const rightValue = right[key as keyof (typeof owners)[number]];
       if (leftValue == null && rightValue == null) return Number(left.id) - Number(right.id);
       if (leftValue == null) return 1;
       if (rightValue == null) return -1;
@@ -61,9 +85,14 @@ describe("public homepage owners directory", () => {
   it("renders the approved homepage structure and real owners table", async () => {
     const user = userEvent.setup();
     const scrollIntoView = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
     page();
-    expect(await screen.findByRole("heading", { name: "Understand how your open source projects grow" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Understand how your open source projects grow" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Explore dashboards" }));
     expect(scrollIntoView).toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: "Traffic history" })).toBeInTheDocument();
@@ -75,7 +104,9 @@ describe("public homepage owners directory", () => {
     expect(within(table).getByRole("link", { name: "Alpha" })).toHaveAttribute("href", "/Alpha");
     expect(within(table).getByText("—")).toBeInTheDocument();
     expect(screen.queryByText(/avatar|github\.com|Top 5/i)).not.toBeInTheDocument();
-    expect(api.mock.calls.every(([request]) => String(request).startsWith("/api/v1/public/"))).toBe(true);
+    expect(api.mock.calls.every(([request]) => String(request).startsWith("/api/v1/public/"))).toBe(
+      true,
+    );
   });
 
   it("persists sort in the URL and landing preference namespace", async () => {
@@ -109,11 +140,15 @@ describe("public homepage owners directory", () => {
   it("keeps Next/Previous tied to the server cursor and Back-friendly URL state", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (!String(path).startsWith("/api/v1/public/owners?")) throw new Error(String(path));
+      if (!String(path).startsWith("/api/v1/public/owners?"))
+        return Promise.reject(new Error(String(path)));
       const url = new URL(String(path), "http://local.test");
       const after = Number(url.searchParams.get("after") ?? "0");
       const item = owners[after];
-      return Promise.resolve({ items: item ? [item] : [], nextCursor: after + 1 < owners.length ? String(after + 1) : null });
+      return Promise.resolve({
+        items: item ? [item] : [],
+        nextCursor: after + 1 < owners.length ? String(after + 1) : null,
+      });
     });
     page("/?sort=stars&order=desc&limit=1");
     expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
@@ -122,6 +157,9 @@ describe("public homepage owners directory", () => {
     expect(screen.queryByRole("link", { name: "Beta" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Previous" }));
     expect(await screen.findByRole("link", { name: "Beta" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Stars/ })).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("button", { name: /^Stars/ })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
   });
 });

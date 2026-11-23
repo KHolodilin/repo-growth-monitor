@@ -19,17 +19,21 @@ export function PublicLayout() {
   // Anonymous never sees collection-incomplete markers; signed-in users keep them.
   const collectionExpected = me.authenticated;
 
+  const parts = location.pathname.split("/").filter(Boolean);
+  const syncPathKey = homePage || parts[0] === "admin" ? null : location.pathname;
+  const [seenSyncPathKey, setSeenSyncPathKey] = useState(syncPathKey);
+  if (syncPathKey !== seenSyncPathKey) {
+    setSeenSyncPathKey(syncPathKey);
+    if (syncPathKey === null) {
+      setSyncAt(null);
+    }
+  }
+
   useEffect(() => {
-    if (homePage) {
-      setSyncAt(null);
+    if (syncPathKey === null) {
       return;
     }
-    const parts = location.pathname.split("/").filter(Boolean);
-    if (parts[0] === "admin") {
-      setSyncAt(null);
-      return;
-    }
-    const [owner, repository] = parts;
+    const [owner, repository] = syncPathKey.split("/").filter(Boolean);
     const abort = new AbortController();
     api<PublicOverview>(publicBase(owner, repository), { signal: abort.signal })
       .then((overview) => {
@@ -43,17 +47,22 @@ export function PublicLayout() {
         }
       });
     return () => abort.abort();
-  }, [homePage, location.pathname]);
+  }, [syncPathKey]);
 
   return (
     <DashboardViewContext.Provider value={{ public: true, collectionExpected }}>
       <div className="flex min-h-screen flex-col bg-background text-foreground">
         <header className="border-b bg-card">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 md:px-6">
-            <Link to="/" className="flex min-w-0 items-center gap-2.5 text-slate-900" aria-label="Repo Growth Monitor">
+            <Link
+              to="/"
+              className="flex min-w-0 items-center gap-2.5 text-slate-900"
+              aria-label="Repo Growth Monitor"
+            >
               <LogoMark className="h-8 w-8 shrink-0 object-contain" />
               <span className="truncate whitespace-nowrap text-[15px] leading-none tracking-tight">
-                <span className="font-bold">Repo Growth</span> <span className="font-normal">Monitor</span>
+                <span className="font-bold">Repo Growth</span>{" "}
+                <span className="font-normal">Monitor</span>
               </span>
             </Link>
             <a
@@ -72,7 +81,9 @@ export function PublicLayout() {
           <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
             {homePage ? (
               <>
-                <p>Public dashboards use saved snapshots. Sign in only for repository management.</p>
+                <p>
+                  Public dashboards use saved snapshots. Sign in only for repository management.
+                </p>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   <button
                     type="button"
@@ -83,7 +94,12 @@ export function PublicLayout() {
                     About data
                   </button>
                   <span aria-hidden="true">·</span>
-                  <a className="font-medium text-primary hover:underline" href={PROJECT_GITHUB} target="_blank" rel="noreferrer">
+                  <a
+                    className="font-medium text-primary hover:underline"
+                    href={PROJECT_GITHUB}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     GitHub
                   </a>
                 </div>
@@ -107,8 +123,8 @@ export function PublicLayout() {
             )}
             {aboutOpen && (
               <p>
-                Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
-                between snapshots.
+                Data is collected once per day. Referrers and paths show the latest GitHub snapshot;
+                History has the change between snapshots.
               </p>
             )}
           </div>

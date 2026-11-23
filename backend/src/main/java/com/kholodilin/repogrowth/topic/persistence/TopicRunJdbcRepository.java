@@ -17,24 +17,30 @@ import org.springframework.stereotype.Repository;
 public class TopicRunJdbcRepository {
 
   static final RowMapper<TopicRun> MAPPER =
-      (rs, rowNum) ->
-          new TopicRun(
-              rs.getLong("id"),
-              rs.getLong("topic_watch_id"),
-              rs.getLong("repository_id"),
-              rs.getObject("business_date", LocalDate.class),
-              SearchRunStatus.valueOf(rs.getString("status")),
-              rs.getInt("attempt"),
-              toInstant(rs.getTimestamp("next_attempt_at")),
-              rs.getString("locked_by"),
-              toInstant(rs.getTimestamp("locked_until")),
-              toInstant(rs.getTimestamp("started_at")),
-              toInstant(rs.getTimestamp("completed_at")),
-              toInstant(rs.getTimestamp("snapshot_at")),
-              (Integer) rs.getObject("total_count"),
-              (Integer) rs.getObject("tracked_repository_position"),
-              rs.getString("error_code"),
-              rs.getString("error_message"));
+      (rs, rowNum) -> {
+        Instant nextAttemptAt = toInstant(rs.getTimestamp("next_attempt_at"));
+        Instant lockedUntil = toInstant(rs.getTimestamp("locked_until"));
+        Instant startedAt = toInstant(rs.getTimestamp("started_at"));
+        Instant completedAt = toInstant(rs.getTimestamp("completed_at"));
+        Instant snapshotAt = toInstant(rs.getTimestamp("snapshot_at"));
+        return new TopicRun(
+            rs.getLong("id"),
+            rs.getLong("topic_watch_id"),
+            rs.getLong("repository_id"),
+            rs.getObject("business_date", LocalDate.class),
+            SearchRunStatus.valueOf(rs.getString("status")),
+            rs.getInt("attempt"),
+            nextAttemptAt,
+            rs.getString("locked_by"),
+            lockedUntil,
+            startedAt,
+            completedAt,
+            snapshotAt,
+            (Integer) rs.getObject("total_count"),
+            (Integer) rs.getObject("tracked_repository_position"),
+            rs.getString("error_code"),
+            rs.getString("error_message"));
+      };
 
   private final JdbcClient jdbcClient;
 

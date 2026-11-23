@@ -131,7 +131,7 @@ public class CollectorNodeMonitor {
           JobStatus status = observed.get();
           if (!status.jobId().equals(job) || !status.attemptId().equals(id))
             throw new IllegalStateException("Node status identity mismatch");
-          remember(attempt, status);
+          remember(status);
           if (status.status() == JobState.SUCCEEDED || status.status() == JobState.FAILED) {
             terminalKnown = true;
             var receipt =
@@ -202,7 +202,7 @@ public class CollectorNodeMonitor {
         .ifPresent(target -> recovery.reassign(job, id, target.key()));
   }
 
-  private void remember(Map<String, Object> expected, JobStatus status) {
+  private void remember(JobStatus status) {
     tx.executeWithoutResult(transaction -> {
       jdbc.queryForList(
           "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR UPDATE OF r",

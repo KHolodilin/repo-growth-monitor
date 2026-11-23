@@ -203,14 +203,6 @@ public class PublicReadService {
     return new Page(safeIds(selected), next);
   }
 
-  private Page datePage(List<Map<String, Object>> rows, int size) {
-    boolean more = rows.size() > size;
-    var selected = more ? new ArrayList<>(rows.subList(0, size)) : new ArrayList<>(rows);
-    for (var row : selected) calendarDate(row);
-    LocalDate next = more ? (LocalDate) selected.getLast().get("date") : null;
-    return new Page(safeIds(selected), null, next);
-  }
-
   private LocalDate publishedEnd(LocalDate to) {
     LocalDate yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1);
     return to.isBefore(yesterday) ? to : yesterday;
@@ -627,22 +619,13 @@ public class PublicReadService {
   /** Top-3 positive shares per day — same honesty as admin Portfolio chart tooltips. */
   private void attachTrafficLeaders(List<Long> ids, List<Map<String, Object>> items) {
     if (items.isEmpty()) return;
-    List<LocalDate> dates =
-        items.stream()
-            .map(row -> localDate(row.get("date")))
-            .filter(Objects::nonNull)
-            .distinct()
-            .toList();
+    List<LocalDate> dates = distinctItemDates(items);
     if (dates.isEmpty()) return;
-    var shares =
-        sql.queryForList(
-            "SELECT t.traffic_date AS date,r.full_name AS \"fullName\",t.views,t.unique_visitors AS visitors,t.clones FROM traffic_daily t JOIN repository r ON r.id=t.repository_id WHERE t.repository_id IN (:ids) AND t.traffic_date IN (:dates)",
-            Map.of("ids", ids, "dates", dates));
-    Map<LocalDate, List<Map<String, Object>>> byDate = new HashMap<>();
-    for (var share : shares) {
-      LocalDate day = localDate(share.get("date"));
-      if (day != null) byDate.computeIfAbsent(day, ignored -> new ArrayList<>()).add(share);
-    }
+    var byDate =
+        sharesByDate(
+            sql.queryForList(
+                "SELECT t.traffic_date AS date,r.full_name AS \"fullName\",t.views,t.unique_visitors AS visitors,t.clones FROM traffic_daily t JOIN repository r ON r.id=t.repository_id WHERE t.repository_id IN (:ids) AND t.traffic_date IN (:dates)",
+                Map.of("ids", ids, "dates", dates)));
     for (var row : items) {
       List<Map<String, Object>> day = byDate.getOrDefault(localDate(row.get("date")), List.of());
       row.put("viewsLeaders", topLeaders(day, "views"));
@@ -653,22 +636,13 @@ public class PublicReadService {
 
   private void attachStatLeaders(List<Long> ids, List<Map<String, Object>> items) {
     if (items.isEmpty()) return;
-    List<LocalDate> dates =
-        items.stream()
-            .map(row -> localDate(row.get("date")))
-            .filter(Objects::nonNull)
-            .distinct()
-            .toList();
+    List<LocalDate> dates = distinctItemDates(items);
     if (dates.isEmpty()) return;
-    var shares =
-        sql.queryForList(
-            "SELECT s.stat_date AS date,r.full_name AS \"fullName\",s.stars,s.forks,s.watchers,s.contributors FROM repository_daily_stats s JOIN repository r ON r.id=s.repository_id WHERE s.repository_id IN (:ids) AND s.stat_date IN (:dates)",
-            Map.of("ids", ids, "dates", dates));
-    Map<LocalDate, List<Map<String, Object>>> byDate = new HashMap<>();
-    for (var share : shares) {
-      LocalDate day = localDate(share.get("date"));
-      if (day != null) byDate.computeIfAbsent(day, ignored -> new ArrayList<>()).add(share);
-    }
+    var byDate =
+        sharesByDate(
+            sql.queryForList(
+                "SELECT s.stat_date AS date,r.full_name AS \"fullName\",s.stars,s.forks,s.watchers,s.contributors FROM repository_daily_stats s JOIN repository r ON r.id=s.repository_id WHERE s.repository_id IN (:ids) AND s.stat_date IN (:dates)",
+                Map.of("ids", ids, "dates", dates)));
     for (var row : items) {
       List<Map<String, Object>> day = byDate.getOrDefault(localDate(row.get("date")), List.of());
       row.put("starsLeaders", topLeaders(day, "stars"));
@@ -676,6 +650,23 @@ public class PublicReadService {
       row.put("watchersLeaders", topLeaders(day, "watchers"));
       row.put("contributorsLeaders", topLeaders(day, "contributors"));
     }
+  }
+
+  private List<LocalDate> distinctItemDates(List<Map<String, Object>> items) {
+    return items.stream()
+        .map(row -> localDate(row.get("date")))
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+  }
+
+  private Map<LocalDate, List<Map<String, Object>>> sharesByDate(List<Map<String, Object>> shares) {
+    Map<LocalDate, List<Map<String, Object>>> byDate = new HashMap<>();
+    for (var share : shares) {
+      LocalDate day = localDate(share.get("date"));
+      if (day != null) byDate.computeIfAbsent(day, ignored -> new ArrayList<>()).add(share);
+    }
+    return byDate;
   }
 
   private List<Map<String, Object>> topLeaders(List<Map<String, Object>> shares, String metric) {
@@ -766,7 +757,7 @@ public class PublicReadService {
 
   private long parent(boolean topics, long id, boolean run) {
     String table =
-        run ? (topics ? "topic_run" : "search_run") : (topics ? "topic_watch" : "search_query");
+        run ? (topics ? "topic_run" : "search_run") : topics ? "topic_watch" : "search_query";
     String join =
         run
             ? " JOIN "
@@ -846,13 +837,13 @@ public class PublicReadService {
   public Page rankResults(boolean topics, long run, long after, int size) {
     parent(topics, run, true);
     String prefix = topics ? "topic" : "search";
-    if (jdbc.queryForObject(
+    if (!Boolean.TRUE.equals(
+        jdbc.queryForObject(
             "SELECT snapshot_at IS NOT NULL AND public_scope_verified FROM "
                 + prefix
                 + "_run WHERE id=?",
             Boolean.class,
-            run)
-        != Boolean.TRUE) throw missing();
+            run))) throw missing();
     return page(
         jdbc.queryForList(
             "SELECT position AS id,position,github_repository_id::text AS \"githubId\",full_name AS \"fullName\",stars,forks,language,description FROM "

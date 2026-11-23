@@ -2,7 +2,14 @@ import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dashboardReady, repository, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
+import {
+  dashboardReady,
+  repository,
+  searchResults,
+  snapshotHistory,
+  topicResults,
+  traffic,
+} from "../test/fixtures";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { Layout } from "../components/Layout";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -35,11 +42,11 @@ describe("coverage gaps", () => {
 
   it("covers dashboard first collection, all-period KPIs and failed collect", async () => {
     const user = userEvent.setup();
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        throw new Error("busy");
+        return Promise.reject(new Error("busy"));
       }
-      return {
+      return Promise.resolve({
         ...dashboardReady,
         lastSyncAt: undefined,
         state: "FIRST_COLLECTION",
@@ -51,9 +58,15 @@ describe("coverage gaps", () => {
         },
         repositories: [
           { ...dashboardReady.repositories[0], growthPercent: null, collectionStatus: "SUCCESS" },
-          { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null },
+          {
+            ...dashboardReady.repositories[0],
+            id: 8,
+            fullName: "KHolodilin/other",
+            visitors: 1,
+            growthPercent: null,
+          },
         ],
-      };
+      });
     });
     render(
       <MemoryRouter>
@@ -83,7 +96,13 @@ describe("coverage gaps", () => {
       traffic: [{ date: "2026-09-23", views: 5, visitors: 2, clones: 1 }],
       repositories: [
         dashboardReady.repositories[0],
-        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", visitors: 1, growthPercent: null },
+        {
+          ...dashboardReady.repositories[0],
+          id: 8,
+          fullName: "KHolodilin/other",
+          visitors: 1,
+          growthPercent: null,
+        },
       ],
     });
     render(
@@ -113,7 +132,10 @@ describe("coverage gaps", () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     };
-    vi.stubGlobal("matchMedia", vi.fn(() => media));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => media),
+    );
     api.mockResolvedValue({
       ...dashboardReady,
       repositories: [
@@ -146,7 +168,9 @@ describe("coverage gaps", () => {
     await waitFor(() => {
       expect(screen.queryByRole("columnheader", { name: "Repository" })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: "KHolodilin/spring-transactional-outbox-kafka" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "KHolodilin/spring-transactional-outbox-kafka" }),
+    ).toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Sort repositories by"), "views");
     await user.click(screen.getByRole("button", { name: "Sort descending" }));
     expect(screen.getByRole("button", { name: "Sort ascending" })).toBeInTheDocument();
@@ -168,7 +192,16 @@ describe("coverage gaps", () => {
           watchers: { value: 0, absoluteChange: 0, growthPercent: 0 },
           contributors: { value: 4, absoluteChange: 4, growthPercent: null },
         },
-        points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 4, missingRepositories: 0 }],
+        points: [
+          {
+            date: "2026-09-23",
+            stars: 21,
+            forks: 16,
+            watchers: 0,
+            contributors: 4,
+            missingRepositories: 0,
+          },
+        ],
       },
     });
     render(
@@ -189,7 +222,9 @@ describe("coverage gaps", () => {
     expect(screen.getByRole("group", { name: "Portfolio analytics" })).toContainElement(
       screen.getByRole("button", { name: "Traffic" }),
     );
-    expect(screen.getByLabelText("Portfolio period")).toContainElement(screen.getByRole("button", { name: "7d" }));
+    expect(screen.getByLabelText("Portfolio period")).toContainElement(
+      screen.getByRole("button", { name: "7d" }),
+    );
     expect(screen.getByRole("button", { name: "Traffic" }).parentElement).not.toBe(
       screen.getByRole("button", { name: "7d" }).parentElement,
     );
@@ -261,7 +296,11 @@ describe("coverage gaps", () => {
             {
               ...searchResults.rows[1],
               positionDelta: null,
-              result: { ...searchResults.rows[1].result, activityAt: null, metadataUpdatedAt: "2026-09-23T06:00:00Z" },
+              result: {
+                ...searchResults.rows[1].result,
+                activityAt: null,
+                metadataUpdatedAt: "2026-09-23T06:00:00Z",
+              },
             },
           ]}
           repositoryId={13}
@@ -270,24 +309,44 @@ describe("coverage gaps", () => {
         <TopicResultsTable
           rows={[
             topicResults.rows[0],
-            { ...topicResults.rows[1], result: { ...topicResults.rows[1].result, language: undefined, htmlUrl: undefined } },
+            {
+              ...topicResults.rows[1],
+              result: { ...topicResults.rows[1].result, language: undefined, htmlUrl: undefined },
+            },
           ]}
           repositoryId={13}
         />
-        <SnapshotHistoryChart title="Referrer Traffic (by day)" kind="referrers" history={snapshotHistory} />
+        <SnapshotHistoryChart
+          title="Referrer Traffic (by day)"
+          kind="referrers"
+          history={snapshotHistory}
+        />
         <SnapshotHistoryChart
           title="Path Traffic (by day)"
           kind="paths"
           history={{ ...snapshotHistory, kind: "PATHS", dates: ["2026-09-23"], rows: [] }}
         />
         <PersistentECharts chartId="plain" series={[{ key: "Views", name: "Views" }]} option={{}} />
-        <PersistentECharts chartId="list" series={[{ key: "Views", name: "Views" }]} option={{ legend: [] }} />
+        <PersistentECharts
+          chartId="list"
+          series={[{ key: "Views", name: "Views" }]}
+          option={{ legend: [] }}
+        />
       </MemoryRouter>,
     );
     // Unenriched watchers/contributors stay unknown; enriched rows keep numeric values.
     expect(screen.getAllByText("—").length).toBeGreaterThan(0);
     expect(screen.getByText("7")).toBeInTheDocument();
-    for (const name of ["#", "Watchers", "Forks", "Contributors", "Activity", "Δ", "Stars", "Language"]) {
+    for (const name of [
+      "#",
+      "Watchers",
+      "Forks",
+      "Contributors",
+      "Activity",
+      "Δ",
+      "Stars",
+      "Language",
+    ]) {
       const buttons = screen.queryAllByRole("button", { name: new RegExp(`^${name}`) });
       if (buttons[0]) {
         await user.click(buttons[0]);
@@ -337,7 +396,10 @@ describe("coverage gaps", () => {
     const queryError = render(
       <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
         <Routes>
-          <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route
+            path="/admin/repositories/:repositoryId/search-queries/:queryId"
+            element={<QueryDetailsPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -347,7 +409,10 @@ describe("coverage gaps", () => {
     const topicError = render(
       <MemoryRouter initialEntries={["/admin/repositories/13/topics/outbox"]}>
         <Routes>
-          <Route path="/admin/repositories/:repositoryId/topics/:topic" element={<TopicDetailsPage />} />
+          <Route
+            path="/admin/repositories/:repositoryId/topics/:topic"
+            element={<TopicDetailsPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -367,38 +432,52 @@ describe("coverage gaps", () => {
 
   it("covers repository details without collection and period change", async () => {
     const user = userEvent.setup();
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/admin/repositories/13")) {
-        return {
+        return Promise.resolve({
           ...repository,
           language: "Java",
           topics: [],
-          health: { discoverability: [], communityStandards: repository.health?.communityStandards ?? [] },
-        };
+          health: {
+            discoverability: [],
+            communityStandards: repository.health?.communityStandards ?? [],
+          },
+        });
       }
       if (url.includes("/traffic?")) {
-        return { ...traffic, lastCollection: undefined, pathSnapshotAt: undefined, referrerSnapshotAt: undefined };
+        return Promise.resolve({
+          ...traffic,
+          lastCollection: undefined,
+          pathSnapshotAt: undefined,
+          referrerSnapshotAt: undefined,
+        });
       }
-      if (url.includes("visibility") || url.includes("growth-events") || url.includes("stats-history")) {
-        return url.includes("stats-history")
-          ? {
-              repositoryId: 13,
-              period: "1d",
-              totals: {
-                stars: { value: null, absoluteChange: null, growthPercent: null },
-                forks: { value: null, absoluteChange: null, growthPercent: null },
-                watchers: { value: null, absoluteChange: null, growthPercent: null },
-                contributors: { value: null, absoluteChange: null, growthPercent: null },
-              },
-              points: [],
-            }
-          : [];
+      if (
+        url.includes("visibility") ||
+        url.includes("growth-events") ||
+        url.includes("stats-history")
+      ) {
+        return Promise.resolve(
+          url.includes("stats-history")
+            ? {
+                repositoryId: 13,
+                period: "1d",
+                totals: {
+                  stars: { value: null, absoluteChange: null, growthPercent: null },
+                  forks: { value: null, absoluteChange: null, growthPercent: null },
+                  watchers: { value: null, absoluteChange: null, growthPercent: null },
+                  contributors: { value: null, absoluteChange: null, growthPercent: null },
+                },
+                points: [],
+              }
+            : [],
+        );
       }
       if (url.includes("growth-event-settings")) {
-        return [{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }];
+        return Promise.resolve([{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }]);
       }
-      return [];
+      return Promise.resolve([]);
     });
     render(
       <MemoryRouter initialEntries={["/admin/repositories/13?tab=settings"]}>
@@ -413,10 +492,14 @@ describe("coverage gaps", () => {
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Collect now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
-    const loadsBefore = api.mock.calls.filter((call) => String(call[0]).endsWith("/admin/repositories/13")).length;
+    const loadsBefore = api.mock.calls.filter((call) =>
+      String(call[0]).endsWith("/admin/repositories/13"),
+    ).length;
     window.dispatchEvent(new Event("repos-collected"));
     await waitFor(() => {
-      const loadsAfter = api.mock.calls.filter((call) => String(call[0]).endsWith("/admin/repositories/13")).length;
+      const loadsAfter = api.mock.calls.filter((call) =>
+        String(call[0]).endsWith("/admin/repositories/13"),
+      ).length;
       expect(loadsAfter).toBeGreaterThan(loadsBefore);
     });
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));

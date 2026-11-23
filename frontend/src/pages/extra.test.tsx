@@ -77,7 +77,14 @@ describe("extra coverage", () => {
     const user = userEvent.setup();
     api.mockResolvedValue([
       repository,
-      { ...repository, id: 8, name: "other", fullName: "KHolodilin/other", trackingEnabled: false, visibility: "PRIVATE" },
+      {
+        ...repository,
+        id: 8,
+        name: "other",
+        fullName: "KHolodilin/other",
+        trackingEnabled: false,
+        visibility: "PRIVATE",
+      },
       { ...repository, id: 9, name: "extra", fullName: "KHolodilin/extra", trackingEnabled: true },
     ]);
     const view = render(
@@ -85,7 +92,13 @@ describe("extra coverage", () => {
         <Routes>
           <Route
             path="/admin/repositories/:id"
-            element={<RepoSwitcher currentId={13} currentLabel="current" hrefFor={(repo) => `/${repo.owner.login}/${repo.name}`} />}
+            element={
+              <RepoSwitcher
+                currentId={13}
+                currentLabel="current"
+                hrefFor={(repo) => `/${repo.owner.login}/${repo.name}`}
+              />
+            }
           />
         </Routes>
       </MemoryRouter>,
@@ -108,7 +121,11 @@ describe("extra coverage", () => {
     api.mockRejectedValueOnce(new Error("switcher down"));
     render(
       <MemoryRouter>
-        <RepoSwitcher currentId={13} currentLabel="current" hrefFor={(repo) => `/${repo.owner.login}/${repo.name}`} />
+        <RepoSwitcher
+          currentId={13}
+          currentLabel="current"
+          hrefFor={(repo) => `/${repo.owner.login}/${repo.name}`}
+        />
       </MemoryRouter>,
     );
     await user.click(screen.getByLabelText("Switch repository"));
@@ -119,36 +136,51 @@ describe("extra coverage", () => {
 
   it("covers query topic and traffic history branches", async () => {
     const user = userEvent.setup();
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/run")) {
-        throw new Error("run failed");
+        return Promise.reject(new Error("run failed"));
       }
       if (url.endsWith("/admin/repositories/13")) {
-        return repository;
+        return Promise.resolve(repository);
       }
       if (url.includes("/topics/") && url.includes("history")) {
-        return { ...topicHistory, searchStatus: "SUCCESS", missedDates: ["2026-09-22"] };
+        return Promise.resolve({
+          ...topicHistory,
+          searchStatus: "SUCCESS",
+          missedDates: ["2026-09-22"],
+        });
       }
       if (url.includes("/topics/") && url.includes("results")) {
-        throw new Error("no topic snapshot");
+        return Promise.reject(new Error("no topic snapshot"));
       }
       if (url.includes("/search-queries/") && url.includes("history")) {
-        return { ...searchHistory, searchStatus: "SUCCESS", enrichmentStatus: "SUCCESS", missedDates: ["2026-09-22"] };
+        return Promise.resolve({
+          ...searchHistory,
+          searchStatus: "SUCCESS",
+          enrichmentStatus: "SUCCESS",
+          missedDates: ["2026-09-22"],
+        });
       }
       if (url.includes("/search-queries/") && url.includes("results")) {
-        throw new Error("no search snapshot");
+        return Promise.reject(new Error("no search snapshot"));
       }
       if (url.includes("/admin/search-runs/")) {
-        return { ...searchResults, run: { ...searchResults.run, enrichmentStatus: "PARTIAL" } };
+        return Promise.resolve({
+          ...searchResults,
+          run: { ...searchResults.run, enrichmentStatus: "PARTIAL" },
+        });
       }
       if (url.includes("traffic-history")) {
-        return snapshotHistory;
+        return Promise.resolve(snapshotHistory);
       }
-      return [];
+      return Promise.resolve([]);
     });
 
-    const topicView = renderAt("/admin/repositories/13/topics/outbox?scope=language", <TopicDetailsPage />);
+    const topicView = renderAt(
+      "/admin/repositories/13/topics/outbox?scope=language",
+      <TopicDetailsPage />,
+    );
     expect(await screen.findByRole("heading", { name: "outbox" })).toBeInTheDocument();
     expect(screen.getByText("No topic snapshot yet.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Run now" }));
@@ -165,8 +197,13 @@ describe("extra coverage", () => {
     expect(await screen.findByText(/Enrichment: PARTIAL/)).toBeInTheDocument();
     runView.unmount();
 
-    const historyView = renderAt("/admin/repositories/13/traffic/history?kind=paths&days=7", <TrafficHistoryPage />);
-    expect(await screen.findByRole("heading", { name: "Path Snapshot History" })).toBeInTheDocument();
+    const historyView = renderAt(
+      "/admin/repositories/13/traffic/history?kind=paths&days=7",
+      <TrafficHistoryPage />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Path Snapshot History" }),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Referrers" }));
     await user.click(screen.getByRole("button", { name: "1d" }));
     await user.click(screen.getByRole("button", { name: "Popular Paths" }));
@@ -176,28 +213,37 @@ describe("extra coverage", () => {
 
   it("covers repository query errors polling and empty repositories", async () => {
     const user = userEvent.setup();
-    api.mockImplementation(async (path: string, init?: RequestInit) => {
+    api.mockImplementation((path: string, init?: RequestInit) => {
       const url = String(path);
       if (url.includes("/collect")) {
-        throw new Error("collect failed");
+        return Promise.reject(new Error("collect failed"));
       }
-      if (url.includes("/search-queries") && init?.method === "POST" && url.endsWith("/search-queries")) {
-        throw new Error("create failed");
+      if (
+        url.includes("/search-queries") &&
+        init?.method === "POST" &&
+        url.endsWith("/search-queries")
+      ) {
+        return Promise.reject(new Error("create failed"));
       }
       if (url.includes("/search-queries/run")) {
-        throw new Error("run all failed");
+        return Promise.reject(new Error("run all failed"));
       }
       if (url.includes("/search-queries/") && init?.method === "DELETE") {
-        throw new Error("delete failed");
+        return Promise.reject(new Error("delete failed"));
       }
       if (url.includes("/topic-watches/run")) {
-        throw new Error("topics failed");
+        return Promise.reject(new Error("topics failed"));
       }
       if (url.endsWith("/admin/repositories/13")) {
-        return { ...repository, githubUrl: undefined, defaultBranch: undefined, lastCommitAt: undefined };
+        return Promise.resolve({
+          ...repository,
+          githubUrl: undefined,
+          defaultBranch: undefined,
+          lastCommitAt: undefined,
+        });
       }
       if (url.includes("/traffic?")) {
-        return {
+        return Promise.resolve({
           ...traffic,
           lastCollection: {
             ...traffic.lastCollection,
@@ -206,33 +252,43 @@ describe("extra coverage", () => {
               { jobType: "TRAFFIC", status: "SUCCESS" },
               { jobType: "CUSTOM_JOB", status: "PLANNED" },
               { jobType: "GROWTH_EVENTS", status: "RUNNING" },
-              { jobType: "REFERRERS", status: "FAILED", errorMessage: "rate", completedAt: "2026-09-23T06:01:00Z" },
+              {
+                jobType: "REFERRERS",
+                status: "FAILED",
+                errorMessage: "rate",
+                completedAt: "2026-09-23T06:01:00Z",
+              },
             ],
           },
-        };
+        });
       }
       if (url.includes("search-visibility")) {
-        return [searchHistory];
+        return Promise.resolve([searchHistory]);
       }
       if (url.includes("topics-visibility")) {
-        return [topicHistory];
+        return Promise.resolve([topicHistory]);
       }
       if (url.includes("growth-events") && !url.includes("settings")) {
-        return [];
+        return Promise.resolve([]);
       }
       if (url.includes("growth-event-settings")) {
-        return [{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }];
+        return Promise.resolve([{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }]);
       }
       if (url.includes("stats-history")) {
-        throw new Error("stats down");
+        return Promise.reject(new Error("stats down"));
       }
-      return [];
+      return Promise.resolve([]);
     });
 
     const details = renderAt("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
     expect(await screen.findByPlaceholderText(/transactional outbox/)).toBeInTheDocument();
-    await user.type(screen.getByPlaceholderText(/transactional outbox/), "transactional outbox language:java");
-    expect(screen.getByText("This search query is already tracked for the repository")).toBeInTheDocument();
+    await user.type(
+      screen.getByPlaceholderText(/transactional outbox/),
+      "transactional outbox language:java",
+    );
+    expect(
+      screen.getByText("This search query is already tracked for the repository"),
+    ).toBeInTheDocument();
     await user.clear(screen.getByPlaceholderText(/transactional outbox/));
     await user.type(screen.getByPlaceholderText(/transactional outbox/), "brand new query");
     await user.click(screen.getByRole("button", { name: "Add query" }));
@@ -257,17 +313,17 @@ describe("extra coverage", () => {
     expect(await screen.findByText("topics failed")).toBeInTheDocument();
     topicErrors.unmount();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        throw new Error("collect failed");
+        return Promise.reject(new Error("collect failed"));
       }
       if (String(path).endsWith("/admin/repositories/13")) {
-        return repository;
+        return Promise.resolve(repository);
       }
       if (String(path).includes("/traffic?")) {
-        return { ...traffic, lastCollection: undefined };
+        return Promise.resolve({ ...traffic, lastCollection: undefined });
       }
-      return [];
+      return Promise.resolve([]);
     });
     const collectView = renderAt("/admin/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText("No collection data yet.")).toBeInTheDocument();
@@ -275,24 +331,28 @@ describe("extra coverage", () => {
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     collectView.unmount();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/admin/repositories/13")) {
-        return repository;
+        return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
-        return {
+        return Promise.resolve({
           ...traffic,
-          lastCollection: { ...traffic.lastCollection, status: "RUNNING", jobs: [{ jobType: "TRAFFIC", status: "RUNNING" }] },
-        };
+          lastCollection: {
+            ...traffic.lastCollection,
+            status: "RUNNING",
+            jobs: [{ jobType: "TRAFFIC", status: "RUNNING" }],
+          },
+        });
       }
       if (url.includes("topics-visibility")) {
-        return [topicHistory];
+        return Promise.resolve([topicHistory]);
       }
       if (url.includes("search-visibility")) {
-        return [{ ...searchHistory, searchStatus: "READY" }];
+        return Promise.resolve([{ ...searchHistory, searchStatus: "READY" }]);
       }
-      return [];
+      return Promise.resolve([]);
     });
     const running = renderAt("/admin/repositories/13?tab=overview", <RepositoryDetailsPage />);
     expect(await screen.findByText(/RUNNING/)).toBeInTheDocument();
@@ -306,9 +366,7 @@ describe("extra coverage", () => {
   it("covers growth event form save error and stats panel", async () => {
     const user = userEvent.setup();
     api.mockRejectedValueOnce(new Error("event save failed"));
-    render(
-      <GrowthEventsPanel repositoryId={13} events={[]} onChanged={vi.fn()} />,
-    );
+    render(<GrowthEventsPanel repositoryId={13} events={[]} onChanged={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: "+ Add event" }));
     await user.type(screen.getByLabelText("Title"), "Posted");
     await user.selectOptions(screen.getByLabelText("Type"), "CUSTOM");
@@ -370,7 +428,7 @@ describe("extra coverage", () => {
     expect(screen.queryByText("Daily totals")).not.toBeInTheDocument();
     expect(
       [...stats.container.querySelectorAll("polyline")].map((line) => line.getAttribute("stroke")),
-    ).toEqual(statsChartOption([]).series.map(line => line.itemStyle.color));
+    ).toEqual(statsChartOption([]).series.map((line) => line.itemStyle.color));
     stats.unmount();
 
     api.mockResolvedValueOnce({
@@ -400,6 +458,95 @@ describe("extra coverage", () => {
     expect(all.container.querySelector("polyline")).toBeNull();
   });
 
+  it("clears stats history when the period changes on the same panel", async () => {
+    const history30 = {
+      repositoryId: 13,
+      period: "30d",
+      totals: {
+        stars: { value: 27, absoluteChange: 6, growthPercent: 28.6 },
+        forks: { value: 19, absoluteChange: -3, growthPercent: -13.6 },
+        watchers: { value: 0, absoluteChange: 0, growthPercent: 0 },
+        contributors: { value: 10, absoluteChange: 2, growthPercent: 25 },
+      },
+      points: [
+        { date: "2026-09-01", stars: 21, forks: 22, watchers: 0, contributors: 8 },
+        { date: "2026-09-23", stars: 27, forks: 19, watchers: 0, contributors: 10 },
+      ],
+    };
+    api.mockImplementation((url: string) =>
+      Promise.resolve(
+        String(url).includes("period=7d")
+          ? { ...history30, period: "7d", points: [history30.points[1]] }
+          : history30,
+      ),
+    );
+    const { rerender } = render(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={13} period="30d" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("↑ +6 (+28.6%)")).toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={13} period="7d" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("View historical data")).toBeInTheDocument();
+    expect(api.mock.calls.some(([url]) => String(url).includes("period=7d"))).toBe(true);
+  });
+
+  it("ignores late stats responses after unmount and surfaces load errors", async () => {
+    let finish: (value: unknown) => void = () => undefined;
+    api.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = render(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={13} period="30d" />
+      </MemoryRouter>,
+    );
+    pending.unmount();
+    finish({
+      repositoryId: 13,
+      period: "30d",
+      totals: {
+        stars: { value: 1, absoluteChange: 0, growthPercent: 0 },
+        forks: { value: 0, absoluteChange: 0, growthPercent: 0 },
+        watchers: { value: 0, absoluteChange: 0, growthPercent: 0 },
+        contributors: { value: 0, absoluteChange: 0, growthPercent: 0 },
+      },
+      points: [],
+    });
+    await Promise.resolve();
+
+    let fail: (reason: unknown) => void = () => undefined;
+    api.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+    );
+    const lateError = render(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={42} period="7d" />
+      </MemoryRouter>,
+    );
+    lateError.unmount();
+    fail(new Error("gone"));
+    await Promise.resolve();
+
+    api.mockRejectedValueOnce(new Error("stats offline"));
+    render(
+      <MemoryRouter>
+        <RepositoryStatsPanel repositoryId={13} period="30d" />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("stats offline")).toBeInTheDocument();
+  });
+
   it("edits a manual growth event and sorts search topic tables", async () => {
     const user = userEvent.setup();
     const onChanged = vi.fn();
@@ -407,7 +554,10 @@ describe("extra coverage", () => {
     render(
       <GrowthEventsPanel
         repositoryId={13}
-        events={[growthEvent, { ...growthEvent, id: 2, source: "GITHUB", title: "Stars", category: "MILESTONE" }]}
+        events={[
+          growthEvent,
+          { ...growthEvent, id: 2, source: "GITHUB", title: "Stars", category: "MILESTONE" },
+        ]}
         onChanged={onChanged}
       />,
     );
@@ -418,31 +568,51 @@ describe("extra coverage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.endsWith("/admin/repositories/13")) {
-        return repository;
+        return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
-        return traffic;
+        return Promise.resolve(traffic);
       }
       if (url.includes("search-visibility")) {
-        return [searchHistory, { ...searchHistory, query: { ...searchHistory.query, id: 6, name: "other", query: "other" } }];
+        return Promise.resolve([
+          searchHistory,
+          {
+            ...searchHistory,
+            query: { ...searchHistory.query, id: 6, name: "other", query: "other" },
+          },
+        ]);
       }
       if (url.includes("topics-visibility")) {
-        return [topicHistory, { ...topicHistory, watch: { ...topicHistory.watch, id: 8, topic: "kafka" } }];
+        return Promise.resolve([
+          topicHistory,
+          { ...topicHistory, watch: { ...topicHistory.watch, id: 8, topic: "kafka" } },
+        ]);
       }
       if (url.includes("growth-events")) {
-        return [];
+        return Promise.resolve([]);
       }
       if (url.includes("growth-event-settings")) {
-        return [{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }];
+        return Promise.resolve([{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }]);
       }
-      return [];
+      return Promise.resolve([]);
     });
     const details = renderAt("/admin/repositories/13?tab=search", <RepositoryDetailsPage />);
-    expect(await screen.findByRole("link", { name: "transactional outbox language:java" })).toBeInTheDocument();
-    for (const name of ["Search Query", "Rank", "Change", "7d", "30d", "Best", "Results", "Updated"]) {
+    expect(
+      await screen.findByRole("link", { name: "transactional outbox language:java" }),
+    ).toBeInTheDocument();
+    for (const name of [
+      "Search Query",
+      "Rank",
+      "Change",
+      "7d",
+      "30d",
+      "Best",
+      "Results",
+      "Updated",
+    ]) {
       await user.click(screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0]);
     }
     await user.click(screen.getByRole("button", { name: "Topics Visibility" }));

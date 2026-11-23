@@ -1,10 +1,34 @@
 import { useDashboardView } from "../lib/dashboardView";
 import type { Period } from "./PeriodSelector";
-import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { api, type GrowthEvent } from "../lib/api";
-import { readChartAxis, readChartEventFilter, subscribeChartMode, writeChartAxis, writeChartEventFilter } from "../lib/chartModePrefs";
+import {
+  readChartAxis,
+  readChartEventFilter,
+  subscribeChartMode,
+  writeChartAxis,
+  writeChartEventFilter,
+} from "../lib/chartModePrefs";
 import { defaultMobileSeriesName } from "../lib/chartLegend";
-import { asGrowthEvents, eventUtcDate, filterGrowthEvents, groupEventsByUtcDate, type EventFilter } from "../lib/growthEvents";
+import {
+  asGrowthEvents,
+  eventUtcDate,
+  filterGrowthEvents,
+  groupEventsByUtcDate,
+  type EventFilter,
+} from "../lib/growthEvents";
 import type { ChartAxis } from "../lib/chartPresentation";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 import { metricColor, prepareSeriesStyles, seriesStyle } from "../lib/seriesStyle";
@@ -94,7 +118,9 @@ export function useChartMode() {
 export function useRegisterChartExport(actions: ExportActions) {
   const registry = useContext(ChartExportContext);
   const latest = useRef(actions);
-  latest.current = actions;
+  useLayoutEffect(() => {
+    latest.current = actions;
+  });
   useLayoutEffect(() => {
     if (!registry) {
       return;
@@ -144,63 +170,85 @@ export function ChartCard({
   const mobileShell = mobile && mobileSeries != null;
   const [loaded, setLoaded] = useState<GrowthEvent[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const [eventFilter, setEventFilterState] = useState<EventFilter>(() => (context ? readChartEventFilter(context) : "off"));
-  const [axis, setAxisState] = useState<ChartAxis>(() => (context ? readChartAxis(context) : "calendar"));
+  const subscribeMode = useCallback(
+    (onStoreChange: () => void) =>
+      context ? subscribeChartMode(context, onStoreChange) : () => {},
+    [context],
+  );
+  const subscribedFilter = useSyncExternalStore(
+    subscribeMode,
+    () => (context ? readChartEventFilter(context) : "off"),
+    (): EventFilter => "off",
+  );
+  const subscribedAxis = useSyncExternalStore(
+    subscribeMode,
+    () => (context ? readChartAxis(context) : "calendar"),
+    (): ChartAxis => "calendar",
+  );
+  const [localFilter, setLocalFilter] = useState<EventFilter>("off");
+  const [localAxis, setLocalAxis] = useState<ChartAxis>("calendar");
+  const eventFilter = context ? subscribedFilter : localFilter;
+  const axis = context ? subscribedAxis : localAxis;
   const [marker, setMarker] = useState<GrowthEvent[] | null>(null);
   const [mobileSeriesName, setMobileSeriesName] = useState<string | null>(() =>
     mobileSeries ? defaultMobileSeriesName(mobileSeries) : null,
   );
-  const effectiveMobileSeriesName = selectedMobileSeries && mobileSeries?.some(item => item.name === selectedMobileSeries) ? selectedMobileSeries : mobileSeriesName;
+  const mobileSeriesKey = mobileSeries?.map((item) => item.name).join("\0") ?? "";
+  const [seenMobileSeriesKey, setSeenMobileSeriesKey] = useState(mobileSeriesKey);
+  if (mobileSeriesKey !== seenMobileSeriesKey) {
+    setSeenMobileSeriesKey(mobileSeriesKey);
+    if (!mobileSeries?.length) {
+      setMobileSeriesName(null);
+    } else if (
+      mobileSeriesName == null ||
+      !mobileSeries.some((item) => item.name === mobileSeriesName)
+    ) {
+      setMobileSeriesName(defaultMobileSeriesName(mobileSeries));
+    }
+  }
+  const effectiveMobileSeriesName =
+    selectedMobileSeries && mobileSeries?.some((item) => item.name === selectedMobileSeries)
+      ? selectedMobileSeries
+      : mobileSeriesName;
   const [axisDates, setAxisDatesState] = useState<string[]>([]);
   const setAxisDates = useCallback((dates: string[]) => {
     setAxisDatesState((prev) =>
-      prev.length === dates.length && prev.every((date, index) => date === dates[index]) ? prev : dates,
+      prev.length === dates.length && prev.every((date, index) => date === dates[index])
+        ? prev
+        : dates,
     );
   }, []);
-  useEffect(() => {
-    if (!mobileSeries?.length) {
-      setMobileSeriesName(null);
-      return;
-    }
-    setMobileSeriesName((current) => {
-      if (current != null && mobileSeries.some((item) => item.name === current)) {
-        return current;
+  const setEventFilter = useCallback(
+    (value: EventFilter) => {
+      if (!context) {
+        setLocalFilter(value);
+        return;
       }
-      return defaultMobileSeriesName(mobileSeries);
-    });
-  }, [mobileSeries]);
-  useEffect(() => {
-    if (!context) {
-      return;
-    }
-    setEventFilterState(readChartEventFilter(context));
-    setAxisState(readChartAxis(context));
-    return subscribeChartMode(context, () => {
-      setEventFilterState(readChartEventFilter(context));
-      setAxisState(readChartAxis(context));
-    });
-  }, [context]);
-  const setEventFilter = useCallback((value: EventFilter) => {
-    if (!context) {
-      setEventFilterState(value);
-      return;
-    }
-    writeChartEventFilter(context, value);
-  }, [context]);
-  const setAxis = useCallback((value: ChartAxis) => {
-    if (!context) {
-      setAxisState(value);
-      return;
-    }
-    writeChartAxis(context, value);
-  }, [context]);
+      writeChartEventFilter(context, value);
+    },
+    [context],
+  );
+  const setAxis = useCallback(
+    (value: ChartAxis) => {
+      if (!context) {
+        setLocalAxis(value);
+        return;
+      }
+      writeChartAxis(context, value);
+    },
+    [context],
+  );
 
   useEffect(() => {
     if (eventsProp !== undefined || repositoryId == null) {
       return;
     }
     let cancelled = false;
-    Promise.resolve(api<GrowthEvent[]>(`/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`))
+    Promise.resolve(
+      api<GrowthEvent[]>(
+        `/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`,
+      ),
+    )
       .then((rows) => {
         if (!cancelled) {
           setLoaded(asGrowthEvents(rows));
@@ -231,11 +279,24 @@ export function ChartCard({
       period,
       openMarker,
       mobile: mobileShell,
-      mobileSeriesName: mobileShell && mobileSeries!.length > 1 ? effectiveMobileSeriesName : null,
+      mobileSeriesName: mobileShell && mobileSeries.length > 1 ? effectiveMobileSeriesName : null,
       axisDates,
       setAxisDates,
     }),
-    [eventFilter, setEventFilter, axis, setAxis, events, period, openMarker, mobileShell, mobileSeries?.length, effectiveMobileSeriesName, axisDates],
+    [
+      eventFilter,
+      setEventFilter,
+      axis,
+      setAxis,
+      events,
+      period,
+      openMarker,
+      mobileShell,
+      mobileSeries,
+      effectiveMobileSeriesName,
+      axisDates,
+      setAxisDates,
+    ],
   );
 
   return (
@@ -250,7 +311,14 @@ export function ChartCard({
               </div>
               {mobileControls}
               {mobileSeries && mobileSeries.length > 1 && effectiveMobileSeriesName && (
-                <SeriesSegment options={mobileSeries} value={effectiveMobileSeriesName} onChange={name => { setMobileSeriesName(name); onMobileSeriesChange?.(name); }} />
+                <SeriesSegment
+                  options={mobileSeries}
+                  value={effectiveMobileSeriesName}
+                  onChange={(name) => {
+                    setMobileSeriesName(name);
+                    onMobileSeriesChange?.(name);
+                  }}
+                />
               )}
               <EventsToggle
                 on={eventFilter !== "off"}
@@ -271,19 +339,23 @@ export function ChartCard({
             <MobileEventStrip events={events} dates={axisDates} onOpen={openMarker} />
           )}
         </Card>
-        {marker && marker.length > 0 && (view.public ? <PublicEventDialog events={marker} onClose={() => setMarker(null)} /> : (
-          <EventDetailsDialog
-            repositoryId={Number(marker[0].repositoryId)}
-            events={marker}
-            onClose={() => setMarker(null)}
-            onEdit={() => setMarker(null)}
-            onChanged={() => {
-              setMarker(null);
-              onEventsChanged?.();
-              setReloadKey((value) => value + 1);
-            }}
-          />
-        ))}
+        {marker &&
+          marker.length > 0 &&
+          (view.public ? (
+            <PublicEventDialog events={marker} onClose={() => setMarker(null)} />
+          ) : (
+            <EventDetailsDialog
+              repositoryId={Number(marker[0].repositoryId)}
+              events={marker}
+              onClose={() => setMarker(null)}
+              onEdit={() => setMarker(null)}
+              onChanged={() => {
+                setMarker(null);
+                onEventsChanged?.();
+                setReloadKey((value) => value + 1);
+              }}
+            />
+          ))}
       </ChartModeContext.Provider>
     </ChartExportProvider>
   );
@@ -298,9 +370,17 @@ function SeriesSegment({
   value: string;
   onChange: (name: string) => void;
 }) {
-  prepareSeriesStyles(options.map(item => metricColor(item.name) ? item.name : item.key));
+  prepareSeriesStyles(options.map((item) => (metricColor(item.name) ? item.name : item.key)));
   return (
-    <div role="tablist" aria-label="Chart series" className={options.every(item => metricColor(item.name)) ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+    <div
+      role="tablist"
+      aria-label="Chart series"
+      className={
+        options.every((item) => metricColor(item.name))
+          ? "grid grid-cols-2 gap-2"
+          : "grid grid-cols-1 gap-2"
+      }
+    >
       {options.map((item) => {
         const active = item.name === value;
         return (
@@ -316,7 +396,10 @@ function SeriesSegment({
             }
             onClick={() => onChange(item.name)}
           >
-            <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} /><span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">{item.name}</span>
+            <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} />
+            <span className="min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]">
+              {item.name}
+            </span>
           </button>
         );
       })}
@@ -351,7 +434,11 @@ function MobileEventStrip({
   const onAxis = new Set(axis);
   const groups = groupEventsByUtcDate(events).filter((group) => onAxis.has(group.date));
   if (axis.length === 0 || groups.length === 0) {
-    return <p role="status" className="mt-2 text-xs text-muted-foreground">No events in the displayed range.</p>;
+    return (
+      <p role="status" className="mt-2 text-xs text-muted-foreground">
+        No events in the displayed range.
+      </p>
+    );
   }
   const first = axis[0];
   const last = axis[axis.length - 1];
@@ -374,7 +461,10 @@ function MobileEventStrip({
               {group.events.length > 1 ? (
                 group.events.length
               ) : (
-                <span className="block h-2.5 w-2.5 rounded-full bg-primary-foreground" aria-hidden="true" />
+                <span
+                  className="block h-2.5 w-2.5 rounded-full bg-primary-foreground"
+                  aria-hidden="true"
+                />
               )}
             </span>
           </button>
@@ -412,7 +502,11 @@ function MobileChartMenu() {
         ⋯
       </button>
       {open && (
-        <div role="menu" aria-label="Chart menu" className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-lg border bg-card py-1 shadow-lg">
+        <div
+          role="menu"
+          aria-label="Chart menu"
+          className="absolute right-0 top-full z-30 mt-1 min-w-44 rounded-lg border bg-card py-1 shadow-lg"
+        >
           <button
             type="button"
             role="menuitemradio"
@@ -424,7 +518,9 @@ function MobileChartMenu() {
               setOpen(false);
             }}
           >
-            <span className="w-3" aria-hidden="true">{axis === "calendar" ? "✓" : ""}</span>
+            <span className="w-3" aria-hidden="true">
+              {axis === "calendar" ? "✓" : ""}
+            </span>
             Calendar
           </button>
           <button
@@ -438,7 +534,9 @@ function MobileChartMenu() {
               setOpen(false);
             }}
           >
-            <span className="w-3" aria-hidden="true">{axis === "timeline" ? "✓" : ""}</span>
+            <span className="w-3" aria-hidden="true">
+              {axis === "timeline" ? "✓" : ""}
+            </span>
             Timeline
           </button>
           {ready && registry && (
@@ -516,7 +614,13 @@ function useModeControls() {
 function Chevron() {
   return (
     <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
-      <path d="M4.5 6.5 8 10l3.5-3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4.5 6.5 8 10l3.5-3.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -524,10 +628,33 @@ function Chevron() {
 function CalendarAxisIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden="true" fill="none">
-      <path d="M4.5 2.5v1.5M8.5 2.5v1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M3 5h7.5V8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3 5v5.5h7.2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9.2 9.2 11.8 10.5 9.2 11.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4.5 2.5v1.5M8.5 2.5v1.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3 5h7.5V8"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 5v5.5h7.2"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.2 9.2 11.8 10.5 9.2 11.8"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -573,7 +700,11 @@ function EventFilterMenu() {
       </button>
       {!open && <MenuTip id={tipId} text={current[3]} />}
       {open && (
-        <div role="menu" aria-label="Growth events" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-lg border bg-card py-1 shadow-lg">
+        <div
+          role="menu"
+          aria-label="Growth events"
+          className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-lg border bg-card py-1 shadow-lg"
+        >
           {EVENT_MODES.map(([key, , label, tip]) => (
             <button
               key={key}
@@ -587,7 +718,9 @@ function EventFilterMenu() {
                 setOpen(false);
               }}
             >
-              <span className="w-3" aria-hidden="true">{eventFilter === key ? "✓" : ""}</span>
+              <span className="w-3" aria-hidden="true">
+                {eventFilter === key ? "✓" : ""}
+              </span>
               {label}
             </button>
           ))}
@@ -619,7 +752,11 @@ function AxisMenu() {
       </button>
       {!open && <MenuTip id={tipId} text={label} />}
       {open && (
-        <div role="menu" aria-label="Chart axis" className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-lg border bg-card py-1 shadow-lg">
+        <div
+          role="menu"
+          aria-label="Chart axis"
+          className="absolute right-0 top-full z-30 mt-1 min-w-40 rounded-lg border bg-card py-1 shadow-lg"
+        >
           <button
             type="button"
             role="menuitemradio"
@@ -631,7 +768,9 @@ function AxisMenu() {
               setOpen(false);
             }}
           >
-            <span className="w-3" aria-hidden="true">{axis === "calendar" ? "✓" : ""}</span>
+            <span className="w-3" aria-hidden="true">
+              {axis === "calendar" ? "✓" : ""}
+            </span>
             <CalendarAxisIcon />
             Calendar
           </button>
@@ -646,7 +785,9 @@ function AxisMenu() {
               setOpen(false);
             }}
           >
-            <span className="w-3" aria-hidden="true">{axis === "timeline" ? "✓" : ""}</span>
+            <span className="w-3" aria-hidden="true">
+              {axis === "timeline" ? "✓" : ""}
+            </span>
             <TimelineAxisIcon />
             Timeline
           </button>
@@ -674,10 +815,11 @@ export function ChartDownloadMenu() {
   if (!registry || !ready) {
     return null;
   }
+  const activeRegistry = registry;
 
   function choose(kind: "png" | "csv") {
     setOpen(false);
-    const actions = registry.current as ExportActions;
+    const actions = activeRegistry.current as ExportActions;
     if (kind === "png") {
       actions.downloadPng();
       return;
@@ -722,10 +864,20 @@ export function ChartDownloadMenu() {
             aria-label="Download format"
             className="absolute right-0 top-full z-30 mt-1 min-w-36 rounded-lg border bg-card py-1 shadow-lg"
           >
-            <button type="button" role="menuitem" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => choose("png")}>
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+              onClick={() => choose("png")}
+            >
               PNG
             </button>
-            <button type="button" role="menuitem" className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted" onClick={() => choose("csv")}>
+            <button
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
+              onClick={() => choose("csv")}
+            >
               CSV
             </button>
           </div>
@@ -736,6 +888,37 @@ export function ChartDownloadMenu() {
 }
 
 function PublicEventDialog({ events, onClose }: { events: GrowthEvent[]; onClose: () => void }) {
-  useEffect(() => { const listener = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); }; window.addEventListener("keydown", listener); return () => window.removeEventListener("keydown", listener); }, [onClose]);
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}><section role="dialog" aria-modal="true" aria-label="Events" className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-xl bg-card p-5" onClick={event => event.stopPropagation()}><button type="button" className="float-right min-h-11 px-3" onClick={onClose} autoFocus>Close</button><h2 className="text-lg font-semibold">Events</h2>{events.map(event => <article key={event.id} className="mt-4 break-words"><time className="text-xs text-muted-foreground">{event.eventAt.slice(0,10)}</time><p>{event.title}</p>{event.description && <p>{event.description}</p>}</article>)}</section></div>;
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, [onClose]);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      onClick={onClose}
+    >
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-label="Events"
+        className="max-h-[80vh] w-full max-w-lg overflow-auto rounded-xl bg-card p-5"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button type="button" className="float-right min-h-11 px-3" onClick={onClose} autoFocus>
+          Close
+        </button>
+        <h2 className="text-lg font-semibold">Events</h2>
+        {events.map((event) => (
+          <article key={event.id} className="mt-4 break-words">
+            <time className="text-xs text-muted-foreground">{event.eventAt.slice(0, 10)}</time>
+            <p>{event.title}</p>
+            {event.description && <p>{event.description}</p>}
+          </article>
+        ))}
+      </section>
+    </div>
+  );
 }

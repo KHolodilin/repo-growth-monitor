@@ -1,0 +1,13 @@
+# Build and dependency trees
+node_modules/
+dist/
+coverage/
+
+# Local tooling / stray trees that must not be reformatted
+.tools/
+.m2-docker/
+backend/
+
+# Lockfile and generated dumps
+package-lock.json
+vitest-coverage.txt

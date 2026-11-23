@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { collectButtonLabel, collectionInProgress, headerProgress, type ProgressRow } from "./collectProgress";
+import {
+  collectButtonLabel,
+  collectionInProgress,
+  headerProgress,
+  type ProgressRow,
+} from "./collectProgress";
 
 const repo = (patch: Partial<ProgressRow> = {}): ProgressRow => ({
   id: 13,
@@ -30,13 +35,24 @@ describe("collect progress", () => {
     const rows = [
       repo({ collectionStatus: "SUCCESS" }),
       repo({ id: 8, fullName: "KHolodilin/other", collectionStatus: "PLANNED" }),
-      repo({ id: 9, fullName: "KHolodilin/third", collectionStatus: "RUNNING", jobs: [{ jobType: "TRAFFIC", status: "FAILED", errorMessage: "  rate limit  " }] }),
+      repo({
+        id: 9,
+        fullName: "KHolodilin/third",
+        collectionStatus: "RUNNING",
+        jobs: [{ jobType: "TRAFFIC", status: "FAILED", errorMessage: "  rate limit  " }],
+      }),
       repo({ id: 10, fullName: "KHolodilin/fourth", collectionStatus: null }),
     ];
-    expect(headerProgress({ repositoryId: null, rows, watching: false })).toBe("Collected 1 of 4. rate limit");
-    expect(headerProgress({ repositoryId: null, rows: rows.map((row) => ({ ...row, collectionStatus: "SUCCESS" })), watching: true })).toBe(
-      "Collected 0 of 4",
+    expect(headerProgress({ repositoryId: null, rows, watching: false })).toBe(
+      "Collected 1 of 4. rate limit",
     );
+    expect(
+      headerProgress({
+        repositoryId: null,
+        rows: rows.map((row) => ({ ...row, collectionStatus: "SUCCESS" })),
+        watching: true,
+      }),
+    ).toBe("Collected 0 of 4");
     expect(headerProgress({ repositoryId: null, rows: [], watching: true })).toBeNull();
     expect(headerProgress({ repositoryId: null, rows, watching: false })).not.toBeNull();
     expect(
@@ -49,7 +65,9 @@ describe("collect progress", () => {
     expect(
       headerProgress({
         repositoryId: null,
-        rows: [repo({ collectionStatus: "RUNNING", jobs: [{ jobType: "TRAFFIC", status: "FAILED" }] })],
+        rows: [
+          repo({ collectionStatus: "RUNNING", jobs: [{ jobType: "TRAFFIC", status: "FAILED" }] }),
+        ],
         watching: false,
       }),
     ).toBe("Collected 0 of 1");
@@ -89,33 +107,63 @@ describe("collect progress", () => {
         ],
         watching: false,
       }),
-    ).toBe("Collecting KHolodilin/repo: Traffic done, Search 10/15, Topics 10/31 failed: rate limit");
-    expect(headerProgress({ repositoryId: 13, rows: [repo({ collectionStatus: "RUNNING", jobs: [] })], watching: false })).toBe(
+    ).toBe(
+      "Collecting KHolodilin/repo: Traffic done, Search 10/15, Topics 10/31 failed: rate limit",
+    );
+    expect(
+      headerProgress({
+        repositoryId: 13,
+        rows: [repo({ collectionStatus: "RUNNING", jobs: [] })],
+        watching: false,
+      }),
+    ).toBe("Collecting KHolodilin/repo");
+    expect(headerProgress({ repositoryId: 13, rows: [repo()], watching: true })).toBe(
       "Collecting KHolodilin/repo",
     );
-    expect(headerProgress({ repositoryId: 13, rows: [repo()], watching: true })).toBe("Collecting KHolodilin/repo");
-    expect(headerProgress({ repositoryId: 99, rows: [row], watching: true })).toBe("Collecting this repository");
+    expect(headerProgress({ repositoryId: 99, rows: [row], watching: true })).toBe(
+      "Collecting this repository",
+    );
     expect(headerProgress({ repositoryId: 99, rows: [row], watching: false })).toBeNull();
     expect(
       headerProgress({
         repositoryId: 13,
-        rows: [repo({ jobs: [{ jobType: "REFERRERS", status: "FAILED", errorMessage: "rate limit" }] })],
+        rows: [
+          repo({ jobs: [{ jobType: "REFERRERS", status: "FAILED", errorMessage: "rate limit" }] }),
+        ],
         watching: false,
       }),
     ).toBe("Referrers failed: rate limit");
     expect(
       headerProgress({
         repositoryId: 13,
-        rows: [repo({ jobs: [{ jobType: "GROWTH_EVENTS", status: "FAILED", errorMessage: "Invalid GitHub search query" }] })],
+        rows: [
+          repo({
+            jobs: [
+              {
+                jobType: "GROWTH_EVENTS",
+                status: "FAILED",
+                errorMessage: "Invalid GitHub search query",
+              },
+            ],
+          }),
+        ],
         watching: false,
       }),
-    ).toBe(
-      "Growth Events failed: Could not load issues",
-    );
+    ).toBe("Growth Events failed: Could not load issues");
     expect(
       headerProgress({
         repositoryId: 13,
-        rows: [repo({ jobs: [{ jobType: "GROWTH_EVENTS", status: "FAILED", errorMessage: "Could not load issues (Validation Failed)" }] })],
+        rows: [
+          repo({
+            jobs: [
+              {
+                jobType: "GROWTH_EVENTS",
+                status: "FAILED",
+                errorMessage: "Could not load issues (Validation Failed)",
+              },
+            ],
+          }),
+        ],
         watching: false,
       }),
     ).toBe("Growth Events failed: Could not load issues (Validation Failed)");

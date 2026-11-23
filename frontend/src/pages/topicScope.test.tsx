@@ -26,21 +26,21 @@ function renderRepo(path: string) {
       <Routes>
         <Route
           path="/:owner/:repository"
-          element={(
+          element={
             <>
               <RepositoryDetailsPage />
               <SearchProbe />
             </>
-          )}
+          }
         />
         <Route
           path="/:owner/:repository/topics/:topic"
-          element={(
+          element={
             <>
               <TopicDetailsPage />
               <SearchProbe />
             </>
-          )}
+          }
         />
       </Routes>
     </MemoryRouter>,
@@ -101,7 +101,9 @@ describe("topics visibility scope cookie", () => {
     renderRepo(`${repoBase}?tab=topics`);
     expect(await screen.findByRole("button", { name: "Java" })).toHaveClass("bg-card");
     expect(screen.getByRole("link", { name: "kafka" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("search").textContent).toContain("scope=language"));
+    await waitFor(() =>
+      expect(screen.getByTestId("search").textContent).toContain("scope=language"),
+    );
     expect(readTopicScope(13)).toBe("language");
   });
 
@@ -118,7 +120,9 @@ describe("topics visibility scope cookie", () => {
     const view = renderRepo(`${repoBase}?tab=topics`);
     await user.click(await screen.findByRole("button", { name: "All" }));
     await waitFor(() => expect(readTopicScope(13)).toBe("all"));
-    await waitFor(() => expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="));
+    await waitFor(() =>
+      expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="),
+    );
     expect(screen.getByRole("link", { name: "outbox" })).toBeInTheDocument();
     view.unmount();
 
@@ -144,7 +148,9 @@ describe("topics visibility scope cookie", () => {
     await waitFor(() => expect(readTopicScope(13)).toBe("language"));
     await user.click(screen.getByLabelText("Switch repository"));
     await user.click(await screen.findByRole("option", { name: "other" }));
-    expect(await screen.findByRole("button", { name: "Switch repository" })).toHaveTextContent("other");
+    expect(await screen.findByRole("button", { name: "Switch repository" })).toHaveTextContent(
+      "other",
+    );
     // Previous repository keeps its own cookie after switching away.
     expect(readTopicScope(13)).toBe("language");
   });
@@ -198,7 +204,9 @@ describe("topics visibility scope cookie", () => {
     expect(await screen.findByRole("link", { name: "outbox" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Java" })).not.toBeInTheDocument();
     await waitFor(() => expect(readTopicScope(13)).toBe("all"));
-    await waitFor(() => expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="));
+    await waitFor(() =>
+      expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="),
+    );
   });
 
   it("treats an invalid scope query as All and saves that", async () => {
@@ -206,7 +214,9 @@ describe("topics visibility scope cookie", () => {
     renderRepo(`${repoBase}?tab=topics&scope=nope`);
     expect(await screen.findByRole("button", { name: "All" })).toHaveClass("bg-card");
     await waitFor(() => expect(readTopicScope(13)).toBe("all"));
-    await waitFor(() => expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="));
+    await waitFor(() =>
+      expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="),
+    );
   });
 
   it("restores the cookie when the topics tab is opened from another tab", async () => {
@@ -226,7 +236,9 @@ describe("topics visibility scope cookie", () => {
     expect(screen.getByRole("button", { name: "Java" })).toHaveClass("bg-card");
     await user.click(screen.getByLabelText("Switch repository"));
     await user.click(await screen.findByRole("option", { name: "other" }));
-    expect(await screen.findByRole("button", { name: "Switch repository" })).toHaveTextContent("other");
+    expect(await screen.findByRole("button", { name: "Switch repository" })).toHaveTextContent(
+      "other",
+    );
     expect(readTopicScope(13)).toBe("language");
     linked.unmount();
 
@@ -268,7 +280,9 @@ describe("topics visibility scope cookie", () => {
 
     renderRepo(`${repoBase}/topics/outbox?scope=language`);
     expect(await screen.findByRole("heading", { name: "outbox" })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="));
+    await waitFor(() =>
+      expect(screen.getByTestId("search").textContent ?? "").not.toContain("scope="),
+    );
     expect(readTopicScope(13)).toBe("all");
   });
 });

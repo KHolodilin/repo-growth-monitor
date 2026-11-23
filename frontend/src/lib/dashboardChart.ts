@@ -41,10 +41,17 @@ function shareLines(total: number | null | undefined, leaders: TrafficLeader[] |
   if (rows.length === 0) {
     return "";
   }
-  return rows.map((leader) => `<div>${leader.fullName} - ${formatNumber(leader.value)}</div>`).join("");
+  return rows
+    .map((leader) => `<div>${leader.fullName} - ${formatNumber(leader.value)}</div>`)
+    .join("");
 }
 
-type TooltipItem = { axisValue?: string; name?: string; seriesName: string; data: number | { value?: number | null } | null };
+type TooltipItem = {
+  axisValue?: string;
+  name?: string;
+  seriesName: string;
+  data: number | { value?: number | null } | null;
+};
 
 function pointValue(data: TooltipItem["data"]) {
   if (data == null) {
@@ -70,8 +77,12 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
   const points = withoutIncompletePortfolioTipDay(traffic);
   const byDate = new Map(points.map((point) => [point.date, point]));
   return {
-    collectionDates: points.filter(point => point.views != null || point.visitors != null || point.clones != null).map(point => point.date),
-    partialCollectionDates: points.filter(point => (point.missingRepositories ?? 0) > 0).map(point => point.date),
+    collectionDates: points
+      .filter((point) => point.views != null || point.visitors != null || point.clones != null)
+      .map((point) => point.date),
+    partialCollectionDates: points
+      .filter((point) => (point.missingRepositories ?? 0) > 0)
+      .map((point) => point.date),
     tooltip: {
       trigger: "item" as const,
       triggerOn: "click" as const,
@@ -86,9 +97,10 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
         }
         const point = byDate.get(dateKey);
         const missing = point?.missingRepositories ?? 0;
-        const partial = missing > 0 && point?.views != null
-          ? `<div>${partialDayTooltip(missing, dateKey)}</div>`
-          : "";
+        const partial =
+          missing > 0 && point?.views != null
+            ? `<div>${partialDayTooltip(missing, dateKey)}</div>`
+            : "";
         const rows = items
           .map((item) => {
             const value = pointValue(item.data);
@@ -125,16 +137,11 @@ export function dashboardTrafficOption(traffic: DashboardTrafficPoint[]) {
   };
 }
 
-const METRIC_KEY = {
-  views: "views",
-  visitors: "visitors",
-  clones: "clones",
-  uniqueCloners: "uniqueCloners",
-} as const;
+type TrafficMetricKey = "views" | "visitors" | "clones" | "uniqueCloners";
 
 function metricSeries(
   traffic: DashboardTrafficPoint[],
-  metric: keyof typeof METRIC_KEY,
+  metric: TrafficMetricKey,
   name: string,
   color: string,
 ) {

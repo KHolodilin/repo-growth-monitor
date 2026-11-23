@@ -6,7 +6,13 @@ import { TrafficKpiCard } from "./TrafficKpiCard";
 describe("TrafficKpiCard", () => {
   it("shows the percent against the previous period and a sparkline", () => {
     const { container } = render(
-      <TrafficKpiCard label="Views" value={40} growthPercent={12.5} period="30d" series={[10, null, 40]} />,
+      <TrafficKpiCard
+        label="Views"
+        value={40}
+        growthPercent={12.5}
+        period="30d"
+        series={[10, null, 40]}
+      />,
     );
     expect(screen.getByText("Views")).toBeInTheDocument();
     expect(screen.getByText("40")).toBeInTheDocument();
@@ -34,14 +40,22 @@ describe("TrafficKpiCard", () => {
     );
     expect(screen.getByText("—")).toBeInTheDocument();
     expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
-    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe(metricColor("Visitors"));
+    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe(
+      metricColor("Visitors"),
+    );
 
-    rerender(<TrafficKpiCard label="Visitors" value={3} growthPercent={0} period="90d" series={[3, 3]} />);
+    rerender(
+      <TrafficKpiCard label="Visitors" value={3} growthPercent={0} period="90d" series={[3, 3]} />,
+    );
     expect(screen.getByText("→ 0%")).toHaveClass("text-muted-foreground");
     expect(screen.getByText("vs prev 90d")).toBeInTheDocument();
-    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe(metricColor("Visitors"));
+    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe(
+      metricColor("Visitors"),
+    );
 
-    rerender(<TrafficKpiCard label="Visitors" value={9} growthPercent={0} period="all" series={[1, 9]} />);
+    rerender(
+      <TrafficKpiCard label="Visitors" value={9} growthPercent={0} period="all" series={[1, 9]} />,
+    );
     expect(screen.queryByText(/vs prev/)).not.toBeInTheDocument();
     expect(screen.queryByText("→ 0%")).not.toBeInTheDocument();
     expect(container.querySelector("polyline")).toBeNull();
@@ -93,7 +107,9 @@ describe("TrafficKpiCard", () => {
     expect(screen.getByText("— No change")).toHaveClass("text-muted-foreground");
     expect(screen.getByText("vs prev 30d")).toBeInTheDocument();
     const points = container.querySelector("polyline")?.getAttribute("points")?.split(" ") ?? [];
-    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe(metricColor("Watchers"));
+    expect(container.querySelector("polyline")?.getAttribute("stroke")).toBe(
+      metricColor("Watchers"),
+    );
     expect(new Set(points.map((point) => point.split(",")[1])).size).toBe(1);
 
     rerender(

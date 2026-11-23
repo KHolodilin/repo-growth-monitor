@@ -2,7 +2,14 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import { dashboardReady, growthEvent, searchResults, snapshotHistory, topicResults, traffic } from "../test/fixtures";
+import {
+  dashboardReady,
+  growthEvent,
+  searchResults,
+  snapshotHistory,
+  topicResults,
+  traffic,
+} from "../test/fixtures";
 import { GrowthEventSettingsCard } from "./GrowthEventSettingsCard";
 import { EventDetailsDialog, GrowthEventsPanel } from "./GrowthEventsPanel";
 import { DashboardIcon, LogoMark, RepositoriesIcon, SettingsIcon, SignInIcon } from "./icons";
@@ -55,9 +62,9 @@ describe("components", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        return {};
+        return Promise.resolve({});
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const ready = render(
       <MemoryRouter initialEntries={["/admin/dashboard"]}>
@@ -98,7 +105,7 @@ describe("components", () => {
           waiters.push(resolve);
         });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const home = render(
       <MemoryRouter>
@@ -141,9 +148,9 @@ describe("components", () => {
 
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        throw new Error("busy");
+        return Promise.reject(new Error("busy"));
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const failed = render(
       <MemoryRouter>
@@ -161,9 +168,9 @@ describe("components", () => {
 
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        throw "nope";
+        return Promise.reject(new Error("nope"));
       }
-      return { lastSyncAt: null };
+      return Promise.resolve({ lastSyncAt: null });
     });
     const empty = render(
       <MemoryRouter>
@@ -183,9 +190,10 @@ describe("components", () => {
 
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        throw "nope";
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
+        return Promise.reject({ reason: "nope" });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const plain = render(
       <MemoryRouter>
@@ -214,8 +222,9 @@ describe("components", () => {
       </MemoryRouter>,
     );
     hanging.unmount();
-    await act(async () => {
+    await act(() => {
       rejectors.forEach((reject) => reject(new Error("late")));
+      return Promise.resolve();
     });
 
     api.mockRejectedValue(new Error("down"));
@@ -239,9 +248,9 @@ describe("components", () => {
     };
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        return {};
+        return Promise.resolve({});
       }
-      return portfolio;
+      return Promise.resolve(portfolio);
     });
     const repo = render(
       <MemoryRouter initialEntries={["/admin/repositories/13/traffic/history"]}>
@@ -257,15 +266,17 @@ describe("components", () => {
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
     );
-    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" });
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", {
+      method: "POST",
+    });
     repo.unmount();
 
     api.mockClear();
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        return {};
+        return Promise.resolve({});
       }
-      return portfolio;
+      return Promise.resolve(portfolio);
     });
     render(
       <MemoryRouter initialEntries={["/admin/repositories"]}>
@@ -291,7 +302,7 @@ describe("components", () => {
       timers.push(() => {
         void (handler as () => void)();
       });
-      return 1 as unknown as ReturnType<typeof setInterval>;
+      return 1;
     });
     const clear = vi.spyOn(window, "clearInterval").mockImplementation(() => undefined);
     let phase: "running" | "done" = "running";
@@ -302,10 +313,10 @@ describe("components", () => {
         return Promise.reject(new Error("poll failed"));
       }
       if (bare || String(path).includes("/collect")) {
-        return bare ? { lastSyncAt: null } : {};
+        return Promise.resolve(bare ? { lastSyncAt: null } : {});
       }
       const running = phase === "running";
-      return {
+      return Promise.resolve({
         ...dashboardReady,
         repositories: [
           {
@@ -318,9 +329,15 @@ describe("components", () => {
                 ]
               : [{ jobType: "TRAFFIC", status: "SUCCESS" }],
           },
-          { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other", collectionStatus: "SUCCESS", jobs: [] },
+          {
+            ...dashboardReady.repositories[0],
+            id: 8,
+            fullName: "KHolodilin/other",
+            collectionStatus: "SUCCESS",
+            jobs: [],
+          },
         ],
-      };
+      });
     });
     const view = render(
       <MemoryRouter initialEntries={["/admin/repositories/13"]}>
@@ -338,7 +355,9 @@ describe("components", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }));
+    await waitFor(() =>
+      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
+    );
     expect(timers.length).toBeGreaterThan(0);
     const fireTimers = async () => {
       await act(async () => {
@@ -356,7 +375,9 @@ describe("components", () => {
     bare = false;
     phase = "done";
     await fireTimers();
-    await waitFor(() => expect(screen.queryByText(/Collecting KHolodilin/)).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText(/Collecting KHolodilin/)).not.toBeInTheDocument(),
+    );
     view.unmount();
     expect(clear).toHaveBeenCalled();
     spy.mockRestore();
@@ -369,7 +390,7 @@ describe("components", () => {
     let calls = 0;
     api.mockImplementation((path: string) => {
       if (String(path).includes("/collect")) {
-        return {};
+        return Promise.resolve({});
       }
       calls += 1;
       if (calls === 1) {
@@ -377,7 +398,7 @@ describe("components", () => {
           release = resolve;
         });
       }
-      return { lastSyncAt: null };
+      return Promise.resolve({ lastSyncAt: null });
     });
     render(
       <MemoryRouter>
@@ -394,7 +415,9 @@ describe("components", () => {
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/collect"), expect.anything());
     release({ lastSyncAt: "2026-09-23T06:00:00Z", repositories: [] });
     await user.click(screen.getByRole("button", { name: "Account menu" }));
-    expect(await screen.findByRole("menuitem", { name: "Select repositories first" })).toBeDisabled();
+    expect(
+      await screen.findByRole("menuitem", { name: "Select repositories first" }),
+    ).toBeDisabled();
   });
 
   it("maps referrer icons and colors", () => {
@@ -486,8 +509,16 @@ describe("components", () => {
       <MemoryRouter>
         <SnapshotHistoryTable kind="referrers" history={snapshotHistory} />
         <SnapshotHistoryTable kind="paths" history={{ ...snapshotHistory, dates: [], rows: [] }} />
-        <SnapshotHistoryChart title="Referrer Traffic (by day)" kind="referrers" history={snapshotHistory} />
-        <PersistentECharts chartId="x" series={[{ key: "Views", name: "Views" }]} option={{ legend: {} }} />
+        <SnapshotHistoryChart
+          title="Referrer Traffic (by day)"
+          kind="referrers"
+          history={snapshotHistory}
+        />
+        <PersistentECharts
+          chartId="x"
+          series={[{ key: "Views", name: "Views" }]}
+          option={{ legend: {} }}
+        />
       </MemoryRouter>,
     );
     await user.click(screen.getAllByRole("button", { name: /^Views/ })[0]);
@@ -501,10 +532,17 @@ describe("components", () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     };
-    vi.stubGlobal("matchMedia", vi.fn(() => media));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => media),
+    );
     render(
       <MemoryRouter>
-        <SnapshotHistoryChart title="Referrer Traffic (by day)" kind="referrers" history={snapshotHistory} />
+        <SnapshotHistoryChart
+          title="Referrer Traffic (by day)"
+          kind="referrers"
+          history={snapshotHistory}
+        />
       </MemoryRouter>,
     );
     expect(await screen.findByRole("button", { name: "Chart menu" })).toBeInTheDocument();
@@ -556,7 +594,13 @@ describe("components", () => {
         today="2026-10-12"
         events={[
           { ...growthEvent, eventAt: "2026-10-05T12:00:00Z", title: "README change" },
-          { ...growthEvent, id: 2, eventAt: "2026-10-05T15:00:00Z", title: "Merged pull request", source: "GITHUB" },
+          {
+            ...growthEvent,
+            id: 2,
+            eventAt: "2026-10-05T15:00:00Z",
+            title: "Merged pull request",
+            source: "GITHUB",
+          },
         ]}
         onClose={vi.fn()}
         onEdit={vi.fn()}
@@ -638,7 +682,10 @@ describe("components", () => {
 
     api.mockImplementation((url: string) => {
       if (String(url).includes("search-visibility")) {
-        return Promise.resolve([{ query: { name: "outbox" } }, { query: { name: "outbox" }, points: [{ date: "2026-01-01", position: 3 }] }]);
+        return Promise.resolve([
+          { query: { name: "outbox" } },
+          { query: { name: "outbox" }, points: [{ date: "2026-01-01", position: 3 }] },
+        ]);
       }
       return Promise.resolve({ traffic: [], points: [] });
     });

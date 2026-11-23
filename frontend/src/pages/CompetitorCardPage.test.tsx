@@ -59,7 +59,10 @@ describe("competitor card", () => {
     renderCard();
 
     expect(await screen.findByRole("heading", { name: "other/repo" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute("href", "https://github.com/other/repo");
+    expect(screen.getByRole("link", { name: "Open on GitHub" })).toHaveAttribute(
+      "href",
+      "https://github.com/other/repo",
+    );
     expect(screen.getByText(card.description)).toBeInTheDocument();
     expect(screen.getByText("kafka")).toBeInTheDocument();
     expect(screen.getByText("Discoverability 1/2")).toBeInTheDocument();
@@ -82,7 +85,13 @@ describe("competitor card", () => {
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.endsWith("/history")) return Promise.resolve(searchHistory);
       if (url.endsWith("/competitors/1")) {
-        return Promise.resolve({ ...card, description: "  ", topics: [], points: [], discoverability: [] });
+        return Promise.resolve({
+          ...card,
+          description: "  ",
+          topics: [],
+          points: [],
+          discoverability: [],
+        });
       }
       return Promise.resolve([]);
     });
@@ -111,7 +120,8 @@ describe("competitor card", () => {
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
-      return Promise.reject("nope");
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
+      return Promise.reject({ reason: "nope" });
     });
     renderCard();
     expect(await screen.findByText("Failed to load the competitor card")).toBeInTheDocument();

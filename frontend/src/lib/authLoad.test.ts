@@ -30,7 +30,7 @@ describe("auth load/signOut", () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
-      text: async () => "<!doctype html><html></html>",
+      text: () => "<!doctype html><html></html>",
     });
     await expect(signOut("/logout")).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledWith(

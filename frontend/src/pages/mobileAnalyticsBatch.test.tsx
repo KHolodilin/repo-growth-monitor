@@ -12,83 +12,220 @@ import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
-vi.mock("../lib/api", async original => ({ ...await original<typeof import("../lib/api")>(), api }));
+vi.mock("../lib/api", async (original) => ({
+  ...(await original<typeof import("../lib/api")>()),
+  api,
+}));
 vi.mock("echarts-for-react", async () => {
   const React = await import("react");
-  return { default: React.forwardRef(function Plot({ option }: { option: { legend?: { selected?: Record<string, boolean> }; series?: unknown } }, ref) {
-    React.useImperativeHandle(ref, () => ({ getEchartsInstance: () => ({ getDataURL: () => "data:image/png;base64,AAAA" }) }));
-    return <div data-testid="batch-chart" data-selected={JSON.stringify(option.legend?.selected)} data-values={JSON.stringify(option.series)} />;
-  }) };
+  return {
+    default: React.forwardRef(function Plot(
+      { option }: { option: { legend?: { selected?: Record<string, boolean> }; series?: unknown } },
+      ref,
+    ) {
+      React.useImperativeHandle(ref, () => ({
+        getEchartsInstance: () => ({ getDataURL: () => "data:image/png;base64,AAAA" }),
+      }));
+      return (
+        <div
+          data-testid="batch-chart"
+          data-selected={JSON.stringify(option.legend?.selected)}
+          data-values={JSON.stringify(option.series)}
+        />
+      );
+    }),
+  };
 });
-function mobile(matches = true) { vi.stubGlobal("matchMedia", vi.fn(() => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() }))); }
-beforeEach(() => { mobile(); api.mockReset(); });
-afterEach(() => { vi.useRealTimers(); });
+function mobile(matches = true) {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+  );
+}
+beforeEach(() => {
+  mobile();
+  api.mockReset();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("mobile analytics batch", () => {
   it("ignores an old period response and keeps an empty current period honest", async () => {
     const user = userEvent.setup();
     let release!: (value: unknown) => void;
-    const missing = { value: null, growthPercent: null, coverage: { observedDays: 0, expectedDays: 1 } };
-    const empty = { ...dashboardReady, summary: { ...dashboardReady.summary, views: missing, visitors: missing, uniqueCloners: missing }, traffic: [{ date: "2026-11-02", views: null, visitors: null, clones: null }] };
-    api.mockImplementation((path: string) => path.includes("dashboard") ? path.includes("30d") ? new Promise(resolve => { release = resolve; }) : Promise.resolve(path.includes("1d") ? empty : dashboardReady) : Promise.resolve([]));
-    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+    const missing = {
+      value: null,
+      growthPercent: null,
+      coverage: { observedDays: 0, expectedDays: 1 },
+    };
+    const empty = {
+      ...dashboardReady,
+      summary: {
+        ...dashboardReady.summary,
+        views: missing,
+        visitors: missing,
+        uniqueCloners: missing,
+      },
+      traffic: [{ date: "2026-11-02", views: null, visitors: null, clones: null }],
+    };
+    api.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("dashboard")
+          ? path.includes("30d")
+            ? new Promise((resolve) => {
+                release = resolve;
+              })
+            : Promise.resolve(path.includes("1d") ? empty : dashboardReady)
+          : Promise.resolve([]),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
     await user.click(await screen.findByRole("tab", { name: "Views" }));
     await user.click(screen.getByRole("button", { name: "30d" }));
     await user.click(screen.getByRole("button", { name: "1d" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("No traffic data for selected period");
-    await act(async () => release(dashboardReady));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "No traffic data for selected period",
+    );
+    await act(() => {
+      release(dashboardReady);
+      return Promise.resolve();
+    });
     expect(screen.getByRole("status")).toHaveTextContent("No traffic data for selected period");
     expect(screen.getByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByTestId("batch-chart")).not.toBeInTheDocument();
   });
   it("keeps repository missing-data states distinct from data available only for one metric", async () => {
     const user = userEvent.setup();
-    let points: typeof traffic.traffic = [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: null }];
-    api.mockImplementation((path: string) => Promise.resolve(path.includes("/traffic?") ? { ...traffic, traffic: points } : path.endsWith("/admin/repositories/13") ? repository : []));
-    render(<MemoryRouter initialEntries={["/admin/repositories/13"]}><Routes><Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} /></Routes></MemoryRouter>);
-    expect(await screen.findByRole("status")).toHaveTextContent("No traffic data for selected period");
-    points = [{ date: "2026-11-02", views: null, uniqueVisitors: 2, clones: null, uniqueCloners: null }];
+    let points: typeof traffic.traffic = [
+      { date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: null },
+    ];
+    api.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("/traffic?")
+          ? { ...traffic, traffic: points }
+          : path.endsWith("/admin/repositories/13")
+            ? repository
+            : [],
+      ),
+    );
+    render(
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
+        <Routes>
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "No traffic data for selected period",
+    );
+    points = [
+      { date: "2026-11-02", views: null, uniqueVisitors: 2, clones: null, uniqueCloners: null },
+    ];
     await user.click(screen.getByRole("button", { name: "30d" }));
     expect(await screen.findByTestId("batch-chart")).toBeInTheDocument();
-    points = [{ date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: 3 }];
+    points = [
+      { date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: 3 },
+    ];
     await user.click(screen.getByRole("button", { name: "1d" }));
-    await waitFor(() => expect(screen.getByTestId("batch-chart").dataset.values).toContain('"data":[3]'));
+    await waitFor(() =>
+      expect(screen.getByTestId("batch-chart").dataset.values).toContain('"data":[3]'),
+    );
   });
   it("keeps the mobile repository menu usable during viewport and page changes", async () => {
     const user = userEvent.setup();
     api.mockResolvedValue([repository]);
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: repository.fullName, repoSwitcher: { currentId: repository.id, hrefFor: (repo) => `/${repo.owner.login}/${repo.name}` } }]} /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <PageBreadcrumb
+          items={[
+            {
+              label: repository.fullName,
+              repoSwitcher: {
+                currentId: repository.id,
+                hrefFor: (repo) => `/${repo.owner.login}/${repo.name}`,
+              },
+            },
+          ]}
+        />
+      </MemoryRouter>,
+    );
     await user.click(screen.getByRole("button", { name: "Switch repository" }));
-    fireEvent.resize(window); fireEvent.scroll(window);
+    fireEvent.resize(window);
+    fireEvent.scroll(window);
     await user.type(screen.getByRole("textbox", { name: "Search repositories" }), "spring");
     expect(await screen.findByRole("option", { name: repository.name })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
   it("never fabricates sparkline observations at missing days", () => {
-    const { container, rerender } = render(<TrafficKpiCard label="Views" value={5} growthPercent={null} period="7d" preserveGaps series={[null, 1, null, 4, null]} />);
+    const { container, rerender } = render(
+      <TrafficKpiCard
+        label="Views"
+        value={5}
+        growthPercent={null}
+        period="7d"
+        preserveGaps
+        series={[null, 1, null, 4, null]}
+      />,
+    );
     expect(container.querySelectorAll("polyline")).toHaveLength(2);
-    expect([...container.querySelectorAll("polyline")].every(node => !node.getAttribute("points")?.includes("NaN"))).toBe(true);
-    rerender(<TrafficKpiCard label="Views" value={0} growthPercent={null} period="7d" preserveGaps series={[0]} />);
+    expect(
+      [...container.querySelectorAll("polyline")].every(
+        (node) => !node.getAttribute("points")?.includes("NaN"),
+      ),
+    ).toBe(true);
+    rerender(
+      <TrafficKpiCard
+        label="Views"
+        value={0}
+        growthPercent={null}
+        period="7d"
+        preserveGaps
+        series={[0]}
+      />,
+    );
     expect(container.querySelector("polyline")).toHaveAttribute("points", "36,23");
   });
   it("supports context hints without treating a normal pointer click as a long press", () => {
     const onClick = vi.fn();
-    const { rerender } = render(<NavigationButton label="Growth Events" mobileLabel="Events" onClick={onClick} />);
+    const { rerender } = render(
+      <NavigationButton label="Growth Events" mobileLabel="Events" onClick={onClick} />,
+    );
     const button = screen.getByRole("button", { name: "Growth Events" });
     fireEvent.contextMenu(button);
     fireEvent.keyDown(button, { key: "ArrowDown" });
     fireEvent.pointerDown(button);
-    fireEvent.click(button); expect(onClick).toHaveBeenCalledOnce();
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
     rerender(<NavigationButton label="Java" onClick={onClick} />);
     fireEvent.contextMenu(screen.getByRole("button", { name: "Java" }));
   });
   it("keeps backdrop hit testing distinct from clicks inside the sheet", () => {
     const onClose = vi.fn();
-    render(<RepositoryWarningSheet count={1} onClose={onClose}>Details</RepositoryWarningSheet>);
+    render(
+      <RepositoryWarningSheet count={1} onClose={onClose}>
+        Details
+      </RepositoryWarningSheet>,
+    );
     const dialog = screen.getByRole("dialog");
-    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({ x: 10, y: 20, left: 10, top: 20, right: 200, bottom: 300, width: 190, height: 280, toJSON() {} });
-    fireEvent.click(dialog, { clientX: 100, clientY: 100 }); expect(onClose).not.toHaveBeenCalled();
+    vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+      x: 10,
+      y: 20,
+      left: 10,
+      top: 20,
+      right: 200,
+      bottom: 300,
+      width: 190,
+      height: 280,
+      toJSON() {},
+    });
+    fireEvent.click(dialog, { clientX: 100, clientY: 100 });
+    expect(onClose).not.toHaveBeenCalled();
     fireEvent.click(dialog, { clientX: 0, clientY: 100 });
     fireEvent.click(dialog, { clientX: 201, clientY: 100 });
     fireEvent.click(dialog, { clientX: 100, clientY: 301 });
@@ -97,50 +234,154 @@ describe("mobile analytics batch", () => {
   it("retains each Portfolio metric through skeleton reloads and checks actual chart selection", async () => {
     const user = userEvent.setup();
     let release!: (value: unknown) => void;
-    api.mockImplementation((path: string) => path.includes("dashboard") ? path.includes("30d") ? new Promise(resolve => { release = resolve; }) : Promise.resolve(dashboardReady) : Promise.resolve([]));
-    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+    api.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("dashboard")
+          ? path.includes("30d")
+            ? new Promise((resolve) => {
+                release = resolve;
+              })
+            : Promise.resolve(dashboardReady)
+          : Promise.resolve([]),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
     await user.click(await screen.findByRole("tab", { name: "Views" }));
     await user.click(screen.getByRole("button", { name: "30d" }));
     expect(screen.queryByRole("tab", { name: "Views" })).not.toBeInTheDocument();
-    await act(async () => release(dashboardReady));
-    expect(await screen.findByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
+    await act(() => {
+      release(dashboardReady);
+      return Promise.resolve();
+    });
+    expect(await screen.findByRole("tab", { name: "Views" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByTestId("batch-chart").dataset.selected).toContain('"Views":true');
     await user.click(screen.getByRole("button", { name: "Stats" }));
     await user.click(await screen.findByRole("tab", { name: "Watchers" }));
     await user.click(screen.getByRole("button", { name: "1d" }));
-    expect(await screen.findByRole("tab", { name: "Watchers" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("tab", { name: "Watchers" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByTestId("batch-chart").dataset.selected).toContain('"Watchers":true');
     await user.click(screen.getByRole("button", { name: "Traffic" }));
-    expect(await screen.findByRole("tab", { name: "Views" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByRole("tab", { name: "Views" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 
   it("keeps the chosen metric for an empty period, renders missing values and suppresses comparisons", () => {
-    render(<TrafficKpiCard label="Visitors" value={null} growthPercent={null} period="1d" previousCoverage={{ observedDays: 0, expectedDays: 1 }} />);
+    render(
+      <TrafficKpiCard
+        label="Visitors"
+        value={null}
+        growthPercent={null}
+        period="1d"
+        previousCoverage={{ observedDays: 0, expectedDays: 1 }}
+      />,
+    );
     expect(screen.getByText(/Comparison unavailable/)).toBeInTheDocument();
     expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
     expect(screen.queryByText(/100%/)).not.toBeInTheDocument();
   });
   it("keeps coverage off KPI cards and preserves true zero", () => {
-    const { rerender } = render(<TrafficKpiCard label="Views" value={5} growthPercent={null} period="7d" coverage={{ observedDays: 2, expectedDays: 6 }} />);
+    const { rerender } = render(
+      <TrafficKpiCard
+        label="Views"
+        value={5}
+        growthPercent={null}
+        period="7d"
+        coverage={{ observedDays: 2, expectedDays: 6 }}
+      />,
+    );
     expect(screen.queryByText(/Partial data/)).not.toBeInTheDocument();
     expect(screen.queryByText(/repository-days/)).not.toBeInTheDocument();
-    rerender(<TrafficKpiCard label="Views" value={0} growthPercent={-100} period="1d" coverage={{ observedDays: 1, expectedDays: 1 }} previousCoverage={{ observedDays: 1, expectedDays: 1 }} />);
+    rerender(
+      <TrafficKpiCard
+        label="Views"
+        value={0}
+        growthPercent={-100}
+        period="1d"
+        coverage={{ observedDays: 1, expectedDays: 1 }}
+        previousCoverage={{ observedDays: 1, expectedDays: 1 }}
+      />,
+    );
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.getByText(/100%/)).toBeInTheDocument();
   });
   it("colors sparklines from explicit series color and trend direction", () => {
-    const { rerender, container } = render(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={-10} period="7d" series={[1, null, 3]} preserveGaps sparklineColor="#111111" />);
+    const { rerender, container } = render(
+      <TrafficKpiCard
+        label="Custom KPI"
+        value={3}
+        growthPercent={-10}
+        period="7d"
+        series={[1, null, 3]}
+        preserveGaps
+        sparklineColor="#111111"
+      />,
+    );
     expect(container.querySelector('polyline[stroke="#111111"]')).toBeTruthy();
-    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={-10} absoluteChange={-1} period="7d" series={[3, 1]} />);
+    rerender(
+      <TrafficKpiCard
+        label="Custom KPI"
+        value={3}
+        growthPercent={-10}
+        absoluteChange={-1}
+        period="7d"
+        series={[3, 1]}
+      />,
+    );
     expect(container.querySelector('polyline[stroke="#b91c1c"]')).toBeTruthy();
-    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={0} absoluteChange={0} period="7d" series={[2, 2]} />);
+    rerender(
+      <TrafficKpiCard
+        label="Custom KPI"
+        value={3}
+        growthPercent={0}
+        absoluteChange={0}
+        period="7d"
+        series={[2, 2]}
+      />,
+    );
     expect(container.querySelector('polyline[stroke="#6b7280"]')).toBeTruthy();
-    rerender(<TrafficKpiCard label="Custom KPI" value={3} growthPercent={10} absoluteChange={1} period="7d" series={[1, 2]} />);
+    rerender(
+      <TrafficKpiCard
+        label="Custom KPI"
+        value={3}
+        growthPercent={10}
+        absoluteChange={1}
+        period="7d"
+        series={[1, 2]}
+      />,
+    );
     expect(container.querySelector('polyline[stroke="#047857"]')).toBeTruthy();
   });
 
   it("keeps breadcrumb navigation and complete page labels available", () => {
-    render(<MemoryRouter><PageBreadcrumb items={[{ label: "Portfolio", to: "/" }, { label: "a/very-long-repository-name", repoSwitcher: { currentId: 13, hrefFor: (repo) => `/${repo.owner.login}/${repo.name}` } }, { label: "Search Visibility" }]} /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <PageBreadcrumb
+          items={[
+            { label: "Portfolio", to: "/" },
+            {
+              label: "a/very-long-repository-name",
+              repoSwitcher: {
+                currentId: 13,
+                hrefFor: (repo) => `/${repo.owner.login}/${repo.name}`,
+              },
+            },
+            { label: "Search Visibility" },
+          ]}
+        />
+      </MemoryRouter>,
+    );
     expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Search Visibility" })).toBeInTheDocument();
     expect(screen.getByTitle("a/very-long-repository-name")).toBeInTheDocument();
@@ -151,50 +392,90 @@ describe("mobile analytics batch", () => {
     vi.useFakeTimers();
     const onClick = vi.fn();
     let measure!: () => void;
-    vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { measure = callback; } observe() {} disconnect() {} });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          measure = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
     render(<NavigationButton label="TypeScript" truncate onClick={onClick} />);
     const button = screen.getByRole("button", { name: "TypeScript" });
     const label = within(button).getByText("TypeScript");
     Object.defineProperty(label, "scrollWidth", { value: 150 });
     Object.defineProperty(label, "clientWidth", { value: 80 });
-    act(measure);
+    void act(measure);
     fireEvent.contextMenu(button);
-    fireEvent.focus(button); expect(screen.getByRole("tooltip")).toHaveTextContent("TypeScript");
-    fireEvent.keyDown(button, { key: "Escape" }); expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-    fireEvent.mouseEnter(button); expect(screen.getByRole("tooltip")).toBeInTheDocument();
-    fireEvent.mouseLeave(button); fireEvent.blur(button);
-    const pointer = new Event("pointerdown", { bubbles: true }); Object.defineProperty(pointer, "pointerType", { value: "touch" });
-    fireEvent(button, pointer); act(() => vi.advanceTimersByTime(510));
-    fireEvent.pointerUp(button); fireEvent.click(button); expect(onClick).not.toHaveBeenCalled();
-    fireEvent.click(button); expect(onClick).toHaveBeenCalledOnce();
+    fireEvent.focus(button);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("TypeScript");
+    fireEvent.keyDown(button, { key: "Escape" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.mouseEnter(button);
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    fireEvent.mouseLeave(button);
+    fireEvent.blur(button);
+    const pointer = new Event("pointerdown", { bubbles: true });
+    Object.defineProperty(pointer, "pointerType", { value: "touch" });
+    fireEvent(button, pointer);
+    void act(() => vi.advanceTimersByTime(510));
+    fireEvent.pointerUp(button);
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    expect(onClick).toHaveBeenCalledOnce();
     fireEvent.pointerCancel(button);
   });
-  it.each([["Search Visibility", "Search"], ["Topics Visibility", "Topics"], ["Growth Events", "Events"]])("does not overlay navigation with a %s hint", (label, short) => {
-    vi.useFakeTimers(); const onClick = vi.fn();
+  it.each([
+    ["Search Visibility", "Search"],
+    ["Topics Visibility", "Topics"],
+    ["Growth Events", "Events"],
+  ])("does not overlay navigation with a %s hint", (label, short) => {
+    vi.useFakeTimers();
+    const onClick = vi.fn();
     render(<NavigationButton label={label} mobileLabel={short} onClick={onClick} />);
     const button = screen.getByRole("button", { name: label });
     expect(within(button).getByText(short)).toBeInTheDocument();
-    fireEvent.focus(button); fireEvent.mouseEnter(button); fireEvent.click(button);
+    fireEvent.focus(button);
+    fireEvent.mouseEnter(button);
+    fireEvent.click(button);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-    const pointer = new Event("pointerdown", { bubbles: true }); Object.defineProperty(pointer, "pointerType", { value: "touch" });
-    fireEvent(button, pointer); act(() => vi.advanceTimersByTime(510));
-    fireEvent.pointerUp(button); fireEvent.click(button);
+    const pointer = new Event("pointerdown", { bubbles: true });
+    Object.defineProperty(pointer, "pointerType", { value: "touch" });
+    fireEvent(button, pointer);
+    void act(() => vi.advanceTimersByTime(510));
+    fireEvent.pointerUp(button);
+    fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(button).not.toHaveAttribute("aria-describedby");
   });
   it("only gives language hints when the full label is actually clipped and updates on resize", () => {
     let measure!: () => void;
-    vi.stubGlobal("ResizeObserver", class { constructor(callback: () => void) { measure = callback; } observe() {} disconnect() {} });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          measure = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
     render(<NavigationButton label="TypeScript" truncate />);
     const button = screen.getByRole("button", { name: "TypeScript" });
-    fireEvent.focus(button); expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    fireEvent.focus(button);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     const label = within(button).getByText("TypeScript");
     Object.defineProperty(label, "scrollWidth", { value: 150, configurable: true });
     Object.defineProperty(label, "clientWidth", { value: 80, configurable: true });
-    act(measure); expect(screen.getByRole("tooltip")).toHaveTextContent("TypeScript");
+    void act(measure);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("TypeScript");
     Object.defineProperty(label, "clientWidth", { value: 180 });
-    act(measure); expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    void act(measure);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   });
   it("retains full desktop tab labels without redundant hints", () => {
     mobile(false);
@@ -206,7 +487,11 @@ describe("mobile analytics batch", () => {
 
   it("closes the warning sheet via button, cancellation, backdrop and deliberate header swipe", () => {
     const onClose = vi.fn();
-    const { unmount } = render(<RepositoryWarningSheet count={2} onClose={onClose}><a href="/admin/repositories/13">owner/repository</a></RepositoryWarningSheet>);
+    const { unmount } = render(
+      <RepositoryWarningSheet count={2} onClose={onClose}>
+        <a href="/admin/repositories/13">owner/repository</a>
+      </RepositoryWarningSheet>,
+    );
     const dialog = screen.getByRole("dialog", { name: "Repository data warnings" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(document.body.style.overflow).toBe("hidden");
@@ -216,20 +501,50 @@ describe("mobile analytics batch", () => {
     fireEvent.click(dialog, { clientY: -5 });
     const header = screen.getByRole("heading").parentElement!.parentElement!;
     header.setPointerCapture = vi.fn();
-    const pointer = (type: string, x: number, y: number) => { const e = new Event(type, { bubbles: true }); Object.defineProperties(e, { clientX: { value: x }, clientY: { value: y } }); fireEvent(header, e); };
-    pointer("pointerdown", 10, 0); pointer("pointerup", 10, 100);
+    const pointer = (type: string, x: number, y: number) => {
+      const e = new Event(type, { bubbles: true });
+      Object.defineProperties(e, { clientX: { value: x }, clientY: { value: y } });
+      fireEvent(header, e);
+    };
+    pointer("pointerdown", 10, 0);
+    pointer("pointerup", 10, 100);
     expect(onClose).toHaveBeenCalledTimes(4);
-    pointer("pointerdown", 10, 0); pointer("pointerup", 150, 100);
-    fireEvent.pointerCancel(header); pointer("pointerup", 10, 100);
+    pointer("pointerdown", 10, 0);
+    pointer("pointerup", 150, 100);
+    fireEvent.pointerCancel(header);
+    pointer("pointerup", 10, 100);
     fireEvent.click(screen.getByRole("link"));
     expect(onClose).toHaveBeenCalledTimes(4);
-    unmount(); expect(document.body.style.overflow).toBe("");
+    unmount();
+    expect(document.body.style.overflow).toBe("");
   });
 
   it("opens the mobile Portfolio sheet with real warning links and closes on navigation", async () => {
     const user = userEvent.setup();
-    api.mockImplementation((path: string) => Promise.resolve(path.includes("dashboard") ? { ...dashboardReady, repositories: [{ ...dashboardReady.repositories[0], trafficNotice: { reason: "GITHUB_DATA_MISSING", date: "2026-11-02", lastTrafficDate: "2026-11-01" } }] } : []));
-    render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+    api.mockImplementation((path: string) =>
+      Promise.resolve(
+        path.includes("dashboard")
+          ? {
+              ...dashboardReady,
+              repositories: [
+                {
+                  ...dashboardReady.repositories[0],
+                  trafficNotice: {
+                    reason: "GITHUB_DATA_MISSING",
+                    date: "2026-11-02",
+                    lastTrafficDate: "2026-11-01",
+                  },
+                },
+              ],
+            }
+          : [],
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>,
+    );
     await user.click(await screen.findByRole("button", { name: /1 repository/ }));
     const dialog = screen.getByRole("dialog");
     const link = within(dialog).getByRole("link");

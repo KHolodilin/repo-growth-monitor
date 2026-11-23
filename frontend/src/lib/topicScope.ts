@@ -16,13 +16,21 @@ export function readTopicScope(repositoryId: number): TopicScope | null {
   return null;
 }
 
-export function writeTopicScope(repositoryId: number, scope: TopicScope, protocol = location.protocol) {
+export function writeTopicScope(
+  repositoryId: number,
+  scope: TopicScope,
+  protocol = location.protocol,
+) {
   const secure = protocol === "https:" ? "; Secure" : "";
   document.cookie = `${topicScopeCookie(repositoryId)}=${encodeURIComponent(scope)}; path=/; max-age=${MAX_AGE}; SameSite=Lax${secure}`;
 }
 
 /** The topics tab shows the query when it is present, otherwise the saved choice. */
-export function resolveVisibleScope(query: string | null, stored: TopicScope | null, hasLanguage: boolean): TopicScope {
+export function resolveVisibleScope(
+  query: string | null,
+  stored: TopicScope | null,
+  hasLanguage: boolean,
+): TopicScope {
   if (query === "language") {
     return hasLanguage ? "language" : "all";
   }

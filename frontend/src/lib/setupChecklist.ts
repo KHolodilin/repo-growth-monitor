@@ -40,12 +40,21 @@ export function headerSchedule(planner: PlannerWindow): string {
   return `${windowText} It has not started yet today.`;
 }
 
-export function collectionJobLines(jobs: ProgressJob[] | null | undefined, trafficPermissionMissing: boolean): JobLine[] {
+export function collectionJobLines(
+  jobs: ProgressJob[] | null | undefined,
+  trafficPermissionMissing: boolean,
+): JobLine[] {
   const byType = new Map((jobs ?? []).map((job) => [job.jobType, job]));
-  return COLLECTION_JOB_TYPES.map((jobType) => jobLine(jobType, byType.get(jobType), trafficPermissionMissing));
+  return COLLECTION_JOB_TYPES.map((jobType) =>
+    jobLine(jobType, byType.get(jobType), trafficPermissionMissing),
+  );
 }
 
-function jobLine(jobType: string, job: ProgressJob | undefined, trafficPermissionMissing: boolean): JobLine {
+function jobLine(
+  jobType: string,
+  job: ProgressJob | undefined,
+  trafficPermissionMissing: boolean,
+): JobLine {
   const label = JOB_LABELS[jobType];
   if (jobType === "TRAFFIC" && trafficPermissionMissing) {
     return { jobType, label, mark: "✕", detail: TRAFFIC_PERMISSION };
@@ -54,7 +63,12 @@ function jobLine(jobType: string, job: ProgressJob | undefined, trafficPermissio
     return { jobType, label, mark: "✓", detail: null };
   }
   if (job?.status === "FAILED") {
-    return { jobType, label, mark: "✕", detail: collectionFailureReason(job.errorMessage, job.jobType) };
+    return {
+      jobType,
+      label,
+      mark: "✕",
+      detail: collectionFailureReason(job.errorMessage, job.jobType),
+    };
   }
   if (job?.status === "RUNNING" || job?.status === "RETRY") {
     return { jobType, label, mark: "…", detail: null };

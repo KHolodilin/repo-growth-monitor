@@ -52,13 +52,14 @@ function periodWindow(period: Period, today: string, topics: TopicRankSample[]) 
     const day = shiftDays(today, -1);
     return { days: [day], previousTo: shiftDays(day, -1) };
   }
-  const from = period === "7d"
-    ? shiftDays(today, -6)
-    : period === "90d"
-      ? shiftDays(today, -89)
-      : period === "1y"
-        ? shiftDays(shiftYears(today, -1), 1)
-        : shiftDays(today, -29);
+  const from =
+    period === "7d"
+      ? shiftDays(today, -6)
+      : period === "90d"
+        ? shiftDays(today, -89)
+        : period === "1y"
+          ? shiftDays(shiftYears(today, -1), 1)
+          : shiftDays(today, -29);
   return { days: eachDate(from, today), previousTo: shiftDays(from, -1) };
 }
 
@@ -128,7 +129,10 @@ function firstDate(topic: TopicRankSample) {
   if (topic.points.length === 0) {
     return null;
   }
-  return topic.points.reduce((min, point) => (point.date < min ? point.date : min), topic.points[0].date);
+  return topic.points.reduce(
+    (min, point) => (point.date < min ? point.date : min),
+    topic.points[0].date,
+  );
 }
 
 function latestOnOrBefore(topic: TopicRankSample, date: string) {

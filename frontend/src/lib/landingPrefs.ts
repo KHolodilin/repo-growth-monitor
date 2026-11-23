@@ -1,7 +1,14 @@
 import { readPublicPreference, writePublicPreference } from "./publicPrefs";
 
 export const LANDING_SCOPE = "landing";
-export const OWNER_SORTS = ["owner", "repositories", "stars", "forks", "watchers", "contributors"] as const;
+export const OWNER_SORTS = [
+  "owner",
+  "repositories",
+  "stars",
+  "forks",
+  "watchers",
+  "contributors",
+] as const;
 export const OWNER_ORDERS = ["asc", "desc"] as const;
 export const OWNER_PAGE_SIZES = [10, 25, 50] as const;
 
@@ -42,7 +49,10 @@ function isLandingDirectoryPrefs(value: unknown): value is LandingDirectoryPrefs
 }
 
 export function readLandingDirectoryPrefs(): LandingDirectoryPrefs {
-  return readPublicPreference(LANDING_SCOPE, "directory", isLandingDirectoryPrefs) ?? DEFAULT_LANDING_DIRECTORY;
+  return (
+    readPublicPreference(LANDING_SCOPE, "directory", isLandingDirectoryPrefs) ??
+    DEFAULT_LANDING_DIRECTORY
+  );
 }
 
 export function writeLandingDirectoryPrefs(prefs: LandingDirectoryPrefs) {

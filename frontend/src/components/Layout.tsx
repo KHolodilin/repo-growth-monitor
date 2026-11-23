@@ -4,7 +4,12 @@ import { api, ApiError, type Dashboard } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
-import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
+import {
+  collectionBlocked,
+  loadGitHubAccess,
+  tokenBanner,
+  type GitHubAccess,
+} from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
 import { formatSyncTime } from "../lib/utils";
 import { RouteScroll } from "./RouteScroll";
@@ -35,7 +40,9 @@ export function Layout() {
   const syncTime = formatSyncTime(sync);
   const [aboutOpen, setAboutOpen] = useState(false);
   const progressRows = ownerScope
-    ? (rows ?? []).filter((row) => row.fullName.toLowerCase().startsWith(`${ownerScope.toLowerCase()}/`))
+    ? (rows ?? []).filter((row) =>
+        row.fullName.toLowerCase().startsWith(`${ownerScope.toLowerCase()}/`),
+      )
     : (rows ?? []);
   const progress =
     repositoryId != null || ownerScope != null
@@ -60,13 +67,27 @@ export function Layout() {
 
   useEffect(() => {
     let cancelled = false;
-    refreshStatus().catch(() => {
-      if (!cancelled) {
-        setSync(null);
-        setRows([]);
-      }
-    });
-    void loadGitHubAccess().then((next) => {
+    // Promise.resolve keeps mocks that return a bare value (or undefined) on the async path,
+    // matching the previous refreshStatus() await semantics.
+    void Promise.resolve(api<Dashboard>("/api/v1/admin/dashboard?period=30d"))
+      .then((dashboard) => {
+        if (cancelled) {
+          return;
+        }
+        if (!dashboard?.repositories) {
+          setRows([]);
+          return;
+        }
+        setSync(dashboard.lastSyncAt);
+        setRows(dashboard.repositories);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSync(null);
+          setRows([]);
+        }
+      });
+    void Promise.resolve(loadGitHubAccess()).then((next) => {
       if (!cancelled) {
         setAccess(next);
       }
@@ -74,7 +95,7 @@ export function Layout() {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname, refreshStatus]);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!live) {
@@ -83,7 +104,9 @@ export function Layout() {
     const timer = window.setInterval(() => {
       refreshStatus()
         .then((dashboard) => {
-          const stillActive = (dashboard?.repositories ?? []).some((row) => collectionInProgress(row.collectionStatus));
+          const stillActive = (dashboard?.repositories ?? []).some((row) =>
+            collectionInProgress(row.collectionStatus),
+          );
           if (!stillActive) {
             setWatching(false);
           }
@@ -108,7 +131,9 @@ export function Layout() {
       } else {
         const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
         const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
-        await Promise.all(ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })));
+        await Promise.all(
+          ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })),
+        );
         if (dashboard?.repositories) {
           setSync(dashboard.lastSyncAt);
           setRows(dashboard.repositories);
@@ -116,7 +141,9 @@ export function Layout() {
       }
       window.dispatchEvent(new Event("repos-collected"));
       const refreshed = await refreshStatus();
-      const stillActive = (refreshed?.repositories ?? []).some((row) => collectionInProgress(row.collectionStatus));
+      const stillActive = (refreshed?.repositories ?? []).some((row) =>
+        collectionInProgress(row.collectionStatus),
+      );
       if (!stillActive) {
         setWatching(false);
       }
@@ -134,10 +161,14 @@ export function Layout() {
 
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
   const collectDisabled =
-    collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0);
+    collecting ||
+    collectionBlocked(access) ||
+    (repositoryId == null && rows != null && rows.length === 0);
   const noToken = showOperationalStatus && access?.tokenState === "MISSING";
   const accessBanner = showOperationalStatus ? tokenBanner(access) : null;
-  document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
+  useEffect(() => {
+    document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
+  }, [noToken]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -151,7 +182,8 @@ export function Layout() {
             >
               <LogoMark className="h-8 w-8 shrink-0 object-contain" />
               <span className="truncate whitespace-nowrap text-[15px] leading-none tracking-tight">
-                <span className="font-bold">Repo Growth</span> <span className="font-normal">Monitor</span>
+                <span className="font-bold">Repo Growth</span>{" "}
+                <span className="font-normal">Monitor</span>
               </span>
             </NavLink>
             {noToken && (
@@ -236,10 +268,12 @@ export function Layout() {
           {aboutOpen && (
             <div className="space-y-1">
               <p>
-                Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
-                between snapshots.
+                Data is collected once per day. Referrers and paths show the latest GitHub snapshot;
+                History has the change between snapshots.
               </p>
-              {showOperationalStatus && access?.planner ? <p>{headerSchedule(access.planner)}</p> : null}
+              {showOperationalStatus && access?.planner ? (
+                <p>{headerSchedule(access.planner)}</p>
+              ) : null}
             </div>
           )}
           {showOperationalStatus && error && <div className="text-sm text-red-600">{error}</div>}
@@ -416,7 +450,10 @@ function ownerLoginFromPath(pathname: string): string | null {
   return decodeURIComponent(parts[0]);
 }
 
-function repositoryIdFromPath(pathname: string, rows: Dashboard["repositories"] | null = null): number | null {
+function repositoryIdFromPath(
+  pathname: string,
+  rows: Dashboard["repositories"] | null = null,
+): number | null {
   const admin = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
   if (admin) {
     return Number(admin[1]);

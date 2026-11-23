@@ -10,7 +10,12 @@ function parseScope(value: string | null): "all" | "language" {
   return value === "language" ? "language" : "all";
 }
 
-export function topicCompetitorPath(repoBase: string, topic: string, githubRepositoryId: number, scope: "all" | "language") {
+export function topicCompetitorPath(
+  repoBase: string,
+  topic: string,
+  githubRepositoryId: number,
+  scope: "all" | "language",
+) {
   const path = `${repoBase}/topics/${encodeURIComponent(topic)}/competitors/${githubRepositoryId}`;
   return scope === "language" ? `${path}?scope=language` : path;
 }
@@ -25,20 +30,33 @@ export function TopicCompetitorCardPage() {
   const topicName = params.topic ? decodeURIComponent(params.topic) : "";
   const githubRepositoryId = Number(params.githubRepositoryId);
   const scope = parseScope(searchParams.get("scope"));
+  const loadKey = `${repositoryId}:${topicName}:${githubRepositoryId}:${scope}`;
+  const [seenKey, setSeenKey] = useState(loadKey);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<TopicHistory | null>(null);
   const [card, setCard] = useState<CompetitorCard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  if (loadKey !== seenKey) {
+    setSeenKey(loadKey);
+    setError(null);
+    setRepo(null);
+    setHistory(null);
+    setCard(null);
+  }
+
   useEffect(() => {
     if (!repositoryId || !topicName || !githubRepositoryId) return;
     let cancelled = false;
-    setError(null);
     const topicPath = encodeURIComponent(topicName);
     Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
-      api<TopicHistory>(`/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`),
-      api<CompetitorCard>(`/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/competitors/${githubRepositoryId}?scope=${scope}`),
+      api<TopicHistory>(
+        `/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`,
+      ),
+      api<CompetitorCard>(
+        `/api/v1/admin/repositories/${repositoryId}/topics/${topicPath}/competitors/${githubRepositoryId}?scope=${scope}`,
+      ),
     ])
       .then(([repository, topicHistory, competitor]) => {
         if (cancelled) return;
@@ -47,15 +65,18 @@ export function TopicCompetitorCardPage() {
         setCard(competitor);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Failed to load the competitor card");
+        if (!cancelled)
+          setError(reason instanceof Error ? reason.message : "Failed to load the competitor card");
       });
     return () => {
       cancelled = true;
     };
   }, [repositoryId, topicName, githubRepositoryId, scope]);
 
-  if (resolveError || error) return <p className="text-sm text-destructive">{resolveError ?? error}</p>;
-  if (!repo || !history || !card) return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
+  if (resolveError || error)
+    return <p className="text-sm text-destructive">{resolveError ?? error}</p>;
+  if (!repo || !history || !card)
+    return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
 
   const base = repoPath(repo.owner.login, repo.name);
   const scopeQuery = scope === "language" ? "&scope=language" : "";
@@ -77,11 +98,16 @@ export function TopicCompetitorCardPage() {
               }
             : {}),
         },
-        { label: "Topics Visibility", to: `${repoHref(repo.owner.login, repo.name, "topics")}${scopeQuery}` },
+        {
+          label: "Topics Visibility",
+          to: `${repoHref(repo.owner.login, repo.name, "topics")}${scopeQuery}`,
+        },
         { label: history.watch.topic, to: topicTo },
       ]}
       card={card}
-      collectionDates={history.watch.enabled === false ? [] : history.points.map(point => point.date)}
+      collectionDates={
+        history.watch.enabled === false ? [] : history.points.map((point) => point.date)
+      }
       missedCollectionDates={history.watch.enabled === false ? [] : history.missedDates}
       chartId={`${repositoryId}:topic-competitor:${topicName}:${githubRepositoryId}`}
       repositoryId={repo.id}

@@ -80,11 +80,21 @@ export default function App() {
             }
           />
           <Route path="/admin" element={<Navigate to="/admin/repositories" replace />} />
-          <Route path="/admin/search-runs/:id" element={<AdminOnly><SearchResultsPage /></AdminOnly>} />
+          <Route
+            path="/admin/search-runs/:id"
+            element={
+              <AdminOnly>
+                <SearchResultsPage />
+              </AdminOnly>
+            }
+          />
           <Route path="/:owner" element={<OwnerPortfolioPage />} />
           <Route path="/:owner/:repository" element={<RepositoryDetailsPage />} />
           <Route path="/:owner/:repository/traffic/history" element={<TrafficHistoryPage />} />
-          <Route path="/:owner/:repository/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route
+            path="/:owner/:repository/search-queries/:queryId"
+            element={<QueryDetailsPage />}
+          />
           <Route
             path="/:owner/:repository/search-queries/:queryId/competitors/:githubRepositoryId"
             element={<CompetitorCardPage />}

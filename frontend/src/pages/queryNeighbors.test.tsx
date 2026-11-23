@@ -1,7 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { repository, searchHistory, searchResults } from "../test/fixtures";
 import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
 import { QueryDetailsPage } from "./QueryDetailsPage";
@@ -11,6 +11,8 @@ vi.mock("../lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/api")>();
   return { ...actual, api };
 });
+
+afterEach(() => cleanup());
 
 describe("query neighbor chart", () => {
   it("adds another repository to the chart and switches the axis", async () => {
@@ -51,7 +53,10 @@ describe("query neighbor chart", () => {
     render(
       <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
         <Routes>
-          <Route path="/admin/repositories/:repositoryId/search-queries/:queryId" element={<QueryDetailsPage />} />
+          <Route
+            path="/admin/repositories/:repositoryId/search-queries/:queryId"
+            element={<QueryDetailsPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -65,7 +70,9 @@ describe("query neighbor chart", () => {
       "href",
       `/KHolodilin/spring-transactional-outbox-kafka/search-queries/5/competitors/${repository.githubId}`,
     );
-    expect(screen.queryByRole("checkbox", { name: `Show ${repository.fullName} on the chart` })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("checkbox", { name: `Show ${repository.fullName} on the chart` }),
+    ).not.toBeInTheDocument();
     await user.click(neighbor);
     expect(neighbor).toBeChecked();
     await user.click(neighbor);
@@ -73,20 +80,93 @@ describe("query neighbor chart", () => {
     await user.click(neighbor);
 
     const metric = screen.getByRole("group", { name: "Chart metric" });
-    expect(within(metric).getByRole("button", { name: "Place" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(metric).getByRole("button", { name: "Place" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await user.click(within(metric).getByRole("button", { name: "Stars" }));
-    expect(within(metric).getByRole("button", { name: "Stars" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(metric).getByRole("button", { name: "Stars" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await user.click(within(metric).getByRole("button", { name: "Forks" }));
-    expect(within(metric).getByRole("button", { name: "Place" })).toHaveAttribute("aria-pressed", "false");
+    expect(within(metric).getByRole("button", { name: "Place" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
 
     expect(screen.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Calendar" }));
-    expect(screen.getByRole("menuitemradio", { name: "Calendar" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("menuitemradio", { name: "Calendar" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     await user.click(screen.getByRole("menuitemradio", { name: "Timeline" }));
     expect(screen.getByRole("button", { name: "Timeline" })).toBeInTheDocument();
-    expect(within(metric).getByRole("button", { name: "Forks" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(metric).getByRole("button", { name: "Forks" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await user.click(screen.getByRole("button", { name: "Timeline" }));
     await user.click(screen.getByRole("menuitemradio", { name: "Calendar" }));
     expect(screen.getByRole("button", { name: "Calendar" })).toBeInTheDocument();
+  });
+
+  it("clears a previous query error when navigating to another query id", async () => {
+    const user = userEvent.setup();
+    let finishB: (value: unknown) => void = () => undefined;
+
+    function Nav() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => void navigate("/admin/repositories/13/search-queries/7")}
+          >
+            open-7
+          </button>
+          <Routes>
+            <Route
+              path="/admin/repositories/:repositoryId/search-queries/:queryId"
+              element={<QueryDetailsPage />}
+            />
+          </Routes>
+        </>
+      );
+    }
+
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      if (url.includes("/search-queries/5/")) return Promise.reject(new Error("query-5-down"));
+      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/search-queries/7/history")) {
+        return new Promise((resolve) => {
+          finishB = resolve;
+        });
+      }
+      if (url.includes("/search-queries/7/results")) return Promise.resolve(searchResults);
+      if (url.includes("/search-queries/7/series")) return Promise.resolve({ series: [] });
+      return Promise.resolve([]);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/admin/repositories/13/search-queries/5"]}>
+        <Nav />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("query-5-down")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "open-7" }));
+    expect(screen.queryByText("query-5-down")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+
+    finishB({
+      ...searchHistory,
+      query: { ...searchHistory.query, id: 7, query: "query-seven language:java" },
+    });
+    expect(await screen.findByRole("heading", { name: /query-seven/ })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("query-5-down")).not.toBeInTheDocument());
   });
 });
