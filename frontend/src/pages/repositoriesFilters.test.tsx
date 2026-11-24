@@ -66,14 +66,14 @@ describe("repository filters", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: null });
       }
       if (url.includes("/tracking")) {
         const id = Number(url.match(/repositories\/(\d+)/)?.[1]);
         const repo = listed.find((item) => item.id === id) ?? tracked;
-        return { ...repo, trackingEnabled: !repo.trackingEnabled };
+        return Promise.resolve({ ...repo, trackingEnabled: !repo.trackingEnabled });
       }
-      return listed;
+      return Promise.resolve(listed);
     });
     renderRepos();
     expect(await screen.findByText("Tracking 3 of 4")).toBeInTheDocument();
@@ -85,14 +85,30 @@ describe("repository filters", () => {
 
     await user.click(screen.getByRole("button", { name: "1 private hidden" }));
     expect(screen.getByText(privateRepo.fullName)).toBeInTheDocument();
-    expect(screen.getByText(/Public search and topics do not rank this repository/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Public search and topics do not rank this repository/),
+    ).toBeInTheDocument();
     expect(sessionStorage.getItem("rgm.repositories.visibility")).toBe("private");
 
-    await user.click(within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", { name: "Private" }));
-    await user.click(within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", { name: "Public" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", {
+        name: "Private",
+      }),
+    );
+    await user.click(
+      within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", {
+        name: "Public",
+      }),
+    );
     expect(screen.queryByText(privateRepo.fullName)).not.toBeInTheDocument();
-    await user.click(within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", { name: "All" }));
-    await user.click(within(screen.getByRole("group", { name: "Tracking" })).getByRole("button", { name: "All" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", {
+        name: "All",
+      }),
+    );
+    await user.click(
+      within(screen.getByRole("group", { name: "Tracking" })).getByRole("button", { name: "All" }),
+    );
     await user.type(screen.getByLabelText("Search repositories"), "other");
     expect(screen.getByText(untracked.fullName)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Start tracking (1)" }));
@@ -101,7 +117,8 @@ describe("repository filters", () => {
     vi.spyOn(window, "confirm").mockReturnValueOnce(false);
     await user.clear(screen.getByLabelText("Search repositories"));
     await user.click(screen.getByRole("button", { name: "No access" }));
-    const trackingCalls = () => api.mock.calls.filter((call) => String(call[0]).includes("/tracking")).length;
+    const trackingCalls = () =>
+      api.mock.calls.filter((call) => String(call[0]).includes("/tracking")).length;
     const beforeCancel = trackingCalls();
     await user.click(screen.getByRole("button", { name: "Stop tracking (1)" }));
     expect(trackingCalls()).toBe(beforeCancel);
@@ -109,50 +126,61 @@ describe("repository filters", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/tracking")) {
-        return { ...lost, trackingEnabled: false };
+        return Promise.resolve({ ...lost, trackingEnabled: false });
       }
-      return listed;
+      return Promise.resolve(listed);
     });
     await user.click(screen.getByRole("button", { name: "Stop tracking (1)" }));
     expect(await screen.findByText("Tracking 3 of 4")).toBeInTheDocument();
     vi.spyOn(window, "confirm").mockRestore();
   });
 
-  it("reads the saved list and refreshes once when a token is new", async () => {
+  it("reads saved data and refreshes only through an explicit POST", async () => {
+    const user = userEvent.setup();
+    let refreshed = false;
     const calls: string[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
       calls.push(url);
       if (url.includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: null });
       }
-      if (url.includes("refresh=true")) {
-        return [{ ...tracked, trackingEnabled: false }];
+      if (url.endsWith("/admin/repositories/refresh")) {
+        refreshed = true;
+        return Promise.resolve([]);
       }
-      return [];
+      return Promise.resolve(refreshed ? [{ ...tracked, trackingEnabled: false }] : []);
     });
     renderRepos();
+    expect(
+      await screen.findByText("No repositories yet. Configure GITHUB_TOKEN and refresh."),
+    ).toBeInTheDocument();
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/refresh", expect.anything());
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
-    expect(calls.filter((url) => url.includes("refresh=true"))).toHaveLength(1);
+    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/refresh", { method: "POST" });
+    expect(calls.filter((url) => url.includes("refresh=true"))).toHaveLength(0);
     expect(screen.getByRole("button", { name: "All", pressed: true })).toBeInTheDocument();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "MISSING", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "MISSING", rateLimitReset: null });
       }
-      return [];
+      return Promise.resolve([]);
     });
     const empty = renderRepos();
-    expect(await screen.findByText("No repositories yet. Configure GITHUB_TOKEN and refresh.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No repositories yet. Configure GITHUB_TOKEN and refresh."),
+    ).toBeInTheDocument();
     empty.unmount();
   });
 
   it("shows token banners and does not start collection", async () => {
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "MISSING", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "MISSING", rateLimitReset: null });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const missing = render(
       <MemoryRouter>
@@ -174,12 +202,12 @@ describe("repository filters", () => {
 
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "REJECTED", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      if (String(path).includes("/repositories")) {
-        return [lost];
+      if (String(path).includes("/admin/repositories")) {
+        return Promise.resolve([lost]);
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     renderRepos();
     expect(await screen.findByText(lost.fullName)).toBeInTheDocument();
@@ -188,9 +216,9 @@ describe("repository filters", () => {
 
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "RATE_LIMITED", rateLimitReset: "not-a-date" };
+        return Promise.resolve({ tokenState: "RATE_LIMITED", rateLimitReset: "not-a-date" });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     render(
       <MemoryRouter>
@@ -201,7 +229,9 @@ describe("repository filters", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Collection continues after the rate limit resets.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Collection continues after the rate limit resets."),
+    ).toBeInTheDocument();
   });
 
   it("shows internal repositories, portfolio marks, and a rejected token on the repository page", async () => {
@@ -213,18 +243,19 @@ describe("repository filters", () => {
       fullName: "Org/inside",
       visibility: "INTERNAL",
     };
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: null });
       }
-      return [tracked, internal];
+      return Promise.resolve([tracked, internal]);
     });
     const list = renderRepos();
     expect(await screen.findByRole("button", { name: "Internal" })).toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", { name: "All" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      within(screen.getByRole("group", { name: "Visibility" })).getByRole("button", {
+        name: "All",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
     await user.click(screen.getByRole("button", { name: "Not tracked" }));
     expect(screen.queryByText(tracked.fullName)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Internal" }));
@@ -233,17 +264,23 @@ describe("repository filters", () => {
     expect(screen.queryByText(tracked.fullName)).not.toBeInTheDocument();
     list.unmount();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "REJECTED", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      if (String(path).includes("/dashboard")) {
-        return {
+      if (String(path).includes("/admin/dashboard")) {
+        return Promise.resolve({
           ...dashboardReady,
-          repositories: [{ ...dashboardReady.repositories[0], accessible: false, trafficPermissionMissing: true }],
-        };
+          repositories: [
+            {
+              ...dashboardReady.repositories[0],
+              accessible: false,
+              trafficPermissionMissing: true,
+            },
+          ],
+        });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const portfolio = render(
       <MemoryRouter>
@@ -254,36 +291,41 @@ describe("repository filters", () => {
     expect(screen.queryByText(/can no longer see/)).not.toBeInTheDocument();
     portfolio.unmount();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: "2026-10-16T18:00:00Z" };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: "2026-10-16T18:00:00Z" });
       }
-      if (url.endsWith("/repositories/13")) {
-        return { ...repository, accessible: false, trafficPermissionMissing: true };
+      if (url.endsWith("/admin/repositories/13")) {
+        return Promise.resolve({
+          ...repository,
+          accessible: false,
+          trafficPermissionMissing: true,
+        });
       }
       if (url.includes("/traffic?")) {
-        return traffic;
+        return Promise.resolve(traffic);
       }
-      return [];
+      return Promise.resolve([]);
     });
-    render(
-      <MemoryRouter initialEntries={["/repositories/13"]}>
+    const details = render(
+      <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByText(/can no longer see this repository/)).toBeInTheDocument();
     expect(screen.getByText(TRAFFIC_PERMISSION)).toBeInTheDocument();
+    details.unmount();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "REJECTED", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
-    render(
+    const rejected = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -293,14 +335,18 @@ describe("repository filters", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(TOKEN_REJECTED)).toBeInTheDocument();
+    rejected.unmount();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "RATE_LIMITED", rateLimitReset: "2026-10-16T18:00:00Z" };
+        return Promise.resolve({
+          tokenState: "RATE_LIMITED",
+          rateLimitReset: "2026-10-16T18:00:00Z",
+        });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
-    render(
+    const limited = render(
       <MemoryRouter>
         <Routes>
           <Route element={<Layout />}>
@@ -310,29 +356,39 @@ describe("repository filters", () => {
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Collection continues after/)).toBeInTheDocument();
+    limited.unmount();
   });
 
   it("reports tracking failures and keeps a blocked refresh on the saved list", async () => {
     const user = userEvent.setup();
-    const hidden = { ...untracked, id: 12, fullName: "Other/hidden", accessible: false, trackingEnabled: false };
-    api.mockImplementation(async (path: string) => {
+    const hidden = {
+      ...untracked,
+      id: 12,
+      fullName: "Other/hidden",
+      accessible: false,
+      trackingEnabled: false,
+    };
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: null });
       }
       if (url.includes("/tracking")) {
-        throw new Error("tracking failed");
+        return Promise.reject(new Error("tracking failed"));
       }
-      return [...listed, hidden];
+      return Promise.resolve([...listed, hidden]);
     });
     const page = renderRepos();
     expect(await screen.findByText("Tracking 3 of 5")).toBeInTheDocument();
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false);
     const trackedRow = screen.getByText(tracked.fullName).closest("label");
-    const trackingCalls = () => api.mock.calls.filter((call) => String(call[0]).includes("/tracking")).length;
+    const trackingCalls = () =>
+      api.mock.calls.filter((call) => String(call[0]).includes("/tracking")).length;
     const beforeCancel = trackingCalls();
     await user.click(within(trackedRow as HTMLElement).getByRole("checkbox"));
-    expect(confirm).toHaveBeenCalledWith("Stop tracking this repository? Collection stops. Stored data stays.");
+    expect(confirm).toHaveBeenCalledWith(
+      "Stop tracking this repository? Collection stops. Stored data stays.",
+    );
     expect(trackingCalls()).toBe(beforeCancel);
     expect(within(trackedRow as HTMLElement).getByRole("checkbox")).toBeChecked();
     confirm.mockReturnValueOnce(true);
@@ -340,7 +396,9 @@ describe("repository filters", () => {
     expect(await screen.findByText("tracking failed")).toBeInTheDocument();
     confirm.mockRestore();
 
-    await user.click(within(screen.getByRole("group", { name: "Tracking" })).getByRole("button", { name: "All" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Tracking" })).getByRole("button", { name: "All" }),
+    );
     const hiddenRow = screen.getByText(hidden.fullName).closest("label");
     expect(within(hiddenRow as HTMLElement).getByRole("checkbox")).toBeDisabled();
 
@@ -350,16 +408,16 @@ describe("repository filters", () => {
     page.unmount();
     sessionStorage.clear();
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "REJECTED", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      return listed;
+      return Promise.resolve(listed);
     });
     const blocked = renderRepos();
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh from GitHub" })).toBeDisabled();
-    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories?refresh=true");
+    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories?refresh=true");
     blocked.unmount();
 
     const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
@@ -381,23 +439,23 @@ describe("repository filters", () => {
   });
 
   it("stops repository collection when the token is rejected and shows an undated rate limit", async () => {
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/system/status")) {
-        return { tokenState: "REJECTED", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      if (url.endsWith("/repositories/13")) {
-        return repository;
+      if (url.endsWith("/admin/repositories/13")) {
+        return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
-        return { ...traffic, lastCollection: undefined };
+        return Promise.resolve({ ...traffic, lastCollection: undefined });
       }
-      return [];
+      return Promise.resolve([]);
     });
     const details = render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
@@ -415,7 +473,7 @@ describe("repository filters", () => {
           releaseDetails = resolve;
         });
       }
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve({ ...repository, accessible: true, trafficPermissionMissing: true });
       }
       if (url.includes("/traffic?")) {
@@ -424,25 +482,28 @@ describe("repository filters", () => {
       return Promise.resolve([]);
     });
     const pendingDetails = render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(repository.fullName)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Switch repository")).toHaveTextContent(repository.name);
+    expect(screen.getByRole("navigation", { name: "Breadcrumb" })).toHaveTextContent(
+      repository.name,
+    );
     pendingDetails.unmount();
     releaseDetails({ tokenState: "OK", rateLimitReset: null });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "RATE_LIMITED", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "RATE_LIMITED", rateLimitReset: null });
       }
-      if (String(path).includes("/dashboard")) {
-        return dashboardReady;
+      if (String(path).includes("/admin/dashboard")) {
+        return Promise.resolve(dashboardReady);
       }
-      return { tokenState: "WEIRD" };
+      return Promise.resolve({ tokenState: "WEIRD" });
     });
     render(
       <MemoryRouter>
@@ -453,22 +514,30 @@ describe("repository filters", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("Collection continues after the rate limit resets.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Collection continues after the rate limit resets."),
+    ).toBeInTheDocument();
 
     let releaseStatus: (value: unknown) => void = () => undefined;
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
         return new Promise((resolve) => {
           releaseStatus = resolve;
         });
       }
-      if (String(path).includes("/dashboard")) {
-        return {
+      if (String(path).includes("/admin/dashboard")) {
+        return Promise.resolve({
           ...dashboardReady,
-          repositories: [{ ...dashboardReady.repositories[0], accessible: false, trafficPermissionMissing: true }],
-        };
+          repositories: [
+            {
+              ...dashboardReady.repositories[0],
+              accessible: false,
+              trafficPermissionMissing: true,
+            },
+          ],
+        });
       }
-      return dashboardReady;
+      return Promise.resolve(dashboardReady);
     });
     const pending = render(
       <MemoryRouter>
@@ -484,14 +553,14 @@ describe("repository filters", () => {
   it("updates the row when the checkbox turns tracking off", async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    api.mockImplementation(async (path: string) => {
+    api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: null });
       }
       if (String(path).includes("/tracking")) {
-        return { ...tracked, trackingEnabled: false };
+        return Promise.resolve({ ...tracked, trackingEnabled: false });
       }
-      return [tracked, privateRepo];
+      return Promise.resolve([tracked, privateRepo]);
     });
     renderRepos();
     expect(await screen.findByText(tracked.fullName)).toBeInTheDocument();
@@ -500,5 +569,4 @@ describe("repository filters", () => {
     expect(await screen.findByText("Tracking 1 of 2")).toBeInTheDocument();
     confirm.mockRestore();
   });
-
 });

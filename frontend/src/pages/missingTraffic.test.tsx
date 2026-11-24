@@ -21,7 +21,7 @@ describe("missing traffic", () => {
   it("opens the portfolio list and keeps the warning off the repository name", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (!String(path).includes("/dashboard")) {
+      if (!String(path).includes("/admin/dashboard")) {
         return Promise.resolve({});
       }
       return Promise.resolve({
@@ -31,7 +31,11 @@ describe("missing traffic", () => {
           {
             ...dashboardReady.repositories[0],
             collectionStatus: "SUCCESS",
-            trafficNotice: { reason: "GITHUB_DATA_MISSING", date: "2026-10-18", lastTrafficDate: "2026-10-17" },
+            trafficNotice: {
+              reason: "GITHUB_DATA_MISSING",
+              date: "2026-10-18",
+              lastTrafficDate: "2026-10-17",
+            },
           },
           {
             ...dashboardReady.repositories[0],
@@ -42,7 +46,11 @@ describe("missing traffic", () => {
               { jobType: "TRAFFIC", status: "FAILED" },
               { jobType: "REFERRERS", status: "SUCCESS" },
             ],
-            trafficNotice: { reason: "COLLECTION_FAILED", date: "2026-10-19", lastTrafficDate: "2026-10-18" },
+            trafficNotice: {
+              reason: "COLLECTION_FAILED",
+              date: "2026-10-19",
+              lastTrafficDate: "2026-10-18",
+            },
           },
         ],
       });
@@ -56,7 +64,9 @@ describe("missing traffic", () => {
     expect(screen.queryByText(/collected partially/)).not.toBeInTheDocument();
     expect(screen.queryByText(/service was not running/)).not.toBeInTheDocument();
     expect(screen.queryByText("Partial data")).not.toBeInTheDocument();
-    const icon = screen.getByRole("img", { name: "No GitHub traffic for 18 Oct. Last data Oct 17" });
+    const icon = screen.getByRole("img", {
+      name: "No GitHub traffic for 18 Oct. Last data Oct 17",
+    });
     expect(icon).toHaveTextContent("!");
     expect(icon.closest("a")).toBeNull();
     const badge = screen.getByRole("button", { name: /2 repositories/ });
@@ -81,14 +91,20 @@ describe("missing traffic", () => {
   it("explains a missing yesterday on the repository page without drawing it as zero", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve({
           ...traffic,
-          traffic: [{ date: "2026-10-17", views: 4, uniqueVisitors: 2, clones: 1, uniqueCloners: 1 }],
-          trafficGap: { reason: "GITHUB_DATA_MISSING", date: "2026-10-18", lastTrafficDate: "2026-10-17" },
+          traffic: [
+            { date: "2026-10-17", views: 4, uniqueVisitors: 2, clones: 1, uniqueCloners: 1 },
+          ],
+          trafficGap: {
+            reason: "GITHUB_DATA_MISSING",
+            date: "2026-10-18",
+            lastTrafficDate: "2026-10-17",
+          },
           lastCollection: {
             ...traffic.lastCollection,
             businessDate: "2026-10-19",
@@ -103,13 +119,15 @@ describe("missing traffic", () => {
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText("⚠ Traffic — GitHub data missing for Oct 18 (T-1)")).toBeInTheDocument();
+    expect(
+      await screen.findByText("⚠ Traffic — GitHub data missing for Oct 18 (T-1)"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/SUCCESS/)).toBeInTheDocument();
     expect(screen.getByText("Referrers")).toBeInTheDocument();
     expect(screen.queryByText("✓ Referrers")).not.toBeInTheDocument();
@@ -118,21 +136,25 @@ describe("missing traffic", () => {
   it("says the collection never started after the window closed", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve({
           ...traffic,
-          trafficGap: { reason: "COLLECTION_NOT_EXECUTED", date: "2026-10-19", lastTrafficDate: null },
+          trafficGap: {
+            reason: "COLLECTION_NOT_EXECUTED",
+            date: "2026-10-19",
+            lastTrafficDate: null,
+          },
         });
       }
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );

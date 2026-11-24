@@ -26,6 +26,8 @@ describe("search visibility KPIs", () => {
       "2026-10-22",
     ]);
     expect(periodDates("30d", today)).toHaveLength(30);
+    expect(periodDates("30d", today)?.[0]).toBe("2026-09-23");
+    expect(periodDates("30d", today)?.at(-1)).toBe(today);
   });
 
   it("counts queries against the limit", () => {
@@ -83,24 +85,37 @@ describe("search visibility KPIs", () => {
     expect(rising.growthPercent).toBeNull();
     expect(rising.series).toEqual([1]);
 
-    const flat = bandKpi([
-      query({
-        id: 1,
-        currentRank: 1,
-        points: [
-          { date: "2026-10-21", position: 1 },
-        ],
-      }),
-    ], 3, "1d", today);
+    const flat = bandKpi(
+      [
+        query({
+          id: 1,
+          currentRank: 1,
+          points: [{ date: "2026-10-21", position: 1 }],
+        }),
+      ],
+      3,
+      "1d",
+      today,
+    );
     expect(flat.value).toBe(1);
     expect(flat.absoluteChange).toBeNull();
   });
 
   it("ignores disabled queries and a day before a query existed", () => {
-    const result = bandKpi([
-      query({ id: 1, enabled: false, currentRank: 1, points: [{ date: "2026-10-21", position: 1 }] }),
-      query({ id: 2, currentRank: 2, points: [{ date: "2026-10-22", position: 2 }] }),
-    ], 3, "7d", today);
+    const result = bandKpi(
+      [
+        query({
+          id: 1,
+          enabled: false,
+          currentRank: 1,
+          points: [{ date: "2026-10-21", position: 1 }],
+        }),
+        query({ id: 2, currentRank: 2, points: [{ date: "2026-10-22", position: 2 }] }),
+      ],
+      3,
+      "7d",
+      today,
+    );
     expect(result.value).toBe(1);
     expect(result.series.filter((point) => point != null)).toEqual([1]);
   });
@@ -117,28 +132,38 @@ describe("search visibility KPIs", () => {
   });
 
   it("uses the newest measurement when the points are out of order", () => {
-    const result = bandKpi([
-      query({
-        id: 1,
-        currentRank: 2,
-        points: [
-          { date: "2026-10-01", position: 2 },
-          { date: "2026-09-01", position: 15 },
-        ],
-      }),
-    ], 10, "1d", today);
+    const result = bandKpi(
+      [
+        query({
+          id: 1,
+          currentRank: 2,
+          points: [
+            { date: "2026-10-01", position: 2 },
+            { date: "2026-09-01", position: 15 },
+          ],
+        }),
+      ],
+      10,
+      "1d",
+      today,
+    );
     expect(result.value).toBe(1);
     expect(result.absoluteChange).toBe(0);
   });
 
   it("does not treat a checked miss as a rank inside the band", () => {
-    const result = bandKpi([
-      query({
-        id: 1,
-        currentRank: null,
-        points: [{ date: "2026-10-21", position: null }],
-      }),
-    ], 20, "1d", today);
+    const result = bandKpi(
+      [
+        query({
+          id: 1,
+          currentRank: null,
+          points: [{ date: "2026-10-21", position: null }],
+        }),
+      ],
+      20,
+      "1d",
+      today,
+    );
     expect(result.value).toBe(0);
     expect(result.series).toEqual([0]);
     expect(result.absoluteChange).toBeNull();

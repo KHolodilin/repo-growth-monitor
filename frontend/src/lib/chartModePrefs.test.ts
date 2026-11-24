@@ -14,7 +14,9 @@ describe("chartModePrefs", () => {
     expect(readChartAxis("portfolio:traffic")).toBe("calendar");
     const seen: string[] = [];
     const stop = subscribeChartMode("portfolio:traffic", () => {
-      seen.push(`${readChartEventFilter("portfolio:traffic")}:${readChartAxis("portfolio:traffic")}`);
+      seen.push(
+        `${readChartEventFilter("portfolio:traffic")}:${readChartAxis("portfolio:traffic")}`,
+      );
     });
     writeChartAxis("repository:13:stats", "timeline");
     writeChartEventFilter("portfolio:traffic", "all");
@@ -39,11 +41,13 @@ describe("chartModePrefs", () => {
   it("ignores a cookie that is not a chart mode", () => {
     document.cookie = `${CHART_MODE_COOKIE}=nope; path=/`;
     expect(readChartAxis("portfolio:traffic")).toBe("calendar");
-    document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(JSON.stringify({
-      "portfolio:traffic": { eventFilter: "nope", axis: "week" },
-      "repository:13:stats": { axis: "timeline" },
-      "repository:8:traffic": [],
-    }))}; path=/`;
+    document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(
+      JSON.stringify({
+        "portfolio:traffic": { eventFilter: "nope", axis: "week" },
+        "repository:13:stats": { axis: "timeline" },
+        "repository:8:traffic": [],
+      }),
+    )}; path=/`;
     expect(readChartEventFilter("portfolio:traffic")).toBe("off");
     expect(readChartAxis("portfolio:traffic")).toBe("calendar");
     expect(readChartAxis("repository:13:stats")).toBe("timeline");
@@ -52,10 +56,12 @@ describe("chartModePrefs", () => {
       document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(JSON.stringify(raw))}; path=/`;
       expect(readChartEventFilter("portfolio:traffic")).toBe("off");
     }
-    document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(JSON.stringify({
-      "repository:1:stats": { eventFilter: "promotion" },
-      "repository:2:traffic": null,
-    }))}; path=/`;
+    document.cookie = `${CHART_MODE_COOKIE}=${encodeURIComponent(
+      JSON.stringify({
+        "repository:1:stats": { eventFilter: "promotion" },
+        "repository:2:traffic": null,
+      }),
+    )}; path=/`;
     expect(readChartEventFilter("repository:1:stats")).toBe("promotion");
     expect(readChartAxis("repository:1:stats")).toBe("calendar");
     expect(readChartAxis("repository:2:traffic")).toBe("calendar");

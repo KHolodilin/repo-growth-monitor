@@ -3,11 +3,15 @@ import { collectionFailureReason } from "./collectProgress";
 import { formatChartAxisDate } from "./utils";
 
 export function formatDayMonth(value: string) {
-  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(`${value}T00:00:00`));
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(
+    new Date(`${value}T00:00:00`),
+  );
 }
 
 export function missingTrafficBadge(count: number) {
-  return count === 1 ? "1 repository missing traffic data" : `${count} repositories missing traffic data`;
+  return count === 1
+    ? "1 repository missing traffic data"
+    : `${count} repositories missing traffic data`;
 }
 
 const JOB_LABELS: Record<string, string> = {
@@ -61,7 +65,11 @@ export function repositoryProblemBadge(count: number) {
   return count === 1 ? "1 repository" : `${count} repositories`;
 }
 
-export function partialDayTooltip(missing: number, date: string, kind: "traffic" | "stats" = "traffic") {
+export function partialDayTooltip(
+  missing: number,
+  date: string,
+  kind: "traffic" | "stats" = "traffic",
+) {
   const repos = missing === 1 ? "repository" : "repositories";
   const subject = kind === "stats" ? "stats" : "traffic";
   return `Partial data — ${missing} ${repos} missing ${subject} data for ${formatDayMonth(date)}`;

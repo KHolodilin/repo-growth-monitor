@@ -2,7 +2,15 @@ import { useChartVisibility } from "../lib/chartVisibility";
 import { WatchListCards } from "../components/WatchListCards";
 import { useIsMobileChart } from "../lib/useMediaQuery";
 import { NavigationButton } from "../components/NavigationButton";
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { Link, useLocation, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import {
   Check,
@@ -29,7 +37,6 @@ import {
   api,
   type CollectionJob,
   type CollectionRun,
-  type GrowthEvent,
   type Repository,
   type RepositoryHealth,
   type RepositoryTraffic,
@@ -39,34 +46,63 @@ import {
 import { collectionFailureReason, JOB_LABELS } from "../lib/collectProgress";
 import { loadGitHubAccess, type TokenState } from "../lib/githubAccess";
 import { useMutationAccess } from "../lib/mutationAccess";
-import { cn, formatChartAxisDate, formatDelta, formatNumber, formatQueryRankChange, formatRank, formatSyncTime, growthClass } from "../lib/utils";
-import { asGrowthEvents } from "../lib/growthEvents";
+import {
+  cn,
+  formatChartAxisDate,
+  formatDelta,
+  formatNumber,
+  formatQueryRankChange,
+  formatRank,
+  formatSyncTime,
+  growthClass,
+} from "../lib/utils";
 import { seriesStyle, prepareSeriesStyles } from "../lib/seriesStyle";
+import { useRepositoryGrowthEvents } from "../lib/useRepositoryGrowthEvents";
 import { SeriesSwatch } from "../components/SeriesSwatch";
 import { datesFromHistory, rankHistoryOption } from "../lib/rankChart";
 import type { RunAllMenuAction } from "../components/Layout";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
-import { PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
+import { PERIODS, PeriodSelector, usePeriod, type Period } from "../components/PeriodSelector";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
 import { ChartCard } from "../components/ChartDownloadMenu";
 import { ChartModePlot } from "../components/PersistentECharts";
 import { RepositoryStatsPanel } from "../components/RepositoryStatsPanel";
 import { SnapshotCards } from "../components/SnapshotCards";
-import { GrowthEventsPanel } from "../components/GrowthEventsPanel";
+import {
+  canShowGrowthEventsList,
+  GrowthEventsPanel,
+  GrowthEventsStatus,
+} from "../components/GrowthEventsPanel";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
-import { pruneChartSelection, repoSearchChartId, repoTopicsChartId, repoTrafficChartId, REPO_TRAFFIC_SERIES } from "../lib/chartLegend";
-import { resolveSearchQuerySelection, writeSearchQuerySelection } from "../lib/searchQuerySelection";
+import {
+  pruneChartSelection,
+  repoSearchChartId,
+  repoTopicsChartId,
+  repoTrafficChartId,
+  REPO_TRAFFIC_SERIES,
+} from "../lib/chartLegend";
+import {
+  resolveSearchQuerySelection,
+  writeSearchQuerySelection,
+} from "../lib/searchQuerySelection";
 import { SearchVisibilityKpis } from "../components/SearchVisibilityKpis";
 import { TopicVisibilityKpis } from "../components/TopicVisibilityKpis";
 import { resolveTopicSelection, writeTopicSelection } from "../lib/topicSelection";
-import { readTopicScope, resolveVisibleScope, writeTopicScope, type TopicScope } from "../lib/topicScope";
+import {
+  readTopicScope,
+  resolveVisibleScope,
+  writeTopicScope,
+  type TopicScope,
+} from "../lib/topicScope";
 import { trafficChartOption } from "../lib/trafficChart";
 import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/querySort";
 import { useTableSort } from "../lib/tableSortPrefs";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { resolveRepository } from "../lib/resolveRepository";
 
 type Tab = "overview" | "traffic" | "stats" | "search" | "topics" | "growth-events";
 
@@ -81,44 +117,167 @@ const TAB_LABEL: Record<Tab, string> = {
 
 function parseTab(tabParam: string | null): Tab {
   if (
-    tabParam === "overview"
-    || tabParam === "stats"
-    || tabParam === "search"
-    || tabParam === "topics"
-    || tabParam === "growth-events"
+    tabParam === "overview" ||
+    tabParam === "stats" ||
+    tabParam === "search" ||
+    tabParam === "topics" ||
+    tabParam === "growth-events"
   ) {
     return tabParam;
   }
-  if (tabParam === "settings") {
+  if (tabParam === "events" || tabParam === "settings") {
     return "growth-events";
   }
   return "traffic";
 }
 
+type RepositoryDetailsBundle = {
+  repository: Repository;
+  traffic: RepositoryTraffic;
+  search: SearchHistory[];
+  plainTopics: TopicHistory[];
+  languageTopics: TopicHistory[];
+};
+
+function fetchRepositoryDetailsBundle(
+  id: string,
+  period: Period,
+  showServicePaths: boolean,
+  signal: AbortSignal,
+): Promise<RepositoryDetailsBundle> {
+  return Promise.all([
+    api<Repository>(`/api/v1/admin/repositories/${id}`, { signal }),
+    api<RepositoryTraffic>(
+      `/api/v1/admin/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
+      { signal },
+    ),
+    api<SearchHistory[]>(`/api/v1/admin/repositories/${id}/search-visibility`, { signal }),
+    api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=all`, {
+      signal,
+    }),
+    api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=language`, {
+      signal,
+    }),
+  ]).then(([repository, traffic, search, plainTopics, languageTopics]) => ({
+    repository,
+    traffic,
+    search,
+    plainTopics,
+    languageTopics,
+  }));
+}
+
+function bindDetailsBundleRequest(
+  request: Promise<RepositoryDetailsBundle>,
+  options: {
+    version: number;
+    getVersion: () => number;
+    signal: AbortSignal;
+    onSuccess: (bundle: RepositoryDetailsBundle) => void;
+    onError: (message: string) => void;
+    onSettled: () => void;
+  },
+): Promise<void> {
+  return request
+    .then((bundle) => {
+      if (options.version !== options.getVersion() || options.signal.aborted) return;
+      options.onSuccess(bundle);
+    })
+    .catch((err: unknown) => {
+      if (options.version !== options.getVersion() || options.signal.aborted) return;
+      options.onError(err instanceof Error ? err.message : String(err));
+    })
+    .finally(() => {
+      if (options.version !== options.getVersion() || options.signal.aborted) return;
+      options.onSettled();
+    });
+}
+
 export function RepositoryDetailsPage() {
-  const { id } = useParams();
+  const { id: idParam, owner = "", repository: repositoryName = "" } = useParams();
   const location = useLocation();
-  const outlet = useOutletContext<{ setRunAll?: Dispatch<SetStateAction<RunAllMenuAction | null>> } | null>();
+  const outlet = useOutletContext<{
+    setRunAll?: Dispatch<SetStateAction<RunAllMenuAction | null>>;
+  } | null>();
   const setRunAll = outlet?.setRunAll;
   const [searchParams, setSearchParams] = useSearchParams();
   const { allowMutations } = useMutationAccess();
   const tabParam = searchParams.get("tab");
   const tab = parseTab(tabParam);
+  const periodParam = searchParams.get("period");
   const scopeQuery = searchParams.get("scope");
+  const resolveKey = idParam ?? `${owner}/${repositoryName}`;
+  const [seenResolveKey, setSeenResolveKey] = useState(resolveKey);
+  const [resolvedId, setResolvedId] = useState<string | undefined>(idParam);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const id = resolvedId ?? idParam;
   const [period, setPeriod] = usePeriod(id);
+
+  useEffect(() => {
+    if (
+      periodParam &&
+      (PERIODS as readonly string[]).includes(periodParam) &&
+      periodParam !== period
+    ) {
+      setPeriod(periodParam as Period);
+    }
+  }, [periodParam, id, period, setPeriod]);
   const { showServicePaths, setShowServicePaths } = useServicePaths(id);
   const [repo, setRepo] = useState<Repository | null>(null);
-  const storedScope = readTopicScope(Number(id));
-  const scope: TopicScope = tab === "topics"
-    ? resolveVisibleScope(scopeQuery, storedScope, Boolean(repo?.language))
-    : "all";
+  const repoBase = repo
+    ? repoPath(repo.owner.login, repo.name)
+    : owner && repositoryName
+      ? repoPath(owner, repositoryName)
+      : "";
+  const storedScope = readTopicScope(Number(id ?? 0));
+  const scope: TopicScope =
+    tab === "topics"
+      ? resolveVisibleScope(scopeQuery, storedScope, Boolean(repo?.language))
+      : "all";
   const [traffic, setTraffic] = useState<RepositoryTraffic | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  if (resolveKey !== seenResolveKey) {
+    setSeenResolveKey(resolveKey);
+    if (idParam) {
+      setResolvedId(idParam);
+      setResolveError(null);
+    } else {
+      setResolvedId(undefined);
+      setResolveError(null);
+      setRepo(null);
+      setLoading(true);
+    }
+  }
+
+  useEffect(() => {
+    if (idParam) {
+      return;
+    }
+    let cancelled = false;
+    resolveRepository(owner, repositoryName)
+      .then((matched) => {
+        if (!cancelled) {
+          setResolvedId(String(matched.id));
+        }
+      })
+      .catch((err: Error) => {
+        if (!cancelled) {
+          setResolveError(err.message);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [idParam, owner, repositoryName]);
   const [visibility, setVisibility] = useState<SearchHistory[]>([]);
   const [plainTopics, setPlainTopics] = useState<TopicHistory[]>([]);
   const [languageTopics, setLanguageTopics] = useState<TopicHistory[]>([]);
   const topicsVisibility = scope === "language" ? languageTopics : plainTopics;
   const knownTopics = [...plainTopics, ...languageTopics].filter(
-    (item, index, list) => list.findIndex((other) => other.watch.topic === item.watch.topic) === index,
+    (item, index, list) =>
+      list.findIndex((other) => other.watch.topic === item.watch.topic) === index,
   );
   const [queryText, setQueryText] = useState("");
   const [queryError, setQueryError] = useState<string | null>(null);
@@ -142,11 +301,12 @@ export function RepositoryDetailsPage() {
   const [trafficSeries, setTrafficSeries] = useState("Visitors");
   const [statsSeries, setStatsSeries] = useState("Stars");
   const requestVersion = useRef(0);
-  const [loading, setLoading] = useState(true);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const [runningQueryId, setRunningQueryId] = useState<number | null>(null);
   const [runningAll, setRunningAll] = useState(false);
-  const [focusHealth, setFocusHealth] = useState(false);
-  const scopeIntent = useRef<TopicScope | null>(null);
+  const [healthScrollRequest, setHealthScrollRequest] = useState(0);
+  const lastHandledHealthScroll = useRef(0);
+  const scopeIntent = useRef<{ repositoryId: string; scope: TopicScope } | null>(null);
   const [scopeChoice, setScopeChoice] = useState(0);
 
   function setTab(next: Tab) {
@@ -155,21 +315,33 @@ export function RepositoryDetailsPage() {
       return;
     }
     if (next === "topics") {
-      const nextScope = resolveVisibleScope(null, readTopicScope(Number(id)), Boolean(repo?.language));
-      setSearchParams(nextScope === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" }, { replace: true });
+      const nextScope = resolveVisibleScope(
+        null,
+        readTopicScope(Number(id)),
+        Boolean(repo?.language),
+      );
+      setSearchParams(
+        nextScope === "language" ? { tab: "topics", scope: "language" } : { tab: "topics" },
+        { replace: true },
+      );
       return;
     }
     setSearchParams({ tab: next }, { replace: true });
   }
 
   function setScope(next: TopicScope) {
-    scopeIntent.current = next;
+    if (!id) {
+      return;
+    }
+    scopeIntent.current = { repositoryId: id, scope: next };
     writeTopicScope(Number(id), next);
     setScopeChoice((value) => value + 1);
   }
 
   useEffect(() => {
-    scopeIntent.current = null;
+    if (scopeIntent.current && scopeIntent.current.repositoryId !== id) {
+      scopeIntent.current = null;
+    }
   }, [id]);
 
   useEffect(() => {
@@ -177,8 +349,9 @@ export function RepositoryDetailsPage() {
       return;
     }
     const hasLanguage = Boolean(repo.language);
-    if (scopeIntent.current) {
-      const desired = scopeIntent.current;
+    if (scopeIntent.current && scopeIntent.current.repositoryId === id) {
+      const desired = scopeIntent.current.scope;
+      scopeIntent.current = null;
       writeTopicScope(repo.id, desired);
       const shown: TopicScope = scopeQuery === "language" ? "language" : "all";
       if (shown !== desired) {
@@ -205,66 +378,90 @@ export function RepositoryDetailsPage() {
     }
   }, [tab, repo, id, scopeQuery, setSearchParams, scopeChoice]);
 
-  const load = useCallback(async () => {
-    if (!id) {
-      return;
-    }
+  const beginDetailsLoad = useCallback(() => {
     const version = ++requestVersion.current;
-    const [repository, trafficData, searchData, plainTopicData, languageTopicData] = await Promise.all([
-      api<Repository>(`/api/v1/repositories/${id}`),
-      api<RepositoryTraffic>(
-        `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
-      ),
-      api<SearchHistory[]>(`/api/v1/repositories/${id}/search-visibility`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=all`),
-      api<TopicHistory[]>(`/api/v1/repositories/${id}/topics-visibility?scope=language`),
-    ]);
-    if (version !== requestVersion.current) return;
-    setRepo(repository);
-    setTraffic(trafficData);
-    setVisibility(searchData);
-    setPlainTopics(plainTopicData);
-    setLanguageTopics(languageTopicData);
-  }, [id, period, showServicePaths]);
+    loadAbortRef.current?.abort();
+    const abort = new AbortController();
+    loadAbortRef.current = abort;
+    return { version, abort };
+  }, []);
+
+  const followDetailsLoad = useCallback(
+    (version: number, abort: AbortController): Promise<void> => {
+      if (!id) {
+        return Promise.resolve();
+      }
+      return bindDetailsBundleRequest(
+        fetchRepositoryDetailsBundle(id, period, showServicePaths, abort.signal),
+        {
+          version,
+          getVersion: () => requestVersion.current,
+          signal: abort.signal,
+          onSuccess: (bundle) => {
+            setError(null);
+            setRepo(bundle.repository);
+            setTraffic(bundle.traffic);
+            setVisibility(bundle.search);
+            setPlainTopics(bundle.plainTopics);
+            setLanguageTopics(bundle.languageTopics);
+          },
+          onError: (message) => setError(message),
+          onSettled: () => setLoading(false),
+        },
+      );
+    },
+    [id, period, showServicePaths, setRepo],
+  );
+
+  const load = useCallback((): Promise<void> => {
+    if (!id) {
+      return Promise.resolve();
+    }
+    const { version, abort } = beginDetailsLoad();
+    return followDetailsLoad(version, abort);
+  }, [id, beginDetailsLoad, followDetailsLoad]);
 
   useEffect(() => {
     function onCollected() {
-      void load().catch((err: Error) => setError(err.message));
+      void load();
     }
     window.addEventListener("repos-collected", onCollected);
     return () => window.removeEventListener("repos-collected", onCollected);
   }, [load]);
 
   useEffect(() => {
-    if (loading || tab !== "overview" || (!focusHealth && searchParams.get("focus") !== "health")) {
+    const fromQuery = searchParams.get("focus") === "health";
+    const fromClick = healthScrollRequest !== lastHandledHealthScroll.current;
+    if (loading || tab !== "overview" || (!fromQuery && !fromClick)) {
       return;
     }
     document.getElementById("repository-health")?.scrollIntoView({ block: "start" });
-    setFocusHealth(false);
-  }, [focusHealth, tab, loading, searchParams]);
+    lastHandledHealthScroll.current = healthScrollRequest;
+  }, [healthScrollRequest, tab, loading, searchParams]);
 
-  const loadedRepositoryId = useRef<string | undefined>(undefined);
+  const [seenLoadId, setSeenLoadId] = useState(id);
+  if (id !== seenLoadId) {
+    setSeenLoadId(id);
+    setLoading(true);
+    setError(null);
+    setRepo(null);
+    setTraffic(null);
+    setVisibility([]);
+    setPlainTopics([]);
+    setLanguageTopics([]);
+  }
   useEffect(() => {
-    let cancelled = false;
-    if (loadedRepositoryId.current !== id) {
-      setLoading(true);
+    if (!id) {
+      return;
     }
-    load()
-      .catch((err: Error) => {
-        if (!cancelled) {
-          setError(err.message);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          loadedRepositoryId.current = id;
-          setLoading(false);
-        }
-      });
+    const { version, abort } = beginDetailsLoad();
+    void followDetailsLoad(version, abort);
     return () => {
-      cancelled = true;
+      requestVersion.current += 1;
+      // Cancel the current in-flight request, including one started by repos-collected.
+      loadAbortRef.current?.abort();
     };
-  }, [load, id]);
+  }, [id, beginDetailsLoad, followDetailsLoad]);
 
   const runStatus = traffic?.lastCollection?.status;
   const runActive = runStatus === "RUNNING" || runStatus === "PLANNED";
@@ -276,12 +473,20 @@ export function RepositoryDetailsPage() {
     const status = item.searchStatus;
     return status === "RUNNING" || status === "READY" || status === "RETRY";
   });
-
-  useEffect(() => {
-    if (!searchActive && !topicsActive) {
+  // Clear local run flags when the server leaves a busy search/topics state (replaces the
+  // previous sync setState-in-effect). Do not clear merely because the server is idle —
+  // local Running... must remain until the first busy observation finishes.
+  const serverSearchBusy = searchActive || topicsActive;
+  const [wasServerSearchBusy, setWasServerSearchBusy] = useState(serverSearchBusy);
+  if (serverSearchBusy !== wasServerSearchBusy) {
+    setWasServerSearchBusy(serverSearchBusy);
+    if (!serverSearchBusy) {
       setRunningQueryId(null);
       setRunningAll(false);
     }
+  }
+
+  useEffect(() => {
     if (!runActive && !searchActive && !topicsActive) {
       return;
     }
@@ -304,7 +509,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/repositories/${id}/search-queries`, {
+      await api(`/api/v1/admin/repositories/${id}/search-queries`, {
         method: "POST",
         body: JSON.stringify({ name: query, query, enabled: true, resultLimit: 50 }),
       });
@@ -322,7 +527,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(queryId);
     try {
-      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -330,12 +535,19 @@ export function RepositoryDetailsPage() {
   }
 
   const runAllQueries = useCallback(async () => {
-    if (!allowMutations || !id || runningQueryId != null || runningAll || searchActive || visibility.length === 0) {
+    if (
+      !allowMutations ||
+      !id ||
+      runningQueryId != null ||
+      runningAll ||
+      searchActive ||
+      visibility.length === 0
+    ) {
       return;
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/repositories/${id}/search-queries/run`, { method: "POST" });
+      await api(`/api/v1/admin/repositories/${id}/search-queries/run`, { method: "POST" });
       await load();
     } catch (err) {
       setQueryError((err as Error).message);
@@ -350,7 +562,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(watchId);
     try {
-      await api(`/api/v1/topic-watches/${watchId}/run`, { method: "POST" });
+      await api(`/api/v1/admin/topic-watches/${watchId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -358,27 +570,52 @@ export function RepositoryDetailsPage() {
   }
 
   const runAllTopics = useCallback(async () => {
-    if (!allowMutations || !id || runningQueryId != null || runningAll || topicsActive || topicsVisibility.length === 0) {
+    if (
+      !allowMutations ||
+      !id ||
+      runningQueryId != null ||
+      runningAll ||
+      topicsActive ||
+      topicsVisibility.length === 0
+    ) {
       return;
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/repositories/${id}/topic-watches/run?scope=${scope}`, { method: "POST" });
+      await api(`/api/v1/admin/repositories/${id}/topic-watches/run?scope=${scope}`, {
+        method: "POST",
+      });
       await load();
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setRunningAll(false);
     }
-  }, [allowMutations, id, runningQueryId, runningAll, topicsActive, topicsVisibility.length, scope, load]);
+  }, [
+    allowMutations,
+    id,
+    runningQueryId,
+    runningAll,
+    topicsActive,
+    topicsVisibility.length,
+    scope,
+    load,
+  ]);
 
   useEffect(() => {
     if (!setRunAll) return;
-    if (!allowMutations || loading || error || String(repo?.id) !== id || (tab !== "search" && tab !== "topics")) {
+    if (
+      !allowMutations ||
+      loading ||
+      error ||
+      String(repo?.id) !== id ||
+      (tab !== "search" && tab !== "topics")
+    ) {
       setRunAll(null);
       return;
     }
-    const busy = runningAll || runningQueryId != null || (tab === "search" ? searchActive : topicsActive);
+    const busy =
+      runningAll || runningQueryId != null || (tab === "search" ? searchActive : topicsActive);
     setRunAll({
       locationKey: location.key,
       label: busy ? "Running..." : "Run all",
@@ -386,15 +623,31 @@ export function RepositoryDetailsPage() {
       onRun: () => void (tab === "search" ? runAllQueries() : runAllTopics()),
     });
     return () => setRunAll(null);
-  }, [setRunAll, allowMutations, loading, error, repo?.id, id, tab, location.key, runningAll, runningQueryId,
-    searchActive, topicsActive, visibility.length, topicsVisibility.length, runAllQueries, runAllTopics]);
+  }, [
+    setRunAll,
+    allowMutations,
+    loading,
+    error,
+    repo?.id,
+    id,
+    tab,
+    location.key,
+    runningAll,
+    runningQueryId,
+    searchActive,
+    topicsActive,
+    visibility.length,
+    topicsVisibility.length,
+    runAllQueries,
+    runAllTopics,
+  ]);
 
   async function deleteQuery(queryId: number) {
     if (!allowMutations || !id) {
       return;
     }
     try {
-      await api(`/api/v1/search-queries/${queryId}`, { method: "DELETE" });
+      await api(`/api/v1/admin/search-queries/${queryId}`, { method: "DELETE" });
       pruneChartSelection(
         repoSearchChartId(id),
         visibility.filter((item) => item.query.id !== queryId).map((item) => String(item.query.id)),
@@ -405,6 +658,9 @@ export function RepositoryDetailsPage() {
     }
   }
 
+  if (resolveError) {
+    return <p className="text-red-600">{resolveError}</p>;
+  }
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
@@ -431,17 +687,28 @@ export function RepositoryDetailsPage() {
       <header>
         <PageBreadcrumb
           items={[
-            { label: "Portfolio", to: "/dashboard" },
+            { label: "Home", to: "/" },
+            { label: repo.owner.login, to: ownerPath(repo.owner.login) },
             {
-              label: repo.fullName,
-              repoSwitcher: {
-                currentId: repo.id,
-                description: repo.description,
-                hrefFor: (repositoryId) =>
-                  tab === "traffic"
-                    ? `/repositories/${repositoryId}`
-                    : `/repositories/${repositoryId}?tab=${tab}`,
-              },
+              label: repo.name,
+              ...(allowMutations
+                ? {
+                    repoSwitcher: {
+                      currentId: repo.id,
+                      description: repo.description,
+                      hrefFor: (next: typeof repo) => {
+                        // Never carry topic scope (or other query) across repositories.
+                        if (tab === "traffic") {
+                          return repoPath(next.owner.login, next.name);
+                        }
+                        if (tab === "topics") {
+                          return `${repoPath(next.owner.login, next.name)}?tab=topics`;
+                        }
+                        return repoHref(next.owner.login, next.name, tab);
+                      },
+                    },
+                  }
+                : {}),
             },
             { label: TAB_LABEL[tab] },
           ]}
@@ -476,7 +743,7 @@ export function RepositoryDetailsPage() {
                   title="Discoverability"
                   items={repo.health.discoverability}
                   onClick={() => {
-                    setFocusHealth(true);
+                    setHealthScrollRequest((value) => value + 1);
                     setTab("overview");
                   }}
                 />
@@ -487,7 +754,7 @@ export function RepositoryDetailsPage() {
                   title="Community Standards"
                   items={repo.health.communityStandards}
                   onClick={() => {
-                    setFocusHealth(true);
+                    setHealthScrollRequest((value) => value + 1);
                     setTab("overview");
                   }}
                 />
@@ -510,29 +777,45 @@ export function RepositoryDetailsPage() {
       </header>
       <div className="flex min-w-0 flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div className="grid w-full min-w-0 grid-cols-3 rounded-lg border bg-muted p-1 md:inline-flex md:w-auto">
-          {([
-            ["traffic", "Traffic"],
-            ["stats", "Stats"],
-            ["search", "Search Visibility"],
-            ["topics", "Topics Visibility"],
-            ["overview", "Overview"],
-            ["growth-events", "Growth Events"],
-          ] as const).map(([key, label]) => (
+          {(
+            [
+              ["traffic", "Traffic"],
+              ["stats", "Stats"],
+              ["search", "Search Visibility"],
+              ["topics", "Topics Visibility"],
+              ["overview", "Overview"],
+              ["growth-events", "Growth Events"],
+            ] as const
+          ).map(([key, label]) => (
             <NavigationButton
               key={key}
               label={label}
-              mobileLabel={key === "search" ? "Search" : key === "topics" ? "Topics" : key === "growth-events" ? "Events" : label}
+              mobileLabel={
+                key === "search"
+                  ? "Search"
+                  : key === "topics"
+                    ? "Topics"
+                    : key === "growth-events"
+                      ? "Events"
+                      : label
+              }
               aria-pressed={tab === key}
               type="button"
               className={cn(
                 "min-h-11 px-1 md:min-h-0 md:px-3",
-                tab === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                tab === key
+                  ? "bg-card text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground",
               )}
               onClick={() => setTab(key)}
             />
           ))}
         </div>
-        {(tab === "traffic" || tab === "stats" || tab === "search" || tab === "topics" || tab === "growth-events") && (
+        {(tab === "traffic" ||
+          tab === "stats" ||
+          tab === "search" ||
+          tab === "topics" ||
+          tab === "growth-events") && (
           <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-center md:gap-2">
             {tab === "topics" && repo.language && (
               <div className="inline-flex w-fit max-w-full min-w-0 self-start items-center rounded-lg border bg-muted p-1">
@@ -546,7 +829,9 @@ export function RepositoryDetailsPage() {
                     className={cn(
                       "min-h-11 md:min-h-0",
                       key === "language" ? "max-w-[min(16rem,65vw)]" : "shrink-0",
-                      scope === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                      scope === key
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                     onClick={() => setScope(key)}
                   />
@@ -558,14 +843,19 @@ export function RepositoryDetailsPage() {
         )}
       </div>
       {tab === "overview" && (
-        <Overview repo={repo} lastCollection={traffic.lastCollection} trafficGap={traffic.trafficGap} />
+        <Overview
+          repo={repo}
+          lastCollection={traffic.lastCollection}
+          trafficGap={traffic.trafficGap}
+        />
       )}
-      {tab === "growth-events" && (
-        <GrowthEventsTab repositoryId={repo.id} period={period} />
-      )}
+      {tab === "growth-events" && <GrowthEventsTab repositoryId={repo.id} period={period} />}
       {tab === "traffic" && (
-        <TrafficPanel selectedMobileSeries={trafficSeries} onMobileSeriesChange={setTrafficSeries}
+        <TrafficPanel
+          selectedMobileSeries={trafficSeries}
+          onMobileSeriesChange={setTrafficSeries}
           repositoryId={repo.id}
+          repoBase={repoBase}
           traffic={traffic}
           period={period}
           showServicePaths={showServicePaths}
@@ -573,11 +863,17 @@ export function RepositoryDetailsPage() {
         />
       )}
       {tab === "stats" && (
-        <RepositoryStatsPanel repositoryId={repo.id} period={period} selectedMobileSeries={statsSeries} onMobileSeriesChange={setStatsSeries} />
+        <RepositoryStatsPanel
+          repositoryId={repo.id}
+          period={period}
+          selectedMobileSeries={statsSeries}
+          onMobileSeriesChange={setStatsSeries}
+        />
       )}
       {tab === "topics" && (
         <TopicsPanel
           repositoryId={repo.id}
+          repoBase={repoBase}
           language={repo.language}
           scope={scope}
           period={period}
@@ -586,12 +882,15 @@ export function RepositoryDetailsPage() {
           runningQueryId={runningQueryId}
           runningAll={runningAll}
           allowMutations={allowMutations}
-          onRun={runTopicWatch}
+          onRun={(watchId) => {
+            void runTopicWatch(watchId);
+          }}
         />
       )}
       {tab === "search" && (
         <SearchPanel
           repositoryId={repo.id}
+          repoBase={repoBase}
           period={period}
           visibility={visibility}
           queryText={queryText}
@@ -604,7 +903,9 @@ export function RepositoryDetailsPage() {
           runningAll={runningAll}
           allowMutations={allowMutations}
           onCreate={() => void createQuery()}
-          onRun={runQuery}
+          onRun={(queryId) => {
+            void runQuery(queryId);
+          }}
           onDelete={(queryId) => void deleteQuery(queryId)}
         />
       )}
@@ -723,7 +1024,12 @@ function Overview({
             <dd>{formatSyncTime(repo.githubUpdatedAt) ?? "—"}</dd>
             <FieldLabel icon={ExternalLink}>GitHub</FieldLabel>
             <dd>
-              <a className="text-primary hover:underline" href={repo.githubUrl ?? `https://github.com/${repo.fullName}`} target="_blank" rel="noreferrer">
+              <a
+                className="text-primary hover:underline"
+                href={repo.githubUrl ?? `https://github.com/${repo.fullName}`}
+                target="_blank"
+                rel="noreferrer"
+              >
                 Open repository
               </a>
             </dd>
@@ -770,12 +1076,19 @@ function HealthScoreLink({
   const passed = items.filter((item) => item.passed).length;
   const percent = items.length === 0 ? 0 : Math.round((passed / items.length) * 100);
   return (
-    <button type="button" onClick={onClick} className="inline-grid justify-items-stretch gap-1 text-left text-sm text-foreground">
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-grid justify-items-stretch gap-1 text-left text-sm text-foreground"
+    >
       <span className="whitespace-nowrap">
         {title} {passed}/{items.length}
       </span>
       <span className="h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-        <span className="block h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} />
+        <span
+          className="block h-full rounded-full bg-emerald-500"
+          style={{ width: `${percent}%` }}
+        />
       </span>
     </button>
   );
@@ -786,7 +1099,11 @@ function RepositoryHealthSection({ health }: { health: RepositoryHealth }) {
     <Card id="repository-health">
       <div className="grid gap-8 md:grid-cols-2">
         <HealthCheckList title="Discoverability" icon={Search} items={health.discoverability} />
-        <HealthCheckList title="Community Standards" icon={UsersRound} items={health.communityStandards} />
+        <HealthCheckList
+          title="Community Standards"
+          icon={UsersRound}
+          items={health.communityStandards}
+        />
       </div>
     </Card>
   );
@@ -809,7 +1126,13 @@ function HealthCheckList({
       </h3>
       <div className="space-y-2 text-sm">
         {items.map((item) => (
-          <div key={item.label} className={cn("flex items-center gap-2", item.passed ? "text-emerald-700" : "text-muted-foreground")}>
+          <div
+            key={item.label}
+            className={cn(
+              "flex items-center gap-2",
+              item.passed ? "text-emerald-700" : "text-muted-foreground",
+            )}
+          >
             {item.passed ? (
               <CircleCheck className="size-4 shrink-0" aria-hidden="true" />
             ) : (
@@ -855,7 +1178,9 @@ function CollectionStatusCard({
   return (
     <Card className="h-full">
       <CollectionTitle success={run.status === "SUCCESS" && !trafficGap} />
-      {run.status === "FAILED" && <h3 className="mb-2 font-medium text-red-700">Collection failed</h3>}
+      {run.status === "FAILED" && (
+        <h3 className="mb-2 font-medium text-red-700">Collection failed</h3>
+      )}
       <div className="text-sm">
         {formatBusinessDate(run.businessDate)} · {run.status}
       </div>
@@ -863,13 +1188,23 @@ function CollectionStatusCard({
         Execution: {run.successfulJobs} / {run.plannedJobs} successful
       </div>
       {(run.completedAt || run.createdAt) && (
-        <div className="mt-1 text-sm text-muted-foreground">Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}</div>
+        <div className="mt-1 text-sm text-muted-foreground">
+          Last collection: {formatSyncTime(run.completedAt ?? run.createdAt)}
+        </div>
       )}
-      <p className="mt-2 text-sm">Traffic data availability: {trafficGap ? repositoryGapText(trafficGap) : "No missing latest-day data reported"}</p>
+      <p className="mt-2 text-sm">
+        Traffic data availability:{" "}
+        {trafficGap ? repositoryGapText(trafficGap) : "No missing latest-day data reported"}
+      </p>
       {failureReason && <p className="mt-2 text-sm">{failureReason}</p>}
       <div className="mt-4 divide-y divide-border text-sm">
         {run.jobs.map((job) => (
-          <JobRow key={job.jobType} job={job} businessDate={run.businessDate} trafficGap={trafficGap} />
+          <JobRow
+            key={job.jobType}
+            job={job}
+            businessDate={run.businessDate}
+            trafficGap={trafficGap}
+          />
         ))}
       </div>
     </Card>
@@ -886,14 +1221,23 @@ function JobRow({
   trafficGap?: RepositoryTraffic["trafficGap"];
 }) {
   if (job.status === "FAILED") {
-    return <div className="py-2 text-sm text-red-700">⛔ Collection failed for {formatChartAxisDate(businessDate)}.</div>;
+    return (
+      <div className="py-2 text-sm text-red-700">
+        ⛔ Collection failed for {formatChartAxisDate(businessDate)}.
+      </div>
+    );
   }
   if (job.jobType === "TRAFFIC" && trafficGap?.reason === "GITHUB_DATA_MISSING") {
     return <div className="py-2 text-sm text-amber-700">⚠ {trafficJobWarning(trafficGap)}</div>;
   }
   const success = job.status === "SUCCESS";
   return (
-    <div className={cn("flex items-center gap-2 py-2", success ? "text-emerald-700" : "text-muted-foreground")}>
+    <div
+      className={cn(
+        "flex items-center gap-2 py-2",
+        success ? "text-emerald-700" : "text-muted-foreground",
+      )}
+    >
       {success ? (
         <Check className="size-4 shrink-0" aria-hidden="true" />
       ) : (
@@ -909,47 +1253,40 @@ function CollectionTitle({ success = false }: { success?: boolean }) {
     <div className="mb-4 flex items-center gap-2">
       <CircleCheck className="size-5 shrink-0 text-slate-500" aria-hidden="true" />
       <h2 className="font-medium">Collection Status</h2>
-      {success && <CircleCheck className="ml-auto size-8 shrink-0 text-emerald-600" aria-hidden="true" />}
+      {success && (
+        <CircleCheck className="ml-auto size-8 shrink-0 text-emerald-600" aria-hidden="true" />
+      )}
     </div>
   );
 }
 
-function GrowthEventsTab({
-  repositoryId,
-  period,
-}: {
-  repositoryId: number;
-  period: Period;
-}) {
-  const [events, setEvents] = useState<GrowthEvent[]>([]);
-
-  const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then(setEvents)
-      .catch(() => setEvents([]));
-  }, [repositoryId, period]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+function GrowthEventsTab({ repositoryId, period }: { repositoryId: number; period: Period }) {
+  const { events, error, loading, reload } = useRepositoryGrowthEvents(repositoryId, period);
+  const hasEvents = events.length > 0;
 
   return (
     <div className="space-y-4">
-      <GrowthEventsPanel repositoryId={repositoryId} events={events} onChanged={loadEvents} />
+      <GrowthEventsStatus loading={loading} error={error} hasEvents={hasEvents} onRetry={reload} />
+      {canShowGrowthEventsList(loading, error, hasEvents) ? (
+        <GrowthEventsPanel repositoryId={repositoryId} events={events} onChanged={reload} />
+      ) : null}
       <GrowthEventSettingsCard repositoryId={repositoryId} />
     </div>
   );
 }
 
 function TrafficPanel({
-  selectedMobileSeries, onMobileSeriesChange,
+  selectedMobileSeries,
+  onMobileSeriesChange,
   repositoryId,
+  repoBase,
   traffic,
   period,
   showServicePaths,
   onShowServicePathsChange,
 }: {
   repositoryId: number;
+  repoBase: string;
   traffic: RepositoryTraffic;
   period: Period;
   selectedMobileSeries: string;
@@ -957,20 +1294,16 @@ function TrafficPanel({
   showServicePaths: boolean;
   onShowServicePathsChange: (next: boolean) => void;
 }) {
-  const [events, setEvents] = useState<GrowthEvent[]>([]);
-
-  const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => setEvents(asGrowthEvents(rows)))
-      .catch(() => setEvents([]));
-  }, [repositoryId, period]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+  const { events, error, loading, reload } = useRepositoryGrowthEvents(repositoryId, period);
 
   return (
     <div className="space-y-3">
+      <GrowthEventsStatus
+        loading={loading}
+        error={error}
+        hasEvents={events.length > 0}
+        onRetry={reload}
+      />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <TrafficKpiCard
           label="Visitors"
@@ -1015,21 +1348,36 @@ function TrafficPanel({
         repositoryId={repositoryId}
         period={period}
         context={`repository:${repositoryId}:traffic`}
-        onEventsChanged={loadEvents}
+        onEventsChanged={reload}
         mobileSeries={REPO_TRAFFIC_SERIES}
         selectedMobileSeries={selectedMobileSeries}
         onMobileSeriesChange={onMobileSeriesChange}
       >
-        {!traffic.traffic.some(point => point.views != null || point.uniqueVisitors != null || point.clones != null || point.uniqueCloners != null) ? <p role="status" className="py-12 text-center text-sm text-muted-foreground">No traffic data for selected period</p> : <ChartModePlot
-          accessibleTitle="Repository Traffic"
-          chartId={repoTrafficChartId(repositoryId)}
-          series={REPO_TRAFFIC_SERIES}
-          style={{ height: 360, width: "100%" }}
-          build={({ events: marked }) => trafficChartOption(traffic.traffic, marked, period, traffic.trafficGap)}
-        />}
+        {!traffic.traffic.some(
+          (point) =>
+            point.views != null ||
+            point.uniqueVisitors != null ||
+            point.clones != null ||
+            point.uniqueCloners != null,
+        ) ? (
+          <p role="status" className="py-12 text-center text-sm text-muted-foreground">
+            No traffic data for selected period
+          </p>
+        ) : (
+          <ChartModePlot
+            accessibleTitle="Repository Traffic"
+            chartId={repoTrafficChartId(repositoryId)}
+            series={REPO_TRAFFIC_SERIES}
+            style={{ height: 360, width: "100%" }}
+            build={({ events: marked }) =>
+              trafficChartOption(traffic.traffic, marked, period, traffic.trafficGap)
+            }
+          />
+        )}
       </ChartCard>
       <SnapshotCards
         repositoryId={repositoryId}
+        historyBasePath={repoBase}
         referrers={traffic.referrers}
         referrerSnapshotAt={traffic.referrerSnapshotAt}
         paths={traffic.paths}
@@ -1049,6 +1397,7 @@ function normalizeSearchQuery(value: string) {
 
 function TopicsPanel({
   repositoryId,
+  repoBase,
   language,
   scope,
   period,
@@ -1060,6 +1409,7 @@ function TopicsPanel({
   onRun,
 }: {
   repositoryId: number;
+  repoBase: string;
   language?: string;
   scope: TopicScope;
   period: Period;
@@ -1071,20 +1421,23 @@ function TopicsPanel({
   onRun: (id: number) => void;
 }) {
   const mobile = useIsMobileChart();
-  prepareSeriesStyles(visibility.map(item => `topic:${repositoryId}:${scope}:${item.watch.id}`));
+  prepareSeriesStyles(visibility.map((item) => `topic:${repositoryId}:${scope}:${item.watch.id}`));
   const [hoveredWatchId, setHoveredWatchId] = useState<number | null>(null);
-  const [selectedSlugs, setSelectedSlugs] = useState<string[]>([]);
-  const knownKey = knownTopics.map((item) => `${item.watch.topic}:${item.currentRank ?? ""}`).join("\n");
   const knownSamples = useMemo(
     () => knownTopics.map((item) => ({ slug: item.watch.topic, rank: item.currentRank })),
-    [knownKey],
+    [knownTopics],
   );
-  useEffect(() => {
-    if (knownSamples.length === 0) {
-      return;
+  const topicSelectionKey = `${repositoryId}:${knownSamples.map((item) => `${item.slug}:${item.rank}`).join(",")}`;
+  const [seenTopicSelectionKey, setSeenTopicSelectionKey] = useState(topicSelectionKey);
+  const [selectedSlugs, setSelectedSlugs] = useState<string[]>(() =>
+    knownSamples.length === 0 ? [] : resolveTopicSelection(repositoryId, knownSamples),
+  );
+  if (topicSelectionKey !== seenTopicSelectionKey) {
+    setSeenTopicSelectionKey(topicSelectionKey);
+    if (knownSamples.length > 0) {
+      setSelectedSlugs(resolveTopicSelection(repositoryId, knownSamples));
     }
-    setSelectedSlugs(resolveTopicSelection(repositoryId, knownSamples));
-  }, [repositoryId, knownSamples]);
+  }
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "topic-watches",
     scope: repositoryId,
@@ -1099,23 +1452,31 @@ function TopicsPanel({
   );
 
   const searchBusy =
-    runningAll
-    || runningQueryId != null
-    || visibility.some(
-      (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
+    runningAll ||
+    runningQueryId != null ||
+    visibility.some(
+      (item) =>
+        item.searchStatus === "RUNNING" ||
+        item.searchStatus === "READY" ||
+        item.searchStatus === "RETRY",
     );
   const scopeQuery = scope === "language" ? "?scope=language" : "";
   const lineVisibility = useChartVisibility(repoTopicsChartId(repositoryId, scope));
-  const topicKey = (slug: string) => `topic:${repositoryId}:${scope}:${visibility.find(item => item.watch.topic === slug)?.watch.id}`;
-  const selected = new Set(selectedSlugs.filter(slug => lineVisibility.isVisible(topicKey(slug))));
+  const topicKey = (slug: string) =>
+    `topic:${repositoryId}:${scope}:${visibility.find((item) => item.watch.topic === slug)?.watch.id}`;
+  const selected = new Set(
+    selectedSlugs.filter((slug) => lineVisibility.isVisible(topicKey(slug))),
+  );
   const visibleSlugs = visibility.map((item) => item.watch.topic);
   const allChecked = visibleSlugs.length > 0 && visibleSlugs.every((slug) => selected.has(slug));
 
   function writeSelection(slugs: string[], reveal: string[] = []) {
-    lineVisibility.reveal(reveal.map(topicKey));
     slugs = [...new Set(slugs)];
     setSelectedSlugs(slugs);
     writeTopicSelection(repositoryId, slugs);
+    if (reveal.length > 0) {
+      lineVisibility.reveal(reveal.map(topicKey));
+    }
   }
 
   return (
@@ -1132,7 +1493,6 @@ function TopicsPanel({
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-medium">Topics</h2>
-
         </div>
         {visibility.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -1141,128 +1501,219 @@ function TopicsPanel({
               : "No topics yet. Add topics to the repository on GitHub."}
           </p>
         ) : mobile ? (
-          <WatchListCards nameLabel="Topic" sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-            allChecked={allChecked} onToggleAll={() => {
-              const hidden = selectedSlugs.filter(slug => !visibleSlugs.includes(slug));
-              writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs], allChecked ? [] : visibleSlugs);
-            }} rows={sorted.map(item => {
-              const running = runningQueryId === item.watch.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
+          <WatchListCards
+            nameLabel="Topic"
+            sortKey={sortKey}
+            sortDir={sortDir}
+            toggle={toggle}
+            allChecked={allChecked}
+            onToggleAll={() => {
+              const hidden = selectedSlugs.filter((slug) => !visibleSlugs.includes(slug));
+              writeSelection(
+                allChecked ? hidden : [...hidden, ...visibleSlugs],
+                allChecked ? [] : visibleSlugs,
+              );
+            }}
+            rows={sorted.map((item) => {
+              const running =
+                runningQueryId === item.watch.id ||
+                ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
               return {
-              id: item.watch.id, name: item.watch.topic, href: `/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
-              seriesKey: `topic:${repositoryId}:${scope}:${item.watch.id}`, checked: selected.has(item.watch.topic),
-              onToggle: () => writeSelection(selected.has(item.watch.topic) ? selectedSlugs.filter(slug => slug !== item.watch.topic) : [...selectedSlugs, item.watch.topic], [item.watch.topic]),
-              rank: item.currentRank, limit: item.watch.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
-              actions: allowMutations ? <Button className="bg-muted text-foreground" disabled={running || searchBusy} onClick={() => onRun(item.watch.id)}>{running || runningAll ? "Running..." : "Run"}</Button> : undefined,
-            }; })} />
+                id: item.watch.id,
+                name: item.watch.topic,
+                href: `${repoBase}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`,
+                seriesKey: `topic:${repositoryId}:${scope}:${item.watch.id}`,
+                checked: selected.has(item.watch.topic),
+                onToggle: () => {
+                  const checked = selected.has(item.watch.topic);
+                  writeSelection(
+                    checked
+                      ? selectedSlugs.filter((slug) => slug !== item.watch.topic)
+                      : [...selectedSlugs, item.watch.topic],
+                    checked ? [] : [item.watch.topic],
+                  );
+                },
+                rank: item.currentRank,
+                limit: item.watch.resultLimit,
+                change: item.change,
+                change7d: item.change7d,
+                change30d: item.change30d,
+                best: item.bestRank,
+                total: item.totalResults,
+                updated: item.lastChecked,
+                actions: allowMutations ? (
+                  <Button
+                    className="bg-muted text-foreground"
+                    disabled={running || searchBusy}
+                    onClick={() => onRun(item.watch.id)}
+                  >
+                    {running || runningAll ? "Running..." : "Run"}
+                  </Button>
+                ) : undefined,
+              };
+            })}
+          />
         ) : (
           <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-2 pr-3">
-                  <input
-                    ref={(node) => {
-                      if (node) {
-                        node.indeterminate = selectedSlugs.length > 0 && visibleSlugs.some((slug) => selected.has(slug)) && !allChecked;
-                      }
-                    }}
-                    type="checkbox"
-                    aria-label="Chart lines"
-                    checked={allChecked}
-                    onChange={() => {
-                      const hidden = selectedSlugs.filter((slug) => !visibleSlugs.includes(slug));
-                      writeSelection(allChecked ? hidden : [...hidden, ...visibleSlugs], allChecked ? [] : visibleSlugs);
-                    }}
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-2 pr-3">
+                    <input
+                      ref={(node) => {
+                        if (node) {
+                          node.indeterminate =
+                            selectedSlugs.length > 0 &&
+                            visibleSlugs.some((slug) => selected.has(slug)) &&
+                            !allChecked;
+                        }
+                      }}
+                      type="checkbox"
+                      aria-label="Chart lines"
+                      checked={allChecked}
+                      onChange={() => {
+                        const hidden = selectedSlugs.filter((slug) => !visibleSlugs.includes(slug));
+                        writeSelection(
+                          allChecked ? hidden : [...hidden, ...visibleSlugs],
+                          allChecked ? [] : visibleSlugs,
+                        );
+                      }}
+                    />
+                  </th>
+                  <QuerySortHeader
+                    label="Topic"
+                    align="left"
+                    className="py-2 pr-4"
+                    active={sortKey === "name"}
+                    dir={sortDir}
+                    onClick={() => toggle("name")}
                   />
-                </th>
-                <QuerySortHeader
-                  label="Topic"
-                  align="left"
-                  className="py-2 pr-4"
-                  active={sortKey === "name"}
-                  dir={sortDir}
-                  onClick={() => toggle("name")}
-                />
-                <QuerySortHeader label="Rank" active={sortKey === "rank"} dir={sortDir} onClick={() => toggle("rank")} />
-                <QuerySortHeader label="Change" active={sortKey === "change"} dir={sortDir} onClick={() => toggle("change")} />
-                <QuerySortHeader label="7d" active={sortKey === "change7d"} dir={sortDir} onClick={() => toggle("change7d")} />
-                <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
-                <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
-                <QuerySortHeader label="Results" active={sortKey === "results"} dir={sortDir} onClick={() => toggle("results")} />
-                <QuerySortHeader label="Updated" active={sortKey === "updated"} dir={sortDir} onClick={() => toggle("updated")} />
-                <th className="py-2 pl-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((item) => {
-                const running =
-                  runningQueryId === item.watch.id
-                  || item.searchStatus === "RUNNING"
-                  || item.searchStatus === "READY"
-                  || item.searchStatus === "RETRY";
-                const rankChange = formatQueryRankChange(item.change);
-                return (
-                  <tr
-                    key={item.watch.id}
-                    className={cn("border-t", hoveredWatchId === item.watch.id && "bg-muted/60")}
-                    onMouseEnter={() => setHoveredWatchId(item.watch.id)}
-                    onMouseLeave={() => setHoveredWatchId(null)}
-                  >
-                    <td className="py-3 pr-3">
-                      <input
-                        type="checkbox"
-                        aria-label={`Chart line for ${item.watch.topic}`}
-                        checked={selected.has(item.watch.topic)}
-                        onChange={(event) => {
-                          const next = event.target.checked
-                            ? [...selectedSlugs, item.watch.topic]
-                            : selectedSlugs.filter((slug) => slug !== item.watch.topic);
-                          writeSelection(next, event.target.checked ? [item.watch.topic] : []);
-                        }}
-                      />
-                    </td>
-                    <td className="py-3 pr-4">
-                      <span className="inline-flex items-center gap-2">
-                        {selected.has(item.watch.topic) && (
-                          <SeriesSwatch style={seriesStyle(`topic:${repositoryId}:${scope}:${item.watch.id}`)} />
-                        )}
-                        <Link
-                          className="text-primary hover:underline"
-                          to={`/repositories/${repositoryId}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
-                        >
-                          {item.watch.topic}
-                        </Link>
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.watch.resultLimit)}</td>
-                    <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
-                      {rankChange.label}
-                    </td>
-                    <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
-                    <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
-                    <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.watch.resultLimit)}</td>
-                    <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
-                      {formatSyncTime(item.lastChecked) ?? "—"}
-                    </td>
-                    <td className="py-3 pl-3">
-                      {allowMutations && (
-                        <div className="flex justify-end">
-                          <Button
-                            className="bg-muted text-foreground"
-                            disabled={running || searchBusy}
-                            onClick={() => onRun(item.watch.id)}
+                  <QuerySortHeader
+                    label="Rank"
+                    active={sortKey === "rank"}
+                    dir={sortDir}
+                    onClick={() => toggle("rank")}
+                  />
+                  <QuerySortHeader
+                    label="Change"
+                    active={sortKey === "change"}
+                    dir={sortDir}
+                    onClick={() => toggle("change")}
+                  />
+                  <QuerySortHeader
+                    label="7d"
+                    active={sortKey === "change7d"}
+                    dir={sortDir}
+                    onClick={() => toggle("change7d")}
+                  />
+                  <QuerySortHeader
+                    label="30d"
+                    active={sortKey === "change30d"}
+                    dir={sortDir}
+                    onClick={() => toggle("change30d")}
+                  />
+                  <QuerySortHeader
+                    label="Best"
+                    active={sortKey === "best"}
+                    dir={sortDir}
+                    onClick={() => toggle("best")}
+                  />
+                  <QuerySortHeader
+                    label="Results"
+                    active={sortKey === "results"}
+                    dir={sortDir}
+                    onClick={() => toggle("results")}
+                  />
+                  <QuerySortHeader
+                    label="Updated"
+                    active={sortKey === "updated"}
+                    dir={sortDir}
+                    onClick={() => toggle("updated")}
+                  />
+                  <th className="py-2 pl-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map((item) => {
+                  const running =
+                    runningQueryId === item.watch.id ||
+                    item.searchStatus === "RUNNING" ||
+                    item.searchStatus === "READY" ||
+                    item.searchStatus === "RETRY";
+                  const rankChange = formatQueryRankChange(item.change);
+                  return (
+                    <tr
+                      key={item.watch.id}
+                      className={cn("border-t", hoveredWatchId === item.watch.id && "bg-muted/60")}
+                      onMouseEnter={() => setHoveredWatchId(item.watch.id)}
+                      onMouseLeave={() => setHoveredWatchId(null)}
+                    >
+                      <td className="py-3 pr-3">
+                        <input
+                          type="checkbox"
+                          aria-label={`Chart line for ${item.watch.topic}`}
+                          checked={selected.has(item.watch.topic)}
+                          onChange={(event) => {
+                            const next = event.target.checked
+                              ? [...selectedSlugs, item.watch.topic]
+                              : selectedSlugs.filter((slug) => slug !== item.watch.topic);
+                            writeSelection(next, event.target.checked ? [item.watch.topic] : []);
+                          }}
+                        />
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className="inline-flex items-center gap-2">
+                          {selected.has(item.watch.topic) && (
+                            <SeriesSwatch
+                              style={seriesStyle(`topic:${repositoryId}:${scope}:${item.watch.id}`)}
+                            />
+                          )}
+                          <Link
+                            className="text-primary hover:underline"
+                            to={`${repoBase}/topics/${encodeURIComponent(item.watch.topic)}${scopeQuery}`}
                           >
-                            {running || runningAll ? "Running..." : "Run"}
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                            {item.watch.topic}
+                          </Link>
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {formatRank(item.currentRank, item.watch.resultLimit)}
+                      </td>
+                      <td
+                        className={cn(
+                          "whitespace-nowrap px-3 py-3 text-right font-medium",
+                          growthClass(rankChange.direction),
+                        )}
+                      >
+                        {rankChange.label}
+                      </td>
+                      <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
+                      <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
+                      <td className="px-3 py-3 text-right">
+                        {formatRank(item.bestRank, item.watch.resultLimit)}
+                      </td>
+                      <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
+                        {formatSyncTime(item.lastChecked) ?? "—"}
+                      </td>
+                      <td className="py-3 pl-3">
+                        {allowMutations && (
+                          <div className="flex justify-end">
+                            <Button
+                              className="bg-muted text-foreground"
+                              disabled={running || searchBusy}
+                              onClick={() => onRun(item.watch.id)}
+                            >
+                              {running || runningAll ? "Running..." : "Run"}
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
@@ -1285,17 +1736,7 @@ function CombinedTopicRankChart({
   selectedSlugs: string[];
   highlightWatchId: number | null;
 }) {
-  const [events, setEvents] = useState<GrowthEvent[]>([]);
-
-  const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => setEvents(asGrowthEvents(rows)))
-      .catch(() => setEvents([]));
-  }, [repositoryId, period]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+  const { events, error, loading, reload } = useRepositoryGrowthEvents(repositoryId, period);
 
   const drawn = useMemo(
     () => visibility.filter((item) => selectedSlugs.includes(item.watch.topic)),
@@ -1303,65 +1744,98 @@ function CombinedTopicRankChart({
   );
 
   const dates = useMemo(
-    () => datesFromHistory(drawn.map((item) => item.points), drawn.flatMap((item) => item.missedDates ?? [])),
+    () =>
+      datesFromHistory(
+        drawn.map((item) => item.points),
+        drawn.flatMap((item) => item.missedDates ?? []),
+      ),
     [drawn],
   );
   const rankSeries = useMemo(
-    () => drawn.map((item) => ({
-      name: item.watch.topic,
-      points: item.points,
-      expected: item.watch.enabled,
-      limit: item.watch.resultLimit,
-      missedDates: item.missedDates,
-      highlighted: highlightWatchId === item.watch.id,
-      dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
-      key: `topic:${repositoryId}:${scope}:${item.watch.id}`,
-    })),
-    [drawn, highlightWatchId, visibility],
+    () =>
+      drawn.map((item) => ({
+        name: item.watch.topic,
+        points: item.points,
+        expected: item.watch.enabled,
+        limit: item.watch.resultLimit,
+        missedDates: item.missedDates,
+        highlighted: highlightWatchId === item.watch.id,
+        dimmed: highlightWatchId != null && highlightWatchId !== item.watch.id,
+        key: `topic:${repositoryId}:${scope}:${item.watch.id}`,
+      })),
+    [drawn, highlightWatchId, repositoryId, scope],
   );
   const series = useMemo(
-    () => drawn.map((item) => ({ key: `topic:${repositoryId}:${scope}:${item.watch.id}`, name: item.watch.topic })),
-    [drawn],
+    () =>
+      drawn.map((item) => ({
+        key: `topic:${repositoryId}:${scope}:${item.watch.id}`,
+        name: item.watch.topic,
+      })),
+    [drawn, repositoryId, scope],
+  );
+
+  const eventsStatus = (
+    <GrowthEventsStatus
+      loading={loading}
+      error={error}
+      hasEvents={events.length > 0}
+      onRetry={reload}
+    />
   );
 
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History" context={`repository:${repositoryId}:topics`} mobileSeries={[]}>
-        <p className="text-sm text-muted-foreground">Select topics from the table to display rank history</p>
-      </ChartCard>
+      <div className="space-y-3">
+        {eventsStatus}
+        <ChartCard
+          title="Rank History"
+          context={`repository:${repositoryId}:topics`}
+          mobileSeries={[]}
+        >
+          <p className="text-sm text-muted-foreground">
+            Select topics from the table to display rank history
+          </p>
+        </ChartCard>
+      </div>
     );
   }
   return (
-    <ChartCard
-      title="Rank History"
-      events={events}
-      repositoryId={repositoryId}
-      period={period}
-      context={`repository:${repositoryId}:topics`}
-      onEventsChanged={loadEvents}
-      mobileSeries={series}
-    >
-      <ChartModePlot
-        chartId={repoTopicsChartId(repositoryId, scope)}
-        series={series}
-        persistSelection={false}
-        style={{ height: 360, width: "100%" }}
-        build={({ axis, events: marked }) => rankHistoryOption({
-          dates,
-          legend: true,
-          legendToggle: false,
-          period,
-          axis,
-          events: marked,
-          series: rankSeries,
-        })}
-      />
-    </ChartCard>
+    <div className="space-y-3">
+      {eventsStatus}
+      <ChartCard
+        title="Rank History"
+        events={events}
+        repositoryId={repositoryId}
+        period={period}
+        context={`repository:${repositoryId}:topics`}
+        onEventsChanged={reload}
+        mobileSeries={series}
+      >
+        <ChartModePlot
+          chartId={repoTopicsChartId(repositoryId, scope)}
+          series={series}
+          persistSelection={false}
+          style={{ height: 360, width: "100%" }}
+          build={({ axis, events: marked }) =>
+            rankHistoryOption({
+              dates,
+              legend: true,
+              legendToggle: false,
+              period,
+              axis,
+              events: marked,
+              series: rankSeries,
+            })
+          }
+        />
+      </ChartCard>
+    </div>
   );
 }
 
 function SearchPanel({
   repositoryId,
+  repoBase,
   period,
   visibility,
   queryText,
@@ -1375,6 +1849,7 @@ function SearchPanel({
   onDelete,
 }: {
   repositoryId: number;
+  repoBase: string;
   period: Period;
   visibility: SearchHistory[];
   queryText: string;
@@ -1388,15 +1863,20 @@ function SearchPanel({
   onDelete: (id: number) => void;
 }) {
   const mobile = useIsMobileChart();
-  prepareSeriesStyles(visibility.map(item => `query:${item.query.id}`));
+  prepareSeriesStyles(visibility.map((item) => `query:${item.query.id}`));
   const [hoveredQueryId, setHoveredQueryId] = useState<number | null>(null);
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  useEffect(() => {
-    setSelectedIds(resolveSearchQuerySelection(
-      repositoryId,
-      visibility.map((item) => ({ id: item.query.id, rank: item.currentRank })),
-    ));
-  }, [repositoryId, visibility]);
+  const querySamples = visibility.map((item) => ({
+    id: item.query.id,
+    rank: item.currentRank,
+  }));
+  const [selectedIds, setSelectedIds] = useState<number[]>(() =>
+    resolveSearchQuerySelection(repositoryId, querySamples),
+  );
+  const [selectionRepoId, setSelectionRepoId] = useState(repositoryId);
+  if (selectionRepoId !== repositoryId) {
+    setSelectionRepoId(repositoryId);
+    setSelectedIds(resolveSearchQuerySelection(repositoryId, querySamples));
+  }
   const { sortKey, sortDir, toggle } = useTableSort({
     tableId: "search-queries",
     scope: repositoryId,
@@ -1422,24 +1902,33 @@ function SearchPanel({
 
   const duplicate = visibility.some(
     (item) =>
-      normalizeSearchQuery(item.query.query) === normalizeSearchQuery(queryText) && normalizeSearchQuery(queryText) !== "",
+      normalizeSearchQuery(item.query.query) === normalizeSearchQuery(queryText) &&
+      normalizeSearchQuery(queryText) !== "",
   );
   const searchBusy =
-    runningAll
-    || runningQueryId != null
-    || visibility.some(
-      (item) => item.searchStatus === "RUNNING" || item.searchStatus === "READY" || item.searchStatus === "RETRY",
+    runningAll ||
+    runningQueryId != null ||
+    visibility.some(
+      (item) =>
+        item.searchStatus === "RUNNING" ||
+        item.searchStatus === "READY" ||
+        item.searchStatus === "RETRY",
     );
 
   const lineVisibility = useChartVisibility(repoSearchChartId(repositoryId));
-  const selected = new Set(selectedIds.filter(id => lineVisibility.isVisible(`query:${id}`)));
-  const allChecked = visibility.length > 0 && visibility.every((item) => selected.has(item.query.id));
+  const selected = new Set(selectedIds.filter((id) => lineVisibility.isVisible(`query:${id}`)));
+  const allChecked =
+    visibility.length > 0 && visibility.every((item) => selected.has(item.query.id));
 
   function writeSelection(ids: number[], reveal: number[] = []) {
-    lineVisibility.reveal(reveal.map(id => `query:${id}`));
     ids = [...new Set(ids)];
     setSelectedIds(ids);
     writeSearchQuerySelection(repositoryId, ids);
+    // Reveal after selection commit so an empty selection cannot be overwritten by a
+    // visibility store notification that re-renders with a stale selectedIds closure.
+    if (reveal.length > 0) {
+      lineVisibility.reveal(reveal.map((id) => `query:${id}`));
+    }
   }
 
   return (
@@ -1477,7 +1966,6 @@ function SearchPanel({
                 <Button disabled={!queryText.trim() || duplicate} onClick={onCreate}>
                   Add query
                 </Button>
-
               </div>
               {(queryError || duplicate) && (
                 <p className="mt-2 text-sm text-red-700">
@@ -1489,132 +1977,242 @@ function SearchPanel({
         ) : (
           <h2 className="mb-3 font-medium">Search Queries</h2>
         )}
-        {visibility.length === 0 ? <p className="text-sm text-muted-foreground">{allowMutations ? "Add a search query to start tracking visibility." : "An administrator can configure search queries."}</p> : mobile ? <WatchListCards nameLabel="Search Query" sortKey={sortKey} sortDir={sortDir} toggle={toggle}
-          allChecked={allChecked} onToggleAll={() => writeSelection(allChecked ? [] : visibility.map(item => item.query.id), allChecked ? [] : visibility.map(item => item.query.id))}
-          rows={sorted.map(item => {
-            const running = runningQueryId === item.query.id || ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
-            return {
-              id: item.query.id, name: item.query.name, href: `/repositories/${repositoryId}/search-queries/${item.query.id}`,
-              seriesKey: `query:${item.query.id}`, checked: selected.has(item.query.id),
-              onToggle: () => writeSelection(selected.has(item.query.id) ? selectedIds.filter(id => id !== item.query.id) : [...selectedIds, item.query.id], [item.query.id]),
-              rank: item.currentRank, limit: item.query.resultLimit, change: item.change, change7d: item.change7d, change30d: item.change30d, best: item.bestRank, total: item.totalResults, updated: item.lastChecked,
-              actions: allowMutations ? <><Button className="bg-muted text-foreground" disabled={running || searchBusy} onClick={() => onRun(item.query.id)}>{running || runningAll ? "Running..." : "Run"}</Button><Button className="bg-muted text-red-700" disabled={running} onClick={() => onDelete(item.query.id)}>Delete</Button></> : undefined,
-            };
-          })} /> : <>
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-2 pr-3">
-                <input
-                  ref={(node) => {
-                    if (node) {
-                      node.indeterminate = selectedIds.length > 0 && !allChecked;
-                    }
-                  }}
-                  type="checkbox"
-                  aria-label="Chart lines"
-                  checked={allChecked}
-                  onChange={() => writeSelection(allChecked ? [] : visibility.map((item) => item.query.id), allChecked ? [] : visibility.map(item => item.query.id))}
-                />
-              </th>
-              <QuerySortHeader
-                label="Search Query"
-                align="left"
-                className="py-2 pr-4"
-                active={sortKey === "name"}
-                dir={sortDir}
-                onClick={() => toggle("name")}
-              />
-              <QuerySortHeader label="Rank" active={sortKey === "rank"} dir={sortDir} onClick={() => toggle("rank")} />
-              <QuerySortHeader label="Change" active={sortKey === "change"} dir={sortDir} onClick={() => toggle("change")} />
-              <QuerySortHeader label="7d" active={sortKey === "change7d"} dir={sortDir} onClick={() => toggle("change7d")} />
-              <QuerySortHeader label="30d" active={sortKey === "change30d"} dir={sortDir} onClick={() => toggle("change30d")} />
-              <QuerySortHeader label="Best" active={sortKey === "best"} dir={sortDir} onClick={() => toggle("best")} />
-              <QuerySortHeader label="Results" active={sortKey === "results"} dir={sortDir} onClick={() => toggle("results")} />
-              <QuerySortHeader label="Updated" active={sortKey === "updated"} dir={sortDir} onClick={() => toggle("updated")} />
-              <th className="py-2 pl-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((item) => {
+        {visibility.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {allowMutations
+              ? "Add a search query to start tracking visibility."
+              : "An administrator can configure search queries."}
+          </p>
+        ) : mobile ? (
+          <WatchListCards
+            nameLabel="Search Query"
+            sortKey={sortKey}
+            sortDir={sortDir}
+            toggle={toggle}
+            allChecked={allChecked}
+            onToggleAll={() =>
+              writeSelection(
+                allChecked ? [] : visibility.map((item) => item.query.id),
+                allChecked ? [] : visibility.map((item) => item.query.id),
+              )
+            }
+            rows={sorted.map((item) => {
               const running =
-                runningQueryId === item.query.id
-                || item.searchStatus === "RUNNING"
-                || item.searchStatus === "READY"
-                || item.searchStatus === "RETRY";
-              const rankChange = formatQueryRankChange(item.change);
-              return (
-                <tr
-                  key={item.query.id}
-                  className={cn("border-t", hoveredQueryId === item.query.id && "bg-muted/60")}
-                  onMouseEnter={() => setHoveredQueryId(item.query.id)}
-                  onMouseLeave={() => setHoveredQueryId(null)}
-                >
-                  <td className="py-3 pr-3">
-                    <input
-                      type="checkbox"
-                      aria-label={`Chart line for ${item.query.name}`}
-                      checked={selected.has(item.query.id)}
-                      onChange={(event) => {
-                        const next = event.target.checked
-                          ? [...selectedIds, item.query.id]
-                          : selectedIds.filter((id) => id !== item.query.id);
-                        writeSelection(next, event.target.checked ? [item.query.id] : []);
-                      }}
-                    />
-                  </td>
-                  <td className="py-3 pr-4">
-                    <span className="inline-flex items-center gap-2">
-                      {selected.has(item.query.id) && (
-                        <SeriesSwatch style={seriesStyle(`query:${item.query.id}`)} />
-                      )}
-                      <Link
-                        className="text-primary hover:underline"
-                        to={`/repositories/${repositoryId}/search-queries/${item.query.id}`}
-                      >
-                        {item.query.name}
-                      </Link>
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-right">{formatRank(item.currentRank, item.query.resultLimit)}</td>
-                  <td className={cn("whitespace-nowrap px-3 py-3 text-right font-medium", growthClass(rankChange.direction))}>
-                    {rankChange.label}
-                  </td>
-                  <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
-                  <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
-                  <td className="px-3 py-3 text-right">{formatRank(item.bestRank, item.query.resultLimit)}</td>
-                  <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
-                  <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
-                    {formatSyncTime(item.lastChecked) ?? "—"}
-                  </td>
-                  <td className="py-3 pl-3">
-                    {allowMutations && (
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          className="bg-muted text-foreground"
-                          disabled={running || searchBusy}
-                          onClick={() => onRun(item.query.id)}
-                        >
-                          {running || runningAll ? "Running..." : "Run"}
-                        </Button>
-                        <Button
-                          className="bg-muted text-red-700"
-                          disabled={running}
-                          onClick={() => onDelete(item.query.id)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
+                runningQueryId === item.query.id ||
+                ["RUNNING", "READY", "RETRY"].includes(item.searchStatus ?? "");
+              return {
+                id: item.query.id,
+                name: item.query.name,
+                href: `${repoBase}/search-queries/${item.query.id}`,
+                seriesKey: `query:${item.query.id}`,
+                checked: selectedIds.includes(item.query.id),
+                onToggle: () => {
+                  const checked = selectedIds.includes(item.query.id);
+                  writeSelection(
+                    checked
+                      ? selectedIds.filter((id) => id !== item.query.id)
+                      : [...selectedIds, item.query.id],
+                    checked ? [] : [item.query.id],
+                  );
+                },
+                rank: item.currentRank,
+                limit: item.query.resultLimit,
+                change: item.change,
+                change7d: item.change7d,
+                change30d: item.change30d,
+                best: item.bestRank,
+                total: item.totalResults,
+                updated: item.lastChecked,
+                actions: allowMutations ? (
+                  <>
+                    <Button
+                      className="bg-muted text-foreground"
+                      disabled={running || searchBusy}
+                      onClick={() => onRun(item.query.id)}
+                    >
+                      {running || runningAll ? "Running..." : "Run"}
+                    </Button>
+                    <Button
+                      className="bg-muted text-red-700"
+                      disabled={running}
+                      onClick={() => onDelete(item.query.id)}
+                    >
+                      Delete
+                    </Button>
+                  </>
+                ) : undefined,
+              };
             })}
-          </tbody>
-        </table>
-        </div>
-        </>}
+          />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-2 pr-3">
+                      <input
+                        ref={(node) => {
+                          if (node) {
+                            node.indeterminate = selectedIds.length > 0 && !allChecked;
+                          }
+                        }}
+                        type="checkbox"
+                        aria-label="Chart lines"
+                        checked={allChecked}
+                        onChange={() =>
+                          writeSelection(
+                            allChecked ? [] : visibility.map((item) => item.query.id),
+                            allChecked ? [] : visibility.map((item) => item.query.id),
+                          )
+                        }
+                      />
+                    </th>
+                    <QuerySortHeader
+                      label="Search Query"
+                      align="left"
+                      className="py-2 pr-4"
+                      active={sortKey === "name"}
+                      dir={sortDir}
+                      onClick={() => toggle("name")}
+                    />
+                    <QuerySortHeader
+                      label="Rank"
+                      active={sortKey === "rank"}
+                      dir={sortDir}
+                      onClick={() => toggle("rank")}
+                    />
+                    <QuerySortHeader
+                      label="Change"
+                      active={sortKey === "change"}
+                      dir={sortDir}
+                      onClick={() => toggle("change")}
+                    />
+                    <QuerySortHeader
+                      label="7d"
+                      active={sortKey === "change7d"}
+                      dir={sortDir}
+                      onClick={() => toggle("change7d")}
+                    />
+                    <QuerySortHeader
+                      label="30d"
+                      active={sortKey === "change30d"}
+                      dir={sortDir}
+                      onClick={() => toggle("change30d")}
+                    />
+                    <QuerySortHeader
+                      label="Best"
+                      active={sortKey === "best"}
+                      dir={sortDir}
+                      onClick={() => toggle("best")}
+                    />
+                    <QuerySortHeader
+                      label="Results"
+                      active={sortKey === "results"}
+                      dir={sortDir}
+                      onClick={() => toggle("results")}
+                    />
+                    <QuerySortHeader
+                      label="Updated"
+                      active={sortKey === "updated"}
+                      dir={sortDir}
+                      onClick={() => toggle("updated")}
+                    />
+                    <th className="py-2 pl-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((item) => {
+                    const running =
+                      runningQueryId === item.query.id ||
+                      item.searchStatus === "RUNNING" ||
+                      item.searchStatus === "READY" ||
+                      item.searchStatus === "RETRY";
+                    const rankChange = formatQueryRankChange(item.change);
+                    return (
+                      <tr
+                        key={item.query.id}
+                        className={cn(
+                          "border-t",
+                          hoveredQueryId === item.query.id && "bg-muted/60",
+                        )}
+                        onMouseEnter={() => setHoveredQueryId(item.query.id)}
+                        onMouseLeave={() => setHoveredQueryId(null)}
+                      >
+                        <td className="py-3 pr-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`Chart line for ${item.query.name}`}
+                            checked={selected.has(item.query.id)}
+                            onChange={(event) => {
+                              const next = event.target.checked
+                                ? [...selectedIds, item.query.id]
+                                : selectedIds.filter((id) => id !== item.query.id);
+                              writeSelection(next, event.target.checked ? [item.query.id] : []);
+                            }}
+                          />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <span className="inline-flex items-center gap-2">
+                            {selected.has(item.query.id) && (
+                              <SeriesSwatch style={seriesStyle(`query:${item.query.id}`)} />
+                            )}
+                            <Link
+                              className="text-primary hover:underline"
+                              to={`${repoBase}/search-queries/${item.query.id}`}
+                            >
+                              {item.query.name}
+                            </Link>
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          {formatRank(item.currentRank, item.query.resultLimit)}
+                        </td>
+                        <td
+                          className={cn(
+                            "whitespace-nowrap px-3 py-3 text-right font-medium",
+                            growthClass(rankChange.direction),
+                          )}
+                        >
+                          {rankChange.label}
+                        </td>
+                        <td className="px-3 py-3 text-right">{formatDelta(item.change7d)}</td>
+                        <td className="px-3 py-3 text-right">{formatDelta(item.change30d)}</td>
+                        <td className="px-3 py-3 text-right">
+                          {formatRank(item.bestRank, item.query.resultLimit)}
+                        </td>
+                        <td className="px-3 py-3 text-right">{formatNumber(item.totalResults)}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-right text-muted-foreground">
+                          {formatSyncTime(item.lastChecked) ?? "—"}
+                        </td>
+                        <td className="py-3 pl-3">
+                          {allowMutations && (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                className="bg-muted text-foreground"
+                                disabled={running || searchBusy}
+                                onClick={() => onRun(item.query.id)}
+                              >
+                                {running || runningAll ? "Running..." : "Run"}
+                              </Button>
+                              <Button
+                                className="bg-muted text-red-700"
+                                disabled={running}
+                                onClick={() => onDelete(item.query.id)}
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </Card>
     </div>
   );
@@ -1662,92 +2260,132 @@ function CombinedRankChart({
   highlightQueryId: number | null;
   selectedIds: number[];
 }) {
-  const [events, setEvents] = useState<GrowthEvent[]>([]);
-
-  const loadEvents = useCallback(() => {
-    api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`)
-      .then((rows) => setEvents(asGrowthEvents(rows)))
-      .catch(() => setEvents([]));
-  }, [repositoryId, period]);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+  const { events, error, loading, reload } = useRepositoryGrowthEvents(repositoryId, period);
 
   const drawn = useMemo(
     () => visibility.filter((item) => selectedIds.includes(item.query.id)),
     [visibility, selectedIds],
   );
   const dates = useMemo(
-    () => datesFromHistory(drawn.map((item) => item.points), drawn.flatMap((item) => item.missedDates)),
+    () =>
+      datesFromHistory(
+        drawn.map((item) => item.points),
+        drawn.flatMap((item) => item.missedDates),
+      ),
     [drawn],
   );
   const rankSeries = useMemo(
-    () => drawn.map((item) => ({
-      name: item.query.name,
-      points: item.points,
-      expected: item.query.enabled,
-      limit: item.query.resultLimit,
-      missedDates: item.missedDates,
-      highlighted: highlightQueryId === item.query.id,
-      dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
-      key: `query:${item.query.id}`,
-    })),
-    [drawn, highlightQueryId, visibility],
+    () =>
+      drawn.map((item) => ({
+        name: item.query.name,
+        points: item.points,
+        expected: item.query.enabled,
+        limit: item.query.resultLimit,
+        missedDates: item.missedDates,
+        highlighted: highlightQueryId === item.query.id,
+        dimmed: highlightQueryId != null && highlightQueryId !== item.query.id,
+        key: `query:${item.query.id}`,
+      })),
+    [drawn, highlightQueryId],
   );
   const series = useMemo(
     () => drawn.map((item) => ({ key: `query:${item.query.id}`, name: item.query.name })),
     [drawn],
   );
 
+  const eventsStatus = (
+    <GrowthEventsStatus
+      loading={loading}
+      error={error}
+      hasEvents={events.length > 0}
+      onRetry={reload}
+    />
+  );
+
   if (visibility.length === 0) {
-    return <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
-      <p className="text-sm text-muted-foreground">No search queries configured yet.</p>
-    </ChartCard>;
+    return (
+      <div className="space-y-3">
+        {eventsStatus}
+        <ChartCard
+          title="Rank History"
+          context={`repository:${repositoryId}:search`}
+          mobileSeries={[]}
+        >
+          <p className="text-sm text-muted-foreground">No search queries configured yet.</p>
+        </ChartCard>
+      </div>
+    );
   }
-  if (drawn.length > 0 && drawn.every(item => item.points.length === 0)) {
-    return <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
-      <p className="text-sm text-muted-foreground">No rank history for the selected queries yet.</p>
-    </ChartCard>;
+  if (drawn.length > 0 && drawn.every((item) => item.points.length === 0)) {
+    return (
+      <div className="space-y-3">
+        {eventsStatus}
+        <ChartCard
+          title="Rank History"
+          context={`repository:${repositoryId}:search`}
+          mobileSeries={[]}
+        >
+          <p className="text-sm text-muted-foreground">
+            No rank history for the selected queries yet.
+          </p>
+        </ChartCard>
+      </div>
+    );
   }
   if (drawn.length === 0) {
     return (
-      <ChartCard title="Rank History" context={`repository:${repositoryId}:search`} mobileSeries={[]}>
-        <p className="text-sm text-muted-foreground">Select search queries from the table to display rank history</p>
-      </ChartCard>
+      <div className="space-y-3">
+        {eventsStatus}
+        <ChartCard
+          title="Rank History"
+          context={`repository:${repositoryId}:search`}
+          mobileSeries={[]}
+        >
+          <p className="text-sm text-muted-foreground">
+            Select search queries from the table to display rank history
+          </p>
+        </ChartCard>
+      </div>
     );
   }
   return (
-    <ChartCard
-      title="Rank History"
-      events={events}
-      repositoryId={repositoryId}
-      period={period}
-      context={`repository:${repositoryId}:search`}
-      onEventsChanged={loadEvents}
-      mobileSeries={series}
-    >
-      <ChartModePlot
-        chartId={repoSearchChartId(repositoryId)}
-        series={series}
-        persistSelection={false}
-        style={{ height: 360, width: "100%" }}
-        build={({ axis, events: marked }) => rankHistoryOption({
-          dates,
-          legend: true,
-          legendToggle: false,
-          period,
-          axis,
-          events: marked,
-          series: rankSeries,
-        })}
-      />
-    </ChartCard>
+    <div className="space-y-3">
+      {eventsStatus}
+      <ChartCard
+        title="Rank History"
+        events={events}
+        repositoryId={repositoryId}
+        period={period}
+        context={`repository:${repositoryId}:search`}
+        onEventsChanged={reload}
+        mobileSeries={series}
+      >
+        <ChartModePlot
+          chartId={repoSearchChartId(repositoryId)}
+          series={series}
+          persistSelection={false}
+          style={{ height: 360, width: "100%" }}
+          build={({ axis, events: marked }) =>
+            rankHistoryOption({
+              dates,
+              legend: true,
+              legendToggle: false,
+              period,
+              axis,
+              events: marked,
+              series: rankSeries,
+            })
+          }
+        />
+      </ChartCard>
+    </div>
   );
 }
 
 function formatBusinessDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(
-    new Date(`${value}T00:00:00`),
-  );
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
 }

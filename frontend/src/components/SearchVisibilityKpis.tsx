@@ -11,7 +11,13 @@ const BANDS = [
   { band: 20, label: "Top 20" },
 ] as const;
 
-export function SearchVisibilityKpis({ queries, period }: { queries: SearchHistory[]; period: Period }) {
+export function SearchVisibilityKpis({
+  queries,
+  period,
+}: {
+  queries: SearchHistory[];
+  period: Period;
+}) {
   const { allowMutations } = useMutationAccess();
   const today = new Date().toISOString().slice(0, 10);
   const samples: RankSample[] = queries.map((item) => ({
@@ -31,11 +37,14 @@ export function SearchVisibilityKpis({ queries, period }: { queries: SearchHisto
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
           <div className="h-full rounded-full bg-primary" style={{ width: `${usage.progress}%` }} />
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">{allowMutations ? `${usage.available} available` : "Tracked search queries"}</div>
+        <div className="mt-1 text-xs text-muted-foreground">
+          {allowMutations ? `${usage.available} available` : "Tracked search queries"}
+        </div>
       </Card>
       {BANDS.map((item) => {
         const kpi = bandKpi(samples, item.band, period, today);
-        const missingHistory = kpi.value == null || (period !== "all" && kpi.absoluteChange == null);
+        const missingHistory =
+          kpi.value == null || (period !== "all" && kpi.absoluteChange == null);
         return (
           <TrafficKpiCard
             key={item.label}

@@ -10,7 +10,9 @@ describe("cookies", () => {
 
   it("round-trips JSON and ignores invalid payloads", () => {
     writeJsonCookie("prefs", { a: 1 });
-    expect(readJsonCookie("prefs", (value) => (value && typeof value === "object" ? value : null))).toEqual({ a: 1 });
+    expect(
+      readJsonCookie("prefs", (value) => (value && typeof value === "object" ? value : null)),
+    ).toEqual({ a: 1 });
     writeCookie("prefs", "not-json");
     expect(readJsonCookie("prefs", () => ({ ok: true }))).toBeNull();
     expect(readJsonCookie("absent", () => ({ ok: true }))).toBeNull();

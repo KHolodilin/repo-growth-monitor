@@ -9,11 +9,10 @@ import org.springframework.security.web.SecurityFilterChain;
 @TestConfiguration
 public class WebMvcTestSecurityConfig {
 
-    @Bean
-    SecurityFilterChain webMvcTestSecurityFilterChain(HttpSecurity http) throws Exception {
-        return http
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
-                .build();
-    }
+  @Bean
+  SecurityFilterChain webMvcTestSecurityFilterChain(HttpSecurity http) throws Exception {
+    return http.csrf(AbstractHttpConfigurer::disable)
+        .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+        .build();
+  }
 }

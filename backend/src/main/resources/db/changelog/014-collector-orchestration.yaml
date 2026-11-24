@@ -1,0 +1,8 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-collector-orchestration
+      author: repo-growth-monitor
+      changes:
+        - sqlFile:
+            path: 014-collector-orchestration.sql
+            relativeToChangelogFile: true

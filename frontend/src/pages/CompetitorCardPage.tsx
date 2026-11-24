@@ -6,6 +6,9 @@ import { PageBreadcrumb, type BreadcrumbItem } from "../components/PageBreadcrum
 import { PersistentECharts } from "../components/PersistentECharts";
 import { api, type CompetitorCard, type Repository, type SearchHistory } from "../lib/api";
 import { storedCountOption } from "../lib/searchSeriesChart";
+import { useMutationAccess } from "../lib/mutationAccess";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 const COMPETITOR_SERIES = [
   { key: "Stars", name: "Stars" },
@@ -14,22 +17,36 @@ const COMPETITOR_SERIES = [
 
 export function CompetitorCardPage() {
   const params = useParams();
-  const repositoryId = Number(params.repositoryId);
+  const { owner = "", repository: repositoryName = "" } = params;
+  const { id: resolvedId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
+  const { allowMutations } = useMutationAccess();
+  const repositoryId = Number(resolvedId);
   const queryId = Number(params.queryId);
   const githubRepositoryId = Number(params.githubRepositoryId);
+  const loadKey = `${repositoryId}:${queryId}:${githubRepositoryId}`;
+  const [seenKey, setSeenKey] = useState(loadKey);
   const [repo, setRepo] = useState<Repository | null>(null);
   const [history, setHistory] = useState<SearchHistory | null>(null);
   const [card, setCard] = useState<CompetitorCard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  if (loadKey !== seenKey) {
+    setSeenKey(loadKey);
+    setError(null);
+    setRepo(null);
+    setHistory(null);
+    setCard(null);
+  }
+
   useEffect(() => {
     if (!repositoryId || !queryId || !githubRepositoryId) return;
     let cancelled = false;
-    setError(null);
     Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
-      api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
-      api<CompetitorCard>(`/api/v1/search-queries/${queryId}/competitors/${githubRepositoryId}`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`),
+      api<CompetitorCard>(
+        `/api/v1/admin/search-queries/${queryId}/competitors/${githubRepositoryId}`,
+      ),
     ])
       .then(([repository, queryHistory, competitor]) => {
         if (cancelled) return;
@@ -38,32 +55,43 @@ export function CompetitorCardPage() {
         setCard(competitor);
       })
       .catch((reason: unknown) => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : "Failed to load the competitor card");
+        if (!cancelled)
+          setError(reason instanceof Error ? reason.message : "Failed to load the competitor card");
       });
     return () => {
       cancelled = true;
     };
   }, [repositoryId, queryId, githubRepositoryId]);
 
-  if (error) return <p className="text-sm text-destructive">{error}</p>;
-  if (!repo || !history || !card) return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
+  if (resolveError || error)
+    return <p className="text-sm text-destructive">{resolveError ?? error}</p>;
+  if (!repo || !history || !card)
+    return <p className="text-sm text-muted-foreground">Loading competitor card...</p>;
 
+  const base = repoPath(repo.owner.login, repo.name);
   return (
     <CompetitorCardView
       items={[
-        { label: "Portfolio", to: "/dashboard" },
+        { label: "Home", to: "/" },
+        { label: repo.owner.login, to: ownerPath(repo.owner.login) },
         {
-          label: repo.fullName,
-          repoSwitcher: {
-            currentId: repo.id,
-            hrefFor: (id) => `/repositories/${id}?tab=search`,
-          },
+          label: repo.name,
+          ...(allowMutations
+            ? {
+                repoSwitcher: {
+                  currentId: repo.id,
+                  hrefFor: (next: typeof repo) => repoHref(next.owner.login, next.name, "search"),
+                },
+              }
+            : {}),
         },
-        { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
-        { label: history.query.query, to: `/repositories/${repo.id}/search-queries/${history.query.id}` },
+        { label: "Search Visibility", to: repoHref(repo.owner.login, repo.name, "search") },
+        { label: history.query.query, to: `${base}/search-queries/${history.query.id}` },
       ]}
       card={card}
-      collectionDates={history.query.enabled === false ? [] : history.points.map(point => point.date)}
+      collectionDates={
+        history.query.enabled === false ? [] : history.points.map((point) => point.date)
+      }
       missedCollectionDates={history.query.enabled === false ? [] : history.missedDates}
       chartId={`${repositoryId}:competitor:${queryId}:${githubRepositoryId}`}
       repositoryId={repo.id}
@@ -102,21 +130,31 @@ export function CompetitorCardView({
       <header>
         <PageBreadcrumb items={items} />
         <h1 className="mt-2 break-all text-xl font-semibold">{card.fullName}</h1>
-        <a className="mt-1 inline-block text-sm text-primary hover:underline" href={card.htmlUrl} target="_blank" rel="noreferrer">
+        <a
+          className="mt-1 inline-block text-sm text-primary hover:underline"
+          href={card.htmlUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
           Open on GitHub
         </a>
       </header>
 
       <section className="rounded-lg border bg-card p-4">
         <h2 className="text-sm font-medium">Description</h2>
-        <p className="mt-2 text-sm text-muted-foreground">{card.description?.trim() || "No description."}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {card.description?.trim() || "No description."}
+        </p>
         <h2 className="mt-4 text-sm font-medium">Topics</h2>
         {card.topics.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">No topics yet.</p>
         ) : (
           <ul className="mt-2 flex flex-wrap gap-2">
             {card.topics.map((topic) => (
-              <li key={topic} className="inline-flex rounded-full bg-[#ddf4ff] px-2.5 py-0.5 text-xs font-medium text-[#0969da]">
+              <li
+                key={topic}
+                className="inline-flex rounded-full bg-[#ddf4ff] px-2.5 py-0.5 text-xs font-medium text-[#0969da]"
+              >
                 {topic}
               </li>
             ))}
@@ -137,7 +175,9 @@ export function CompetitorCardView({
         </ul>
       </section>
 
-      <div role="group" aria-label="History period" className="flex justify-end"><PeriodSelector fitMobile period={period} onPeriod={setPeriod} /></div>
+      <div role="group" aria-label="History period" className="flex justify-end">
+        <PeriodSelector fitMobile period={period} onPeriod={setPeriod} />
+      </div>
       <ChartCard
         title="Stars and forks"
         repositoryId={repositoryId}
@@ -145,7 +185,13 @@ export function CompetitorCardView({
         context={`repository:${repositoryId}:competitor`}
         mobileSeries={COMPETITOR_SERIES}
       >
-        <PersistentECharts exportTitle="Stars and forks" chartId={chartId} series={COMPETITOR_SERIES} option={{ ...option, collectionDates, missedCollectionDates }} style={{ height: 320 }} />
+        <PersistentECharts
+          exportTitle="Stars and forks"
+          chartId={chartId}
+          series={COMPETITOR_SERIES}
+          option={{ ...option, collectionDates, missedCollectionDates }}
+          style={{ height: 320 }}
+        />
       </ChartCard>
     </div>
   );

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { readTopicScope, resolveVisibleScope, topicScopeCookie, writeTopicScope } from "./topicScope";
+import {
+  readTopicScope,
+  resolveVisibleScope,
+  topicScopeCookie,
+  writeTopicScope,
+} from "./topicScope";
 
 afterEach(() => {
   document.cookie = `${topicScopeCookie(13)}=; path=/; max-age=0`;
@@ -28,7 +33,7 @@ describe("topic scope cookie", () => {
     const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, "cookie");
     Object.defineProperty(document, "cookie", {
       configurable: true,
-      get: () => descriptor?.get?.call(document) ?? "",
+      get: (): string => String(descriptor?.get?.call(document) ?? ""),
       set: (value: string) => {
         assigned.push(value);
         descriptor?.set?.call(document, value);
@@ -36,7 +41,9 @@ describe("topic scope cookie", () => {
     });
     try {
       writeTopicScope(13, "all", "https:");
-      expect(assigned.some((value) => value.includes("path=/; max-age=31536000; SameSite=Lax; Secure"))).toBe(true);
+      expect(
+        assigned.some((value) => value.includes("path=/; max-age=31536000; SameSite=Lax; Secure")),
+      ).toBe(true);
       expect(readTopicScope(13)).toBe("all");
     } finally {
       if (descriptor) {

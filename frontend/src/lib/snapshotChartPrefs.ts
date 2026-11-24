@@ -1,3 +1,4 @@
+import { publicContext, readPublicPreference, writePublicPreference } from "./publicPrefs";
 import { readJsonCookie, writeJsonCookie } from "./cookies";
 
 const PREFIX = "repo-growth.snapshot-chart.";
@@ -21,11 +22,14 @@ function parsePrefs(value: unknown): SnapshotChartPrefs | null {
     return null;
   }
   const record = value as { metric?: unknown; keys?: unknown };
-  const metric = record.metric === "VIEWS" ? "VIEWS" : record.metric === "VISITORS" ? "VISITORS" : null;
+  const metric =
+    record.metric === "VIEWS" ? "VIEWS" : record.metric === "VISITORS" ? "VISITORS" : null;
   if (!metric || !Array.isArray(record.keys)) {
     return null;
   }
-  const keys = record.keys.filter((item): item is string => typeof item === "string" && item.length > 0);
+  const keys = record.keys.filter(
+    (item): item is string => typeof item === "string" && item.length > 0,
+  );
   return { metric, keys };
 }
 
@@ -33,6 +37,14 @@ export function readSnapshotChartPrefs(
   repositoryId: number | string,
   kind: SnapshotChartKind,
 ): SnapshotChartPrefs | null {
+  if (publicContext(String(repositoryId)))
+    return (
+      readPublicPreference(
+        String(repositoryId),
+        `sources:${kind}`,
+        (value): value is SnapshotChartPrefs => parsePrefs(value) !== null,
+      ) ?? null
+    );
   return readJsonCookie(cookieName(repositoryId, kind), parsePrefs);
 }
 
@@ -41,5 +53,9 @@ export function writeSnapshotChartPrefs(
   kind: SnapshotChartKind,
   prefs: SnapshotChartPrefs,
 ) {
+  if (publicContext(String(repositoryId))) {
+    writePublicPreference(String(repositoryId), `sources:${kind}`, prefs);
+    return;
+  }
   writeJsonCookie(cookieName(repositoryId, kind), prefs);
 }

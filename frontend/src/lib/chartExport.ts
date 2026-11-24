@@ -29,20 +29,42 @@ export function chartExportBase(chartId: string) {
   return cleaned;
 }
 
+function axisLabel(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "bigint") return value.toString();
+  return "";
+}
+
 /** One row per axis date, one column per line series. Event markers and rank glyphs stay off the sheet. */
 export function chartTable(option: object) {
   const chart = option as ChartOption;
   const axis = Array.isArray(chart.xAxis) ? chart.xAxis[0] : chart.xAxis;
-  const dates = (chart.exportDates ?? axis?.data ?? []).map(value => value == null ? "" : String(value));
-  return { dates, columns: [...mergedColumns(chart.series ?? []), ...(chart.exportExtraColumns ?? [])].map(column => ({ name: chart.exportLabels?.[column.name] ?? column.name, values: dates.map((_, index) => cellText(column.data[index])) })) };
+  const dates = (chart.exportDates ?? axis?.data ?? []).map(axisLabel);
+  return {
+    dates,
+    columns: [...mergedColumns(chart.series ?? []), ...(chart.exportExtraColumns ?? [])].map(
+      (column) => ({
+        name: chart.exportLabels?.[column.name] ?? column.name,
+        values: dates.map((_, index) => cellText(column.data[index])),
+      }),
+    ),
+  };
 }
 
 export function chartCsv(option: object) {
   const chart = option as ChartOption;
   const axis = Array.isArray(chart.xAxis) ? chart.xAxis[0] : chart.xAxis;
-  const dates = (chart.exportDates ?? axis?.data ?? []).map((value) => (value == null ? "" : String(value)));
+  const dates = (chart.exportDates ?? axis?.data ?? []).map(axisLabel);
   const columns = [...mergedColumns(chart.series ?? []), ...(chart.exportExtraColumns ?? [])];
-  const header = ["date", ...columns.map((series) => chart.exportLabels?.[series.name] ?? series.name)].map(csvField).join(",");
+  const header = [
+    "date",
+    ...columns.map((series) => chart.exportLabels?.[series.name] ?? series.name),
+  ]
+    .map(csvField)
+    .join(",");
   const rows = dates.map((date, index) =>
     [date, ...columns.map((series) => cellText(series.data?.[index]))].map(csvField).join(","),
   );
@@ -55,14 +77,32 @@ export function downloadChartPng(chart: ChartView | null, filename: string, titl
   }
   const instance = chart.getEchartsInstance();
   const original = title && instance.getOption && instance.setOption ? instance.getOption() : null;
-  const size = original && instance.resize && instance.getWidth && instance.getHeight ? { width: instance.getWidth(), height: instance.getHeight() } : null;
+  const size =
+    original && instance.resize && instance.getWidth && instance.getHeight
+      ? { width: instance.getWidth(), height: instance.getHeight() }
+      : null;
   try {
-    if (original) instance.setOption!({ animation: false, title: { text: title, left: "center", top: 0, textStyle: { fontSize: 14 } }, legend: { show: true, top: 24 }, grid: { top: 96, left: 48, right: 32, bottom: 40, containLabel: true } });
-    if (size) instance.resize!({ width: Math.max(760, size.width), height: Math.max(400, size.height), silent: true });
+    if (original)
+      instance.setOption!({
+        animation: false,
+        title: { text: title, left: "center", top: 0, textStyle: { fontSize: 14 } },
+        legend: { show: true, top: 24 },
+        grid: { top: 96, left: 48, right: 32, bottom: 40, containLabel: true },
+      });
+    if (size)
+      instance.resize!({
+        width: Math.max(760, size.width),
+        height: Math.max(400, size.height),
+        silent: true,
+      });
     const image = instance.getDataURL({ type: "png", pixelRatio: 2, backgroundColor: "#fff" });
-    const bytes = Uint8Array.from(atob(image.split(",")[1]), char => char.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(image.split(",")[1]), (char) => char.charCodeAt(0));
     const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
-    try { saveDownload(filename, url); } finally { URL.revokeObjectURL(url); }
+    try {
+      saveDownload(filename, url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   } finally {
     if (original) instance.setOption!(original, true);
     if (size) instance.resize!({ ...size, silent: true });
@@ -106,7 +146,12 @@ function mergedColumns(series: Series[]) {
 }
 
 function isExportedSeries(series: Series): series is Series & { name: string } {
-  return series.type === "line" && typeof series.name === "string" && series.name.length > 0 && series.name !== "Events";
+  return (
+    series.type === "line" &&
+    typeof series.name === "string" &&
+    series.name.length > 0 &&
+    series.name !== "Events"
+  );
 }
 
 function cellText(value: unknown): string {
@@ -127,7 +172,7 @@ function cellText(value: unknown): string {
 
 function csvField(value: string) {
   if (/[",\n\r]/.test(value)) {
-    return `"${value.replaceAll("\"", "\"\"")}"`;
+    return `"${value.replaceAll('"', '""')}"`;
   }
   return value;
 }

@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-result-history
+      author: repo-growth-monitor
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE collection_history_mapping(task_id BIGINT PRIMARY KEY, family VARCHAR(32) NOT NULL, legacy_run_id BIGINT NOT NULL);
+              CREATE TABLE collector_snapshot_header(repository_id BIGINT NOT NULL, family VARCHAR(32) NOT NULL, business_date DATE NOT NULL, observed_at TIMESTAMPTZ NOT NULL, PRIMARY KEY(repository_id,family,business_date));

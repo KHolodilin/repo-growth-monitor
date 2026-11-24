@@ -1,11 +1,10 @@
-import { prepareSeriesStyles, seriesStyle } from "./seriesStyle";
-import type { Period } from "../components/PeriodSelector";
+import { prepareSeriesStyles, seriesMarkerHtml, seriesStyle } from "./seriesStyle";
+import type { Period } from "./period";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { eventUtcDate } from "./growthEvents";
 import { periodDates } from "./searchVisibilityKpi";
 import { calendarDates, formatChartAxisDate } from "./utils";
-
 
 export type RankHistoryPoint = { date: string; position: number | null };
 
@@ -21,7 +20,11 @@ export type RankHistorySeries = {
   dimmed?: boolean;
 };
 
-export function rankTooltipText(point: RankHistoryPoint | undefined, limit: number, missed = false) {
+export function rankTooltipText(
+  point: RankHistoryPoint | undefined,
+  limit: number,
+  missed = false,
+) {
   if (missed) {
     return "Not collected";
   }
@@ -62,7 +65,9 @@ function timelineRank(dates: string[], series: RankHistorySeries[]) {
         }
         return [{ date: label, position: point.position }];
       }),
-      missedDates: axis.filter((label, index) => index < span.length && (item.missedDates ?? []).includes(span[index])),
+      missedDates: axis.filter(
+        (_label, index) => index < span.length && (item.missedDates ?? []).includes(span[index]),
+      ),
     })),
   };
 }
@@ -101,16 +106,21 @@ export function rankHistoryOption({
     : events;
   const calendarAxis = markerAt
     ? dates
-    : windowDates
-      ?? (visibleEvents.length > 0 ? calendarDates([...dates, ...visibleEvents.map((event) => eventUtcDate(event))]) : dates);
+    : (windowDates ??
+      (visibleEvents.length > 0
+        ? calendarDates([...dates, ...visibleEvents.map((event) => eventUtcDate(event))])
+        : dates));
   const frame = axis === "timeline" ? timelineRank(calendarAxis, series) : null;
   const plotSeries = frame?.series ?? series;
   const axisDates = frame?.dates ?? calendarAxis;
   const plotAxis = frame ? (value: string) => `Day ${value}` : formatAxis;
-  const locate = frame ? (event: GrowthEvent) => frame.dateToDay.get(eventUtcDate(event)) ?? "" : markerAt;
-  const overlays = visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period, locate) : null;
+  const locate = frame
+    ? (event: GrowthEvent) => frame.dateToDay.get(eventUtcDate(event)) ?? ""
+    : markerAt;
+  const overlays =
+    visibleEvents.length > 0 ? rankEventOverlays(axisDates, visibleEvents, period, locate) : null;
   const maxLimit = Math.max(50, ...series.map((item) => item.limit));
-  prepareSeriesStyles(plotSeries.map(item => item.key ?? item.name));
+  prepareSeriesStyles(plotSeries.map((item) => item.key ?? item.name));
   const lines = plotSeries.flatMap((item) => {
     const identity = item.key ?? item.name;
     const style = seriesStyle(identity);
@@ -125,7 +135,12 @@ export function rankHistoryOption({
         showSymbol: true,
         symbol: style.symbol,
         symbolSize: item.highlighted ? 8 : 6,
-        lineStyle: { type: style.line, width: item.highlighted ? 3.5 : 2, opacity: item.dimmed ? 0.25 : 1, color },
+        lineStyle: {
+          type: style.line,
+          width: item.highlighted ? 3.5 : 2,
+          opacity: item.dimmed ? 0.25 : 1,
+          color,
+        },
         itemStyle: { color, opacity: item.dimmed ? 0.25 : 1 },
         data: axisDates.map((date) => {
           const point = byDate.get(date);
@@ -158,9 +173,15 @@ export function rankHistoryOption({
     ];
   });
   return {
-    collectionSeries: series.filter(item => item.expected !== false).map(item => ({ name: item.name, dates: item.points.map(point => point.date) })),
-    collectionDates: series.filter(item => item.expected !== false).flatMap(item => item.points.map(point => point.date)),
-    missedCollectionDates: series.filter(item => item.expected !== false).flatMap(item => item.missedDates ?? []),
+    collectionSeries: series
+      .filter((item) => item.expected !== false)
+      .map((item) => ({ name: item.name, dates: item.points.map((point) => point.date) })),
+    collectionDates: series
+      .filter((item) => item.expected !== false)
+      .flatMap((item) => item.points.map((point) => point.date)),
+    missedCollectionDates: series
+      .filter((item) => item.expected !== false)
+      .flatMap((item) => item.missedDates ?? []),
     eventAxisDates: frame?.eventAxisDates ?? calendarAxis,
     tooltip: {
       trigger: "axis",
@@ -174,7 +195,7 @@ export function rankHistoryOption({
             const point = item.points.find((entry) => entry.date === date);
             const missed = item.missedDates?.includes(date) ?? false;
             const observedOn = tooltipDate?.(item.name, date);
-            return `<span style="color:${seriesStyle(item.key ?? item.name).color}">●</span> ${item.name}${observedOn ? ` (${observedOn})` : ""}: ${rankTooltipText(point, item.limit, missed)}`;
+            return `${seriesMarkerHtml(item.key ?? item.name)} ${item.name}${observedOn ? ` (${observedOn})` : ""}: ${rankTooltipText(point, item.limit, missed)}`;
           })
           .join("<br/>");
         const dayEvents = overlays?.groups.find((group) => group.date === date)?.events ?? [];
@@ -195,7 +216,13 @@ export function rankHistoryOption({
           ...(legendToggle ? {} : { selectedMode: false }),
         }
       : undefined,
-    grid: { left: 48, right: 24, top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24, bottom: 8, containLabel: true },
+    grid: {
+      left: 48,
+      right: 24,
+      top: overlays && overlays.groups.length > 0 ? 64 : legend ? 48 : 24,
+      bottom: 8,
+      containLabel: true,
+    },
     xAxis: {
       type: "category",
       data: axisDates,
@@ -264,7 +291,10 @@ function rankEventOverlays(
 }
 
 export function datesFromHistory(points: RankHistoryPoint[][], extraDates: string[] = []) {
-  return calendarDates([...points.flatMap((list) => list.map((point) => point.date)), ...extraDates]);
+  return calendarDates([
+    ...points.flatMap((list) => list.map((point) => point.date)),
+    ...extraDates,
+  ]);
 }
 
 /** Old gaps are history; a gap in the last week means the collection is broken right now. */

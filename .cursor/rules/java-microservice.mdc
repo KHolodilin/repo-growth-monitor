@@ -1,0 +1,87 @@
+---
+description: Shared rules and constraints for Java microservice development (layers, ArchUnit, quality)
+alwaysApply: true
+---
+
+# Java microservice development
+
+Rules for Spring Boot / Java microservices in this repository (collector and similar modules). Issue/PR/release workflows live in `issue-workflow` / `issue-execution`. Frontend belongs in separate UI/chart rules.
+
+The agent changes **code to match the rules**, not the rules to match the code. POM, CI, ArchitectureTest, coverage/mutation thresholds, and exclusions/suppressions are changed only by the standards owner (or with their explicit approval).
+
+## Architecture: classic layers
+
+**Layered Architecture** only. Do not switch to Hexagonal/Clean, do not introduce ports/adapters “for style”, and do not create Maven modules only to draw layer boundaries.
+
+Agreed dependency direction:
+
+- `Controller` → `Service`
+- `Service` → `Repository` / `Integration` / `Model`
+- `Repository` → `Model`
+- `Integration` → `Model`
+- `Configuration` wires components; the entrypoint depends only on configuration
+- `Security` / `Logging` are narrow side layers per the module’s ArchUnit rules
+
+Forbidden:
+
+- `Integration` → `Repository` or `Service` (including via callback/Supplier/Function into a store/queue)
+- controller → repository / cache / external client, bypassing service
+- moving classes between packages **only** to satisfy ArchUnit
+- `ignoreDependency`, frozen rules, exclude/suppression / `allowEmptyShould(true)` to hide a layer violation
+- pulling HTTP/security/`@ConfigurationProperties` into `service`
+- framework/JSON/HTTP/SQL/idempotency-wire types in `model`
+
+Storage, checkpoint, lease/fencing, retry and job completion, and local queue orchestration belong in **service**.  
+Integration owns external APIs (HTTP, URL, GraphQL, headers) and response transformation, with no knowledge of local persistence.
+
+### Integration: client / source / mapper
+
+- Source/reader: transport, credentials, rate limiting, interpretation of HTTP headers and statuses.
+- Client: builds the request (URL/GraphQL/parameters, including page size) and calls the source; passes mapper any required context explicitly.
+- Mapper: extracts and validates external JSON → typed model observations; keeps opaque JSON where needed. No HTTP, retry, checkpoint, queue, service, or repository access.
+- Collection services consume typed observations, not `JsonNode`.
+
+## Data and JSON
+
+- Build dynamic JSON with Jackson (builders / object serialization). String concatenation and string formatting of JSON are forbidden.
+- Do not double-encode nested JSON (object → escaped string inside JSON).
+- Validate required fields explicitly. Do not silently replace corrupt data with `0` / `false` / `""` / `[]`.
+- Distinguish missing data, unknown values, and zero.
+- Use `enum` for fixed value sets. Do not pack unrelated fields into positional arrays such as `Long[4]`.
+- Do not keep unused fields “for later” or add fake reads only to satisfy an analyzer.
+
+## HTTP, time, errors
+
+- Prefer `HttpStatus`, `HttpHeaders`, `MediaType` over magic numbers and strings.
+- Put repeated protocol-specific headers in named constants owned by that protocol.
+- Do not change status/range semantics during cosmetic refactors.
+- Deadline, lease, and retry use an injected `Clock`.
+- Do not swallow unexpected exceptions: log context and stack traces without secrets or full payloads.
+
+## Readability and scope
+
+- Use the project’s shared formatter (Spotless).
+- Split large methods by scenario and responsibility.
+- Do not invent universal frameworks, interfaces, or wrappers without a practical need.
+- Do not extract every literal into a constant mechanically.
+
+## ArchitectureTest — user only
+
+Only the **user** may edit `*ArchitectureTest*` files. The agent must not create, change, delete, or “fix” them via formatters/scripts as a way to alter the rules.
+
+If an architecture test fails or a rule change seems needed:
+
+1. Prefer fixing code to match the **existing** rules immediately.
+2. Otherwise in chat: **cause** (which rule / dependency), **why it happened**, **trade-offs** of keeping vs changing the rule, **proposal** (exact ArchitectureTest diff/snippet and/or code change).
+3. Wait until the user updates ArchitectureTest themselves.
+4. After their edit / request — run ArchitectureTest or `verify`.
+
+## Quality and verification
+
+- Do not weaken analyzers, coverage/mutation thresholds, suppressions, or exclusions.
+- New exclusions/suppressions must be precise (class + method + signature when needed), with a verified reason in the filter comment.
+- Before suppressing nullable warnings: check the interface/SPI contract (annotations, docs, stock implementations), not only `requireNonNull` in our code.
+- Do not change unrelated code “while here”; do not alter idempotency/lease/deadline/checkpoint contracts without an explicit task.
+- Preserve behavior and contracts unless the task says otherwise.
+- Tests must assert real behavior; do not replace them with delegation-only tests.
+- When asked to verify: run ArchUnit and affected tests, then `mvn verify` for the module with dependencies. Report the commands actually run and any environment limits; do not claim success from an old report.

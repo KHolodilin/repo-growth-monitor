@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --coverage"
+    "test": "vitest run --coverage",
+    "assert:eslint-ts": "node -e \"const ts=require('typescript'); if (!/^6\\./.test(ts.version) || typeof ts.createProgram !== 'function') { console.error('ESLint must resolve TypeScript 6 API, got', ts.version); process.exit(1); } console.log('eslint typescript', ts.version);\"",
+    "typecheck": "node ./node_modules/@typescript/native/bin/tsc -p tsconfig.json --noEmit && node ./node_modules/@typescript/native/bin/tsc -p tsconfig.node.json --noEmit",
+    "lint": "npm run assert:eslint-ts && eslint --max-warnings=0 \"src/**/*.{ts,tsx}\" \"vite.config.ts\" \"eslint.config.js\" \"prettier.config.js\"",
+    "format": "prettier --write --ignore-unknown \"src/**/*\" \"index.html\" \"*.config.js\" \"*.config.ts\" \"tsconfig.json\" \"tsconfig.node.json\" \"package.json\" \"test-fixtures/**/*\" \"public/**/*\"",
+    "format:check": "prettier --check --ignore-unknown \"src/**/*\" \"index.html\" \"*.config.js\" \"*.config.ts\" \"tsconfig.json\" \"tsconfig.node.json\" \"package.json\" \"test-fixtures/**/*\" \"public/**/*\"",
+    "verify": "npm run format:check && npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.4.1",
@@ -24,17 +30,28 @@
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.8",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@tailwindcss/vite": "^4.3.3",
+    "@typescript/native": "npm:typescript@7.0.2",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.4.4",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^16.5.0",
     "jsdom": "^30.1.3",
+    "prettier": "^3.10.1",
     "tailwindcss": "^4.3.3",
-    "typescript": "^7.0.2",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript-eslint": "8.73.0",
     "vite": "^8.3.5",
     "vitest": "^5.0.1"
   }

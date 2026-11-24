@@ -24,7 +24,8 @@ vi.mock("echarts-for-react", async () => {
         "button",
         {
           type: "button",
-          onClick: () => onEvents?.legendselectchanged?.({ selected: { Views: false, Visitors: true } }),
+          onClick: () =>
+            onEvents?.legendselectchanged?.({ selected: { Views: false, Visitors: true } }),
         },
         "legend",
       ),
@@ -68,11 +69,22 @@ vi.mock("echarts-for-react", async () => {
 });
 
 Element.prototype.scrollIntoView = vi.fn();
-vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
-HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
-HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+vi.stubGlobal(
+  "ResizeObserver",
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  },
+);
+HTMLDialogElement.prototype.showModal = function () {
+  this.setAttribute("open", "");
+};
+HTMLDialogElement.prototype.close = function () {
+  this.removeAttribute("open");
+};
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   document.cookie.split(";").forEach((part) => {
     const name = part.split("=")[0]?.trim();
@@ -80,4 +92,6 @@ afterEach(() => {
       document.cookie = `${name}=; path=/; max-age=0`;
     }
   });
+  const { resetChartVisibilityStore } = await import("../lib/chartVisibility");
+  resetChartVisibilityStore();
 });

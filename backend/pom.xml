@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.2</version>
-        <relativePath/>
+        <groupId>com.kholodilin</groupId>
+        <artifactId>repo-growth-monitor-parent</artifactId>
+        <version>0.4.1</version>
+        <relativePath>../pom.xml</relativePath>
     </parent>
 
     <groupId>com.kholodilin</groupId>
@@ -20,8 +20,17 @@
     <properties>
         <java.version>25</java.version>
         <springdoc.version>3.2.0</springdoc.version>
+        <!--
+          springdoc-openapi 3.2.0 still pulls org.webjars:swagger-ui:5.34.0 (bundled
+          DOMPurify 3.4.16: CVE-2026-116802/803/804). 5.34.1 ships DOMPurify 3.4.17.
+          Keep springdoc.swagger-ui.version in application.yml in sync (resource filter).
+        -->
+        <swagger-ui.version>5.34.1</swagger-ui.version>
         <wiremock.version>3.13.2</wiremock.version>
-        <jacoco.version>0.8.16</jacoco.version>
+        <pitest.skip>false</pitest.skip>
+        <dependency-check.skip>false</dependency-check.skip>
+        <pitest.target.classes>com.kholodilin.repogrowth.*</pitest.target.classes>
+        <pitest.target.tests>com.kholodilin.repogrowth.*</pitest.target.tests>
     </properties>
 
     <dependencyManagement>
@@ -33,10 +42,34 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <dependency>
+                <groupId>org.webjars</groupId>
+                <artifactId>swagger-ui</artifactId>
+                <version>${swagger-ui.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>com.kholodilin</groupId>
+            <artifactId>collector-contracts</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.kholodilin</groupId>
+            <artifactId>spring-boot-idempotency-starter</artifactId>
+            <version>${idempotency-starter.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>8.14.0</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
@@ -163,27 +196,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco.version}</version>
                 <executions>
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>report</id>
-                        <phase>test</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                        <configuration>
-                            <formats>
-                                <format>HTML</format>
-                                <format>XML</format>
-                            </formats>
-                        </configuration>
-                    </execution>
                     <execution>
                         <id>check</id>
                         <phase>test</phase>
@@ -218,6 +231,14 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
                     <excludes>
                         <exclude>

@@ -2,7 +2,12 @@ import { lineStyle, metricColor } from "./seriesStyle";
 import type { GrowthEvent, TrafficNotice, TrafficPoint } from "./api";
 import { nextIsoDay, repositoryGapText, trafficWarningDate } from "./trafficGap";
 import { formatChartAxisDate, formatNumber } from "./utils";
-import { eventMarkerLabel, eventTypeLabel, eventUtcDate, groupEventsByUtcDate } from "./growthEvents";
+import {
+  eventMarkerLabel,
+  eventTypeLabel,
+  eventUtcDate,
+  groupEventsByUtcDate,
+} from "./growthEvents";
 
 /** One text row above the line. A label that does not fit is replaced by the event count. */
 const LABEL_DISTANCE = 18;
@@ -74,9 +79,10 @@ export function eventMarkOverlays(
       events: group.events,
     };
   });
-  const visibleText = kind === "count"
-    ? new Map(labels.map((label) => [label.date, label.text]))
-    : labelTexts(dates, labels);
+  const visibleText =
+    kind === "count"
+      ? new Map(labels.map((label) => [label.date, label.text]))
+      : labelTexts(dates, labels);
   const tooltip = {
     formatter: (params: { data?: { events?: GrowthEvent[] } }) => {
       const items = params.data?.events ?? [];
@@ -84,7 +90,10 @@ export function eventMarkOverlays(
         return "";
       }
       const rows = items
-        .map((item) => `<div>${item.title}<div style="opacity:.7">${eventTypeLabel(item.type)}</div></div>`)
+        .map(
+          (item) =>
+            `<div>${item.title}<div style="opacity:.7">${eventTypeLabel(item.type)}</div></div>`,
+        )
         .join("");
       return `<div style="max-width:100%">${rows}</div>`;
     },
@@ -118,26 +127,35 @@ export function eventMarkOverlays(
       symbolSize: 42,
       silent: false,
       itemStyle: { color: "#0969da" },
-      label: { color: "#fff", fontSize: 11, formatter: (params: { data?: { events?: GrowthEvent[]; countAsText?: boolean } }) => {
-        const count = params.data?.events?.length ?? 0;
-        if (kind === "count" || params.data?.countAsText || count <= 1) {
-          return "";
-        }
-        return String(count);
-      } },
+      label: {
+        color: "#fff",
+        fontSize: 11,
+        formatter: (params: { data?: { events?: GrowthEvent[]; countAsText?: boolean } }) => {
+          const count = params.data?.events?.length ?? 0;
+          if (kind === "count" || params.data?.countAsText || count <= 1) {
+            return "";
+          }
+          return String(count);
+        },
+      },
       tooltip,
       data: groups.map((group) => ({
         xAxis: group.date,
         yAxis: peak,
         name: group.events[0]?.title ?? "Events",
         events: group.events,
-        countAsText: kind === "count" || visibleText.get(group.date) === String(group.events.length),
+        countAsText:
+          kind === "count" || visibleText.get(group.date) === String(group.events.length),
       })),
     },
   };
 }
 
-export function trafficAxisDates(points: { date: string }[], events: GrowthEvent[], marker?: string | null) {
+export function trafficAxisDates(
+  points: { date: string }[],
+  events: GrowthEvent[],
+  marker?: string | null,
+) {
   const trafficDates = points.map((point) => point.date).sort();
   if (trafficDates.length === 0) {
     const dates = chartDatesWithEvents([], events);
@@ -154,11 +172,13 @@ export function trafficAxisDates(points: { date: string }[], events: GrowthEvent
   for (let day = trafficDates[0]; day <= end; day = nextIsoDay(day)) {
     filled.push(day);
   }
-  const extras = chartDatesWithEvents(points, events).filter((date) => date < trafficDates[0] || date > end);
+  const extras = chartDatesWithEvents(points, events).filter(
+    (date) => date < trafficDates[0] || date > end,
+  );
   return [...filled, ...extras].sort();
 }
 
-export function chartDatesWithEvents(points: TrafficPoint[], events: GrowthEvent[]) {
+export function chartDatesWithEvents(points: { date: string }[], events: GrowthEvent[]) {
   const dates = new Set(points.map((point) => point.date));
   for (const event of events) {
     dates.add(eventUtcDate(event));
@@ -178,12 +198,16 @@ export function trafficChartOption(
   const byDate = new Map(points.map((point) => [point.date, point]));
   const peak = Math.max(
     1,
-    ...points.flatMap((point) => [point.views, point.uniqueVisitors, point.clones, point.uniqueCloners].filter((value): value is number => value != null)),
+    ...points.flatMap((point) =>
+      [point.views, point.uniqueVisitors, point.clones, point.uniqueCloners].filter(
+        (value): value is number => value != null,
+      ),
+    ),
   );
   const { groups, markLine } = eventMarkOverlays(dates, events, peak, period);
 
   return {
-    collectionDates: points.map(point => point.date),
+    collectionDates: points.map((point) => point.date),
     collectionWarning: marker ? { date: marker, text: gapText } : undefined,
     tooltip: {
       trigger: "axis" as const,
@@ -198,7 +222,8 @@ export function trafficChartOption(
         const rows = params
           .filter((item) => item.seriesName !== "Events")
           .map((item) => {
-            const value = item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
+            const value =
+              item.data === null || item.data === undefined ? "—" : formatNumber(item.data);
             return `<div style="display:flex;justify-content:space-between;gap:24px"><span><span style="color:${metricColor(item.seriesName)}">●</span> ${item.seriesName}</span><span>${value}</span></div>`;
           })
           .join("");
@@ -243,7 +268,6 @@ export function trafficChartOption(
         symbolSize: 8,
         connectNulls: true,
         data: dates.map((date) => byDate.get(date)?.views ?? null),
-
       },
       {
         name: "Visitors",
@@ -255,8 +279,14 @@ export function trafficChartOption(
         data: dates.map((date) => byDate.get(date)?.uniqueVisitors ?? null),
       },
       {
-        name: "Clones", markPoint: undefined, ...lineStyle("Clones"), type: "line", showSymbol: true, symbolSize: 8, connectNulls: true,
-        data: dates.map(date => byDate.get(date)?.clones ?? null),
+        name: "Clones",
+        markPoint: undefined,
+        ...lineStyle("Clones"),
+        type: "line",
+        showSymbol: true,
+        symbolSize: 8,
+        connectNulls: true,
+        data: dates.map((date) => byDate.get(date)?.clones ?? null),
       },
       {
         name: "Unique Cloners",
@@ -280,7 +310,10 @@ export function trafficChartOption(
   };
 }
 
-export function markLineEvents(params: { componentType?: string; data?: { events?: GrowthEvent[] } }): GrowthEvent[] {
+export function markLineEvents(params: {
+  componentType?: string;
+  data?: { events?: GrowthEvent[] };
+}): GrowthEvent[] {
   if (params.componentType !== "markLine" && params.componentType !== "markPoint") {
     return [];
   }

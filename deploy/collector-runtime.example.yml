@@ -1,0 +1,59 @@
+# Copy to a host-private path and point SPRING_CONFIG_ADDITIONAL_LOCATION at it.
+# Replace tokens; never commit real secrets. No collector Postgres.
+# Non-secret defaults live in github-collector application.yml; this file supplies secrets + overrides.
+collector:
+  runtime:
+    enabled: true
+  acceptance:
+    destinations:
+      - rgm-results
+  http:
+    enabled: true
+    clients:
+      - origin: rgm
+        token: "SERVICE_TOKEN_AT_LEAST_32_CHARS____________"
+  credentials:
+    enabled: true
+    ttl: 2h
+    maximum-size: 100
+    allow-http: false
+    origins:
+      - origin: rgm
+        endpoint: https://rgm.example
+        service-token: "RESOLVE_TOKEN_AT_LEAST_32_CHARS____________"
+  execution:
+    enabled: true
+    maximum-payload-bytes: 5242880
+    maximum-pages: 5
+  delivery:
+    enabled: true
+    allow-http: false
+    destinations:
+      - ref: rgm-results
+        origin: rgm
+        endpoint: https://rgm.example/internal/v1/collector-results
+    retry:
+      max-attempts: 12
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2
+  search:
+    rank-sort: best_match
+    rank-sort-order: desc
+  github:
+    pacing:
+      concurrency: 1
+      core-interval: 1200ms
+      search-interval: 3000ms
+      graphql-interval: 1200ms
+    retry:
+      max-attempts: 5
+      initial-delay: 5s
+      max-delay: 5m
+      multiplier: 2.0
+      jitter: 0.2
+  capacity:
+    max-jobs: 100
+    max-queue-bytes: 67108864
+    max-request-bytes: 262144

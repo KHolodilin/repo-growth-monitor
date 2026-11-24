@@ -32,9 +32,9 @@ export function defaultTopKeys(rows: SnapshotHistoryRow[], metric: SnapshotMetri
   return [...rows]
     .sort(
       (left, right) =>
-        latestValue(right, metric) - latestValue(left, metric)
-        || latestValue(right, other) - latestValue(left, other)
-        || left.key.localeCompare(right.key),
+        latestValue(right, metric) - latestValue(left, metric) ||
+        latestValue(right, other) - latestValue(left, other) ||
+        left.key.localeCompare(right.key),
     )
     .slice(0, limit)
     .map((row) => row.key);

@@ -8,8 +8,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Configuration
 public class TransactionConfig {
 
-    @Bean
-    TransactionTemplate transactionTemplate(PlatformTransactionManager transactionManager) {
-        return new TransactionTemplate(transactionManager);
-    }
+  @Bean
+  TransactionTemplate transactionTemplate(PlatformTransactionManager transactionManager) {
+    return new TransactionTemplate(transactionManager);
+  }
 }

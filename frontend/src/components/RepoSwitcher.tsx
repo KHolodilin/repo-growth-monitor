@@ -1,5 +1,13 @@
 import { useIsMobileChart } from "../lib/useMediaQuery";
-import { useLayoutEffect, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useLayoutEffect,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Book, Check, ChevronDown, Lock, Search } from "lucide-react";
 import { api, type Repository } from "../lib/api";
@@ -8,7 +16,7 @@ import { cn } from "../lib/utils";
 type RepoSwitcherProps = {
   currentId: number;
   currentLabel: string;
-  hrefFor: (repositoryId: number) => string;
+  hrefFor: (repository: Repository) => string;
   description?: string;
 };
 
@@ -33,24 +41,34 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
     const update = () => {
       const rect = rootRef.current!.getBoundingClientRect();
       const width = Math.min(352, document.documentElement.clientWidth - 32);
-      setMenuPosition({ left: Math.max(16, Math.min(rect.left, document.documentElement.clientWidth - width - 16)), top: rect.bottom + 4, width });
+      setMenuPosition({
+        left: Math.max(16, Math.min(rect.left, document.documentElement.clientWidth - width - 16)),
+        top: rect.bottom + 4,
+        width,
+      });
     };
     update();
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
-    return () => { window.removeEventListener("resize", update); window.removeEventListener("scroll", update, true); };
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
   }, [open, mobile]);
 
   const options = useMemo(() => {
     const tracked = (repos ?? [])
       .filter((repo) => repo.trackingEnabled || repo.id === currentId)
-      .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }));
+      .sort((left, right) =>
+        left.name.localeCompare(right.name, undefined, { sensitivity: "base" }),
+      );
     const needle = query.trim().toLowerCase();
     if (!needle) {
       return tracked;
     }
     return tracked.filter(
-      (repo) => repo.name.toLowerCase().includes(needle) || repo.fullName.toLowerCase().includes(needle),
+      (repo) =>
+        repo.name.toLowerCase().includes(needle) || repo.fullName.toLowerCase().includes(needle),
     );
   }, [repos, currentId, query]);
 
@@ -77,17 +95,21 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
     };
   }, [open]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+  const highlightKey = open
+    ? `${query}\0${currentId}\0${options.map((repo) => repo.id).join(",")}`
+    : "closed";
+  const [seenHighlightKey, setSeenHighlightKey] = useState(highlightKey);
+  if (open && highlightKey !== seenHighlightKey) {
+    setSeenHighlightKey(highlightKey);
     if (query.trim()) {
       setHighlighted(0);
-      return;
+    } else {
+      const index = options.findIndex((repo) => repo.id === currentId);
+      setHighlighted(index >= 0 ? index : 0);
     }
-    const index = options.findIndex((repo) => repo.id === currentId);
-    setHighlighted(index >= 0 ? index : 0);
-  }, [query, open, options, currentId]);
+  } else if (!open && seenHighlightKey !== "closed") {
+    setSeenHighlightKey("closed");
+  }
 
   useEffect(() => {
     highlightedRef.current?.scrollIntoView({ block: "nearest" });
@@ -101,7 +123,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
       return;
     }
     try {
-      setRepos(await api<Repository[]>("/api/v1/repositories?refresh=false"));
+      setRepos(await api<Repository[]>("/api/v1/admin/repositories?refresh=false"));
     } catch (err) {
       setError((err as Error).message);
     }
@@ -109,11 +131,15 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
 
   function select(repo: Repository) {
     setOpen(false);
-    const to = hrefFor(repo.id);
+    const to = hrefFor(repo);
     if (to === `${location.pathname}${location.search}`) {
       return;
     }
-    navigate(to);
+    const q = to.indexOf("?");
+    void navigate(
+      q < 0 ? { pathname: to, search: "" } : { pathname: to.slice(0, q), search: to.slice(q) },
+      { replace: false },
+    );
   }
 
   function onSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -149,7 +175,12 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
           void openMenu();
         }}
       >
-        <span className="min-w-0 truncate text-left md:whitespace-normal md:break-all" title={currentLabel}>{currentLabel}</span>
+        <span
+          className="min-w-0 truncate text-left md:whitespace-normal md:break-all"
+          title={currentLabel}
+        >
+          {currentLabel}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden="true" />
         {tipText && !open && (
           <span
@@ -162,7 +193,10 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
         )}
       </button>
       {open && (
-        <div style={mobile ? menuPosition : undefined} className="fixed z-50 mt-1 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border bg-card shadow-lg md:absolute md:left-0">
+        <div
+          style={mobile ? menuPosition : undefined}
+          className="fixed z-50 mt-1 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border bg-card shadow-lg md:absolute md:left-0"
+        >
           <div className="border-b px-3 py-2 text-sm font-medium">Switch repository</div>
           <div className="relative border-b px-2 py-2">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -178,7 +212,9 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
           </div>
           <div className="max-h-72 overflow-y-auto py-1" role="listbox">
             {error && <p className="px-3 py-2 text-sm text-red-600">{error}</p>}
-            {!error && repos === null && <p className="px-3 py-2 text-sm text-muted-foreground">Loading...</p>}
+            {!error && repos === null && (
+              <p className="px-3 py-2 text-sm text-muted-foreground">Loading...</p>
+            )}
             {!error && repos !== null && options.length === 0 && (
               <p className="px-3 py-2 text-sm text-muted-foreground">No repositories found</p>
             )}
@@ -203,9 +239,15 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
                     {current ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}
                   </span>
                   {privateRepo ? (
-                    <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <Lock
+                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <Book className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <Book
+                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                   )}
                   <span className="min-w-0 truncate">{repo.name}</span>
                 </button>

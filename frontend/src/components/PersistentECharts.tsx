@@ -1,5 +1,19 @@
-import { publishChartVisibility, readChartVisibility, subscribeChartVisibility } from "../lib/chartVisibility";
-import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useDashboardView } from "../lib/dashboardView";
+import {
+  publishChartVisibility,
+  readChartVisibility,
+  subscribeChartVisibility,
+} from "../lib/chartVisibility";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { metricColor, seriesStyle } from "../lib/seriesStyle";
 import { SeriesSwatch } from "./SeriesSwatch";
 import { ChartDataAlternative } from "./ChartDataAlternative";
@@ -11,7 +25,7 @@ import { presentChartOption, type ChartAxis } from "../lib/chartPresentation";
 import { markLineEvents } from "../lib/trafficChart";
 import { useChartMode, useRegisterChartExport } from "./ChartDownloadMenu";
 
-type SeriesRef = { key: string; name: string; icon?: ReactNode };
+type SeriesRef = { key: string; name: string; label?: string; icon?: ReactNode };
 
 type Props = {
   chartId: string;
@@ -21,7 +35,8 @@ type Props = {
   accessibleTitle?: string;
   exportTitle?: string;
   dataAlternative?: boolean;
-} & ComponentProps<typeof ReactECharts>;
+  option?: object;
+} & Omit<ComponentProps<typeof ReactECharts>, "option">;
 
 export function ChartModePlot({
   build,
@@ -34,20 +49,36 @@ export function ChartModePlot({
     () => build({ axis: mode.axis, events: mode.events }),
     [build, mode.axis, mode.events],
   );
-  return <PersistentECharts {...rest} option={option} />;
+  return <PersistentECharts {...rest} option={option as object} />;
 }
 
-export function PersistentECharts({ chartId, series, option, onEvents, persistSelection = true, accessibleTitle, exportTitle, dataAlternative = true, style, ...rest }: Props) {
+export function PersistentECharts({
+  chartId,
+  series,
+  option,
+  onEvents,
+  persistSelection = true,
+  accessibleTitle,
+  exportTitle,
+  dataAlternative = true,
+  style,
+  ...rest
+}: Props) {
+  const view = useDashboardView();
   const descriptionId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReactECharts>(null);
   const mode = useChartMode();
-  const [stored, setStored] = useState<Record<string, boolean> | null>(() => readChartVisibility(chartId) ?? (persistSelection ? readChartSelection(chartId) : null));
-
-  useEffect(() => {
-    setStored(readChartVisibility(chartId) ?? (persistSelection ? readChartSelection(chartId) : null));
-    return subscribeChartVisibility(chartId, () => setStored(readChartVisibility(chartId)));
-  }, [chartId, persistSelection]);
+  const subscribeVisibility = useCallback(
+    (onStoreChange: () => void) => subscribeChartVisibility(chartId, onStoreChange),
+    [chartId],
+  );
+  const visibilityFlags = useSyncExternalStore(
+    subscribeVisibility,
+    () => readChartVisibility(chartId),
+    () => null,
+  );
+  const stored = visibilityFlags ?? (persistSelection ? readChartSelection(chartId) : null);
 
   const selectedByName = useMemo(() => {
     const defaults = defaultChartSelection(series.map((item) => item.key));
@@ -65,7 +96,11 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
         selected[item.name] = defaults[item.key];
         continue;
       }
-      selected[item.name] = Object.prototype.hasOwnProperty.call(stored, item.key) ? stored[item.key] : (item.key === "Total Clones" || item.key === "Unique Cloners" ? false : true);
+      selected[item.name] = Object.prototype.hasOwnProperty.call(stored, item.key)
+        ? stored[item.key]
+        : item.key === "Total Clones" || item.key === "Unique Cloners"
+          ? false
+          : true;
     }
     if (mode.mobile) {
       selected.Events = false;
@@ -75,16 +110,26 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
 
   useEffect(() => {
     if (!mode.mobile || !mode.mobileSeriesName || persistSelection) return;
-    const active = series.find(item => item.name === mode.mobileSeriesName);
+    const active = series.find((item) => item.name === mode.mobileSeriesName);
     if (active && readChartVisibility(chartId)?.[active.key] === false) {
       publishChartVisibility(chartId, { ...readChartVisibility(chartId), [active.key]: true });
     }
   }, [mode.mobile, mode.mobileSeriesName, persistSelection, series, chartId]);
 
-  const mergedOption = useMemo(() => ({
-    ...option,
-    legend: { show: false, data: series.map(item => item.name), selected: selectedByName },
-  }), [option, selectedByName, series]);
+  const collectionExpected = view.collectionExpected ?? !view.public;
+  const mergedOption = useMemo(
+    () => ({
+      ...option,
+      ...(collectionExpected === false ? { collectionExpected: false } : {}),
+      legend: {
+        show: false,
+        data: series.map((item) => item.name),
+        selected: selectedByName,
+        formatter: (name: string) => series.find((item) => item.name === name)?.label ?? name,
+      },
+    }),
+    [option, selectedByName, series, collectionExpected],
+  );
 
   const presented = useMemo(
     () =>
@@ -97,14 +142,22 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     [mergedOption, mode.axis, mode.events, mode.period, mode.mobile],
   );
 
+  const setAxisDates = mode.setAxisDates;
   useEffect(() => {
     const axis = (presented as { xAxis?: { data?: unknown } | unknown[] }).xAxis;
     if (!axis || Array.isArray(axis) || !Array.isArray(axis.data)) {
-      mode.setAxisDates([]);
+      setAxisDates([]);
       return;
     }
-    mode.setAxisDates((presented as { eventAxisDates?: string[] }).eventAxisDates ?? axis.data.map((value) => String(value)));
-  }, [presented, mode.setAxisDates]);
+    setAxisDates(
+      (presented as { eventAxisDates?: string[] }).eventAxisDates ??
+        axis.data.map((value) =>
+          typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+            ? String(value)
+            : "",
+        ),
+    );
+  }, [presented, setAxisDates]);
 
   const plotStyle = mode.mobile
     ? { ...(typeof style === "object" && style ? style : {}), height: 220, width: "100%" }
@@ -118,12 +171,14 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
     }
     if (persistSelection) writeChartSelection(chartId, next);
     publishChartVisibility(chartId, next);
-    setStored(next);
   }
 
   useEffect(() => {
-    const hide = () => chartRef.current?.getEchartsInstance?.()?.dispatchAction?.({ type: "hideTip" });
-    const outside = (event: PointerEvent) => { if (!wrapperRef.current?.contains(event.target as Node)) hide(); };
+    const hide = () =>
+      chartRef.current?.getEchartsInstance?.()?.dispatchAction?.({ type: "hideTip" });
+    const outside = (event: PointerEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) hide();
+    };
     hide();
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("scroll", hide, true);
@@ -138,45 +193,78 @@ export function PersistentECharts({ chartId, series, option, onEvents, persistSe
 
   const fileBase = chartExportBase(chartId);
   useRegisterChartExport({
-    downloadPng: () => downloadChartPng(chartRef.current, `${fileBase}.png`, exportTitle ?? accessibleTitle),
+    downloadPng: () =>
+      downloadChartPng(chartRef.current, `${fileBase}.png`, exportTitle ?? accessibleTitle),
     downloadCsv: () => downloadChartCsv(`${fileBase}.csv`, chartCsv(presented)),
   });
 
-  const shown = series.filter(item => selectedByName[item.name]).map(item => item.name);
+  const shown = series
+    .filter((item) => selectedByName[item.name])
+    .map((item) => item.label ?? item.name);
   function toggleSeries(name: string) {
     onLegendSelectChanged({ selected: { ...selectedByName, [name]: !selectedByName[name] } });
   }
   return (
     <div ref={wrapperRef} role="group" aria-label={accessibleTitle ?? `${chartId} chart`}>
-      {!(mode.mobile && mode.mobileSeriesName) && <div role="group" aria-label={`${accessibleTitle ?? chartId} series`} className="mb-3 flex flex-wrap justify-center gap-2">
-        {series.map(item => <button key={item.key} type="button" aria-pressed={selectedByName[item.name]} onClick={() => toggleSeries(item.name)} className={`inline-flex min-h-11 max-w-full min-w-0 items-center gap-1.5 rounded border px-3 py-1 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selectedByName[item.name] ? "bg-muted" : "opacity-60"}`}>
-          <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} />{item.icon}<span className="min-w-0 [overflow-wrap:anywhere]">{item.name}</span><span aria-hidden="true">{selectedByName[item.name] ? "✓" : "—"}</span>
-        </button>)}
-      </div>}
-      <p id={descriptionId} className="sr-only">{accessibleTitle ?? chartId}. Period: {mode.period ?? "all"}. Visible series: {shown.join(", ") || "none"}. Historical values are available below the chart.</p>
-      {shown.length === 0 && <p role="status" className="py-3 text-center text-sm text-muted-foreground">No series selected. Choose a metric to display the chart.</p>}
-      <div role="img" aria-label={`${accessibleTitle ?? chartId} graph`} aria-describedby={descriptionId}>
-    <ReactECharts
-      option={presented}
-      notMerge
-      style={plotStyle}
-      onEvents={{
-        ...onEvents,
-        legendselectchanged: onLegendSelectChanged,
-        click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
-          const clicked = markLineEvents(params);
-          if (clicked.length > 0) {
-            mode.openMarker(clicked);
-          }
-          const click = onEvents?.click as ((value: unknown) => void) | undefined;
-          click?.(params);
-        },
-      }}
-      {...rest}
-      ref={chartRef}
-    />
+      {!(mode.mobile && mode.mobileSeriesName) && (
+        <div
+          role="group"
+          aria-label={`${accessibleTitle ?? chartId} series`}
+          className="mb-3 flex flex-wrap justify-center gap-2"
+        >
+          {series.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={selectedByName[item.name]}
+              onClick={() => toggleSeries(item.name)}
+              className={`inline-flex min-h-11 max-w-full min-w-0 items-center gap-1.5 rounded border px-3 py-1 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${selectedByName[item.name] ? "bg-muted" : "opacity-60"}`}
+            >
+              <SeriesSwatch style={seriesStyle(metricColor(item.name) ? item.name : item.key)} />
+              {item.icon}
+              <span className="min-w-0 [overflow-wrap:anywhere]">{item.label ?? item.name}</span>
+              <span aria-hidden="true">{selectedByName[item.name] ? "✓" : "—"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <p id={descriptionId} className="sr-only">
+        {accessibleTitle ?? chartId}. Period: {mode.period ?? "all"}. Visible series:{" "}
+        {shown.join(", ") || "none"}. Historical values are available below the chart.
+      </p>
+      {shown.length === 0 && (
+        <p role="status" className="py-3 text-center text-sm text-muted-foreground">
+          No series selected. Choose a metric to display the chart.
+        </p>
+      )}
+      <div
+        role="img"
+        aria-label={`${accessibleTitle ?? chartId} graph`}
+        aria-describedby={descriptionId}
+      >
+        <ReactECharts
+          option={presented}
+          notMerge
+          style={plotStyle}
+          onEvents={{
+            ...onEvents,
+            legendselectchanged: onLegendSelectChanged,
+            click: (params: { componentType?: string; data?: { events?: GrowthEvent[] } }) => {
+              const clicked = markLineEvents(params);
+              if (clicked.length > 0) {
+                mode.openMarker(clicked);
+              }
+              const click = onEvents?.click as ((value: unknown) => void) | undefined;
+              click?.(params);
+            },
+          }}
+          {...rest}
+          ref={chartRef}
+        />
       </div>
-      {accessibleTitle && dataAlternative && <ChartDataAlternative option={presented} title={accessibleTitle} />}
+      {accessibleTitle && dataAlternative && (
+        <ChartDataAlternative option={presented} title={accessibleTitle} />
+      )}
     </div>
   );
 }

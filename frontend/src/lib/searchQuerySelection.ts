@@ -12,17 +12,28 @@ export function readSearchQuerySelection(repositoryId: number): number[] | null 
     return null;
   }
   try {
-    const parsed = JSON.parse(decodeURIComponent(match[1])) as unknown;
-    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "number" || !Number.isInteger(item))) {
+    const parsed: unknown = JSON.parse(decodeURIComponent(match[1]));
+    if (!Array.isArray(parsed)) {
       return null;
     }
-    return parsed;
+    const ids: number[] = [];
+    for (const item of parsed) {
+      if (typeof item !== "number" || !Number.isInteger(item)) {
+        return null;
+      }
+      ids.push(item);
+    }
+    return ids;
   } catch {
     return null;
   }
 }
 
-export function writeSearchQuerySelection(repositoryId: number, ids: number[], protocol = currentProtocol()) {
+export function writeSearchQuerySelection(
+  repositoryId: number,
+  ids: number[],
+  protocol = currentProtocol(),
+) {
   const secure = protocol === "https:" ? "; Secure" : "";
   const value = encodeURIComponent(JSON.stringify(ids));
   document.cookie = `${searchQuerySelectionCookie(repositoryId)}=${value}; path=/; max-age=${MAX_AGE}; SameSite=Lax${secure}`;

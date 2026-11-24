@@ -1,10 +1,10 @@
 package com.kholodilin.repogrowth.auth.domain;
 
 public enum AppRole {
-    USER,
-    ADMIN;
+  USER,
+  ADMIN;
 
-    public String authority() {
-        return "ROLE_" + name();
-    }
+  public String authority() {
+    return "ROLE_" + name();
+  }
 }

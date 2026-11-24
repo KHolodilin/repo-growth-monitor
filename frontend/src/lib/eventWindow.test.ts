@@ -40,7 +40,13 @@ describe("eventWindowComparison", () => {
     expect(comparison.visitors).toEqual({ before: 120, after: 340, difference: 220 });
     expect(comparison.clones).toEqual({ before: 18, after: 40, difference: 22 });
     expect(comparison.stars).toEqual({ before: 1, after: 6, difference: 5 });
-    expect(comparison.rank).toEqual({ kind: "move", name: "outbox", from: 22, to: 14, difference: 8 });
+    expect(comparison.rank).toEqual({
+      kind: "move",
+      name: "outbox",
+      from: 22,
+      to: 14,
+      difference: 8,
+    });
   });
 
   it("marks a short after window and an empty query list", () => {
@@ -107,7 +113,13 @@ describe("eventWindowComparison", () => {
     expect(comparison.visitors.before).toBe(0);
     expect(comparison.stars.before).toBe(3);
     expect(comparison.stars.after).toBe(1);
-    expect(comparison.rank).toEqual({ kind: "move", name: "better", from: 12, to: 4, difference: 8 });
+    expect(comparison.rank).toEqual({
+      kind: "move",
+      name: "better",
+      from: 12,
+      to: 4,
+      difference: 8,
+    });
   });
 
   it("prefers an improvement when two moves have the same size", () => {

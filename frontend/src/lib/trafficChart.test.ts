@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { GrowthEvent } from "./api";
-import { chartDatesWithEvents, eventMarkOverlays, markLineEvents, trafficChartOption } from "./trafficChart";
+import {
+  chartDatesWithEvents,
+  eventMarkOverlays,
+  markLineEvents,
+  trafficChartOption,
+} from "./trafficChart";
 
 const event = (date: string, title: string, id = 1): GrowthEvent => ({
   id,
@@ -14,9 +19,14 @@ const event = (date: string, title: string, id = 1): GrowthEvent => ({
 
 describe("trafficChart", () => {
   it("merges event dates and builds overlays", () => {
-    expect(chartDatesWithEvents([{ date: "2026-09-23", views: 1, uniqueVisitors: 1, clones: 0, uniqueCloners: 0 }], [
-      event("2026-09-21", "Post"),
-    ])).toEqual(["2026-09-21", "2026-09-23"]);
+    expect(
+      chartDatesWithEvents(
+        [
+          { date: "2026-09-23", views: 1, uniqueVisitors: 1, clones: 0, uniqueCloners: 0 },
+        ] as unknown as { date: string }[],
+        [event("2026-09-21", "Post")],
+      ),
+    ).toEqual(["2026-09-21", "2026-09-23"]);
 
     const overlays = eventMarkOverlays(
       ["2026-09-20", "2026-09-21", "2026-09-22", "2026-09-23"],
@@ -32,13 +42,21 @@ describe("trafficChart", () => {
     expect(overlays.groups).toHaveLength(4);
     expect(overlays.markLine.tooltip.formatter({})).toBe("");
     expect(overlays.markLine.tooltip.formatter({ data: {} })).toBe("");
-    expect(overlays.markLine.tooltip.formatter({ data: { events: [event("2026-09-20", "A")] } })).toContain("A");
+    expect(
+      overlays.markLine.tooltip.formatter({ data: { events: [event("2026-09-20", "A")] } }),
+    ).toContain("A");
     expect(overlays.markPoint.label.formatter({})).toBe("");
-    expect(overlays.markPoint.label.formatter({ data: { events: [event("2026-09-20", "A"), event("2026-09-20", "B", 2)] } })).toBe(
-      "2",
-    );
+    expect(
+      overlays.markPoint.label.formatter({
+        data: { events: [event("2026-09-20", "A"), event("2026-09-20", "B", 2)] },
+      }),
+    ).toBe("2");
     expect(overlays.markPoint.label.formatter({ data: {} })).toBe("");
-    expect(overlays.markPoint.label.formatter({ data: { events: [event("2026-09-20", "A")], countAsText: false } })).toBe("");
+    expect(
+      overlays.markPoint.label.formatter({
+        data: { events: [event("2026-09-20", "A")], countAsText: false },
+      }),
+    ).toBe("");
   });
 
   it("formats traffic tooltips and marker clicks", () => {
@@ -46,9 +64,7 @@ describe("trafficChart", () => {
       [{ date: "2026-09-23", views: 5, uniqueVisitors: null, clones: 1, uniqueCloners: 1 }],
       [event("2026-09-23", "Launch")],
     );
-    const formatter = option.tooltip.formatter as (
-      params: { axisValue: string; seriesName: string; data: number | null }[],
-    ) => string;
+    const formatter = option.tooltip.formatter;
     expect(formatter([])).toBe("");
     expect(
       formatter([
@@ -59,9 +75,11 @@ describe("trafficChart", () => {
     ).toContain("Launch");
     expect((option.tooltip.formatter as (params: unknown) => string)("nope")).toBe("");
     expect(
-      (option.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null | undefined }[]) => string)([
-        { axisValue: "2026-09-01", seriesName: "Views", data: undefined },
-      ]),
+      (
+        option.tooltip.formatter as (
+          params: { axisValue: string; seriesName: string; data: number | null | undefined }[],
+        ) => string
+      )([{ axisValue: "2026-09-01", seriesName: "Views", data: undefined }]),
     ).not.toContain("Launch");
     const sparse = trafficChartOption(
       [{ date: "2026-09-23", views: 1, uniqueVisitors: 1, clones: 0, uniqueCloners: 0 }],
@@ -70,7 +88,9 @@ describe("trafficChart", () => {
     expect(sparse.series[0].data).toContain(null);
     expect(sparse.series[1].data).toContain(null);
     expect(sparse.series[2].data).toContain(null);
-    expect(("markPoint" in sparse.series[4] ? sparse.series[4].markPoint : undefined)).toBeUndefined();
+    expect(
+      "markPoint" in sparse.series[4] ? sparse.series[4].markPoint : undefined,
+    ).toBeUndefined();
     expect(sparse.series[4].markLine!.data[0].events[0].title).toBeUndefined();
     expect(option.legend).toMatchObject({ top: 0 });
     expect(option.xAxis.axisLabel.formatter("2026-09-23")).toMatch(/Sep/);
@@ -87,10 +107,10 @@ describe("trafficChart", () => {
     expect(broken.xAxis.data).toContain("2026-10-16");
     expect(broken.xAxis.data).toContain("2026-10-18");
     expect(broken.series[0].data[broken.xAxis.data.indexOf("2026-10-16")]).toBeNull();
-    expect(("connectNulls" in broken.series[0] && broken.series[0].connectNulls)).toBe(true);
+    expect("connectNulls" in broken.series[0] && broken.series[0].connectNulls).toBe(true);
     expect(broken.collectionWarning?.date).toBe("2026-10-18");
     expect(broken.collectionWarning?.text).toBe("GitHub traffic data is missing for Oct 18 (T-1).");
-    const gapFormatter = broken.tooltip.formatter as (params: { axisValue: string; seriesName: string; data: number | null }[]) => string;
+    const gapFormatter = broken.tooltip.formatter;
     expect(gapFormatter([{ axisValue: "2026-10-18", seriesName: "Views", data: null }])).toBe(
       "GitHub traffic data is missing for Oct 18 (T-1).",
     );
@@ -100,17 +120,22 @@ describe("trafficChart", () => {
       "7d",
       { reason: "COLLECTION_FAILED", date: "2026-10-19", lastTrafficDate: null },
     );
-    expect(("markPoint" in kept.series[0] ? kept.series[0].markPoint : undefined)).toBeUndefined();
+    expect("markPoint" in kept.series[0] ? kept.series[0].markPoint : undefined).toBeUndefined();
     expect(kept.series[0].data).toEqual([0]);
-    expect(trafficChartOption([], [], "7d", {
-      reason: "COLLECTION_NOT_EXECUTED",
-      date: "2026-10-19",
-      lastTrafficDate: null,
-    }).xAxis.data).toEqual(["2026-10-18"]);
+    expect(
+      trafficChartOption([], [], "7d", {
+        reason: "COLLECTION_NOT_EXECUTED",
+        date: "2026-10-19",
+        lastTrafficDate: null,
+      }).xAxis.data,
+    ).toEqual(["2026-10-18"]);
     expect(markLineEvents({ componentType: "series" })).toEqual([]);
-    expect(markLineEvents({ componentType: "markLine", data: { events: [event("2026-09-23", "Launch")] } })).toHaveLength(
-      1,
-    );
+    expect(
+      markLineEvents({
+        componentType: "markLine",
+        data: { events: [event("2026-09-23", "Launch")] },
+      }),
+    ).toHaveLength(1);
     expect(markLineEvents({ componentType: "markPoint" })).toEqual([]);
   });
 
@@ -142,7 +167,13 @@ describe("trafficChart", () => {
       event("2026-01-04", "D", 4),
       event("2026-01-05", "E", 5),
     ]);
-    expect(overlays.markLine.data.map((item) => item.name)).toEqual(["LinkedIn post", "1", "1", "1", "1"]);
+    expect(overlays.markLine.data.map((item) => item.name)).toEqual([
+      "LinkedIn post",
+      "1",
+      "1",
+      "1",
+      "1",
+    ]);
     expect(overlays.markPoint.label.formatter({ data: overlays.markPoint.data[4] })).toBe("");
   });
 
@@ -166,7 +197,10 @@ describe("trafficChart", () => {
     expect(names.get("2026-10-01")).toBe("3");
     expect(names.get("2026-10-04")).toBe("1");
     expect(names.get("2026-10-05")).toBe("2");
-    const pin = (date: string) => overlays.markPoint.label.formatter({ data: overlays.markPoint.data.find((item) => item.xAxis === date) });
+    const pin = (date: string) =>
+      overlays.markPoint.label.formatter({
+        data: overlays.markPoint.data.find((item) => item.xAxis === date),
+      });
     expect(pin("2026-10-01")).toBe("");
     expect(pin("2026-10-05")).toBe("");
   });

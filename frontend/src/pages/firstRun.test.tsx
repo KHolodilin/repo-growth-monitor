@@ -39,7 +39,12 @@ describe("first-run portfolio", () => {
       if (String(path).includes("/system/status")) {
         return Promise.resolve(status("REJECTED"));
       }
-      return Promise.resolve({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
+      return Promise.resolve({
+        ...dashboardReady,
+        state: "NO_REPOSITORIES",
+        repositories: [],
+        traffic: [],
+      });
     });
     renderDashboard();
     expect(await screen.findByText(/Stored data is kept/)).toBeInTheDocument();
@@ -56,12 +61,22 @@ describe("first-run portfolio", () => {
       if (String(path).includes("/system/status")) {
         return Promise.resolve(status("RATE_LIMITED", false, "Europe/Moscow"));
       }
-      return Promise.resolve({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
+      return Promise.resolve({
+        ...dashboardReady,
+        state: "NO_REPOSITORIES",
+        repositories: [],
+        traffic: [],
+      });
     });
     renderDashboard();
-    expect(await screen.findByRole("link", { name: "Select repositories" })).toHaveAttribute("href", "/repositories");
+    expect(await screen.findByRole("link", { name: "Select repositories" })).toHaveAttribute(
+      "href",
+      "/admin/repositories",
+    );
     expect(screen.getByText(/10:00 to 18:00 Europe\/Moscow/)).toBeInTheDocument();
-    expect(screen.getByText(/The first collection starts as soon as a repository is enabled/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/The first collection starts as soon as a repository is enabled/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/Read permissions/)).not.toBeInTheDocument();
   });
 
@@ -70,10 +85,15 @@ describe("first-run portfolio", () => {
       if (String(path).includes("/system/status")) {
         return Promise.reject(new Error("offline"));
       }
-      return Promise.resolve({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] });
+      return Promise.resolve({
+        ...dashboardReady,
+        state: "NO_REPOSITORIES",
+        repositories: [],
+        traffic: [],
+      });
     });
     renderDashboard();
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/system/status"));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/system/status"));
     expect(await screen.findByText("Application is running.")).toBeInTheDocument();
     expect(screen.getByText(/Read permissions/)).toBeInTheDocument();
     expect(screen.queryByText(/Stored data is kept/)).not.toBeInTheDocument();
@@ -124,10 +144,11 @@ describe("first-run portfolio", () => {
       return Promise.resolve(empty);
     });
     const accepted = renderDashboard();
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/system/status"));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/v1/admin/system/status"));
     accepted.unmount();
-    await act(async () => {
+    await act(() => {
       resolveStatus(status("OK", true));
+      return Promise.resolve();
     });
 
     let rejectStatus: (error: Error) => void = () => undefined;
@@ -140,10 +161,15 @@ describe("first-run portfolio", () => {
       return Promise.resolve(empty);
     });
     const failed = renderDashboard();
-    await waitFor(() => expect(api.mock.calls.filter((call) => String(call[0]).includes("/system/status")).length).toBeGreaterThan(1));
+    await waitFor(() =>
+      expect(
+        api.mock.calls.filter((call) => String(call[0]).includes("/system/status")).length,
+      ).toBeGreaterThan(1),
+    );
     failed.unmount();
-    await act(async () => {
+    await act(() => {
       rejectStatus(new Error("offline"));
+      return Promise.resolve();
     });
   });
 
@@ -164,13 +190,16 @@ describe("first-run portfolio", () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText(/Last sync: Sep/)).toBeInTheDocument();
-    expect(screen.getByText(/Outside auto-collect window/)).toBeInTheDocument();
+    expect(screen.queryByText(/Last sync/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Outside auto-collect window/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
     expect(screen.queryByText(/It has not started yet today/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About data" }));
     const line = await screen.findByText(/It has not started yet today/);
     expect(line.closest("footer")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Portfolio" }).parentElement).not.toContainElement(line);
+    expect(screen.getByRole("heading", { name: "Portfolio" }).parentElement).not.toContainElement(
+      line,
+    );
     expect(screen.getByRole("heading", { name: "Traffic" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "About data" }));
     expect(screen.queryByText(/It has not started yet today/)).not.toBeInTheDocument();
@@ -183,14 +212,16 @@ describe("first-run portfolio", () => {
       return Promise.resolve(dashboardReady);
     });
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/KHolodilin"]}>
         <Routes>
           <Route element={<Layout />}>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/:owner" element={<DashboardPage />} />
           </Route>
         </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByText(/Auto-collect window open/)).toBeInTheDocument();
+    expect(screen.getByText(/Last sync: Sep/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "GitHub" })).not.toBeInTheDocument();
   });
 });

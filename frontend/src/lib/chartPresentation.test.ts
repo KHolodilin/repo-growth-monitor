@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { GrowthEvent } from "./api";
-import { presentChartOption, timelineColumns } from "./chartPresentation";
+import { presentChartOption, timelineColumns, type ChartOption } from "./chartPresentation";
+
+type TimelineTestOption = ChartOption & {
+  xAxis: {
+    data: unknown[];
+    axisLabel: { formatter: (value: string) => string; alignMinLabel?: string };
+  };
+  series: Array<{
+    name?: string;
+    data?: unknown;
+    markLine?: { data: Array<{ xAxis?: string; events?: GrowthEvent[] }> };
+    markPoint?: { data?: Array<{ xAxis?: string }> };
+  }>;
+  grid: { top?: number | string };
+  tooltip: { formatter: (...args: unknown[]) => unknown; position?: unknown };
+};
 
 const event: GrowthEvent = {
   id: 1,
@@ -34,22 +49,23 @@ describe("chartPresentation", () => {
     const option = presentChartOption(
       {
         tooltip: {
-          formatter: (params: { axisValue: string; data: number | null }[]) => `On ${params[0].axisValue}: ${params[0].data}`,
+          formatter: (params: { axisValue: string; data: number | null }[]) =>
+            `On ${params[0].axisValue}: ${params[0].data}`,
         },
         grid: { top: 40 },
         xAxis: { data: ["2026-09-22", "2026-09-23"], axisLabel: { alignMinLabel: "left" } },
         series: [{ name: "Views", type: "line", data: [null, 4] }],
       },
       { axis: "timeline", events: [event], period: "30d" },
-    );
+    ) as TimelineTestOption;
     expect(option.xAxis.data).toEqual(["1"]);
     expect(option.xAxis.axisLabel.formatter("1")).toBe("Day 1");
     expect(option.xAxis.axisLabel.alignMinLabel).toBe("left");
     expect(option.series[0].data).toEqual([4]);
     const events = option.series[1];
     expect(events.name).toBe("Events");
-    expect(events.markLine.data[0].xAxis).toBe("1");
-    expect(events.markLine.data[0].events[0].title).toBe("Launch");
+    expect(events.markLine?.data[0].xAxis).toBe("1");
+    expect(events.markLine?.data[0].events?.[0].title).toBe("Launch");
     expect(events.markPoint).toBeUndefined();
     expect(option.grid.top).toBe(64);
     expect(option.tooltip.formatter([{ axisValue: "1", data: 4 }])).toBe("On Day 1: 4");
@@ -60,24 +76,37 @@ describe("chartPresentation", () => {
         series: [{ name: "Views", data: [4], markPoint: { data: [{ xAxis: "2026-09-01" }] } }],
       },
       { axis: "timeline", events: [] },
-    );
+    ) as TimelineTestOption;
     expect(single.tooltip.formatter({ name: "1" })).toEqual({ name: "2026-09-23" });
-    expect(single.series[0].markPoint.data).toEqual([]);
-    expect(presentChartOption(option, { axis: "timeline", events: [event] }).xAxis.data).toEqual(["1"]);
+    expect(single.series[0].markPoint?.data).toEqual([]);
+    expect(
+      presentChartOption<TimelineTestOption>(option, { axis: "timeline", events: [event] }).xAxis
+        .data,
+    ).toEqual(["1"]);
     expect(presentChartOption(null, { axis: "calendar", events: [] })).toBeNull();
-    expect(presentChartOption({ series: [] }, { axis: "timeline", events: [event] })).toEqual({ series: [] });
-    expect(presentChartOption({ xAxis: [], series: [{ data: [1] }] }, { axis: "timeline", events: [event] })).toEqual({
+    expect(presentChartOption({ series: [] }, { axis: "timeline", events: [event] })).toEqual({
+      series: [],
+    });
+    expect(
+      presentChartOption(
+        { xAxis: [], series: [{ data: [1] }] },
+        { axis: "timeline", events: [event] },
+      ),
+    ).toEqual({
       xAxis: [],
       series: [{ data: [1] }],
     });
     const odd = presentChartOption(
       {
-        tooltip: { formatter: (params: { axisValue?: string }[]) => params[0]?.axisValue },
+        tooltip: {
+          formatter: (params: ({ axisValue?: string; name?: string } | null)[]) =>
+            params[0]?.axisValue,
+        },
         xAxis: { data: ["2026-09-22", "2026-09-23"] },
         series: [{ name: "Views" }, { name: "Visitors", data: [1, null], markLine: {} }],
       },
       { axis: "timeline", events: [event] },
-    );
+    ) as TimelineTestOption;
     expect(odd.xAxis.data).toEqual(["1", "2"]);
     expect(odd.tooltip.formatter([])).toBeUndefined();
     expect(odd.tooltip.formatter([{ axisValue: "9" }, null])).toBe("9");
@@ -87,16 +116,18 @@ describe("chartPresentation", () => {
       {
         tooltip: { formatter: () => 4 },
         xAxis: { data: ["2026-09-23"] },
-        series: [{
-          name: "Views",
-          data: [1],
-          markPoint: { data: [{ xAxis: "2026-01-01" }, { xAxis: "2026-09-23" }] },
-        }],
+        series: [
+          {
+            name: "Views",
+            data: [1],
+            markPoint: { data: [{ xAxis: "2026-01-01" }, { xAxis: "2026-09-23" }] },
+          },
+        ],
       },
       { axis: "timeline", events: [] },
-    );
+    ) as TimelineTestOption;
     expect(numeric.tooltip.formatter({ axisValue: "1", name: "1" })).toBe(4);
-    expect(numeric.series[0].markPoint.data).toEqual([{ xAxis: "1" }]);
+    expect(numeric.series[0]?.markPoint?.data).toEqual([{ xAxis: "1" }]);
     const kept = presentChartOption(
       {
         grid: { top: "10%" },
@@ -117,29 +148,37 @@ describe("chartPresentation", () => {
     );
     expect(labeled.series).toHaveLength(2);
     expect(labeled.grid.top).toBe("10%");
-    expect(presentChartOption(
-      { xAxis: { data: [] }, series: [] },
-      { axis: "timeline", events: [event] },
-    ).xAxis.data).toEqual([]);
+    expect(
+      presentChartOption({ xAxis: { data: [] }, series: [] }, { axis: "timeline", events: [event] })
+        .xAxis.data,
+    ).toEqual([]);
     const onlyEvents = presentChartOption(
       { xAxis: { data: ["2026-09-23"] } },
       { axis: "calendar", events: [event] },
-    );
-    expect(onlyEvents.series.map((item) => item.name)).toEqual(["Events"]);
-    expect(presentChartOption(
-      { xAxis: { data: ["2026-09-23"] } },
-      { axis: "timeline", events: [] },
-    ).xAxis.data).toEqual(["2026-09-23"]);
+    ) as ChartOption;
+    expect((onlyEvents.series ?? []).map((item) => item.name)).toEqual(["Events"]);
+    expect(
+      presentChartOption({ xAxis: { data: ["2026-09-23"] } }, { axis: "timeline", events: [] })
+        .xAxis.data,
+    ).toEqual(["2026-09-23"]);
     const plain = presentChartOption(
-      { tooltip: { formatter: "plain" }, xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
+      {
+        tooltip: { formatter: "plain" },
+        xAxis: { data: ["2026-09-23"] },
+        series: [{ name: "Views", data: [1] }],
+      },
       { axis: "timeline", events: [] },
     );
     expect(plain.xAxis.data).toEqual(["1"]);
     expect(plain.tooltip.formatter).toBe("plain");
-    expect(presentChartOption(
-      { xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
-      { axis: "timeline", events: [] },
-    ).tooltip).toBeUndefined();
+    expect(
+      (
+        presentChartOption(
+          { xAxis: { data: ["2026-09-23"] }, series: [{ name: "Views", data: [1] }] },
+          { axis: "timeline", events: [] },
+        ) as ChartOption
+      ).tooltip,
+    ).toBeUndefined();
   });
 
   it("leaves an existing events series and a chart with no stored points", () => {
@@ -150,7 +189,9 @@ describe("chartPresentation", () => {
         { name: "Events", data: [null], markLine: { data: [{ xAxis: "2026-09-23" }] } },
       ],
     };
-    expect(presentChartOption(option, { axis: "calendar", events: [event] }).series).toHaveLength(2);
+    expect(presentChartOption(option, { axis: "calendar", events: [event] }).series).toHaveLength(
+      2,
+    );
     expect(presentChartOption(option, { axis: "timeline", events: [] })).toBe(option);
   });
 
@@ -172,9 +213,11 @@ describe("chartPresentation", () => {
       ).series,
     ).toHaveLength(1);
     expect(
-      presentChartOption(
-        { xAxis: { data: ["2026-09-23"] } },
-        { axis: "calendar", events: [event], mobile: true },
+      (
+        presentChartOption(
+          { xAxis: { data: ["2026-09-23"] } },
+          { axis: "calendar", events: [event], mobile: true },
+        ) as ChartOption
       ).series,
     ).toEqual([]);
   });
@@ -183,28 +226,62 @@ describe("chartPresentation", () => {
 describe("mobile plot spacing", () => {
   const desktopGrid = { left: 48, right: 72, top: 64, bottom: 40, containLabel: false };
 
-  it.each(["calendar", "timeline"] as const)("fits labels inside a tight grid in %s mode", (axis) => {
-    const option = {
-      grid: desktopGrid,
-      xAxis: { data: ["2026-09-23", "2026-09-24"] },
-      yAxis: [{ type: "value" }, { type: "value", position: "right" }],
-      series: [{ name: "Views", data: [100000, 200000] }],
-    };
-    const result = presentChartOption(option, { axis, events: [event], mobile: true });
-    expect(result.grid).toEqual({ left: 4, right: 4, top: 12, bottom: 8, containLabel: true });
-    expect(result.yAxis).toBe(option.yAxis);
-    expect(option.grid).toBe(desktopGrid);
-    expect(option.grid.top).toBe(64);
-  });
+  it.each(["calendar", "timeline"] as const)(
+    "fits labels inside a tight grid in %s mode",
+    (axis) => {
+      const option = {
+        grid: desktopGrid,
+        xAxis: { data: ["2026-09-23", "2026-09-24"] },
+        yAxis: [{ type: "value" }, { type: "value", position: "right" }],
+        series: [{ name: "Views", data: [100000, 200000] }],
+      };
+      const result = presentChartOption(option, { axis, events: [event], mobile: true });
+      expect(result.grid).toEqual({ left: 4, right: 4, top: 12, bottom: 8, containLabel: true });
+      expect(result.yAxis).toBe(option.yAxis);
+      expect(option.grid).toBe(desktopGrid);
+      expect(option.grid.top).toBe(64);
+    },
+  );
 
   it("keeps desktop gutters with mobile disabled or omitted", () => {
     const option = { grid: desktopGrid, series: [] };
-    expect(presentChartOption(option, { axis: "calendar", events: [], mobile: false })).toBe(option);
+    expect(presentChartOption(option, { axis: "calendar", events: [], mobile: false })).toBe(
+      option,
+    );
     expect(presentChartOption(option, { axis: "calendar", events: [] })).toBe(option);
   });
 
   it("contains axis labels even without a source grid or data", () => {
-    const result = presentChartOption<Record<string, unknown>>({}, { axis: "calendar", events: [], mobile: true });
+    const result = presentChartOption<Record<string, unknown>>(
+      {},
+      { axis: "calendar", events: [], mobile: true },
+    );
     expect(result.grid).toEqual({ left: 4, right: 4, top: 12, bottom: 8, containLabel: true });
+  });
+
+  it("flips tooltips above the pointer near the bottom of the chart", () => {
+    const option = presentChartOption(
+      {
+        tooltip: { formatter: () => "long tip" },
+        series: [{ name: "Views", type: "line", data: [1] }],
+      },
+      { axis: "calendar", events: [], mobile: true },
+    ) as TimelineTestOption;
+    const position = option.tooltip.position as (
+      point: number[],
+      params: unknown,
+      dom: unknown,
+      rect: unknown,
+      size: { contentSize: number[]; viewSize: number[] },
+    ) => number[];
+    expect(
+      position([10, 200], null, null, null, { contentSize: [300, 180], viewSize: [360, 220] }),
+    ).toEqual([10, 8]);
+    expect(
+      position([300, 20], null, null, null, { contentSize: [120, 40], viewSize: [360, 220] }),
+    ).toEqual([240, 32]);
+    expect(
+      position([-4, 20], null, null, null, { contentSize: [40, 20], viewSize: [360, 220] }),
+    ).toEqual([0, 32]);
   });
 });

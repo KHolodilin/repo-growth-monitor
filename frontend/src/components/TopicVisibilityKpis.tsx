@@ -10,7 +10,13 @@ const BANDS = [
   { band: 20, label: "Top 20" },
 ] as const;
 
-export function TopicVisibilityKpis({ topics, period }: { topics: TopicHistory[]; period: Period }) {
+export function TopicVisibilityKpis({
+  topics,
+  period,
+}: {
+  topics: TopicHistory[];
+  period: Period;
+}) {
   const today = new Date().toISOString().slice(0, 10);
   const samples: TopicRankSample[] = topics.map((item) => ({
     slug: item.watch.topic,

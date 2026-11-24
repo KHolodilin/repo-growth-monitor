@@ -1,0 +1,22 @@
+[
+  "api",
+  "admin",
+  "login",
+  "logout",
+  "oauth2",
+  "settings",
+  "assets",
+  "actuator",
+  "dashboard",
+  "repositories",
+  "search-runs",
+  "error",
+  "v3",
+  "swagger-ui",
+  "favicon.ico",
+  "favicon.svg",
+  "logo.png",
+  "vite.svg",
+  "robots.txt",
+  "sitemap.xml"
+]

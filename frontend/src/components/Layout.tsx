@@ -4,11 +4,18 @@ import { api, ApiError, type Dashboard } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
 import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
-import { collectionBlocked, loadGitHubAccess, tokenBanner, type GitHubAccess } from "../lib/githubAccess";
+import {
+  collectionBlocked,
+  loadGitHubAccess,
+  tokenBanner,
+  type GitHubAccess,
+} from "../lib/githubAccess";
 import { headerSchedule } from "../lib/setupChecklist";
 import { formatSyncTime } from "../lib/utils";
 import { RouteScroll } from "./RouteScroll";
 import { LogoMark, SignInIcon } from "./icons";
+
+const PROJECT_GITHUB = "https://github.com/KHolodilin/repo-growth-monitor";
 
 export type RunAllMenuAction = {
   locationKey: string;
@@ -19,26 +26,36 @@ export type RunAllMenuAction = {
 
 export function Layout() {
   const location = useLocation();
+  const homePage = location.pathname === "/";
   const [runAll, setRunAll] = useState<RunAllMenuAction | null>(null);
   const { me, loading: authLoading, logout } = useAuth();
-  const repositoryId = repositoryIdFromPath(location.pathname);
   const [sync, setSync] = useState<string | null>(null);
   const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
+  const ownerScope = ownerLoginFromPath(location.pathname);
+  const repositoryId = repositoryIdFromPath(location.pathname, rows);
   const [collecting, setCollecting] = useState(false);
   const [watching, setWatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
   const syncTime = formatSyncTime(sync);
   const [aboutOpen, setAboutOpen] = useState(false);
-  const progress = headerProgress({ repositoryId, rows: rows ?? [], watching });
-  const live = watching || (rows ?? []).some((row) => collectionInProgress(row.collectionStatus));
+  const progressRows = ownerScope
+    ? (rows ?? []).filter((row) =>
+        row.fullName.toLowerCase().startsWith(`${ownerScope.toLowerCase()}/`),
+      )
+    : (rows ?? []);
+  const progress =
+    repositoryId != null || ownerScope != null
+      ? headerProgress({ repositoryId, rows: progressRows, watching })
+      : null;
+  const live = watching || progressRows.some((row) => collectionInProgress(row.collectionStatus));
   const mutateBlocked = mutationBlockedReason(authLoading ? null : me);
   const allowMutations = canMutate(me) && !authLoading;
   const showOperationalStatus = !authLoading && me.authenticated;
   const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
-    const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+    const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
     if (!dashboard?.repositories) {
       setRows([]);
       return dashboard;
@@ -50,13 +67,27 @@ export function Layout() {
 
   useEffect(() => {
     let cancelled = false;
-    refreshStatus().catch(() => {
-      if (!cancelled) {
-        setSync(null);
-        setRows([]);
-      }
-    });
-    void loadGitHubAccess().then((next) => {
+    // Promise.resolve keeps mocks that return a bare value (or undefined) on the async path,
+    // matching the previous refreshStatus() await semantics.
+    void Promise.resolve(api<Dashboard>("/api/v1/admin/dashboard?period=30d"))
+      .then((dashboard) => {
+        if (cancelled) {
+          return;
+        }
+        if (!dashboard?.repositories) {
+          setRows([]);
+          return;
+        }
+        setSync(dashboard.lastSyncAt);
+        setRows(dashboard.repositories);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSync(null);
+          setRows([]);
+        }
+      });
+    void Promise.resolve(loadGitHubAccess()).then((next) => {
       if (!cancelled) {
         setAccess(next);
       }
@@ -64,7 +95,7 @@ export function Layout() {
     return () => {
       cancelled = true;
     };
-  }, [location.pathname, refreshStatus]);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!live) {
@@ -73,7 +104,9 @@ export function Layout() {
     const timer = window.setInterval(() => {
       refreshStatus()
         .then((dashboard) => {
-          const stillActive = (dashboard?.repositories ?? []).some((row) => collectionInProgress(row.collectionStatus));
+          const stillActive = (dashboard?.repositories ?? []).some((row) =>
+            collectionInProgress(row.collectionStatus),
+          );
           if (!stillActive) {
             setWatching(false);
           }
@@ -94,11 +127,13 @@ export function Layout() {
     try {
       const onlyId = repositoryIdFromPath(location.pathname);
       if (onlyId != null) {
-        await api(`/api/v1/repositories/${onlyId}/collect`, { method: "POST" });
+        await api(`/api/v1/admin/repositories/${onlyId}/collect`, { method: "POST" });
       } else {
-        const dashboard = await api<Dashboard>("/api/v1/dashboard?period=30d");
+        const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
         const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
-        await Promise.all(ids.map((id) => api(`/api/v1/repositories/${id}/collect`, { method: "POST" })));
+        await Promise.all(
+          ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })),
+        );
         if (dashboard?.repositories) {
           setSync(dashboard.lastSyncAt);
           setRows(dashboard.repositories);
@@ -106,7 +141,9 @@ export function Layout() {
       }
       window.dispatchEvent(new Event("repos-collected"));
       const refreshed = await refreshStatus();
-      const stillActive = (refreshed?.repositories ?? []).some((row) => collectionInProgress(row.collectionStatus));
+      const stillActive = (refreshed?.repositories ?? []).some((row) =>
+        collectionInProgress(row.collectionStatus),
+      );
       if (!stillActive) {
         setWatching(false);
       }
@@ -124,10 +161,14 @@ export function Layout() {
 
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
   const collectDisabled =
-    collecting || collectionBlocked(access) || (repositoryId == null && rows != null && rows.length === 0);
+    collecting ||
+    collectionBlocked(access) ||
+    (repositoryId == null && rows != null && rows.length === 0);
   const noToken = showOperationalStatus && access?.tokenState === "MISSING";
   const accessBanner = showOperationalStatus ? tokenBanner(access) : null;
-  document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
+  useEffect(() => {
+    document.title = noToken ? "Repo Growth Monitor — no token" : "Repo Growth Monitor";
+  }, [noToken]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -141,7 +182,8 @@ export function Layout() {
             >
               <LogoMark className="h-8 w-8 shrink-0 object-contain" />
               <span className="truncate whitespace-nowrap text-[15px] leading-none tracking-tight">
-                <span className="font-bold">Repo Growth</span> <span className="font-normal">Monitor</span>
+                <span className="font-bold">Repo Growth</span>{" "}
+                <span className="font-normal">Monitor</span>
               </span>
             </NavLink>
             {noToken && (
@@ -184,28 +226,54 @@ export function Layout() {
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-6xl space-y-2 px-4 py-4 text-xs text-muted-foreground md:px-6">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <p>
-              <span className="font-medium text-foreground">
-                {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
-              </span>
-              {briefState ? <span> · {briefState}</span> : null}
-            </p>
-            <button
-              type="button"
-              className="font-medium text-primary hover:underline"
-              aria-expanded={aboutOpen}
-              onClick={() => setAboutOpen((value) => !value)}
-            >
-              About data
-            </button>
+            {homePage ? (
+              <>
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  aria-expanded={aboutOpen}
+                  onClick={() => setAboutOpen((value) => !value)}
+                >
+                  About data
+                </button>
+                <span aria-hidden="true">·</span>
+                <a
+                  className="font-medium text-primary hover:underline"
+                  href={PROJECT_GITHUB}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  GitHub
+                </a>
+              </>
+            ) : (
+              <>
+                <p>
+                  <span className="font-medium text-foreground">
+                    {syncTime ? `Last sync: ${syncTime}` : "No successful sync yet"}
+                  </span>
+                  {briefState ? <span> · {briefState}</span> : null}
+                </p>
+                <button
+                  type="button"
+                  className="font-medium text-primary hover:underline"
+                  aria-expanded={aboutOpen}
+                  onClick={() => setAboutOpen((value) => !value)}
+                >
+                  About data
+                </button>
+              </>
+            )}
           </div>
           {aboutOpen && (
             <div className="space-y-1">
               <p>
-                Data is collected once per day. Referrers and paths show the latest GitHub snapshot; History has the change
-                between snapshots.
+                Data is collected once per day. Referrers and paths show the latest GitHub snapshot;
+                History has the change between snapshots.
               </p>
-              {showOperationalStatus && access?.planner ? <p>{headerSchedule(access.planner)}</p> : null}
+              {showOperationalStatus && access?.planner ? (
+                <p>{headerSchedule(access.planner)}</p>
+              ) : null}
             </div>
           )}
           {showOperationalStatus && error && <div className="text-sm text-red-600">{error}</div>}
@@ -297,7 +365,7 @@ function AuthChrome({
                 )}
               </div>
               <Link
-                to="/repositories"
+                to="/admin/repositories"
                 role="menuitem"
                 className="block w-full px-3 py-2 text-left text-muted-foreground hover:bg-muted hover:text-foreground"
                 onClick={() => setOpen(false)}
@@ -373,10 +441,28 @@ function collectionBriefState(
   return planner.open ? "Auto-collect window open" : "Outside auto-collect window";
 }
 
-function repositoryIdFromPath(pathname: string): number | null {
-  const match = pathname.match(/^\/repositories\/(\d+)(?:\/|$)/);
-  if (!match) {
+/** Owner Portfolio path `/:owner` — not home, not repository, not admin. */
+function ownerLoginFromPath(pathname: string): string | null {
+  const parts = pathname.split("/").filter(Boolean);
+  if (parts.length !== 1 || parts[0] === "admin") {
     return null;
   }
-  return Number(match[1]);
+  return decodeURIComponent(parts[0]);
+}
+
+function repositoryIdFromPath(
+  pathname: string,
+  rows: Dashboard["repositories"] | null = null,
+): number | null {
+  const admin = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
+  if (admin) {
+    return Number(admin[1]);
+  }
+  const parts = pathname.match(/^\/([^/]+)\/([^/]+)(?:\/|$)/);
+  if (!parts || !rows) {
+    return null;
+  }
+  const fullName = `${decodeURIComponent(parts[1])}/${decodeURIComponent(parts[2])}`.toLowerCase();
+  const row = rows.find((item) => item.fullName.toLowerCase() === fullName);
+  return row?.id ?? null;
 }

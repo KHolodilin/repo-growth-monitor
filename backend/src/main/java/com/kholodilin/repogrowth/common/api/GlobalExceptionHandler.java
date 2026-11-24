@@ -3,6 +3,7 @@ package com.kholodilin.repogrowth.common.api;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.time.Instant;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -12,57 +13,101 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.time.Instant;
-
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ApiError> handleApi(ApiException ex) {
-        log.warn("API error category={} message={}", ex.code(), ex.getMessage());
-        return ResponseEntity.status(ex.status()).body(error(ex.code(), ex.getMessage()));
-    }
+  @ExceptionHandler(com.kholodilin.idempotency.exception.IdempotencyConflictException.class)
+  public ResponseEntity<ApiError> handleIdempotencyConflict(Exception ex) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            error(
+                ErrorCode.IDEMPOTENCY_CONFLICT, "Idempotency key was used for different content"));
+  }
 
-    @ExceptionHandler(GitHubException.class)
-    public ResponseEntity<ApiError> handleGitHub(GitHubException ex) {
-        log.warn("GitHub error category={} status={} retryable={} message={}",
-                ex.errorCode(), ex.statusCode(), ex.retryable(), ex.getMessage());
-        HttpStatus status = switch (ex.errorCode()) {
-            case GITHUB_AUTH_ERROR -> HttpStatus.UNAUTHORIZED;
-            case GITHUB_RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
-            case NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case VALIDATION_ERROR -> HttpStatus.BAD_REQUEST;
-            default -> HttpStatus.BAD_GATEWAY;
+  @ExceptionHandler({
+    org.springframework.web.bind.MissingRequestHeaderException.class,
+    com.kholodilin.repogrowth.orchestration.idempotency.InvalidIdempotencyKeyException.class
+  })
+  public ResponseEntity<ApiError> handleInvalidRequest(Exception ex) {
+    return ResponseEntity.badRequest()
+        .body(error(ErrorCode.VALIDATION_ERROR, "Invalid request parameters or Idempotency-Key"));
+  }
+
+  @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+  public ResponseEntity<ApiError> handleDenied(Exception ex) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(error(ErrorCode.FORBIDDEN, "ADMIN role required"));
+  }
+
+  @ExceptionHandler(ApiException.class)
+  public ResponseEntity<ApiError> handleApi(ApiException ex) {
+    log.warn("API error category={} message={}", ex.code(), ex.getMessage());
+    return ResponseEntity.status(ex.status()).body(error(ex.code(), ex.getMessage()));
+  }
+
+  @ExceptionHandler(GitHubException.class)
+  public ResponseEntity<ApiError> handleGitHub(GitHubException ex) {
+    log.warn(
+        "GitHub error category={} status={} retryable={} message={}",
+        ex.errorCode(),
+        ex.statusCode(),
+        ex.retryable(),
+        ex.getMessage());
+    HttpStatus status =
+        switch (ex.errorCode()) {
+          case GITHUB_AUTH_ERROR -> HttpStatus.UNAUTHORIZED;
+          case GITHUB_RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
+          case NOT_FOUND -> HttpStatus.NOT_FOUND;
+          case VALIDATION_ERROR -> HttpStatus.BAD_REQUEST;
+          default -> HttpStatus.BAD_GATEWAY;
         };
-        return ResponseEntity.status(status).body(error(ex.errorCode(), ex.getMessage()));
-    }
+    return ResponseEntity.status(status).body(error(ex.errorCode(), ex.getMessage()));
+  }
 
-    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
-    public ResponseEntity<ApiError> handleValidation(Exception ex) {
-        return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR, ex.getMessage()));
-    }
+  @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
+  public ResponseEntity<ApiError> handleValidation(Exception ex) {
+    return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR, ex.getMessage()));
+  }
 
-    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
-    public ResponseEntity<ApiError> handleUnreadable(Exception ex) {
-        return ResponseEntity.badRequest().body(error(ErrorCode.VALIDATION_ERROR, "Invalid request body"));
-    }
+  @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+  public ResponseEntity<ApiError> handleUnreadable(Exception ex) {
+    return ResponseEntity.badRequest()
+        .body(error(ErrorCode.VALIDATION_ERROR, "Invalid request body"));
+  }
 
-    /** An unknown URL is a client mistake, so it must not be reported as a server failure. */
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiError> handleMissingResource(NoResourceFoundException ex, HttpServletRequest request) {
-        log.warn("No handler for path={}", request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error(ErrorCode.NOT_FOUND, "Not found"));
-    }
+  /** An unknown URL is a client mistake, so it must not be reported as a server failure. */
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<ApiError> handleMissingResource(
+      NoResourceFoundException ex, HttpServletRequest request) {
+    log.warn("No handler for path={}", request.getRequestURI());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(error(ErrorCode.NOT_FOUND, "Not found"));
+  }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
-        log.error("Unhandled error path={}", request.getRequestURI(), ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error(ErrorCode.INTERNAL_ERROR, "Internal server error"));
-    }
+  @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+  public ResponseEntity<ApiError> handleDatabase(Exception ex) {
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(error(ErrorCode.INTERNAL_ERROR, "Data temporarily unavailable"));
+  }
 
-    private ApiError error(ErrorCode code, String message) {
-        return new ApiError(code, message, Instant.now(), MDC.get("traceId"));
-    }
+  @ExceptionHandler({
+    org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+    org.springframework.web.bind.MissingServletRequestParameterException.class
+  })
+  public ResponseEntity<ApiError> handleParameters(Exception ex) {
+    return ResponseEntity.badRequest()
+        .body(error(ErrorCode.VALIDATION_ERROR, "Invalid request parameters"));
+  }
+
+  @ExceptionHandler(Exception.class)
+  public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
+    log.error("Unhandled error path={}", request.getRequestURI(), ex);
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(error(ErrorCode.INTERNAL_ERROR, "Internal server error"));
+  }
+
+  private ApiError error(ErrorCode code, String message) {
+    return new ApiError(code, message, Instant.now(), MDC.get("traceId"));
+  }
 }

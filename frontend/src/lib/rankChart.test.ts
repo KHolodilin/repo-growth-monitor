@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { datesFromHistory, rankHistoryOption, rankTooltipText, recentMissedDates } from "./rankChart";
+import {
+  datesFromHistory,
+  rankHistoryOption,
+  rankTooltipText,
+  recentMissedDates,
+} from "./rankChart";
 
 describe("rankChart", () => {
   it("describes tooltip states", () => {
@@ -27,7 +32,7 @@ describe("rankChart", () => {
         },
       ],
     });
-    const tooltip = option.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    const tooltip = option.tooltip.formatter;
     expect(tooltip([])).toBe("");
     expect(tooltip([{ axisValue: "2026-09-23" }])).toContain("#24");
     expect(option.yAxis.axisLabel.formatter(51)).toBe(">50");
@@ -41,7 +46,7 @@ describe("rankChart", () => {
       dates: ["2026-09-23"],
       series: [{ name: "plain", limit: 50, points: [{ date: "2026-09-23", position: 2 }] }],
     });
-    const plainTooltip = withoutMisses.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    const plainTooltip = withoutMisses.tooltip.formatter;
     expect(plainTooltip([{ axisValue: "2026-09-23" }])).toContain("#2");
     const marked = rankHistoryOption({
       dates: ["2026-09-23"],
@@ -67,7 +72,7 @@ describe("rankChart", () => {
     expect(eventLine.markLine.data[0].label.position).toBe("start");
     expect(eventLine.markPoint).toBeUndefined();
     expect(marked.xAxis.data).toEqual(["2026-09-22", "2026-09-23"]);
-    const markedTooltip = marked.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    const markedTooltip = marked.tooltip.formatter;
     const hint = markedTooltip([{ axisValue: "2026-09-22" }]);
     expect(hint).toContain("LinkedIn launch");
     expect(hint).not.toContain("Before");
@@ -146,11 +151,13 @@ describe("rankChart", () => {
     expect(option.xAxis.axisLabel.formatter("2")).toBe("Day 2");
     const line = option.series[0] as { data: (number | null)[] };
     expect(line.data).toEqual([null, 4]);
-    const tooltip = option.tooltip.formatter as (params: { axisValue: string }[]) => string;
+    const tooltip = option.tooltip.formatter;
     expect(tooltip([{ axisValue: "1" }])).toContain("Not collected");
     expect(tooltip([{ axisValue: "2" }])).toContain("Day 2");
     expect(tooltip([{ axisValue: "2" }])).toContain("Launch");
-    expect(rankHistoryOption({ dates: ["2026-09-23"], axis: "timeline", series: [] }).xAxis.data).toEqual([]);
+    expect(
+      rankHistoryOption({ dates: ["2026-09-23"], axis: "timeline", series: [] }).xAxis.data,
+    ).toEqual([]);
 
     const shared = rankHistoryOption({
       dates: ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"],

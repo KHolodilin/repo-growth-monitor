@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { RepositoryAccessNote } from "../components/RepositoryAccessNote";
 import { Button, Card } from "../components/ui";
@@ -23,39 +23,110 @@ export function RepositoriesPage() {
   const [repos, setRepos] = useState<Repository[]>([]);
   const [access, setAccess] = useState<GitHubAccess | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [pendingRefresh, setPendingRefresh] = useState<string[]>([]);
   const [search, setSearch] = useState(() => readSession(SEARCH_KEY));
   const [visibilityStored, setVisibilityStored] = useState(() => readSession(VISIBILITY_KEY));
   const [trackingChoice, setTrackingChoice] = useState<TrackingFilter | null>(null);
 
-  async function load(refresh = false) {
+  const accessRef = useRef(access);
+  useEffect(() => {
+    accessRef.current = access;
+  }, [access]);
+
+  const load = useCallback(async (refresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      let nextAccess = access;
+      let nextAccess = accessRef.current;
       if (!nextAccess) {
         nextAccess = await loadGitHubAccess();
         setAccess(nextAccess);
       }
       if (refresh) {
-        setRepos(await api<Repository[]>("/api/v1/repositories?refresh=true"));
+        const accepted = await api<{ requestId: string }[]>("/api/v1/admin/repositories/refresh", {
+          method: "POST",
+        });
+        setPendingRefresh(
+          Array.isArray(accepted) ? accepted.map((item) => item.requestId).filter(Boolean) : [],
+        );
+        setRepos(await api<Repository[]>("/api/v1/admin/repositories"));
         return;
       }
-      let data = await api<Repository[]>("/api/v1/repositories?refresh=false");
-      if (nextAccess.tokenState === "OK" && data.length === 0) {
-        data = await api<Repository[]>("/api/v1/repositories?refresh=true");
-      }
+      const data = await api<Repository[]>("/api/v1/admin/repositories?refresh=false");
       setRepos(data);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    void load(false);
+    let cancelled = false;
+    void (async () => {
+      try {
+        let nextAccess = accessRef.current;
+        if (!nextAccess) {
+          nextAccess = await loadGitHubAccess();
+          if (!cancelled) {
+            setAccess(nextAccess);
+          }
+        }
+        const data = await api<Repository[]>("/api/v1/admin/repositories?refresh=false");
+        if (!cancelled) {
+          setRepos(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError((err as Error).message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!pendingRefresh.length) return;
+    let active = true;
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const states = await Promise.all(
+          pendingRefresh.map((id) =>
+            api<{ state: string }>(`/api/v1/admin/collection-requests/${id}`, {
+              signal: abort.signal,
+            }),
+          ),
+        );
+        if (!active) return;
+        setRepos(await api<Repository[]>("/api/v1/admin/repositories", { signal: abort.signal }));
+        if (states.every((item) => item.state !== "ACTIVE")) {
+          setPendingRefresh([]);
+          if (states.some((item) => item.state === "FAILED" || item.state === "CANCELLED"))
+            setError("Repository refresh did not complete. Saved data is still available.");
+        } else timer = setTimeout(() => void poll(), 5000);
+      } catch (err) {
+        if (active) {
+          setError((err as Error).message);
+          setPendingRefresh([]);
+        }
+      }
+    };
+    timer = setTimeout(() => void poll(), 1000);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [pendingRefresh]);
 
   const listed = useMemo(
     () => (allowMutations ? repos : repos.filter((repo) => repo.visibility === "PUBLIC")),
@@ -65,7 +136,8 @@ export function RepositoriesPage() {
   const tracking: TrackingFilter = trackingChoice ?? (trackedCount > 0 ? "tracked" : "all");
   const showVisibility = allowMutations && !sameVisibility(listed);
   const showInternal = allowMutations && listed.some((repo) => repo.visibility === "INTERNAL");
-  const showNoAccess = access?.tokenState !== "REJECTED" && listed.some((repo) => repo.accessible === false);
+  const showNoAccess =
+    access?.tokenState !== "REJECTED" && listed.some((repo) => repo.accessible === false);
   const visibility = allowMutations
     ? resolveVisibility(listed, visibilityStored, showVisibility)
     : "public";
@@ -76,27 +148,38 @@ export function RepositoriesPage() {
   );
   const privateHidden = allowMutations
     ? searched(listed, search).filter(
-        (repo) => matchesTracking(repo, tracking) && repo.visibility === "PRIVATE" && visibility === "public",
+        (repo) =>
+          matchesTracking(repo, tracking) &&
+          repo.visibility === "PRIVATE" &&
+          visibility === "public",
       ).length
     : 0;
-  const enableTargets = visible.filter((repo) => !repo.trackingEnabled && repo.accessible !== false);
+  const enableTargets = visible.filter(
+    (repo) => !repo.trackingEnabled && repo.accessible !== false,
+  );
   const disableTargets = visible.filter((repo) => repo.trackingEnabled);
-  const showEnable = allowMutations && !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
+  const showEnable =
+    allowMutations && !(tracking === "all" && search.trim() === "") && enableTargets.length > 0;
 
   async function toggle(repo: Repository) {
     if (!allowMutations) {
       setError(mutateBlocked ?? "Admin role required");
       return;
     }
-    if (repo.trackingEnabled && !window.confirm("Stop tracking this repository? Collection stops. Stored data stays.")) {
+    if (
+      repo.trackingEnabled &&
+      !window.confirm("Stop tracking this repository? Collection stops. Stored data stays.")
+    ) {
       return;
     }
     try {
-      const updated = await api<Repository>(`/api/v1/repositories/${repo.id}/tracking`, {
+      const updated = await api<Repository>(`/api/v1/admin/repositories/${repo.id}/tracking`, {
         method: "POST",
         body: JSON.stringify({ enabled: !repo.trackingEnabled }),
       });
-      setRepos((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)));
+      setRepos((current) =>
+        current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+      );
     } catch (err) {
       setError((err as Error).message);
     }
@@ -108,16 +191,23 @@ export function RepositoriesPage() {
       return;
     }
     const targets = enabled ? enableTargets : disableTargets;
-    if (!enabled && !window.confirm("Turn tracking off for the shown repositories? Collection stops. Stored data stays.")) {
+    if (
+      !enabled &&
+      !window.confirm(
+        "Turn tracking off for the shown repositories? Collection stops. Stored data stays.",
+      )
+    ) {
       return;
     }
     for (const repo of targets) {
       try {
-        const updated = await api<Repository>(`/api/v1/repositories/${repo.id}/tracking`, {
+        const updated = await api<Repository>(`/api/v1/admin/repositories/${repo.id}/tracking`, {
           method: "POST",
           body: JSON.stringify({ enabled }),
         });
-        setRepos((current) => current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)));
+        setRepos((current) =>
+          current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+        );
       } catch (err) {
         setError((err as Error).message);
         return;
@@ -139,12 +229,18 @@ export function RepositoriesPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {showEnable && (
-            <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(true)}>
+            <Button
+              className="bg-card text-foreground hover:bg-muted"
+              onClick={() => void applyShown(true)}
+            >
               Start tracking ({enableTargets.length})
             </Button>
           )}
           {allowMutations && disableTargets.length > 0 && (
-            <Button className="bg-card text-foreground hover:bg-muted" onClick={() => void applyShown(false)}>
+            <Button
+              className="bg-card text-foreground hover:bg-muted"
+              onClick={() => void applyShown(false)}
+            >
               Stop tracking ({disableTargets.length})
             </Button>
           )}
@@ -155,6 +251,11 @@ export function RepositoriesPage() {
           )}
         </div>
       </div>
+      {pendingRefresh.length > 0 && (
+        <p role="status">
+          Refreshing repositories. Saved data will update when collection finishes.
+        </p>
+      )}
       {error && <p className="text-red-600">{error}</p>}
       <Card>
         <div className="space-y-4">
@@ -176,12 +277,19 @@ export function RepositoriesPage() {
           <div className="flex flex-wrap items-center gap-3">
             <FilterGroup label="Tracking">
               {(["all", "tracked", "untracked"] as const).map((key) => (
-                <FilterButton key={key} active={tracking === key} onClick={() => setTrackingChoice(key)}>
+                <FilterButton
+                  key={key}
+                  active={tracking === key}
+                  onClick={() => setTrackingChoice(key)}
+                >
                   {TRACKING_LABEL[key]}
                 </FilterButton>
               ))}
               {showNoAccess && (
-                <FilterButton active={tracking === "no-access"} onClick={() => setTrackingChoice("no-access")}>
+                <FilterButton
+                  active={tracking === "no-access"}
+                  onClick={() => setTrackingChoice("no-access")}
+                >
                   No access
                 </FilterButton>
               )}
@@ -191,28 +299,44 @@ export function RepositoriesPage() {
                 <FilterButton active={visibility === "all"} onClick={() => chooseVisibility("all")}>
                   All
                 </FilterButton>
-                <FilterButton active={visibility === "public"} onClick={() => chooseVisibility("public")}>
+                <FilterButton
+                  active={visibility === "public"}
+                  onClick={() => chooseVisibility("public")}
+                >
                   Public
                 </FilterButton>
-                <FilterButton active={visibility === "private"} onClick={() => chooseVisibility("private")}>
+                <FilterButton
+                  active={visibility === "private"}
+                  onClick={() => chooseVisibility("private")}
+                >
                   Private
                 </FilterButton>
                 {showInternal && (
-                  <FilterButton active={visibility === "internal"} onClick={() => chooseVisibility("internal")}>
+                  <FilterButton
+                    active={visibility === "internal"}
+                    onClick={() => chooseVisibility("internal")}
+                  >
                     Internal
                   </FilterButton>
                 )}
               </FilterGroup>
             )}
             {privateHidden > 0 && (
-              <button type="button" className="text-sm text-primary hover:underline" onClick={() => chooseVisibility("private")}>
+              <button
+                type="button"
+                className="text-sm text-primary hover:underline"
+                onClick={() => chooseVisibility("private")}
+              >
                 {privateHidden} private hidden
               </button>
             )}
           </div>
           <div className="space-y-3">
             {visible.map((repo) => (
-              <label key={repo.id} className="flex items-center justify-between gap-4 rounded-lg border px-3 py-3">
+              <label
+                key={repo.id}
+                className="flex items-center justify-between gap-4 rounded-lg border px-3 py-3"
+              >
                 <div className="flex min-w-0 items-start gap-3">
                   {allowMutations && (
                     <input
@@ -225,15 +349,21 @@ export function RepositoriesPage() {
                   )}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link className="break-words [overflow-wrap:anywhere] font-medium text-primary hover:underline" to={`/repositories/${repo.id}`}>
+                      <Link
+                        className="break-words [overflow-wrap:anywhere] font-medium text-primary hover:underline"
+                        to={`/${encodeURIComponent(repo.owner.login)}/${encodeURIComponent(repo.name)}`}
+                      >
                         {repo.fullName}
                       </Link>
                       {repo.visibility === "PRIVATE" && (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">Private</span>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-foreground">
+                          Private
+                        </span>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {repo.visibility === "PRIVATE" ? "Private" : repo.visibility} · {repo.stars} stars · {repo.owner.login}
+                      {repo.visibility === "PRIVATE" ? "Private" : repo.visibility} · {repo.stars}{" "}
+                      stars · {repo.owner.login}
                     </div>
                     {repo.visibility === "PRIVATE" && repo.trackingEnabled && (
                       <p className="mt-1 text-xs text-muted-foreground">{PRIVATE_TRACKING}</p>
@@ -278,11 +408,23 @@ function FilterGroup({ label, children }: { label: string; children: ReactNode }
   );
 }
 
-function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
-      className={active ? "rounded-md bg-card px-3 py-1.5 text-sm font-medium shadow-xs" : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"}
+      className={
+        active
+          ? "rounded-md bg-card px-3 py-1.5 text-sm font-medium shadow-xs"
+          : "rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+      }
       aria-pressed={active}
       onClick={onClick}
     >
@@ -315,10 +457,16 @@ function resolveVisibility(repos: Repository[], stored: string, shown: boolean):
   if (!shown) {
     return "all";
   }
-  if ((stored === "all" || stored === "public" || stored === "private" || stored === "internal") && (stored !== "internal" || repos.some((repo) => repo.visibility === "INTERNAL"))) {
+  if (
+    (stored === "all" || stored === "public" || stored === "private" || stored === "internal") &&
+    (stored !== "internal" || repos.some((repo) => repo.visibility === "INTERNAL"))
+  ) {
     return stored;
   }
-  if (repos.some((repo) => repo.visibility === "PUBLIC") && repos.some((repo) => repo.visibility === "PRIVATE")) {
+  if (
+    repos.some((repo) => repo.visibility === "PUBLIC") &&
+    repos.some((repo) => repo.visibility === "PRIVATE")
+  ) {
     return "public";
   }
   return "all";
@@ -330,7 +478,8 @@ function searched(repos: Repository[], search: string): Repository[] {
     return repos;
   }
   return repos.filter(
-    (repo) => repo.fullName.toLowerCase().includes(query) || repo.owner.login.toLowerCase().includes(query),
+    (repo) =>
+      repo.fullName.toLowerCase().includes(query) || repo.owner.login.toLowerCase().includes(query),
   );
 }
 
@@ -347,7 +496,13 @@ function matchesTracking(repo: Repository, tracking: TrackingFilter): boolean {
   return true;
 }
 
-function matches(repo: Repository, search: string, tracking: TrackingFilter, visibility: VisibilityFilter, showVisibility: boolean): boolean {
+function matches(
+  repo: Repository,
+  search: string,
+  tracking: TrackingFilter,
+  visibility: VisibilityFilter,
+  showVisibility: boolean,
+): boolean {
   if (!searched([repo], search).length) {
     return false;
   }

@@ -22,8 +22,8 @@ const TEST_ADMIN: AuthContextValue = {
     logoutUrl: "/logout",
   },
   loading: false,
-  refresh: async () => TEST_ADMIN.me,
-  logout: async () => undefined,
+  refresh: () => Promise.resolve(TEST_ADMIN.me),
+  logout: () => Promise.resolve(),
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,18 +44,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    loadMe()
+      .then((next) => {
+        if (!cancelled) {
+          setMe(next);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMe(anonymousMe);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const logout = useCallback(async () => {
     try {
       await signOut(me.logoutUrl);
+    } catch {
+      // Logout still clears local session; response may be a non-JSON redirect page.
     } finally {
       setMe({ ...anonymousMe, loginUrl: me.loginUrl || anonymousMe.loginUrl });
     }
   }, [me.loginUrl, me.logoutUrl]);
 
-  return <AuthContext.Provider value={{ me, loading, refresh, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ me, loading, refresh, logout }}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

@@ -3,7 +3,11 @@ export const JOB_LABELS: Record<string, string> = {
   REFERRERS: "Referrers",
   POPULAR_PATHS: "Popular Paths",
   REPOSITORY_STATS: "Repository Stats",
+  STATS: "Repository Stats",
   GROWTH_EVENTS: "Growth Events",
+  SEARCH_QUERY: "Search",
+  TOPIC_WATCH: "Topics",
+  DISCOVER_REPOSITORIES: "Discover",
 };
 
 export type ProgressJob = {
@@ -60,7 +64,9 @@ function repositoryLine(row: ProgressRow | undefined, watching: boolean): string
   }
   const phrases = jobPhrases(row.jobs);
   if (active) {
-    return phrases.length > 0 ? `Collecting ${row.fullName}: ${phrases.map((phrase) => phrase.text).join(", ")}` : `Collecting ${row.fullName}`;
+    return phrases.length > 0
+      ? `Collecting ${row.fullName}: ${phrases.map((phrase) => phrase.text).join(", ")}`
+      : `Collecting ${row.fullName}`;
   }
   const failed = phrases.filter((phrase) => phrase.failed);
   if (failed.length === 0) {
@@ -78,7 +84,9 @@ function portfolioLine(rows: ProgressRow[], watching: boolean): string | null {
     return null;
   }
   const done = active
-    ? rows.filter((row) => row.collectionStatus != null && !collectionInProgress(row.collectionStatus)).length
+    ? rows.filter(
+        (row) => row.collectionStatus != null && !collectionInProgress(row.collectionStatus),
+      ).length
     : 0;
   const base = `Collected ${done} of ${rows.length}`;
   if (!active) {
@@ -87,8 +95,12 @@ function portfolioLine(rows: ProgressRow[], watching: boolean): string | null {
   const failedJob = rows
     .filter((row) => collectionInProgress(row.collectionStatus))
     .flatMap((row) => row.jobs)
-    .find((job) => job.status === "FAILED" && collectionFailureReason(job.errorMessage, job.jobType));
-  const reason = failedJob ? collectionFailureReason(failedJob.errorMessage, failedJob.jobType) : null;
+    .find(
+      (job) => job.status === "FAILED" && collectionFailureReason(job.errorMessage, job.jobType),
+    );
+  const reason = failedJob
+    ? collectionFailureReason(failedJob.errorMessage, failedJob.jobType)
+    : null;
   return reason ? `${base}. ${reason}` : base;
 }
 
@@ -97,7 +109,10 @@ export const MISLABELED_SEARCH_ERROR = "Invalid GitHub search query";
 
 export const GROWTH_ACTIVITY_FAILURE = "Could not load issues";
 
-export function collectionFailureReason(message: string | null | undefined, jobType?: string): string | null {
+export function collectionFailureReason(
+  message: string | null | undefined,
+  jobType?: string,
+): string | null {
   const reason = message?.trim();
   if (reason === MISLABELED_SEARCH_ERROR && jobType === "GROWTH_EVENTS") {
     return GROWTH_ACTIVITY_FAILURE;
@@ -109,8 +124,33 @@ export function collectionFailureReason(message: string | null | undefined, jobT
 }
 
 function jobPhrases(jobs: ProgressJob[]): { text: string; failed: boolean }[] {
-  return jobs.flatMap((job) => {
-    const label = JOB_LABELS[job.jobType] ?? job.jobType;
+  const order: string[] = [];
+  const byType = new Map<string, ProgressJob[]>();
+  for (const job of jobs) {
+    if (!byType.has(job.jobType)) {
+      order.push(job.jobType);
+      byType.set(job.jobType, []);
+    }
+    byType.get(job.jobType)!.push(job);
+  }
+  return order.flatMap((jobType) => phraseForType(jobType, byType.get(jobType) ?? []));
+}
+
+/** One line per task family: singles keep done/running/failed; multiples use done/total. */
+function phraseForType(jobType: string, jobs: ProgressJob[]): { text: string; failed: boolean }[] {
+  const label = JOB_LABELS[jobType] ?? jobType;
+  const visible = jobs.filter(
+    (job) =>
+      job.status === "SUCCESS" ||
+      job.status === "RUNNING" ||
+      job.status === "RETRY" ||
+      job.status === "FAILED",
+  );
+  if (visible.length === 0) {
+    return [];
+  }
+  if (jobs.length === 1) {
+    const job = jobs[0];
     if (job.status === "SUCCESS") {
       return [{ text: `${label} done`, failed: false }];
     }
@@ -122,5 +162,13 @@ function jobPhrases(jobs: ProgressJob[]): { text: string; failed: boolean }[] {
       return [{ text: reason ? `${label} failed: ${reason}` : `${label} failed`, failed: true }];
     }
     return [];
-  });
+  }
+  const done = jobs.filter((job) => job.status === "SUCCESS").length;
+  const failed = jobs.filter((job) => job.status === "FAILED");
+  const text = `${label} ${done}/${jobs.length}`;
+  if (failed.length === 0) {
+    return [{ text, failed: false }];
+  }
+  const reason = collectionFailureReason(failed[0].errorMessage, jobType);
+  return [{ text: reason ? `${text} failed: ${reason}` : `${text} failed`, failed: true }];
 }

@@ -31,9 +31,9 @@ describe("growthEvents", () => {
     expect(eventMarkerLabel([])).toBe("");
     expect(eventMarkerLabel([event({})])).toBe("Star milestones");
     expect(eventMarkerLabel([event({}), event({ id: 2 })])).toBe("2 - GitHub events");
-    expect(eventMarkerLabel([event({ source: "MANUAL" }), event({ id: 2, source: "MANUAL" })])).toBe(
-      "2 - Growth events",
-    );
+    expect(
+      eventMarkerLabel([event({ source: "MANUAL" }), event({ id: 2, source: "MANUAL" })]),
+    ).toBe("2 - Growth events");
     expect(sourceBadge("MANUAL")).toBe("MANUAL");
     expect(sourceBadge("GITHUB")).toBe("AUTO");
     expect(eventUtcDate(event({}))).toBe("2026-09-22");

@@ -8,50 +8,53 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class AnalyticsController {
 
-    private final AnalyticsService analyticsService;
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private com.kholodilin.repogrowth.analytics.application.AdminCollectionProgress progress;
 
-    public AnalyticsController(AnalyticsService analyticsService) {
-        this.analyticsService = analyticsService;
-    }
+  private final AnalyticsService analyticsService;
 
-    @GetMapping("/dashboard")
-    public DashboardResponse dashboard(@RequestParam(defaultValue = "30d") String period) {
-        return analyticsService.dashboard(period);
-    }
+  public AnalyticsController(AnalyticsService analyticsService) {
+    this.analyticsService = analyticsService;
+  }
 
-    @GetMapping("/portfolio")
-    public AnalyticsService.PortfolioSnapshot portfolio(@RequestParam(defaultValue = "30d") String period) {
-        return analyticsService.portfolio(period);
-    }
+  @GetMapping("/dashboard")
+  public Object dashboard(
+      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(required = false) String owner) {
+    var result = analyticsService.dashboard(period, owner);
+    return progress == null ? result : progress.apply(result);
+  }
 
-    @GetMapping("/repositories/{id}/traffic")
-    public AnalyticsService.RepositoryTrafficSnapshot traffic(
-            @PathVariable long id,
-            @RequestParam(defaultValue = "30d") String period,
-            @RequestParam(defaultValue = "false") boolean includeServicePaths
-    ) {
-        return analyticsService.traffic(id, period, includeServicePaths);
-    }
+  @GetMapping("/portfolio")
+  public AnalyticsService.PortfolioSnapshot portfolio(
+      @RequestParam(defaultValue = "30d") String period) {
+    return analyticsService.portfolio(period);
+  }
 
-    @GetMapping("/repositories/{id}/traffic-history")
-    public AnalyticsService.SnapshotHistoryResponse trafficHistory(
-            @PathVariable long id,
-            @RequestParam(required = false) String kind,
-            @RequestParam(required = false) Integer days,
-            @RequestParam(required = false) String period,
-            @RequestParam(defaultValue = "false") boolean includeServicePaths
-    ) {
-        return analyticsService.snapshotHistory(id, kind, period, days, includeServicePaths);
-    }
+  @GetMapping("/repositories/{id}/traffic")
+  public AnalyticsService.RepositoryTrafficSnapshot traffic(
+      @PathVariable long id,
+      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "false") boolean includeServicePaths) {
+    return analyticsService.traffic(id, period, includeServicePaths);
+  }
 
-    @GetMapping("/repositories/{id}/stats-history")
-    public AnalyticsService.RepositoryStatsHistory statsHistory(
-            @PathVariable long id,
-            @RequestParam(defaultValue = "30d") String period
-    ) {
-        return analyticsService.statsHistory(id, period);
-    }
+  @GetMapping("/repositories/{id}/traffic-history")
+  public AnalyticsService.SnapshotHistoryResponse trafficHistory(
+      @PathVariable long id,
+      @RequestParam(required = false) String kind,
+      @RequestParam(required = false) Integer days,
+      @RequestParam(required = false) String period,
+      @RequestParam(defaultValue = "false") boolean includeServicePaths) {
+    return analyticsService.snapshotHistory(id, kind, period, days, includeServicePaths);
+  }
+
+  @GetMapping("/repositories/{id}/stats-history")
+  public AnalyticsService.RepositoryStatsHistory statsHistory(
+      @PathVariable long id, @RequestParam(defaultValue = "30d") String period) {
+    return analyticsService.statsHistory(id, period);
+  }
 }

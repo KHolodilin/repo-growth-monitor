@@ -1,3 +1,4 @@
+import { publicContext, readPublicPreference, writePublicPreference } from "./publicPrefs";
 import type { ChartAxis } from "./chartPresentation";
 import { readJsonCookie, writeJsonCookie } from "./cookies";
 import type { EventFilter } from "./growthEvents";
@@ -31,19 +32,21 @@ function choiceOf(value: unknown): ChartModeChoice | null {
 }
 
 function readMap(): Record<string, ChartModeChoice> {
-  return readJsonCookie(CHART_MODE_COOKIE, (value) => {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return null;
-    }
-    const stored: Record<string, ChartModeChoice> = {};
-    for (const [context, item] of Object.entries(value)) {
-      const choice = choiceOf(item);
-      if (choice) {
-        stored[context] = choice;
+  return (
+    readJsonCookie(CHART_MODE_COOKIE, (value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
       }
-    }
-    return stored;
-  }) ?? {};
+      const stored: Record<string, ChartModeChoice> = {};
+      for (const [context, item] of Object.entries(value)) {
+        const choice = choiceOf(item);
+        if (choice) {
+          stored[context] = choice;
+        }
+      }
+      return stored;
+    }) ?? {}
+  );
 }
 
 function publish(context: string) {
@@ -57,6 +60,16 @@ function publish(context: string) {
 }
 
 function writeChoice(context: string, patch: Partial<ChartModeChoice>) {
+  if (publicContext(context)) {
+    const current = readPublicPreference(
+      context,
+      "mode",
+      (v): v is ChartModeChoice => choiceOf(v) != null,
+    ) ?? { eventFilter: "off", axis: "calendar" };
+    writePublicPreference(context, "mode", { ...current, ...patch });
+    publish(context);
+    return;
+  }
   const stored = readMap();
   const current = stored[context] ?? { eventFilter: "off", axis: "calendar" };
   stored[context] = { ...current, ...patch };
@@ -74,11 +87,21 @@ export function subscribeChartMode(context: string, listener: () => void) {
 }
 
 export function readChartEventFilter(context: string): EventFilter {
-  return readMap()[context]?.eventFilter ?? "off";
+  return (
+    (publicContext(context)
+      ? readPublicPreference(context, "mode", (v): v is ChartModeChoice => choiceOf(v) != null)
+      : readMap()[context]
+    )?.eventFilter ?? "off"
+  );
 }
 
 export function readChartAxis(context: string): ChartAxis {
-  return readMap()[context]?.axis ?? "calendar";
+  return (
+    (publicContext(context)
+      ? readPublicPreference(context, "mode", (v): v is ChartModeChoice => choiceOf(v) != null)
+      : readMap()[context]
+    )?.axis ?? "calendar"
+  );
 }
 
 export function writeChartEventFilter(context: string, value: EventFilter) {

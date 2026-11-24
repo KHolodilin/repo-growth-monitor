@@ -1,9 +1,11 @@
 package com.kholodilin.repogrowth.event.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kholodilin.repogrowth.event.application.GrowthEventService;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.time.Instant;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,78 +16,67 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Instant;
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/admin")
 public class GrowthEventController {
 
-    private final GrowthEventService growthEventService;
+  private final GrowthEventService growthEventService;
 
-    public GrowthEventController(GrowthEventService growthEventService) {
-        this.growthEventService = growthEventService;
-    }
+  public GrowthEventController(GrowthEventService growthEventService) {
+    this.growthEventService = growthEventService;
+  }
 
-    @GetMapping("/repositories/{id}/growth-events")
-    public List<GrowthEvent> list(@PathVariable long id, @RequestParam(defaultValue = "30d") String period) {
-        return growthEventService.list(id, period);
-    }
+  @GetMapping("/repositories/{id}/growth-events")
+  public List<GrowthEvent> list(
+      @PathVariable long id, @RequestParam(defaultValue = "30d") String period) {
+    return growthEventService.list(id, period);
+  }
 
-    @PostMapping("/repositories/{id}/growth-events")
-    public GrowthEvent create(@PathVariable long id, @RequestBody ManualEventRequest request) {
-        return growthEventService.createManual(
-                id,
-                request.type(),
-                request.eventAt(),
-                request.title(),
-                request.url(),
-                request.description()
-        );
-    }
+  @PostMapping("/repositories/{id}/growth-events")
+  public GrowthEvent create(@PathVariable long id, @RequestBody ManualEventRequest request) {
+    return growthEventService.createManual(
+        id,
+        request.type(),
+        request.eventAt(),
+        request.title(),
+        request.url(),
+        request.description());
+  }
 
-    @PutMapping("/growth-events/{id}")
-    public GrowthEvent update(@PathVariable long id, @RequestBody ManualEventRequest request) {
-        return growthEventService.updateManual(
-                id,
-                request.type(),
-                request.eventAt(),
-                request.title(),
-                request.url(),
-                request.description()
-        );
-    }
+  @PutMapping("/growth-events/{id}")
+  public GrowthEvent update(@PathVariable long id, @RequestBody ManualEventRequest request) {
+    return growthEventService.updateManual(
+        id,
+        request.type(),
+        request.eventAt(),
+        request.title(),
+        request.url(),
+        request.description());
+  }
 
-    @DeleteMapping("/growth-events/{id}")
-    public void delete(@PathVariable long id) {
-        growthEventService.deleteManual(id);
-    }
+  @DeleteMapping("/growth-events/{id}")
+  public void delete(@PathVariable long id) {
+    growthEventService.deleteManual(id);
+  }
 
-    @GetMapping("/repositories/{id}/growth-event-settings")
-    public List<GrowthEventSetting> settings(@PathVariable long id) {
-        return growthEventService.settings(id);
-    }
+  @GetMapping("/repositories/{id}/growth-event-settings")
+  public List<GrowthEventSetting> settings(@PathVariable long id) {
+    return growthEventService.settings(id);
+  }
 
-    @PutMapping("/repositories/{id}/growth-event-settings")
-    public List<GrowthEventSetting> updateSettings(@PathVariable long id, @RequestBody List<SettingUpdateRequest> settings) {
-        return growthEventService.updateSettings(
-                id,
-                settings.stream()
-                        .map(item -> new GrowthEventSetting(id, item.eventType(), item.enabled(), null, null))
-                        .toList()
-        );
-    }
+  @PutMapping("/repositories/{id}/growth-event-settings")
+  public List<GrowthEventSetting> updateSettings(
+      @PathVariable long id, @RequestBody List<SettingUpdateRequest> settings) {
+    return growthEventService.updateSettings(
+        id,
+        settings.stream()
+            .map(item -> new GrowthEventSetting(id, item.eventType(), item.enabled(), null, null))
+            .toList());
+  }
 
-    public record ManualEventRequest(
-            String type,
-            Instant eventAt,
-            String title,
-            String url,
-            String description
-    ) {
-    }
+  public record ManualEventRequest(
+      String type, Instant eventAt, String title, String url, String description) {}
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record SettingUpdateRequest(String eventType, boolean enabled) {
-    }
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record SettingUpdateRequest(String eventType, boolean enabled) {}
 }

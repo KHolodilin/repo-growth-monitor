@@ -1,6 +1,10 @@
 spring:
   application:
     name: repo-growth-monitor
+  banner:
+    location: classpath:banner.txt
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   datasource:
     url: jdbc:postgresql://localhost:5432/repogrowth
     username: postgres
@@ -12,11 +16,10 @@ spring:
     password: ${LIQUIBASE_PASSWORD:${spring.datasource.password}}
   jackson:
     default-property-inclusion: non_null
-  lifecycle:
-    timeout-per-shutdown-phase: 30s
 
 server:
   port: 8080
+  shutdown: graceful
   forward-headers-strategy: framework
   servlet:
     session:
@@ -45,14 +48,8 @@ auth:
   mock:
     users-location: ${AUTH_MOCK_USERS_LOCATION:classpath:auth/mock-users.yml}
 
-github:
-  token: ${GITHUB_TOKEN:}
-  api-base-url: https://api.github.com
-  web-base-url: https://github.com
-  connect-timeout: 10s
-  read-timeout: 30s
-
 collection:
+  # workers/job-lease remain for configuration binding; in-process workers were removed.
   workers: 4
   job-lease: 5m
   planner:
@@ -122,6 +119,9 @@ management:
       enabled: false
     logfile:
       enabled: false
+  info:
+    env:
+      enabled: true
   metrics:
     tags:
       application: ${spring.application.name}
@@ -140,3 +140,12 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+    # Must match org.webjars:swagger-ui (see swagger-ui.version in backend/pom.xml).
+    version: @swagger-ui.version@
+
+# Rank-sort frozen into SEARCH_QUERY / TOPIC_WATCH parameters (collector.search.*).
+# Collector GitHub execution is not started in this process — use the standalone boot JAR.
+collector:
+  search:
+    rank-sort: best_match
+    rank-sort-order: desc

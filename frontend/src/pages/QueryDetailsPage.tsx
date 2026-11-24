@@ -1,20 +1,35 @@
 import { useChartVisibility } from "../lib/chartVisibility";
 import { PeriodSelector, usePeriod } from "../components/PeriodSelector";
 import { RankSummary } from "../components/RankSummary";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { api, type Repository, type SearchHistory, type SearchRunResults, type SearchSnapshotSeries } from "../lib/api";
+import {
+  api,
+  type Repository,
+  type SearchHistory,
+  type SearchRunResults,
+  type SearchSnapshotSeries,
+} from "../lib/api";
+import { waitForCollectionRequest } from "../lib/collectionRequest";
 import { useMutationAccess } from "../lib/mutationAccess";
 import { formatSyncTime, cn } from "../lib/utils";
-import { SEARCH_METRICS, queryDetailsChart, searchSeriesFromPayload, type SearchChartMetric } from "../lib/searchSeriesChart";
+import {
+  SEARCH_METRICS,
+  queryDetailsChart,
+  searchSeriesFromPayload,
+  type SearchChartMetric,
+} from "../lib/searchSeriesChart";
 import { ChartCard, useChartMode } from "../components/ChartDownloadMenu";
 import { PersistentECharts } from "../components/PersistentECharts";
 import { Button, Card, Skeleton } from "../components/ui";
 import { PageBreadcrumb } from "../components/PageBreadcrumb";
 import { SearchResultsTable } from "../components/SearchResultsTable";
+import { ownerPath, repoHref, repoPath } from "../lib/repoPaths";
+import { useResolvedRepositoryId } from "../lib/useResolvedRepositoryId";
 
 export function QueryDetailsPage() {
-  const { repositoryId, queryId } = useParams();
+  const { owner = "", repository: repositoryName = "", queryId } = useParams();
+  const { id: repositoryId, error: resolveError } = useResolvedRepositoryId(owner, repositoryName);
   const [period, setPeriod] = usePeriod(repositoryId);
   const { allowMutations } = useMutationAccess();
   const [repo, setRepo] = useState<Repository | null>(null);
@@ -22,55 +37,119 @@ export function QueryDetailsPage() {
   const [results, setResults] = useState<SearchRunResults | null>(null);
   const [series, setSeries] = useState<SearchSnapshotSeries[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const identityKey = `${repositoryId}:${queryId}`;
+  const [seenIdentityKey, setSeenIdentityKey] = useState(identityKey);
+  if (identityKey !== seenIdentityKey) {
+    setSeenIdentityKey(identityKey);
+    setSelected([]);
+    setError(null);
+    setHistory(null);
+    setResults(null);
+    setSeries([]);
+  }
   const visibility = useChartVisibility(`${repositoryId}:query:${queryId}`);
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedMetric = searchParams.get("metric");
-  const metric: SearchChartMetric = requestedMetric === "stars" || requestedMetric === "forks" ? requestedMetric : "place";
-  const [error, setError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
+  const metric: SearchChartMetric =
+    requestedMetric === "stars" || requestedMetric === "forks" ? requestedMetric : "place";
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!repositoryId || !queryId) {
       return;
     }
     const [repository, queryHistory] = await Promise.all([
-      api<Repository>(`/api/v1/repositories/${repositoryId}`),
-      api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`),
     ]);
     setRepo(repository);
     setHistory(queryHistory);
     try {
-      setResults(await api<SearchRunResults>(`/api/v1/search-queries/${queryId}/results`));
+      setResults(await api<SearchRunResults>(`/api/v1/admin/search-queries/${queryId}/results`));
     } catch {
       setResults(null);
     }
     try {
-      setSeries(searchSeriesFromPayload(await api(`/api/v1/search-queries/${queryId}/series`)));
+      setSeries(
+        searchSeriesFromPayload(await api(`/api/v1/admin/search-queries/${queryId}/series`)),
+      );
     } catch {
       setSeries([]);
     }
-  }
+  }, [repositoryId, queryId]);
 
   useEffect(() => {
-    setSelected([]);
-    load().catch((err: Error) => setError(err.message));
+    if (!repositoryId || !queryId) {
+      return;
+    }
+    const abort = new AbortController();
+    let cancelled = false;
+    Promise.all([
+      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`, { signal: abort.signal }),
+      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`, {
+        signal: abort.signal,
+      }),
+    ])
+      .then(async ([repository, queryHistory]) => {
+        if (cancelled || abort.signal.aborted) {
+          return;
+        }
+        setError(null);
+        setRepo(repository);
+        setHistory(queryHistory);
+        try {
+          const nextResults = await api<SearchRunResults>(
+            `/api/v1/admin/search-queries/${queryId}/results`,
+            { signal: abort.signal },
+          );
+          if (!cancelled && !abort.signal.aborted) {
+            setResults(nextResults);
+          }
+        } catch {
+          if (!cancelled && !abort.signal.aborted) {
+            setResults(null);
+          }
+        }
+        try {
+          const nextSeries = searchSeriesFromPayload(
+            await api(`/api/v1/admin/search-queries/${queryId}/series`, { signal: abort.signal }),
+          );
+          if (!cancelled && !abort.signal.aborted) {
+            setSeries(nextSeries);
+          }
+        } catch {
+          if (!cancelled && !abort.signal.aborted) {
+            setSeries([]);
+          }
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled || abort.signal.aborted) {
+          return;
+        }
+        setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+      abort.abort();
+    };
   }, [repositoryId, queryId]);
 
   const searchBusy =
-    history?.searchStatus === "RUNNING"
-    || history?.searchStatus === "READY"
-    || history?.searchStatus === "RETRY";
+    history?.searchStatus === "RUNNING" ||
+    history?.searchStatus === "READY" ||
+    history?.searchStatus === "RETRY";
 
   useEffect(() => {
     if (!searchBusy) {
-      setRunning(false);
       return;
     }
     const timer = window.setInterval(() => {
       void load().catch(() => undefined);
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [searchBusy, repositoryId, queryId]);
+  }, [searchBusy, load]);
 
   async function runNow() {
     if (!allowMutations || !queryId || running || searchBusy) {
@@ -78,7 +157,13 @@ export function QueryDetailsPage() {
     }
     setRunning(true);
     try {
-      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
+      const created = await api<{ requestId?: string }>(
+        `/api/v1/admin/search-queries/${queryId}/run`,
+        { method: "POST" },
+      );
+      if (created?.requestId) {
+        await waitForCollectionRequest(created.requestId);
+      }
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -87,9 +172,8 @@ export function QueryDetailsPage() {
     }
   }
 
-
-  if (error) {
-    return <p className="text-red-600">{error}</p>;
+  if (resolveError || error) {
+    return <p className="text-red-600">{resolveError ?? error}</p>;
   }
   if (!repo || !history) {
     return (
@@ -102,21 +186,38 @@ export function QueryDetailsPage() {
 
   const busy = running || searchBusy;
   const metricControls = (
-    <div className="inline-flex rounded-lg border bg-muted p-1" role="group" aria-label="Chart metric">
-      {([
-        ["place", "Place"],
-        ["stars", "Stars"],
-        ["forks", "Forks"],
-      ] as const).map(([key, label]) => (
+    <div
+      className="inline-flex rounded-lg border bg-muted p-1"
+      role="group"
+      aria-label="Chart metric"
+    >
+      {(
+        [
+          ["place", "Place"],
+          ["stars", "Stars"],
+          ["forks", "Forks"],
+        ] as const
+      ).map(([key, label]) => (
         <button
           key={key}
           type="button"
           className={cn(
             "rounded-md px-3 py-1.5 text-sm font-medium",
-            metric === key ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+            metric === key
+              ? "bg-card text-foreground shadow-xs"
+              : "text-muted-foreground hover:text-foreground",
           )}
           aria-pressed={metric === key}
-          onClick={() => setSearchParams(previous => { const next = new URLSearchParams(previous); next.set("metric", key); return next; }, { replace: true })}
+          onClick={() =>
+            setSearchParams(
+              (previous) => {
+                const next = new URLSearchParams(previous);
+                next.set("metric", key);
+                return next;
+              },
+              { replace: true },
+            )
+          }
         >
           {label}
         </button>
@@ -130,15 +231,21 @@ export function QueryDetailsPage() {
         <div className="sm:col-start-1 sm:row-start-1">
           <PageBreadcrumb
             items={[
-              { label: "Portfolio", to: "/dashboard" },
+              { label: "Home", to: "/" },
+              { label: repo.owner.login, to: ownerPath(repo.owner.login) },
               {
-                label: repo.fullName,
-                repoSwitcher: {
-                  currentId: repo.id,
-                  hrefFor: (id) => `/repositories/${id}?tab=search`,
-                },
+                label: repo.name,
+                ...(allowMutations
+                  ? {
+                      repoSwitcher: {
+                        currentId: repo.id,
+                        hrefFor: (next: typeof repo) =>
+                          repoHref(next.owner.login, next.name, "search"),
+                      },
+                    }
+                  : {}),
               },
-              { label: "Search Visibility", to: `/repositories/${repo.id}?tab=search` },
+              { label: "Search Visibility", to: repoHref(repo.owner.login, repo.name, "search") },
             ]}
           />
           <h1 className="mt-2 break-all text-xl font-semibold">
@@ -168,9 +275,19 @@ export function QueryDetailsPage() {
         )}
       </header>
 
-      <div role="group" aria-label="History period" className="flex justify-end"><PeriodSelector fitMobile period={period} onPeriod={setPeriod} /></div>
+      <div role="group" aria-label="History period" className="flex justify-end">
+        <PeriodSelector fitMobile period={period} onPeriod={setPeriod} />
+      </div>
 
-      <RankSummary current={history.currentRank} best={history.bestRank} limit={history.query.resultLimit} change7d={history.change7d} change30d={history.change30d} total={history.totalResults} />
+      <RankSummary
+        current={history.currentRank}
+        best={history.bestRank}
+        limit={history.query.resultLimit}
+        change7d={history.change7d}
+        change30d={history.change30d}
+        total={history.totalResults}
+        sortMode={history.sortMode}
+      />
 
       <ChartCard
         title={SEARCH_METRICS[metric].title}
@@ -181,7 +298,13 @@ export function QueryDetailsPage() {
         mobileControls={metricControls}
         mobileSeries={[]}
       >
-        {selected.some(id => !series.some(item => item.githubRepositoryId === id && item.points.length > 0)) && <p role="status" className="mb-2 text-sm text-muted-foreground">No history for one or more selected competitors.</p>}
+        {selected.some(
+          (id) => !series.some((item) => item.githubRepositoryId === id && item.points.length > 0),
+        ) && (
+          <p role="status" className="mb-2 text-sm text-muted-foreground">
+            No history for one or more selected competitors.
+          </p>
+        )}
         <QueryRankChart
           history={history}
           repo={repo}
@@ -201,12 +324,16 @@ export function QueryDetailsPage() {
             rows={results.rows}
             repositoryId={repo.id}
             trackedGithubId={repo.githubId}
-            selectedIds={selected.filter(id => visibility.isVisible(`repository:${id}`))}
+            selectedIds={selected.filter((id) => visibility.isVisible(`repository:${id}`))}
             onToggle={(id) =>
-              !visibility.isVisible(`repository:${id}`) && selected.includes(id) ? visibility.reveal([`repository:${id}`]) : setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+              !visibility.isVisible(`repository:${id}`) && selected.includes(id)
+                ? visibility.reveal([`repository:${id}`])
+                : setSelected((current) =>
+                    current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+                  )
             }
             nameTo={(row) =>
-              `/repositories/${repo.id}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
+              `${repoPath(repo.owner.login, repo.name)}/search-queries/${history.query.id}/competitors/${row.result.githubRepositoryId}`
             }
           />
         )}
@@ -232,7 +359,8 @@ function QueryRankChart({
 }) {
   const { axis, events, period } = useChartMode();
   const chart = useMemo(
-    () => queryDetailsChart({ history, repo, rows, series, selected, metric, axis, events, period })!,
+    () =>
+      queryDetailsChart({ history, repo, rows, series, selected, metric, axis, events, period })!,
     [history, repo, rows, series, selected, metric, axis, events, period],
   );
   return (

@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { readCookie } from "./cookies";
 
 export type Me = {
   authenticated: boolean;
@@ -41,6 +42,16 @@ export async function loadMe(): Promise<Me> {
   return api<Me>("/api/v1/me");
 }
 
+/** Logout may redirect to HTML; never parse the body as JSON. */
 export async function signOut(logoutUrl: string): Promise<void> {
-  await api(logoutUrl || "/logout", { method: "POST" });
+  const headers = new Headers();
+  const csrf = readCookie("XSRF-TOKEN");
+  if (csrf) {
+    headers.set("X-XSRF-TOKEN", csrf);
+  }
+  await fetch(logoutUrl || "/logout", {
+    method: "POST",
+    headers,
+    credentials: "include",
+  });
 }

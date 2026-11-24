@@ -1,0 +1,20 @@
+# Standalone github-collector boot image (in-memory queue, no collector Postgres).
+# Builds with -Pcollector,!full so the backend module is not required on disk.
+FROM maven:3.9-eclipse-temurin-26 AS build
+WORKDIR /build
+COPY pom.xml ./
+COPY .mvn/ ./.mvn/
+COPY checkstyle.xml ./
+COPY collector-contracts/ ./collector-contracts/
+COPY github-collector/ ./github-collector/
+RUN mvn -q '-Pcollector,!full' -DskipTests package
+
+FROM eclipse-temurin:25-jre-alpine
+WORKDIR /app
+RUN addgroup -S app && adduser -S app -G app \
+  && mkdir -p /var/log/collector \
+  && chown -R app:app /var/log/collector
+COPY --from=build /build/github-collector/target/github-collector-*-boot.jar app.jar
+USER app
+EXPOSE 8080 8081
+ENTRYPOINT ["java","-jar","/app/app.jar"]

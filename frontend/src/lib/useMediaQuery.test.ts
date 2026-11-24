@@ -14,7 +14,10 @@ describe("useMediaQuery", () => {
       addEventListener: (_: string, listener: () => void) => listeners.add(listener),
       removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
     };
-    vi.stubGlobal("matchMedia", vi.fn(() => media));
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => media),
+    );
 
     const { result, unmount } = renderHook(() => useMediaQuery("(max-width: 767px)"));
     expect(result.current).toBe(false);

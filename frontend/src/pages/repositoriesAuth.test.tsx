@@ -18,7 +18,12 @@ vi.mock("../lib/auth", async (importOriginal) => {
   return { ...actual, loadMe };
 });
 
-const tracked = { ...repository, accessible: true, trafficPermissionMissing: false, visibility: "PUBLIC" };
+const tracked = {
+  ...repository,
+  accessible: true,
+  trafficPermissionMissing: false,
+  visibility: "PUBLIC",
+};
 const privateRepo = {
   ...repository,
   id: 8,
@@ -40,9 +45,9 @@ describe("repositories auth gating", () => {
   it("hides private repositories and tracking controls for guests", async () => {
     api.mockImplementation((path: string) => {
       if (String(path).includes("/system/status")) {
-        return { tokenState: "OK", rateLimitReset: null };
+        return Promise.resolve({ tokenState: "OK", rateLimitReset: null });
       }
-      return [tracked, privateRepo];
+      return Promise.resolve([tracked, privateRepo]);
     });
     render(
       <MemoryRouter>

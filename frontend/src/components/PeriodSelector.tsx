@@ -1,17 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils";
 import { readCookie, readJsonCookie, writeCookie, writeJsonCookie } from "../lib/cookies";
+import { PERIODS, isPeriod, type Period } from "../lib/period";
 
-export const PERIODS = ["1d", "7d", "30d", "90d", "1y", "all"] as const;
-export type Period = (typeof PERIODS)[number];
+export { PERIODS, type Period };
 
 const PERIOD_COOKIE = "rgm-period";
 const REPO_PERIODS_COOKIE = "rgm-period-repos";
 const DEFAULT_PERIOD: Period = "7d";
-
-function isPeriod(value: string): value is Period {
-  return (PERIODS as readonly string[]).includes(value);
-}
 
 export function readStoredPeriod(): Period {
   const value = readCookie(PERIOD_COOKIE);
@@ -103,7 +99,9 @@ export function PeriodSelector({
       className={cn(
         "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium",
         fitMobile && "min-h-11 min-w-0 px-0 md:min-h-0 md:px-3",
-        period === item ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+        period === item
+          ? "bg-card text-foreground shadow-xs"
+          : "text-muted-foreground hover:text-foreground",
       )}
       aria-pressed={period === item}
       onClick={() => onPeriod(item)}

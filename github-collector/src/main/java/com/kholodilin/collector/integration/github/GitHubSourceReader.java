@@ -1,0 +1,177 @@
+package com.kholodilin.collector.integration.github;
+
+import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import com.kholodilin.collector.integration.HttpClients;
+import com.kholodilin.collector.integration.credentials.CredentialCache;
+import com.kholodilin.collector.integration.credentials.CredentialedGitHubRequest;
+import com.kholodilin.collector.model.CredentialSettings;
+import com.kholodilin.collector.model.ExecutionSettings;
+import com.kholodilin.collector.model.GitHubSourceUnavailableException;
+import java.net.URI;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.*;
+import org.springframework.web.client.RestClient;
+import tools.jackson.databind.*;
+import tools.jackson.databind.json.JsonMapper;
+
+/** GitHub HTTP observation fetch and response projection. No local storage. */
+@RequiredArgsConstructor
+public final class GitHubSourceReader {
+  private final CredentialCache cache;
+  private final CredentialSettings credentials;
+  private final ExecutionSettings properties;
+  private final LocalGitHubPacer pacer;
+  private final RestClient client;
+  private final JsonMapper json;
+
+  public static RestClient restClient(ExecutionSettings properties) {
+    return HttpClients.noRedirect(properties.requestTimeout(), properties.requestTimeout());
+  }
+
+  public JsonNode fetch(
+      String trustedOrigin,
+      JobRequest job,
+      String key,
+      String method,
+      String path,
+      String body,
+      boolean optional) {
+    if (!job.deadlineAt().isAfter(java.time.Instant.now()))
+      throw new GitHubSourceUnavailableException();
+    String resource =
+        path.startsWith("/search/") ? "search" : path.equals("/graphql") ? "graphql" : "core";
+    var limiter =
+        new GitHubRequestLimiter(
+            trustedOrigin,
+            job,
+            resource,
+            credentials,
+            pacer,
+            properties.requestTimeout().multipliedBy(2).plusSeconds(2));
+    var requests = new CredentialedGitHubRequest(cache, limiter);
+    return requests.execute(
+        trustedOrigin,
+        job,
+        token -> {
+          var request =
+              client
+                  .method(HttpMethod.valueOf(method))
+                  .uri(URI.create(properties.apiBaseUrl().toString().replaceAll("/+$", "") + path))
+                  .headers(h -> {
+                    h.setBearerAuth(token);
+                    h.set(HttpHeaders.ACCEPT, GitHubHttp.ACCEPT_JSON);
+                    h.set(GitHubHttp.API_VERSION_HEADER, GitHubHttp.API_VERSION);
+                  })
+                  .contentType(MediaType.APPLICATION_JSON);
+          if (body != null) request.body(body);
+          return request.exchange((sent, response) -> {
+            int status = response.getStatusCode().value();
+            limiter.observe(
+                optional && status == HttpStatus.NOT_FOUND.value() ? HttpStatus.OK.value() : status,
+                response.getHeaders());
+            if (optional && status == HttpStatus.NOT_FOUND.value()) return json.readTree("null");
+            if (!response.getStatusCode().is2xxSuccessful()) {
+              var retry = retryAt(response.getHeaders());
+              if (status == HttpStatus.FORBIDDEN.value()) {
+                String message =
+                    new String(
+                            response.getBody().readNBytes(4096),
+                            java.nio.charset.StandardCharsets.UTF_8)
+                        .toLowerCase(java.util.Locale.ROOT);
+                if (retry == null && message.contains("rate limit"))
+                  retry = java.time.Instant.now().plusSeconds(60);
+              }
+              if (optional && status == HttpStatus.FORBIDDEN.value() && retry == null)
+                return json.readTree("null");
+              throw new CredentialedGitHubRequest.Failure(status, retry);
+            }
+            byte[] bytes = response.getBody().readNBytes(properties.maximumPayloadBytes() * 4 + 1);
+            if (bytes.length > properties.maximumPayloadBytes() * 4)
+              throw new CredentialedGitHubRequest.Failure(HttpStatus.CONTENT_TOO_LARGE.value());
+            JsonNode parsed = bytes.length == 0 ? json.readTree("null") : json.readTree(bytes);
+            if (key.equals("contributor-count")) {
+              long total = parsed.size();
+              String link = response.getHeaders().getFirst(HttpHeaders.LINK);
+              if (link != null)
+                for (String segment : link.split(","))
+                  if (segment.contains("rel=\"last\"")) {
+                    var matcher =
+                        java.util.regex.Pattern.compile("[?&]page=([0-9]+)").matcher(segment);
+                    if (matcher.find()) total = Long.parseLong(matcher.group(1));
+                  }
+              var count = json.createObjectNode();
+              count.put("total", total);
+              return count;
+            }
+            return project(key, parsed);
+          });
+        });
+  }
+
+  private JsonNode project(String key, JsonNode raw) {
+    if (raw.isNull()) return raw;
+    if (key.equals("social-preview") && raw.hasNonNull("errors")) return json.readTree("null");
+    if (key.startsWith("security:") || key.startsWith("issue-template:"))
+      return json.createObjectNode().put("exists", true);
+    java.util.List<String> fields = null;
+    if (key.startsWith("issues:"))
+      fields =
+          java.util.List.of(
+              "id",
+              "number",
+              "title",
+              "state",
+              "html_url",
+              "created_at",
+              "user",
+              "labels",
+              "pull_request");
+    else if (key.startsWith("pulls:"))
+      fields =
+          java.util.List.of(
+              "id",
+              "number",
+              "title",
+              "state",
+              "merged",
+              "html_url",
+              "created_at",
+              "merged_at",
+              "user");
+    else if (key.startsWith("releases:") || key.equals("latest-release"))
+      fields =
+          java.util.List.of(
+              "id", "draft", "tag_name", "name", "html_url", "published_at", "created_at");
+    else if (key.startsWith("contributors:"))
+      fields = java.util.List.of("id", "login", "type", "contributions");
+    if (fields == null) return raw;
+    if (raw.isArray()) {
+      var array = json.createArrayNode();
+      for (var row : raw) array.add(fields(row, fields));
+      return array;
+    }
+    return fields(raw, fields);
+  }
+
+  private JsonNode fields(JsonNode raw, java.util.List<String> fields) {
+    var projected = json.createObjectNode();
+    for (String field : fields) if (raw.has(field)) projected.set(field, raw.get(field));
+    return projected;
+  }
+
+  private java.time.Instant retryAt(HttpHeaders headers) {
+    try {
+      String after = headers.getFirst(HttpHeaders.RETRY_AFTER);
+      if (after != null) return java.time.Instant.now().plusSeconds(Long.parseLong(after));
+    } catch (RuntimeException ignored) {
+    }
+    try {
+      String remaining = headers.getFirst(GitHubHttp.RATE_LIMIT_REMAINING),
+          reset = headers.getFirst(GitHubHttp.RATE_LIMIT_RESET);
+      if ("0".equals(remaining) && reset != null)
+        return java.time.Instant.ofEpochSecond(Long.parseLong(reset));
+    } catch (RuntimeException ignored) {
+    }
+    return null;
+  }
+}

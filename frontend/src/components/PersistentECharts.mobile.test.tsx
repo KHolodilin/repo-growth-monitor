@@ -15,7 +15,10 @@ function stubMobile(matches: boolean) {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   };
-  vi.stubGlobal("matchMedia", vi.fn(() => media));
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => media),
+  );
 }
 
 describe("PersistentECharts mobile shell", () => {

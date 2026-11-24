@@ -1,0 +1,135 @@
+package com.kholodilin.collector.configuration;
+
+import com.kholodilin.collector.integration.credentials.CredentialCache;
+import com.kholodilin.collector.integration.github.AssignedGithubClient;
+import com.kholodilin.collector.integration.github.GitHubObservationMapper;
+import com.kholodilin.collector.integration.github.GitHubSourceReader;
+import com.kholodilin.collector.integration.github.LocalGitHubPacer;
+import com.kholodilin.collector.model.CredentialSettings;
+import com.kholodilin.collector.model.ExecutionSettings;
+import com.kholodilin.collector.repository.InMemoryObservationStore;
+import com.kholodilin.collector.repository.JobQueue;
+import com.kholodilin.collector.repository.ObservationStore;
+import com.kholodilin.collector.service.JobExecutionService;
+import com.kholodilin.collector.service.ObservationCheckpoint;
+import com.kholodilin.collector.service.collection.AssignedTaskCollectionService;
+import java.time.Clock;
+import java.util.concurrent.*;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.SmartLifecycle;
+import org.springframework.context.annotation.*;
+import tools.jackson.databind.json.JsonMapper;
+
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnProperty(
+    name = {
+      "collector.execution.enabled",
+      "collector.runtime.enabled",
+      "collector.credentials.enabled"
+    },
+    havingValue = "true")
+@EnableConfigurationProperties({ExecutionProperties.class, GitHubClientProperties.class})
+@Slf4j
+public class CollectorExecutionConfiguration {
+  @Bean
+  ExecutionSettings executionSettings(ExecutionProperties properties) {
+    return properties.toSettings();
+  }
+
+  @Bean
+  LocalGitHubPacer localGitHubPacer(GitHubClientProperties github) {
+    return new LocalGitHubPacer(github.pacingSettings());
+  }
+
+  @Bean
+  ObservationStore observationStore(ExecutionSettings settings) {
+    return new InMemoryObservationStore(settings.maximumPayloadBytes() - 512);
+  }
+
+  @Bean
+  GitHubSourceReader gitHubSourceReader(
+      CredentialCache cache,
+      CredentialSettings credentials,
+      ExecutionSettings settings,
+      LocalGitHubPacer pacer,
+      JsonMapper json) {
+    return new GitHubSourceReader(
+        cache, credentials, settings, pacer, GitHubSourceReader.restClient(settings), json);
+  }
+
+  @Bean
+  GitHubObservationMapper gitHubObservationMapper(JsonMapper json) {
+    return new GitHubObservationMapper(json);
+  }
+
+  @Bean
+  AssignedGithubClient assignedGithubClient(
+      GitHubSourceReader source,
+      ExecutionSettings settings,
+      GitHubObservationMapper observations,
+      JsonMapper json) {
+    return new AssignedGithubClient(source, settings, observations, json);
+  }
+
+  @Bean
+  ObservationCheckpoint observationCheckpoint(ObservationStore store, JsonMapper json) {
+    return new ObservationCheckpoint(store, json);
+  }
+
+  @Bean
+  AssignedTaskCollectionService assignedTaskCollectionService(
+      ObservationCheckpoint checkpoint, AssignedGithubClient github) {
+    return new AssignedTaskCollectionService(checkpoint, github);
+  }
+
+  @Bean(destroyMethod = "close")
+  JobExecutionService jobExecutionService(
+      JobQueue queue,
+      AssignedTaskCollectionService collector,
+      ExecutionSettings settings,
+      GitHubClientProperties github,
+      JsonMapper json,
+      Clock clock) {
+    return new JobExecutionService(queue, collector, settings, github.retrySettings(), json, clock);
+  }
+
+  @Bean
+  SmartLifecycle collectorExecutionLoop(JobExecutionService executor, ExecutionSettings settings) {
+    return new SmartLifecycle() {
+      private ScheduledExecutorService loop;
+      private volatile boolean running;
+
+      public void start() {
+        running = true;
+        loop =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+              Thread t = new Thread(r, "collector-assigned-execution");
+              t.setDaemon(true);
+              return t;
+            });
+        loop.scheduleWithFixedDelay(
+            () -> {
+              try {
+                executor.poll("collector-executor");
+              } catch (RuntimeException error) {
+                log.warn("Collector execution loop failed; continuing", error);
+              }
+            },
+            0,
+            settings.pollInterval().toMillis(),
+            TimeUnit.MILLISECONDS);
+      }
+
+      public void stop() {
+        running = false;
+        if (loop != null) loop.shutdownNow();
+      }
+
+      public boolean isRunning() {
+        return running;
+      }
+    };
+  }
+}

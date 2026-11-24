@@ -1,0 +1,24 @@
+# Copy to a host-private path and point SPRING_CONFIG_ADDITIONAL_LOCATION at it for the RGM service.
+# Replace tokens/keys; never commit real secrets.
+rgm:
+  collector:
+    enabled: false
+  planner:
+    enabled: true
+  credentials:
+    enabled: true
+    default-ref: default-github
+    active-key-id: v1
+    encryption-keys:
+      v1: "BASE64_32_BYTE_KEY"
+    cache-lease: 2h
+  orchestration:
+    enabled: true
+    allow-http: false
+    nodes:
+      - key: collector-a
+        pool: default
+        endpoint: https://collector.example
+        enabled: true
+        service-token: "SERVICE_TOKEN_AT_LEAST_32_CHARS____________"
+        resolve-token: "RESOLVE_TOKEN_AT_LEAST_32_CHARS____________"

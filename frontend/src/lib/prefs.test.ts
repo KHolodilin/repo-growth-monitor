@@ -48,7 +48,10 @@ describe("chart and table prefs", () => {
     writeChartSelection("13:traffic", {});
     expect(readChartSelection("13:traffic")).toBeNull();
     writeChartSelection("13:traffic", { Views: false, skip: true });
-    expect(resolveChartSelection("13:traffic", ["Views", "Clones"])).toEqual({ Views: false, Clones: true });
+    expect(resolveChartSelection("13:traffic", ["Views", "Clones"])).toEqual({
+      Views: false,
+      Clones: true,
+    });
     pruneChartSelection("missing", ["Views"]);
     pruneChartSelection("13:traffic", ["Views"]);
     expect(readChartSelection("13:traffic")).toEqual({ Views: false });
@@ -68,7 +71,10 @@ describe("chart and table prefs", () => {
   it("stores snapshot chart prefs", () => {
     expect(readSnapshotChartPrefs(13, "referrers")).toBeNull();
     writeSnapshotChartPrefs(13, "referrers", { metric: "VIEWS", keys: ["github.com", ""] });
-    expect(readSnapshotChartPrefs(13, "referrers")).toEqual({ metric: "VIEWS", keys: ["github.com"] });
+    expect(readSnapshotChartPrefs(13, "referrers")).toEqual({
+      metric: "VIEWS",
+      keys: ["github.com"],
+    });
     writeSnapshotChartPrefs(13, "paths", { metric: "VISITORS", keys: ["readme"] });
     expect(readSnapshotChartPrefs(13, "paths")?.metric).toBe("VISITORS");
     document.cookie = `repo-growth.snapshot-chart.referrers.13=${encodeURIComponent(JSON.stringify({ metric: "NOPE", keys: [1, ""] }))}; path=/`;
@@ -129,8 +135,9 @@ describe("chart and table prefs", () => {
     writeStoredPeriod("1y");
     writeJsonCookie("rgm-period-repos", { "13": "nope", "8": "90d" });
     writeStoredRepoPeriod("13", "1d");
+    const initialProps: { id?: string } = { id: "13" };
     const { result, rerender } = renderHook(({ id }: { id?: string }) => usePeriod(id), {
-      initialProps: { id: "13" as string | undefined },
+      initialProps,
     });
     expect(result.current[0]).toBe("1d");
     act(() => result.current[1]("all"));
@@ -142,7 +149,7 @@ describe("chart and table prefs", () => {
 
   it("toggles service path visibility per repository", () => {
     const { result, rerender } = renderHook(({ id }: { id?: number }) => useServicePaths(id), {
-      initialProps: { id: 13 as number | undefined },
+      initialProps: { id: 13 },
     });
     expect(result.current.showServicePaths).toBe(false);
     act(() => result.current.setShowServicePaths(true));

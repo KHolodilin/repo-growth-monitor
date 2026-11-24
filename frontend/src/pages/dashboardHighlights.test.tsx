@@ -38,16 +38,54 @@ describe("portfolio highlights", () => {
     api.mockResolvedValue({
       ...dashboardReady,
       highlights: {
-        rankRise: { repositoryId: 13, fullName: "acme/outbox", queryName: "outbox", fromRank: 22, toRank: 14 },
-        rankDrop: { repositoryId: 8, fullName: "acme/kafka", queryName: "kafka", fromRank: 4, toRank: 11 },
-        events: { count: 2, repositoryId: 13, fullName: "acme/outbox", repositoryNames: ["acme/outbox"] },
+        rankRise: {
+          repositoryId: 13,
+          fullName: "acme/outbox",
+          queryName: "outbox",
+          fromRank: 22,
+          toRank: 14,
+        },
+        rankDrop: {
+          repositoryId: 8,
+          fullName: "acme/kafka",
+          queryName: "kafka",
+          fromRank: 4,
+          toRank: 11,
+        },
+        events: {
+          count: 2,
+          repositoryId: 13,
+          fullName: "acme/outbox",
+          repositoryNames: ["acme/outbox"],
+        },
         visitors: { repositoryId: 13, fullName: "acme/outbox", growthPercent: 25 },
       },
       repositories: [
         { ...dashboardReady.repositories[0], discoverabilityPassed: 12, discoverabilityTotal: 13 },
-        { ...dashboardReady.repositories[0], id: 8, fullName: "acme/mid", visitors: 2, discoverabilityPassed: 8, discoverabilityTotal: 13 },
-        { ...dashboardReady.repositories[0], id: 9, fullName: "acme/low", visitors: 1, discoverabilityPassed: 3, discoverabilityTotal: 13 },
-        { ...dashboardReady.repositories[0], id: 10, fullName: "acme/none", visitors: 0, discoverabilityPassed: null, discoverabilityTotal: null },
+        {
+          ...dashboardReady.repositories[0],
+          id: 8,
+          fullName: "acme/mid",
+          visitors: 2,
+          discoverabilityPassed: 8,
+          discoverabilityTotal: 13,
+        },
+        {
+          ...dashboardReady.repositories[0],
+          id: 9,
+          fullName: "acme/low",
+          visitors: 1,
+          discoverabilityPassed: 3,
+          discoverabilityTotal: 13,
+        },
+        {
+          ...dashboardReady.repositories[0],
+          id: 10,
+          fullName: "acme/none",
+          visitors: 0,
+          discoverabilityPassed: null,
+          discoverabilityTotal: null,
+        },
       ],
     });
     render(
@@ -56,29 +94,33 @@ describe("portfolio highlights", () => {
       </MemoryRouter>,
     );
     expect((await screen.findAllByText("Unique Cloners"))[0]).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "acme/outbox · outbox 22 → 14" })).toHaveAttribute(
-      "href",
-      "/repositories/13?tab=search",
-    );
+    expect(
+      await screen.findByRole("link", { name: "acme/outbox · outbox 22 → 14" }),
+    ).toHaveAttribute("href", "/acme/outbox?tab=search");
     expect(screen.getByRole("link", { name: "acme/kafka · kafka 4 → 11" })).toHaveAttribute(
       "href",
-      "/repositories/8?tab=search",
+      "/acme/kafka?tab=search",
     );
     expect(screen.getByRole("link", { name: "2 promotion events · acme/outbox" })).toHaveAttribute(
       "href",
-      "/repositories/13?tab=growth-events",
+      "/acme/outbox?tab=growth-events&period=7d",
     );
-    expect(screen.getByRole("link", { name: /acme\/outbox ↑ 25%/ })).toHaveAttribute("href", "/repositories/13");
+    expect(screen.getByRole("link", { name: /acme\/outbox ↑ 25%/ })).toHaveAttribute(
+      "href",
+      "/acme/outbox",
+    );
     expect(screen.getByText("12")).toHaveClass("text-emerald-700");
     expect(screen.getByText("8")).toHaveClass("text-amber-600");
     expect(screen.getByText("3")).toHaveClass("text-red-700");
     expect(screen.getByRole("link", { name: "12/13" })).toHaveAttribute(
       "href",
-      "/repositories/13?tab=overview&focus=health",
+      `/${repository.fullName}?tab=overview&focus=health`,
     );
     const dash = screen.getAllByText("—").find((node) => node.closest("td"));
     expect(dash?.className ?? "").not.toMatch(/emerald|amber|red/);
-    expect(screen.getByRole("columnheader", { name: "Repository" }).closest("table")).not.toHaveTextContent("checks");
+    expect(
+      screen.getByRole("columnheader", { name: "Repository" }).closest("table"),
+    ).not.toHaveTextContent("checks");
     await user.click(screen.getByRole("link", { name: "12/13" }));
     await user.click(screen.getByRole("button", { name: /Disc\./ }));
   });
@@ -88,8 +130,19 @@ describe("portfolio highlights", () => {
       ...dashboardReady,
       highlights: {
         rankRise: null,
-        rankDrop: { repositoryId: 8, fullName: "acme/kafka", queryName: "kafka", fromRank: 4, toRank: 11 },
-        events: { count: 1, repositoryId: 8, fullName: "acme/kafka", repositoryNames: ["acme/kafka", "acme/outbox"] },
+        rankDrop: {
+          repositoryId: 8,
+          fullName: "acme/kafka",
+          queryName: "kafka",
+          fromRank: 4,
+          toRank: 11,
+        },
+        events: {
+          count: 1,
+          repositoryId: 8,
+          fullName: "acme/kafka",
+          repositoryNames: ["acme/kafka", "acme/outbox"],
+        },
         visitors: { repositoryId: 13, fullName: "acme/outbox", growthPercent: Number.NaN },
       },
     });
@@ -100,21 +153,68 @@ describe("portfolio highlights", () => {
     );
     expect(await screen.findByRole("link", { name: "acme/kafka · kafka 4 → 11" })).toHaveAttribute(
       "href",
-      "/repositories/8?tab=search",
+      "/acme/kafka?tab=search",
     );
     expect(screen.queryByText("No rank changes")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "1 promotion event · acme/kafka, acme/outbox" })).toHaveAttribute(
-      "href",
-      "/repositories/8?tab=growth-events",
-    );
+    expect(
+      screen.getByRole("link", { name: "1 promotion event · acme/kafka, acme/outbox" }),
+    ).toHaveAttribute("href", "/acme/kafka?tab=growth-events&period=7d");
     expect(screen.getByText("No visitor growth")).toBeInTheDocument();
   });
 
-  it("scrolls overview to repository health from the portfolio link", async () => {
-    vi.mocked(Element.prototype.scrollIntoView).mockClear();
+  it("opens Growth Events from a legacy events tab and applies period from the URL", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/repositories/13")) {
+      if (url.includes("/api/v1/public/resolve")) {
+        return Promise.resolve({
+          ownerId: "1",
+          repositoryId: "13",
+          canonicalPath: `/${repository.owner.login}/${repository.name}`,
+          redirect: false,
+        });
+      }
+      if (url.endsWith("/admin/repositories/13")) {
+        return Promise.resolve(repository);
+      }
+      if (url.includes("/traffic?")) {
+        return Promise.resolve(traffic);
+      }
+      if (url.includes("growth-events")) {
+        return Promise.resolve([
+          {
+            id: "1",
+            repositoryId: "13",
+            eventAt: "2026-09-23T00:00:00Z",
+            title: "Promotion",
+            type: "PROMOTION",
+            category: "GROWTH",
+            source: "MANUAL",
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    render(
+      <MemoryRouter
+        initialEntries={[`/${repository.owner.login}/${repository.name}?tab=events&period=30d`]}
+      >
+        <Routes>
+          <Route path="/:owner/:repository" element={<RepositoryDetailsPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole("button", { name: "Growth Events", pressed: true }),
+    ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "30d", pressed: true })).toBeInTheDocument();
+  });
+
+  it("scrolls overview to repository health from the portfolio link", async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, "scrollIntoView");
+    scrollIntoView.mockClear();
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/traffic?")) {
@@ -123,16 +223,17 @@ describe("portfolio highlights", () => {
       return Promise.resolve([]);
     });
     render(
-      <MemoryRouter initialEntries={["/repositories/13?tab=overview&focus=health"]}>
+      <MemoryRouter initialEntries={["/admin/repositories/13?tab=overview&focus=health"]}>
         <Routes>
-          <Route path="/repositories/:id" element={<RepositoryDetailsPage />} />
+          <Route path="/admin/repositories/:id" element={<RepositoryDetailsPage />} />
         </Routes>
       </MemoryRouter>,
     );
     expect(await screen.findByRole("heading", { name: "Discoverability" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Repository Health" })).not.toBeInTheDocument();
     await waitFor(() => {
-      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+      expect(scrollIntoView).toHaveBeenCalled();
     });
+    scrollIntoView.mockRestore();
   });
 });
