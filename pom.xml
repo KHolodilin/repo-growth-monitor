@@ -8,8 +8,51 @@
     <jacoco.version>0.8.16</jacoco.version>
     <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
     <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
+    <pitest.version>1.30.2</pitest.version>
+    <pitest.junit5.plugin.version>1.2.3</pitest.junit5.plugin.version>
+    <!-- 13.0.0 treats a missing NVD key as "" and aborts; stay on 12.1.9 until a fixed 13.x. -->
+    <dependency-check.version>12.1.9</dependency-check.version>
+    <!--
+      Parent packaging=pom has no Java sources. Java modules must set both skips to false
+      and override pitest.target.classes / pitest.target.tests for their packages.
+    -->
+    <pitest.skip>true</pitest.skip>
+    <dependency-check.skip>true</dependency-check.skip>
+    <pitest.target.classes>__set_pitest_target_classes_in_java_module__</pitest.target.classes>
+    <pitest.target.tests>__set_pitest_target_tests_in_java_module__</pitest.target.tests>
   </properties>
-  <modules><module>collector-contracts</module><module>github-collector</module><module>backend</module></modules>
+  <!--
+    Shared parent only. Reactors are profile-scoped so collector and backend can build
+    without each other's sources on disk (Docker images, -f module/pom.xml workflows).
+    Default profile "full" keeps root `mvn test/package` building everything in a checkout.
+  -->
+  <profiles>
+    <profile>
+      <id>full</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <modules>
+        <module>collector-contracts</module>
+        <module>github-collector</module>
+        <module>backend</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>collector</id>
+      <modules>
+        <module>collector-contracts</module>
+        <module>github-collector</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>backend</id>
+      <modules>
+        <module>collector-contracts</module>
+        <module>backend</module>
+      </modules>
+    </profile>
+  </profiles>
   <build>
     <plugins>
       <plugin>
@@ -127,6 +170,84 @@
         <executions>
           <execution>
             <id>checkstyle-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>${pitest.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>${pitest.junit5.plugin.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <skip>${pitest.skip}</skip>
+          <targetClasses>
+            <param>${pitest.target.classes}</param>
+          </targetClasses>
+          <targetTests>
+            <param>${pitest.target.tests}</param>
+          </targetTests>
+          <mutators>
+            <mutator>STRONGER</mutator>
+          </mutators>
+          <threads>4</threads>
+          <outputFormats>
+            <param>HTML</param>
+            <param>XML</param>
+          </outputFormats>
+          <timestampedReports>false</timestampedReports>
+          <!--
+            Report-only: collect HTML/XML mutation results. Do not set
+            testStrengthThreshold; blocking quality bars are agreed separately.
+            Analyzer/execution failures remain visible (no blanket skip/ignore).
+            Zero thresholds score the run; they are not a mutation Quality Gate.
+          -->
+          <mutationThreshold>0</mutationThreshold>
+          <coverageThreshold>0</coverageThreshold>
+        </configuration>
+        <executions>
+          <execution>
+            <id>pitest-mutation</id>
+            <goals>
+              <goal>mutationCoverage</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>${dependency-check.version}</version>
+        <configuration>
+          <skip>${dependency-check.skip}</skip>
+          <formats>
+            <format>HTML</format>
+            <format>JSON</format>
+          </formats>
+          <!--
+            Report-only for findings: CVSS scale tops at 10, so 11 never fails the
+            build on vulnerability score. Analyzer/data-fetch errors must still fail
+            the build — do not set failOnError=false. Blocking CVSS policy TBD.
+            Module-local suppressions are added only where a file exists (collector).
+          -->
+          <failBuildOnCVSS>11</failBuildOnCVSS>
+          <!-- Optional: export NVD_API_KEY for faster NVD updates (https://nvd.nist.gov/developers/request-an-api-key). -->
+          <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
+          <nvdApiDelay>4000</nvdApiDelay>
+        </configuration>
+        <executions>
+          <execution>
+            <id>owasp-dependency-check</id>
             <goals>
               <goal>check</goal>
             </goals>

@@ -8,9 +8,9 @@
 | `github-collector` | Standalone Boot app (`GitHubCollectorApplication`) |
 | `backend` | Product UI, planner, orchestration, credential vault (no GitHub product fetches) |
 
-Build: `mvn -B package`. Collector tests: `mvn -B -pl github-collector -am test`. Backend: `mvn -B -pl backend -am test`.
+Build all (default profile): `mvn -B package`. Collector only: `mvn -B -Pcollector,!full test`. Backend only: `mvn -B -Pbackend,!full test`. From a full checkout, `-pl … -am` still works under `-Pfull`.
 
-Standalone collector image: `Dockerfile.collector` → `github-collector-*-boot.jar`. No collector PostgreSQL.
+Standalone collector image: `Dockerfile.collector` → `github-collector-*-boot.jar` (`-Pcollector,!full`, no backend sources). Product image: `Dockerfile` (`-Pbackend,!full`, no github-collector sources). No collector PostgreSQL.
 Queue, observations and acceptance idempotency are process-local. RGM owns schedules, retries and history.
 
 The product process does **not** embed collector execution or GitHub integration. Combined-process

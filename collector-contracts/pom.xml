@@ -1,7 +1,36 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
- <modelVersion>4.0.0</modelVersion><parent><groupId>com.kholodilin</groupId><artifactId>repo-growth-monitor-parent</artifactId><version>0.4.1</version></parent>
- <artifactId>collector-contracts</artifactId><dependencies>
- <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
- <dependency><groupId>org.assertj</groupId><artifactId>assertj-core</artifactId><scope>test</scope></dependency>
- <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-databind</artifactId><scope>test</scope></dependency>
- </dependencies></project>
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.kholodilin</groupId>
+    <artifactId>repo-growth-monitor-parent</artifactId>
+    <version>0.4.1</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+  <artifactId>collector-contracts</artifactId>
+  <properties>
+    <pitest.skip>false</pitest.skip>
+    <dependency-check.skip>false</dependency-check.skip>
+    <pitest.target.classes>com.kholodilin.collector.contracts.*</pitest.target.classes>
+    <pitest.target.tests>com.kholodilin.collector.contracts.*</pitest.target.tests>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>tools.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

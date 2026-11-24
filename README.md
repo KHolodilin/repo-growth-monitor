@@ -211,6 +211,6 @@ The token is only accepted from environment / Docker secrets. Diagnostics expose
 
 ## Collector module development
 
-The Maven reactor contains `collector-contracts`, `github-collector` and `backend`. Build from the repository root with `mvn -B package`; for backend tests with dependencies use `mvn -B -pl backend -am test`.
+Shared parent `pom.xml` has no hard-wired reactor: profiles select modules. Default `-Pfull` builds `collector-contracts`, `github-collector` and `backend` (`mvn -B package`). Collector-only: `mvn -B -Pcollector,!full package`. Backend-only: `mvn -B -Pbackend,!full package` (or `mvn -B -pl backend -am test` from a full checkout).
 
 The same image supports product and collector roles. Contributor Compose runs them as two containers with a shared PostgreSQL instance (product + collector databases). See [collector architecture](docs/collector-architecture.md) and [local split runtime](docs/collector-combined-local.md). The `web-only` profile remains a transitional single-process guard; prefer the split Compose topology for local work that should match production.

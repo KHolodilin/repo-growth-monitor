@@ -6,10 +6,15 @@
     <groupId>com.kholodilin</groupId>
     <artifactId>repo-growth-monitor-parent</artifactId>
     <version>0.4.1</version>
+    <relativePath>../pom.xml</relativePath>
   </parent>
   <artifactId>github-collector</artifactId>
   <properties>
     <archunit.version>1.4.1</archunit.version>
+    <pitest.skip>false</pitest.skip>
+    <dependency-check.skip>false</dependency-check.skip>
+    <pitest.target.classes>com.kholodilin.collector.*</pitest.target.classes>
+    <pitest.target.tests>com.kholodilin.collector.*</pitest.target.tests>
   </properties>
   <dependencies>
     <dependency><groupId>com.bucket4j</groupId><artifactId>bucket4j_jdk17-core</artifactId><version>8.14.0</version></dependency>
@@ -71,71 +76,12 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.pitest</groupId>
-        <artifactId>pitest-maven</artifactId>
-        <version>1.30.2</version>
-        <dependencies>
-          <dependency>
-            <groupId>org.pitest</groupId>
-            <artifactId>pitest-junit5-plugin</artifactId>
-            <version>1.2.3</version>
-          </dependency>
-        </dependencies>
-        <configuration>
-          <targetClasses>
-            <param>com.kholodilin.collector.*</param>
-          </targetClasses>
-          <targetTests>
-            <param>com.kholodilin.collector.*</param>
-          </targetTests>
-          <mutators>
-            <mutator>STRONGER</mutator>
-          </mutators>
-          <threads>4</threads>
-          <outputFormats>
-            <param>HTML</param>
-            <param>XML</param>
-          </outputFormats>
-          <timestampedReports>false</timestampedReports>
-          <!-- Report mutations now; raise the bar once coverage improves. -->
-          <mutationThreshold>0</mutationThreshold>
-          <coverageThreshold>0</coverageThreshold>
-        </configuration>
-        <executions>
-          <execution>
-            <id>pitest-mutation</id>
-            <goals>
-              <goal>mutationCoverage</goal>
-            </goals>
-            <phase>verify</phase>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.owasp</groupId>
         <artifactId>dependency-check-maven</artifactId>
-        <!-- 13.0.0 treats a missing NVD key as "" and aborts; use 12.1.9 until a fixed 13.x. -->
-        <version>12.1.9</version>
         <configuration>
-          <formats>
-            <format>HTML</format>
-            <format>JSON</format>
-          </formats>
-          <failBuildOnCVSS>7</failBuildOnCVSS>
-          <!-- Optional: export NVD_API_KEY for faster NVD updates (https://nvd.nist.gov/developers/request-an-api-key). -->
-          <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
-          <nvdApiDelay>4000</nvdApiDelay>
+          <!-- Collector-only suppressions; not inherited by other modules. -->
           <suppressionFile>${project.basedir}/dependency-check-suppressions.xml</suppressionFile>
         </configuration>
-        <executions>
-          <execution>
-            <id>owasp-dependency-check</id>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>verify</phase>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>

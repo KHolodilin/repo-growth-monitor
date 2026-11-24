@@ -140,6 +140,8 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:true}
+    # Must match org.webjars:swagger-ui (see swagger-ui.version in backend/pom.xml).
+    version: @swagger-ui.version@
 
 # Rank-sort frozen into SEARCH_QUERY / TOPIC_WATCH parameters (collector.search.*).
 # Collector GitHub execution is not started in this process — use the standalone boot JAR.
