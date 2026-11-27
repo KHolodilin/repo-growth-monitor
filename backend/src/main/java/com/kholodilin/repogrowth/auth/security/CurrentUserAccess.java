@@ -15,6 +15,14 @@ public class CurrentUserAccess {
     this.users = users;
   }
 
+  /** True when the security context holds an application principal. */
+  public boolean authenticated() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    return auth != null
+        && auth.isAuthenticated()
+        && auth.getPrincipal() instanceof AppUserPrincipal;
+  }
+
   /** Admins may see private/internal repositories; guests and USER may not. */
   public boolean canSeePrivateRepositories() {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
