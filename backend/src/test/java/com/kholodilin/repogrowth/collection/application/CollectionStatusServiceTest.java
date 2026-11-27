@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
@@ -11,8 +13,6 @@ import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.domain.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -40,12 +40,58 @@ class CollectionStatusServiceTest {
     Instant now = Instant.parse("2026-11-10T06:00:00Z");
     publicRepo =
         new Repository(
-            13L, 99L, 1L, "outbox", "acme/outbox", "d", "PUBLIC", "main", "Java", false, false, 21,
-            0, 16, 1, 7, true, now, now, now, now, null, null, now, now);
+            13L,
+            99L,
+            1L,
+            "outbox",
+            "acme/outbox",
+            "d",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            21,
+            0,
+            16,
+            1,
+            7,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
     privateRepo =
         new Repository(
-            14L, 100L, 1L, "secret", "acme/secret", "d", "PRIVATE", "main", "Java", false, false, 1,
-            0, 0, 0, 1, true, now, now, now, now, null, null, now, now);
+            14L,
+            100L,
+            1L,
+            "secret",
+            "acme/secret",
+            "d",
+            "PRIVATE",
+            "main",
+            "Java",
+            false,
+            false,
+            1,
+            0,
+            0,
+            0,
+            1,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
   }
 
   @Test

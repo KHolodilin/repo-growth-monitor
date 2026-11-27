@@ -9,15 +9,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
 import com.kholodilin.repogrowth.common.model.kpi.KpiScope;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
 import com.kholodilin.repogrowth.traffic.domain.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
@@ -60,12 +60,58 @@ class TrafficReadServiceTest {
     Instant now = Instant.parse("2026-11-01T00:00:00Z");
     repository =
         new Repository(
-            13L, 99L, 1L, "outbox", "acme/outbox", "desc", "PUBLIC", "main", "Java", false, false,
-            21, 0, 16, 1, 7, true, now, now, now, now, null, null, now, now);
+            13L,
+            99L,
+            1L,
+            "outbox",
+            "acme/outbox",
+            "desc",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            21,
+            0,
+            16,
+            1,
+            7,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
     sibling =
         new Repository(
-            14L, 100L, 1L, "kafka", "acme/kafka", "desc", "PUBLIC", "main", "Java", false, false,
-            10, 0, 5, 1, 3, true, now, now, now, now, null, null, now, now);
+            14L,
+            100L,
+            1L,
+            "kafka",
+            "acme/kafka",
+            "desc",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            10,
+            0,
+            5,
+            1,
+            3,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
   }
 
   @Test
@@ -74,12 +120,10 @@ class TrafficReadServiceTest {
     LocalDate end = TODAY.minusDays(1);
     LocalDate from = end.minusDays(6);
     when(traffic.observedDays(eq(Set.of(13L)), any(), any())).thenReturn(7L);
-    when(traffic.totalsInRange(eq(13L), any(), any()))
-        .thenReturn(new TrafficTotals(70, 35, 14, 7));
+    when(traffic.totalsInRange(eq(13L), any(), any())).thenReturn(new TrafficTotals(70, 35, 14, 7));
     var kpi = service.repositoryKpi(13L, "7d");
     assertThat(kpi.scope()).isEqualTo(KpiScope.REPOSITORY);
-    assertThat(kpi.metrics().views().dataStatus())
-        .isIn(DataStatus.COMPLETE, DataStatus.PARTIAL);
+    assertThat(kpi.metrics().views().dataStatus()).isIn(DataStatus.COMPLETE, DataStatus.PARTIAL);
     assertThat(kpi.metrics().views().value()).isNotNull();
     assertThat(from).isBeforeOrEqualTo(end);
   }
@@ -89,14 +133,19 @@ class TrafficReadServiceTest {
     when(repositories.owner(1L))
         .thenReturn(
             new GitHubOwner(
-                1L, 1L, "acme", OwnerType.USER, null, "https://github.com/acme", Instant.now(),
+                1L,
+                1L,
+                "acme",
+                OwnerType.USER,
+                null,
+                "https://github.com/acme",
+                Instant.now(),
                 Instant.now()));
     when(repositories.list(false)).thenReturn(List.of(repository, sibling));
     when(access.filterReadable(List.of(13L, 14L), PublicationService.Module.TRAFFIC))
         .thenReturn(List.of(13L, 14L));
     when(traffic.observedDays(eq(Set.of(13L, 14L)), any(), any())).thenReturn(14L);
-    when(traffic.totalsInRange(anyLong(), any(), any()))
-        .thenReturn(new TrafficTotals(10, 5, 2, 1));
+    when(traffic.totalsInRange(anyLong(), any(), any())).thenReturn(new TrafficTotals(10, 5, 2, 1));
     var kpi = service.ownerKpi(1L, "7d");
     assertThat(kpi.scope()).isEqualTo(KpiScope.OWNER);
     assertThat(kpi.scopeId()).isEqualTo("1");
@@ -118,14 +167,21 @@ class TrafficReadServiceTest {
                 day(13L, TODAY.minusDays(1), 6, 3, 1, 1),
                 day(13L, TODAY, 9, 4, 1, 1)));
     var history = service.dailyHistory(13L, "7d");
-    assertThat(history.points()).extracting(TrafficReadService.DailyPoint::date)
+    assertThat(history.points())
+        .extracting(TrafficReadService.DailyPoint::date)
         .doesNotContain(TODAY);
     assertThat(history.points()).isNotEmpty();
 
     when(repositories.owner(1L))
         .thenReturn(
             new GitHubOwner(
-                1L, 1L, "acme", OwnerType.USER, null, "https://github.com/acme", Instant.now(),
+                1L,
+                1L,
+                "acme",
+                OwnerType.USER,
+                null,
+                "https://github.com/acme",
+                Instant.now(),
                 Instant.now()));
     when(repositories.list(false)).thenReturn(List.of(repository, sibling));
     when(access.filterReadable(List.of(13L, 14L), PublicationService.Module.TRAFFIC))
@@ -134,8 +190,7 @@ class TrafficReadServiceTest {
         .thenReturn(List.of(day(13L, TODAY.minusDays(1), 5, 2, 1, 1)));
     when(traffic.history(eq(14L), any())).thenReturn(List.of());
     var ownerHistory = service.ownerDailyHistory(1L, "7d");
-    assertThat(ownerHistory.points())
-        .anySatisfy(point -> assertThat(point.views()).isNull());
+    assertThat(ownerHistory.points()).anySatisfy(point -> assertThat(point.views()).isNull());
   }
 
   @Test
@@ -157,8 +212,7 @@ class TrafficReadServiceTest {
                 new Observation(TODAY.minusDays(2), "github.com", null, 4, 2),
                 new Observation(TODAY.minusDays(1), "github.com", null, 8, 3)));
     when(traffic.pathSnapshotsForDelta(eq(13L), any(), any(), anyBoolean()))
-        .thenReturn(
-            List.of(new Observation(TODAY.minusDays(1), "/acme/outbox", "Home", 6, 2)));
+        .thenReturn(List.of(new Observation(TODAY.minusDays(1), "/acme/outbox", "Home", 6, 2)));
     when(traffic.earliestPathSnapshotDate(13L, true)).thenReturn(Optional.of(TODAY.minusDays(20)));
 
     assertThat(service.referrerHistory(13L, "7d", null).kind()).isEqualTo("REFERRERS");
@@ -191,8 +245,7 @@ class TrafficReadServiceTest {
     var kpi = service.repositoryKpi(13L, "all");
     assertThat(kpi.comparison()).isNull();
     assertThat(service.dailyHistory(13L, "all").points()).isNotEmpty();
-    assertThat(service.snapshotHistory(13L, "REFERRERS", null, null, false).days())
-        .isEqualTo(14);
+    assertThat(service.snapshotHistory(13L, "REFERRERS", null, null, false).days()).isEqualTo(14);
   }
 
   private static TrafficDaily day(

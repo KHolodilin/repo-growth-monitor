@@ -4,24 +4,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.event.application.GrowthEventService;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -51,8 +50,31 @@ class EventsResourceControllerTest {
     Instant now = Instant.parse("2026-11-10T06:00:00Z");
     repository =
         new Repository(
-            13L, 99L, 1L, "outbox", "acme/outbox", "d", "PUBLIC", "main", "Java", false, false, 21,
-            0, 16, 1, 7, true, now, now, now, now, null, null, now, now);
+            13L,
+            99L,
+            1L,
+            "outbox",
+            "acme/outbox",
+            "d",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            21,
+            0,
+            16,
+            1,
+            7,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
     event =
         new GrowthEvent(
             5L,
@@ -74,7 +96,13 @@ class EventsResourceControllerTest {
     when(repositories.owner(1L))
         .thenReturn(
             new GitHubOwner(
-                1L, 1L, "acme", OwnerType.USER, null, "https://github.com/acme", Instant.now(),
+                1L,
+                1L,
+                "acme",
+                OwnerType.USER,
+                null,
+                "https://github.com/acme",
+                Instant.now(),
                 Instant.now()));
     when(repositories.list(false)).thenReturn(List.of(repository));
     when(access.filterReadable(List.of(13L), PublicationService.Module.DASHBOARD))
@@ -119,7 +147,8 @@ class EventsResourceControllerTest {
 
     when(currentUser.canSeePrivateRepositories()).thenReturn(true);
     when(repositories.get(13L)).thenReturn(repository);
-    when(events.settings(13L)).thenReturn(List.of(new GrowthEventSetting(13L, "STAR_MILESTONE", true, null, null)));
+    when(events.settings(13L))
+        .thenReturn(List.of(new GrowthEventSetting(13L, "STAR_MILESTONE", true, null, null)));
     assertThat(controller.settings(13L)).hasSize(1);
     when(events.updateSettings(anyLong(), any())).thenReturn(List.of());
     assertThat(

@@ -6,17 +6,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.DashboardState;
 import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
+import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.repository.GitHubOwnerJdbcRepository;
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
-import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.Repository;
-import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
-import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
@@ -97,7 +97,7 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1, 0);
     repositoryJdbcRepository.upsertHealth(
         kafka.id(),
-        new com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts(
+        new com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts(
             "https://example.com", true, true, true, true, true, true, true, true, true, true));
 
     CollectionRun kafkaRun = runRepository.insertIgnore(kafka.id(), today, 4);

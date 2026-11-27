@@ -1,16 +1,16 @@
 package com.kholodilin.repogrowth.event.api;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.event.application.GrowthEventService;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;

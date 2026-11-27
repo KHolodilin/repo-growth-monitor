@@ -5,14 +5,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchKpiService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
@@ -52,8 +51,7 @@ class SearchResourceControllerTest {
     when(kpi.repositoryKpi(13L, "7d")).thenReturn(null);
     controller.ownerSearchKpi(1L, "7d");
     controller.repositorySearchKpi(13L, "7d");
-    when(kpi.repositoryQueriesWithHistory(anyLong(), anyBoolean(), anyInt()))
-        .thenReturn(List.of());
+    when(kpi.repositoryQueriesWithHistory(anyLong(), anyBoolean(), anyInt())).thenReturn(List.of());
     assertThat(controller.listQueries(13L, "history", 20)).isEmpty();
     verify(kpi).repositoryQueriesWithHistory(13L, true, 20);
 
@@ -63,8 +61,19 @@ class SearchResourceControllerTest {
     when(searchQueries.history(5L))
         .thenReturn(
             new SearchHistory(
-                query, 2, null, null, null, 2, "stars", List.of(), Instant.now(), "SUCCESS", null,
-                1, List.of()));
+                query,
+                2,
+                null,
+                null,
+                null,
+                2,
+                "stars",
+                List.of(),
+                Instant.now(),
+                "SUCCESS",
+                null,
+                1,
+                List.of()));
     assertThat(controller.history(5L).currentRank()).isEqualTo(2);
     when(searchQueries.latestResults(5L)).thenReturn(new SearchRunResults(null, query, List.of()));
     assertThat(controller.results(5L).query()).isEqualTo(query);

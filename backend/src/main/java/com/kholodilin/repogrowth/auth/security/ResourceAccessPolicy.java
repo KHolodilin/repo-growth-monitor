@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.auth.security;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;

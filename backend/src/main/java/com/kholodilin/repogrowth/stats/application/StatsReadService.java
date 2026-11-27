@@ -1,9 +1,12 @@
 package com.kholodilin.repogrowth.stats.application;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.analytics.application.DashboardPeriod;
 import com.kholodilin.repogrowth.analytics.application.GrowthMath;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.PeriodParser;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
@@ -15,9 +18,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.stats.api.StatsKpiResponse;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryDailyStats;

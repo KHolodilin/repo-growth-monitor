@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.search.api;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchKpiService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;

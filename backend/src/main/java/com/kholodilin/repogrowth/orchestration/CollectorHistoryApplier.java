@@ -1,15 +1,15 @@
 package com.kholodilin.repogrowth.orchestration;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
+import com.kholodilin.repogrowth.catalog.repository.GitHubOwnerJdbcRepository;
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthEvaluator;
 import com.kholodilin.repogrowth.event.detect.*;
 import com.kholodilin.repogrowth.event.domain.*;
 import com.kholodilin.repogrowth.event.persistence.*;
 import com.kholodilin.repogrowth.github.model.*;
-import com.kholodilin.repogrowth.repository.application.RepositoryHealthEvaluator;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
-import com.kholodilin.repogrowth.repository.persistence.GitHubOwnerJdbcRepository;
-import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.search.application.RepositoryEnricher;
 import com.kholodilin.repogrowth.search.persistence.*;
 import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnProperty(name = "rgm.orchestration.enabled", havingValue = "true")
 public class CollectorHistoryApplier {
   @org.springframework.beans.factory.annotation.Autowired
-  private com.kholodilin.repogrowth.publication.PublicationService publication;
+  private com.kholodilin.repogrowth.administration.service.PublicationService publication;
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   private com.kholodilin.repogrowth.credentials.CredentialVault credentialVault;
@@ -242,7 +242,7 @@ public class CollectorHistoryApplier {
           existing.map(value -> value.visibility()).orElse(remote.resolvedVisibility());
       var stored =
           repositories.upsertKeepingTracking(
-              new com.kholodilin.repogrowth.repository.domain.Repository(
+              new com.kholodilin.repogrowth.catalog.model.Repository(
                   null,
                   remote.id(),
                   owner,

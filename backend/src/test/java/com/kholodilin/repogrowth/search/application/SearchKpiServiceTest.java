@@ -5,14 +5,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.kpi.KpiScope;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.search.application.SearchQueryService.RankPoint;
 import com.kholodilin.repogrowth.search.application.SearchQueryService.SearchHistory;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
@@ -49,8 +49,31 @@ class SearchKpiServiceTest {
     query = new SearchQuery(5L, 13L, "outbox", "outbox language:java", true, 50, now, now);
     repository =
         new Repository(
-            13L, 99L, 1L, "outbox", "acme/outbox", "d", "PUBLIC", "main", "Java", false, false, 21,
-            0, 16, 1, 7, true, now, now, now, now, null, null, now, now);
+            13L,
+            99L,
+            1L,
+            "outbox",
+            "acme/outbox",
+            "d",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            21,
+            0,
+            16,
+            1,
+            7,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
   }
 
   @Test
@@ -77,12 +100,19 @@ class SearchKpiServiceTest {
     when(repositories.owner(1L))
         .thenReturn(
             new GitHubOwner(
-                1L, 1L, "acme", OwnerType.USER, null, "https://github.com/acme", Instant.now(),
+                1L,
+                1L,
+                "acme",
+                OwnerType.USER,
+                null,
+                "https://github.com/acme",
+                Instant.now(),
                 Instant.now()));
     when(repositories.list(false)).thenReturn(List.of(repository));
     when(access.filterReadable(List.of(13L), PublicationService.Module.DASHBOARD))
         .thenReturn(List.of(13L));
-    when(searchQueries.visibility(13L)).thenReturn(List.of(history(query, 2, List.of(point(TODAY, 2)))));
+    when(searchQueries.visibility(13L))
+        .thenReturn(List.of(history(query, 2, List.of(point(TODAY, 2)))));
     assertThat(service.ownerKpi(1L, "7d").scope()).isEqualTo(KpiScope.OWNER);
 
     when(access.filterReadable(List.of(13L), PublicationService.Module.DASHBOARD))
@@ -93,7 +123,8 @@ class SearchKpiServiceTest {
   @Test
   void repositoryQueriesWithHistoryRespectsIncludeFlagAndCap() {
     doNothing().when(access).requireReadable(13L, PublicationService.Module.DASHBOARD);
-    when(searchQueries.visibility(13L)).thenReturn(List.of(history(query, 2, List.of(point(TODAY, 2)))));
+    when(searchQueries.visibility(13L))
+        .thenReturn(List.of(history(query, 2, List.of(point(TODAY, 2)))));
     assertThat(service.repositoryQueriesWithHistory(13L, true, 10)).hasSize(1);
 
     when(searchQueries.list(13L)).thenReturn(List.of(query));

@@ -1,0 +1,60 @@
+package com.kholodilin.repogrowth.catalog.service;
+
+import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
+import java.util.List;
+import org.springframework.stereotype.Service;
+
+@Service
+public class RepositoryHealthService {
+
+  private final RepositoryJdbcRepository repositoryJdbcRepository;
+  private final SearchQueryJdbcRepository searchQueryJdbcRepository;
+  private final RepositoryHealthEvaluator evaluator;
+
+  public RepositoryHealthService(
+      RepositoryJdbcRepository repositoryJdbcRepository,
+      SearchQueryJdbcRepository searchQueryJdbcRepository,
+      RepositoryHealthEvaluator evaluator) {
+    this.repositoryJdbcRepository = repositoryJdbcRepository;
+    this.searchQueryJdbcRepository = searchQueryJdbcRepository;
+    this.evaluator = evaluator;
+  }
+
+  public RepositoryHealthResponse forRepository(Repository repository) {
+    RepositoryHealthFacts facts =
+        repositoryJdbcRepository.findHealth(repository.id()).orElse(RepositoryHealthFacts.empty());
+    return evaluator.evaluate(
+        repository,
+        repositoryJdbcRepository.findTopics(repository.id()),
+        searchQueryJdbcRepository.countByRepository(repository.id()),
+        facts);
+  }
+
+  /**
+   * Passed Discoverability checks, or null before the first stats collection stored health facts.
+   */
+  public Integer discoverabilityPassed(Repository repository) {
+    return discoverabilityScore(repository).passed();
+  }
+
+  public DiscoverabilityScore discoverabilityScore(Repository repository) {
+    if (repositoryJdbcRepository.findHealth(repository.id()).isEmpty()) {
+      return new DiscoverabilityScore(null, null);
+    }
+    List<HealthCheckItem> items = forRepository(repository).discoverability();
+    int passed = 0;
+    for (HealthCheckItem item : items) {
+      if (item.passed()) {
+        passed++;
+      }
+    }
+    return new DiscoverabilityScore(passed, items.size());
+  }
+
+  public record DiscoverabilityScore(Integer passed, Integer total) {}
+}

@@ -7,15 +7,15 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
 import com.kholodilin.repogrowth.common.model.kpi.KpiScope;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository.RepositoryDailyStats;
 import java.time.Clock;
@@ -51,12 +51,58 @@ class StatsReadServiceTest {
     Instant now = Instant.parse("2026-11-01T00:00:00Z");
     repository =
         new Repository(
-            13L, 99L, 1L, "outbox", "acme/outbox", "d", "PUBLIC", "main", "Java", false, false, 21,
-            0, 16, 1, 7, true, now, now, now, now, null, null, now, now);
+            13L,
+            99L,
+            1L,
+            "outbox",
+            "acme/outbox",
+            "d",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            21,
+            0,
+            16,
+            1,
+            7,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
     sibling =
         new Repository(
-            14L, 100L, 1L, "kafka", "acme/kafka", "d", "PUBLIC", "main", "Java", false, false, 10, 0,
-            5, 1, 3, true, now, now, now, now, null, null, now, now);
+            14L,
+            100L,
+            1L,
+            "kafka",
+            "acme/kafka",
+            "d",
+            "PUBLIC",
+            "main",
+            "Java",
+            false,
+            false,
+            10,
+            0,
+            5,
+            1,
+            3,
+            true,
+            now,
+            now,
+            now,
+            now,
+            null,
+            null,
+            now,
+            now);
   }
 
   @Test
@@ -84,7 +130,13 @@ class StatsReadServiceTest {
     when(repositories.owner(1L))
         .thenReturn(
             new GitHubOwner(
-                1L, 1L, "acme", OwnerType.USER, null, "https://github.com/acme", Instant.now(),
+                1L,
+                1L,
+                "acme",
+                OwnerType.USER,
+                null,
+                "https://github.com/acme",
+                Instant.now(),
                 Instant.now()));
     when(repositories.list(false)).thenReturn(List.of(repository, sibling));
     when(access.filterReadable(List.of(13L, 14L), PublicationService.Module.DASHBOARD))

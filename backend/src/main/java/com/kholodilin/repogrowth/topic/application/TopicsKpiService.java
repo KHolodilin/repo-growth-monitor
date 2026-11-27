@@ -1,6 +1,9 @@
 package com.kholodilin.repogrowth.topic.application;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.PeriodParser;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
@@ -12,9 +15,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.Repository;
 import com.kholodilin.repogrowth.search.application.BandKpiMath;
 import com.kholodilin.repogrowth.search.application.BandKpiMath.BandKpi;
 import com.kholodilin.repogrowth.search.application.BandKpiMath.DayMode;

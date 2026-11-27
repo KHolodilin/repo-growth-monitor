@@ -8,13 +8,13 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.AppUserPrincipal;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import com.kholodilin.repogrowth.orchestration.IdempotentCollectionRequests;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
@@ -62,7 +62,8 @@ class CollectionResourceControllerTest {
             eq(PublicationService.Module.DASHBOARD));
     UUID requestId = UUID.randomUUID();
     when(idempotent.create(anyLong(), any(), anyLong(), any()))
-        .thenReturn(new CollectionRequestService.Created(requestId, List.of(UUID.randomUUID()), false));
+        .thenReturn(
+            new CollectionRequestService.Created(requestId, List.of(UUID.randomUUID()), false));
     AppUserPrincipal principal = new AppUserPrincipal(42L, "admin");
     var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
     assertThat(controller.collect(13L, "key-1", auth).getStatusCode().value()).isEqualTo(201);

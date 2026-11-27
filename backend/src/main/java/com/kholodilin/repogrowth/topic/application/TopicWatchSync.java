@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.topic.application;
 
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
-import com.kholodilin.repogrowth.repository.domain.Repository;
-import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;
 import com.kholodilin.repogrowth.topic.persistence.TopicWatchJdbcRepository;
 import java.util.HashSet;

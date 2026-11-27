@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.collection.api;
 
 import com.kholodilin.collector.contracts.CollectorHttpHeaders;
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.AppUserPrincipal;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
@@ -8,7 +9,6 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import com.kholodilin.repogrowth.orchestration.IdempotentCollectionRequests;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.topic.domain.TopicWatch;

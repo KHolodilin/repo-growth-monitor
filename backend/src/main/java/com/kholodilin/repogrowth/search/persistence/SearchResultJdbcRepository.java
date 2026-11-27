@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.search.persistence;
 
+import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
-import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
 import java.sql.Timestamp;
 import java.time.Instant;

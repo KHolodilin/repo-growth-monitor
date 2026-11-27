@@ -7,9 +7,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import com.kholodilin.repogrowth.topic.application.TopicCompetitorService;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService;
 import com.kholodilin.repogrowth.topic.application.TopicVisibilityService.TopicHistory;

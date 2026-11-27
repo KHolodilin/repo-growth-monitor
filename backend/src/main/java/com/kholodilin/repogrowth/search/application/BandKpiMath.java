@@ -52,8 +52,7 @@ public final class BandKpiMath {
       return new BandKpi(value, null, null, frozen);
     }
     int absoluteChange = value - previous;
-    return new BandKpi(
-        value, absoluteChange, GrowthMath.percent(value, previous), frozen);
+    return new BandKpi(value, absoluteChange, GrowthMath.percent(value, previous), frozen);
   }
 
   public record Usage(int used, int limit, int available, double progress) {}

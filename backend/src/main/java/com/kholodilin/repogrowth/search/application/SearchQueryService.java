@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.search.application;
 
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
 import com.kholodilin.repogrowth.search.domain.SearchRun;

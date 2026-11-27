@@ -1,12 +1,12 @@
 package com.kholodilin.repogrowth.auth.config;
 
+import com.kholodilin.repogrowth.administration.configuration.PublishedRepositoryReadFilter;
 import com.kholodilin.repogrowth.auth.mock.MockAuthenticationProvider;
 import com.kholodilin.repogrowth.auth.security.AbsoluteSessionTimeoutFilter;
 import com.kholodilin.repogrowth.auth.security.AdminAuthorizationManager;
 import com.kholodilin.repogrowth.auth.security.AuthJsonHandlers;
 import com.kholodilin.repogrowth.auth.security.MockLoginSuccessHandler;
 import com.kholodilin.repogrowth.auth.security.OidcLoginSuccessHandler;
-import com.kholodilin.repogrowth.publication.PublishedRepositoryReadFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

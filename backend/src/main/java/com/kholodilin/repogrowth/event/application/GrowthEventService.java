@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.event.application;
 
 import com.kholodilin.repogrowth.analytics.application.DashboardPeriod;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
@@ -8,7 +9,6 @@ import com.kholodilin.repogrowth.event.domain.GrowthEventCatalog;
 import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.event.persistence.GrowthEventSettingJdbcRepository;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;

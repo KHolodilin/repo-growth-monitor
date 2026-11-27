@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.search.domain;
 
+import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import java.time.Instant;
 
 public record SearchResult(

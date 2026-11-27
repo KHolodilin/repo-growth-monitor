@@ -2,10 +2,10 @@ package com.kholodilin.repogrowth.analytics.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
-import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 

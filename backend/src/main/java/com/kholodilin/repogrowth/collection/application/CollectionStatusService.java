@@ -1,13 +1,13 @@
 package com.kholodilin.repogrowth.collection.application;
 
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
 import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.Repository;
-import com.kholodilin.repogrowth.repository.domain.RepositoryVisibility;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;

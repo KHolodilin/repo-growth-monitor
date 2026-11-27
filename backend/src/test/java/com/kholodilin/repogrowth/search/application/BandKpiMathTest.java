@@ -30,9 +30,7 @@ class BandKpiMathTest {
             2,
             true,
             4,
-            List.of(
-                new RankPoint(TODAY.minusDays(2), 4),
-                new RankPoint(TODAY.minusDays(1), 4)));
+            List.of(new RankPoint(TODAY.minusDays(2), 4), new RankPoint(TODAY.minusDays(1), 4)));
     var kpi = BandKpiMath.bandKpi(List.of(a, b), 3, Period.D7, TODAY, DayMode.STRICT_DAY);
     assertThat(kpi.value()).isEqualTo(1);
     assertThat(kpi.series()).hasSize(7);
@@ -59,12 +57,10 @@ class BandKpiMathTest {
 
   @Test
   void emptyCarryForwardCurrentIsZeroAndAllTimeHasNoComparison() {
-    assertThat(
-            BandKpiMath.bandKpi(List.of(), 3, Period.D30, TODAY, DayMode.CARRY_FORWARD).value())
+    assertThat(BandKpiMath.bandKpi(List.of(), 3, Period.D30, TODAY, DayMode.CARRY_FORWARD).value())
         .isZero();
     RankSample onlyToday = sample(1, true, 1, List.of(new RankPoint(TODAY, 1)));
-    var all =
-        BandKpiMath.bandKpi(List.of(onlyToday), 3, Period.ALL, TODAY, DayMode.STRICT_DAY);
+    var all = BandKpiMath.bandKpi(List.of(onlyToday), 3, Period.ALL, TODAY, DayMode.STRICT_DAY);
     assertThat(all.absoluteChange()).isNull();
     assertThat(all.growthPercent()).isNull();
     assertThat(all.series()).isNotEmpty();
@@ -101,8 +97,7 @@ class BandKpiMathTest {
 
   @Test
   void usageClampsProgressAndAvailableSlots() {
-    assertThat(BandKpiMath.usage(12, 50))
-        .isEqualTo(new BandKpiMath.Usage(12, 50, 38, 24.0));
+    assertThat(BandKpiMath.usage(12, 50)).isEqualTo(new BandKpiMath.Usage(12, 50, 38, 24.0));
     assertThat(BandKpiMath.usage(-2, 10).used()).isZero();
     assertThat(BandKpiMath.usage(4, 0).progress()).isZero();
     assertThat(BandKpiMath.usage(120, 50).progress()).isEqualTo(100.0);
@@ -120,23 +115,20 @@ class BandKpiMathTest {
                 new RankPoint(TODAY.minusDays(1), 1),
                 new RankPoint(TODAY, 1)));
     assertThat(
-            BandKpiMath.bandKpi(List.of(sample), 3, Period.D90, TODAY, DayMode.STRICT_DAY)
-                .series())
+            BandKpiMath.bandKpi(List.of(sample), 3, Period.D90, TODAY, DayMode.STRICT_DAY).series())
         .hasSize(90);
     assertThat(
             BandKpiMath.bandKpi(List.of(sample), 3, Period.Y1, TODAY, DayMode.STRICT_DAY).series())
         .hasSize(365);
     assertThat(
-            BandKpiMath.bandKpi(List.of(sample), 3, Period.D30, TODAY, DayMode.STRICT_DAY)
-                .series())
+            BandKpiMath.bandKpi(List.of(sample), 3, Period.D30, TODAY, DayMode.STRICT_DAY).series())
         .hasSize(30);
   }
 
   @Test
   void samplesWithoutPointsYieldNullCurrentInStrictMode() {
     RankSample empty = sample(1, true, null, List.of());
-    assertThat(
-            BandKpiMath.bandKpi(List.of(empty), 3, Period.D7, TODAY, DayMode.STRICT_DAY).value())
+    assertThat(BandKpiMath.bandKpi(List.of(empty), 3, Period.D7, TODAY, DayMode.STRICT_DAY).value())
         .isNull();
   }
 

@@ -1,9 +1,10 @@
 package com.kholodilin.repogrowth.search.application;
 
+import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
+import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
-import com.kholodilin.repogrowth.repository.domain.Repository;
-import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository;
-import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.search.domain.SearchResult;
 import java.time.Instant;
 import org.springframework.stereotype.Component;

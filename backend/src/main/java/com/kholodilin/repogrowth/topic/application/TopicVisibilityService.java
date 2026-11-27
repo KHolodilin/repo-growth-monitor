@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.topic.application;
 
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
 import com.kholodilin.repogrowth.search.application.RankChangeMath;
 import com.kholodilin.repogrowth.topic.domain.TopicResult;
 import com.kholodilin.repogrowth.topic.domain.TopicRun;

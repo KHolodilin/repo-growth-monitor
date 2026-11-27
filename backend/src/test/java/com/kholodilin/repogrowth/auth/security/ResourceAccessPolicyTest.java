@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
-import com.kholodilin.repogrowth.publication.PublicationService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,13 +43,25 @@ class ResourceAccessPolicyTest {
   void mutateRequiresAdminAndMapsAuthFailures() {
     when(currentUserAccess.canSeePrivateRepositories()).thenReturn(false);
     when(currentUserAccess.authenticated()).thenReturn(false);
-    assertThat(policy.can(13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.DASHBOARD))
+    assertThat(
+            policy.can(
+                13L,
+                ResourceAccessPolicy.ResourceAction.MUTATE,
+                PublicationService.Module.DASHBOARD))
         .isEqualTo(ResourceAccessPolicy.Decision.UNAUTHENTICATED);
     when(currentUserAccess.authenticated()).thenReturn(true);
-    assertThat(policy.can(13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.DASHBOARD))
+    assertThat(
+            policy.can(
+                13L,
+                ResourceAccessPolicy.ResourceAction.MUTATE,
+                PublicationService.Module.DASHBOARD))
         .isEqualTo(ResourceAccessPolicy.Decision.FORBIDDEN);
     when(currentUserAccess.canSeePrivateRepositories()).thenReturn(true);
-    assertThat(policy.can(13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.DASHBOARD))
+    assertThat(
+            policy.can(
+                13L,
+                ResourceAccessPolicy.ResourceAction.MUTATE,
+                PublicationService.Module.DASHBOARD))
         .isEqualTo(ResourceAccessPolicy.Decision.ALLOW);
   }
 
@@ -62,18 +74,16 @@ class ResourceAccessPolicyTest {
         .hasMessageContaining("Repository not found");
 
     when(currentUserAccess.authenticated()).thenReturn(false);
-    assertThatThrownBy(
-            () ->
-                policy.requireAction(
-                    13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.TRAFFIC))
+    assertThatThrownBy(() ->
+            policy.requireAction(
+                13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.TRAFFIC))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Authentication required");
 
     when(currentUserAccess.authenticated()).thenReturn(true);
-    assertThatThrownBy(
-            () ->
-                policy.requireAction(
-                    13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.TRAFFIC))
+    assertThatThrownBy(() ->
+            policy.requireAction(
+                13L, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.TRAFFIC))
         .isInstanceOf(ApiException.class)
         .hasMessageContaining("Forbidden");
 

@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.search.application;
 
+import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthEvaluator;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.repository.api.HealthCheckItem;
-import com.kholodilin.repogrowth.repository.application.RepositoryHealthEvaluator;
-import com.kholodilin.repogrowth.repository.domain.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.search.domain.CompetitorProfile;
 import com.kholodilin.repogrowth.search.persistence.CompetitorProfileJdbcRepository;
 import com.kholodilin.repogrowth.search.persistence.SearchResultJdbcRepository;

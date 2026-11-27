@@ -17,9 +17,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.kholodilin.repogrowth.administration.controller.RepositoryController;
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.analytics.api.AnalyticsController;
 import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
+import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
+import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
+import com.kholodilin.repogrowth.catalog.model.OwnerType;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
 import com.kholodilin.repogrowth.collection.application.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
@@ -40,21 +52,9 @@ import com.kholodilin.repogrowth.event.domain.GrowthEventSetting;
 import com.kholodilin.repogrowth.github.client.SystemStatusController;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
 import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
-import com.kholodilin.repogrowth.publication.PublicationService;
-import com.kholodilin.repogrowth.repository.api.HealthCheckItem;
-import com.kholodilin.repogrowth.repository.api.RepositoryController;
-import com.kholodilin.repogrowth.repository.api.RepositoryHealthResponse;
-import com.kholodilin.repogrowth.repository.application.RepositoryHealthService;
-import com.kholodilin.repogrowth.repository.application.RepositoryService;
-import com.kholodilin.repogrowth.repository.domain.GitHubOwner;
-import com.kholodilin.repogrowth.repository.domain.OwnerType;
-import com.kholodilin.repogrowth.repository.domain.Repository;
-import com.kholodilin.repogrowth.repository.persistence.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.search.api.SearchQueryController;
-import com.kholodilin.repogrowth.search.application.ActivityClassifier;
 import com.kholodilin.repogrowth.search.application.CompetitorCardService;
 import com.kholodilin.repogrowth.search.application.SearchQueryService;
-import com.kholodilin.repogrowth.search.domain.ActivityStatus;
 import com.kholodilin.repogrowth.search.domain.SearchQuery;
 import com.kholodilin.repogrowth.search.domain.SearchRun;
 import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
@@ -229,14 +229,7 @@ class ApiControllersWebMvcTest {
                 now,
                 List.of(
                     new CollectionRunMapper.CollectionJobView(
-                        2L,
-                        "TRAFFIC",
-                        "SUCCESS",
-                        1,
-                        null,
-                        null,
-                        now,
-                        now))));
+                        2L, "TRAFFIC", "SUCCESS", 1, null, null, now, now))));
     when(dailyPlanner.planNow(true))
         .thenReturn(new DailyPlanner.PlannerResult(true, 1, 0, 0, "2026-09-23"));
     when(searchQueryService.list(13L)).thenReturn(List.of(query));
