@@ -1,9 +1,8 @@
 package com.kholodilin.repogrowth.events.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
+/** Durable detection snapshot — JSON mapping configured in the repository layer, not on the model. */
 public record GrowthEventState(
     boolean initialized,
     String readmeText,

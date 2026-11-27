@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel;
-import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel.OwnerRow;
+import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
+import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService.OwnerRow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import java.util.List;
@@ -20,7 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class OwnerDirectoryControllerTest {
 
   @Mock ResourceAccessPolicy access;
-  @Mock OwnerDirectoryReadModel readModel;
+  @Mock OwnerDirectoryService readModel;
   @InjectMocks OwnerDirectoryController controller;
 
   @Test

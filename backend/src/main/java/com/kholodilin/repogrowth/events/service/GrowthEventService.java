@@ -35,6 +35,12 @@ public class GrowthEventService {
     this.planningWindow = planningWindow;
   }
 
+  public GrowthEvent get(long id) {
+    return eventRepository
+        .findById(id)
+        .orElseThrow(() -> ApiException.notFound("Growth event not found"));
+  }
+
   public List<GrowthEvent> list(long repositoryId, String periodParam) {
     repositoryService.get(repositoryId);
     DashboardPeriod period =

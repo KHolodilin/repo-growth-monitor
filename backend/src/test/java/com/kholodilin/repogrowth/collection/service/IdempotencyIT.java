@@ -215,7 +215,7 @@ class IdempotencyIT extends AbstractPostgresTest {
                   .header("Idempotency-Key", "key"))
           .andExpect(status().isForbidden());
       assertThatThrownBy(() -> requests.create(adminId, "key", repositoryId, LocalDate.now()))
-          .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+          .isInstanceOf(com.kholodilin.repogrowth.common.api.ApiException.class);
     } finally {
       users.grantAdmin(adminId);
     }

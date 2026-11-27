@@ -2,7 +2,7 @@ package com.kholodilin.repogrowth.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.collection.model.CollectionJob;
 import com.kholodilin.repogrowth.collection.model.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.model.CollectionJobType;

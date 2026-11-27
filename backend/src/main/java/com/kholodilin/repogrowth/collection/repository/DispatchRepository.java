@@ -2,7 +2,8 @@ package com.kholodilin.repogrowth.collection.repository;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
-import com.kholodilin.repogrowth.collection.service.DispatchError;
+import com.kholodilin.repogrowth.collection.model.DispatchClaim;
+import com.kholodilin.repogrowth.collection.model.DispatchError;
 import com.kholodilin.repogrowth.collection.service.OrchestrationStates;
 import java.sql.Timestamp;
 import java.time.*;
@@ -17,15 +18,6 @@ import tools.jackson.databind.json.JsonMapper;
 @Repository
 @ConditionalOnProperty(name = "rgm.orchestration.enabled", havingValue = "true")
 public class DispatchRepository {
-  public record Claim(
-      long id,
-      String owner,
-      long generation,
-      String nodeKey,
-      String endpoint,
-      JobRequest request,
-      int sendCount) {}
-
   private final JdbcTemplate jdbc;
   private final TransactionTemplate tx;
   private final JsonMapper json;
@@ -42,7 +34,7 @@ public class DispatchRepository {
     this.properties = properties;
   }
 
-  public Optional<Claim> claim(String owner) {
+  public Optional<DispatchClaim> claim(String owner) {
     if (owner == null || owner.isBlank() || owner.length() > 128)
       throw new IllegalArgumentException("Invalid dispatch owner");
     return tx.execute(status -> {
@@ -65,7 +57,7 @@ public class DispatchRepository {
           jdbc.queryForObject(
               "SELECT d.*,n.node_key FROM collector_dispatch d JOIN collection_attempt a ON a.public_id=d.attempt_id JOIN collector_node n ON n.id=a.node_id WHERE d.id=?",
               (r, n) ->
-                  new Claim(
+                  new DispatchClaim(
                       id,
                       owner,
                       r.getLong("generation"),
@@ -77,7 +69,7 @@ public class DispatchRepository {
     });
   }
 
-  private boolean lock(Claim claim) {
+  private boolean lock(DispatchClaim claim) {
     // Result application serializes request aggregate completion before locking its task.
     jdbc.queryForList(
         "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR UPDATE OF r",
@@ -97,7 +89,7 @@ public class DispatchRepository {
         .isEmpty();
   }
 
-  public boolean acknowledge(Claim claim, JobAccepted accepted) {
+  public boolean acknowledge(DispatchClaim claim, JobAccepted accepted) {
     if (!accepted.jobId().equals(claim.request().jobId())
         || !accepted.attemptId().equals(claim.request().attemptId()))
       throw new IllegalArgumentException("Collector acceptance identity mismatch");
@@ -128,11 +120,11 @@ public class DispatchRepository {
         }));
   }
 
-  public boolean failed(Claim claim, DispatchError error, boolean retryable) {
+  public boolean failed(DispatchClaim claim, DispatchError error, boolean retryable) {
     return failed(claim, error, retryable, null);
   }
 
-  public boolean failed(Claim claim, DispatchError error, boolean retryable, Duration retryAfter) {
+  public boolean failed(DispatchClaim claim, DispatchError error, boolean retryable, Duration retryAfter) {
     // Persist bounded categories only, never exception bodies, credentials or response contents.
     Objects.requireNonNull(error, "error");
     long backoff =
@@ -152,7 +144,7 @@ public class DispatchRepository {
         == 1;
   }
 
-  public boolean expired(Claim claim) {
+  public boolean expired(DispatchClaim claim) {
     return Boolean.TRUE.equals(
         tx.execute(status -> {
           if (!lock(claim)) return false;

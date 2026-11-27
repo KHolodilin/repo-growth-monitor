@@ -3,7 +3,7 @@ package com.kholodilin.repogrowth.catalog.controller;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel;
+import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
@@ -48,7 +48,7 @@ public class CatalogController {
   public record RepositoryHealth(String repositoryId, Object health) {}
 
   private final ResourceAccessPolicy access;
-  private final OwnerDirectoryReadModel owners;
+  private final OwnerDirectoryService owners;
   private final RepositoryService repositories;
   private final RepositoryHealthService health;
   private final ActivityClassifier activity;
@@ -56,7 +56,7 @@ public class CatalogController {
 
   public CatalogController(
       ResourceAccessPolicy access,
-      OwnerDirectoryReadModel owners,
+      OwnerDirectoryService owners,
       RepositoryService repositories,
       RepositoryHealthService health,
       ActivityClassifier activity,
@@ -125,8 +125,8 @@ public class CatalogController {
   }
 
   private void requireOwnerVisible(long ownerId) {
-    List<OwnerDirectoryReadModel.OwnerRow> rows = owners.list(null);
-    OwnerDirectoryReadModel.OwnerRow match =
+    List<OwnerDirectoryService.OwnerRow> rows = owners.list(null);
+    OwnerDirectoryService.OwnerRow match =
         rows.stream().filter(row -> row.ownerId() == ownerId).findFirst().orElse(null);
     if (match == null) {
       throw ApiException.notFound("Owner not found");

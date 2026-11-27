@@ -1,13 +1,9 @@
 package com.kholodilin.repogrowth.stats.service;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
-import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.GrowthMath;
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import java.time.Clock;
@@ -21,21 +17,18 @@ public class AdminStatsHistoryService {
   private final RepositoryService repositoryService;
   private final StatsJdbcRepository statsJdbcRepository;
   private final Clock clock;
-  private final CurrentUserAccess currentUserAccess;
 
   public AdminStatsHistoryService(
       RepositoryService repositoryService,
       StatsJdbcRepository statsJdbcRepository,
-      Clock clock,
-      CurrentUserAccess currentUserAccess) {
+      Clock clock) {
     this.repositoryService = repositoryService;
     this.statsJdbcRepository = statsJdbcRepository;
     this.clock = clock;
-    this.currentUserAccess = currentUserAccess;
   }
 
   public RepositoryStatsHistory statsHistory(long repositoryId, String periodParam) {
-    requireVisible(repositoryService.get(repositoryId));
+    repositoryService.get(repositoryId);
     DashboardPeriod period = periodForStats(repositoryId, periodParam);
     List<RepositoryDailyStats> history =
         statsJdbcRepository.dailyStatsHistory(
@@ -99,13 +92,6 @@ public class AdminStatsHistoryService {
     return DashboardPeriod.of(periodParam, today, earliest);
   }
 
-  private Repository requireVisible(Repository repository) {
-    if (currentUserAccess.canSeePrivateRepositories()
-        || RepositoryVisibility.isPublic(repository.visibility())) {
-      return repository;
-    }
-    throw ApiException.notFound("Repository not found");
-  }
 
   public record RepositoryStatsHistory(
       long repositoryId, String period, StatsTotals totals, List<StatsHistoryPoint> points) {}

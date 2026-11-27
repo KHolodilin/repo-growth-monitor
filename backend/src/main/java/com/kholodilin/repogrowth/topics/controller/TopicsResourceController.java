@@ -1,11 +1,13 @@
 package com.kholodilin.repogrowth.topics.controller;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.service.CompetitorCardService;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;
-import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
 import com.kholodilin.repogrowth.topics.service.TopicCompetitorService;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService.TopicHistory;
@@ -27,22 +29,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class TopicsResourceController {
 
   private final ResourceAccessPolicy access;
+  private final RepositoryService repositories;
   private final TopicsKpiService kpi;
   private final TopicVisibilityService topics;
   private final TopicCompetitorService topicCompetitors;
-  private final TopicWatchJdbcRepository watches;
 
   public TopicsResourceController(
       ResourceAccessPolicy access,
+      RepositoryService repositories,
       TopicsKpiService kpi,
       TopicVisibilityService topics,
-      TopicCompetitorService topicCompetitors,
-      TopicWatchJdbcRepository watches) {
+      TopicCompetitorService topicCompetitors) {
     this.access = access;
+    this.repositories = repositories;
     this.kpi = kpi;
     this.topics = topics;
     this.topicCompetitors = topicCompetitors;
-    this.watches = watches;
   }
 
   @GetMapping("/owners/{ownerId}/topics/kpi")
@@ -50,7 +52,7 @@ public class TopicsResourceController {
       @PathVariable long ownerId,
       @RequestParam(defaultValue = "7d") String period,
       @RequestParam(defaultValue = "all") String scope) {
-    return kpi.ownerKpi(ownerId, period, scope);
+    return kpi.ownerKpi(ownerId, readableOwnerRepositories(ownerId), period, scope);
   }
 
   @GetMapping("/repositories/{repositoryId}/topics/kpi")
@@ -58,6 +60,7 @@ public class TopicsResourceController {
       @PathVariable long repositoryId,
       @RequestParam(defaultValue = "7d") String period,
       @RequestParam(defaultValue = "all") String scope) {
+    access.requireReadable(repositoryId, PublicationService.Module.TOPICS);
     return kpi.repositoryKpi(repositoryId, period, scope);
   }
 
@@ -67,6 +70,7 @@ public class TopicsResourceController {
       @RequestParam(defaultValue = "all") String scope,
       @RequestParam(required = false) String include,
       @RequestParam(defaultValue = "50") int limit) {
+    access.requireReadable(repositoryId, PublicationService.Module.TOPICS);
     boolean withHistory = include != null && include.toLowerCase().contains("history");
     return kpi.repositoryWatchesWithHistory(repositoryId, scope, withHistory, limit);
   }
@@ -116,10 +120,22 @@ public class TopicsResourceController {
   }
 
   private TopicWatch requireWatch(long watchId) {
-    return watches
-        .findById(watchId)
-        .orElseThrow(() ->
-            com.kholodilin.repogrowth.common.api.ApiException.notFound("Topic watch not found"));
+    return topics.getWatch(watchId);
+  }
+
+  private List<Long> readableOwnerRepositories(long ownerId) {
+    repositories.owner(ownerId);
+    List<Long> readable =
+        access.filterReadable(
+            repositories.list(false).stream()
+                .filter(repo -> repo.ownerId() == ownerId)
+                .map(Repository::id)
+                .toList(),
+            PublicationService.Module.TOPICS);
+    if (readable.isEmpty()) {
+      throw ApiException.notFound("Owner not found");
+    }
+    return readable;
   }
 
   private static String scopeOf(TopicWatch watch) {

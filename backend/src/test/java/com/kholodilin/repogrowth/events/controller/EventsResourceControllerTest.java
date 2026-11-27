@@ -17,7 +17,6 @@ import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.events.model.GrowthEvent;
 import com.kholodilin.repogrowth.events.model.GrowthEventSetting;
-import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.events.service.GrowthEventService;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
@@ -36,7 +35,6 @@ class EventsResourceControllerTest {
   @Mock ResourceAccessPolicy access;
   @Mock CurrentUserAccess currentUser;
   @Mock GrowthEventService events;
-  @Mock GrowthEventJdbcRepository eventRepository;
   @Mock RepositoryService repositories;
 
   EventsResourceController controller;
@@ -46,7 +44,7 @@ class EventsResourceControllerTest {
   @BeforeEach
   void setUp() {
     controller =
-        new EventsResourceController(access, currentUser, events, eventRepository, repositories);
+        new EventsResourceController(access, currentUser, events, repositories);
     Instant now = Instant.parse("2026-11-10T06:00:00Z");
     repository =
         new Repository(
@@ -134,7 +132,7 @@ class EventsResourceControllerTest {
                     "LINKEDIN_POST", Instant.parse("2026-11-10T06:00:00Z"), "Launch", null, null)))
         .isEqualTo(event);
 
-    when(eventRepository.findById(5L)).thenReturn(Optional.of(event));
+    when(events.get(5L)).thenReturn(event);
     when(events.updateManual(anyLong(), any(), any(), any(), any(), any())).thenReturn(event);
     assertThat(
             controller.update(
@@ -162,7 +160,7 @@ class EventsResourceControllerTest {
     assertThatThrownBy(() -> controller.settings(13L)).isInstanceOf(ApiException.class);
     when(currentUser.authenticated()).thenReturn(true);
     assertThatThrownBy(() -> controller.settings(13L)).isInstanceOf(ApiException.class);
-    when(eventRepository.findById(9L)).thenReturn(Optional.empty());
+    when(events.get(9L)).thenThrow(ApiException.notFound("Growth event not found"));
     assertThatThrownBy(() -> controller.delete(9L)).isInstanceOf(ApiException.class);
   }
 }

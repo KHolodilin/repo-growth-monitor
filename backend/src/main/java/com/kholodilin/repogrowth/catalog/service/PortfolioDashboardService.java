@@ -25,7 +25,7 @@ import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
-import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.collection.model.CollectionJob;
 import com.kholodilin.repogrowth.collection.model.CollectionJobType;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
@@ -35,7 +35,6 @@ import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcReposito
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
 import com.kholodilin.repogrowth.stats.model.RepositoryStatDay;
@@ -84,7 +83,6 @@ public class PortfolioDashboardService {
   private final PortfolioHighlightsService highlightsService;
   private final PlanningWindow planningWindow;
   private final Clock clock;
-  private final CurrentUserAccess currentUserAccess;
 
   public PortfolioDashboardService(
       RepositoryService repositoryService,
@@ -97,8 +95,7 @@ public class PortfolioDashboardService {
       RepositoryHealthService healthService,
       PortfolioHighlightsService highlightsService,
       PlanningWindow planningWindow,
-      Clock clock,
-      CurrentUserAccess currentUserAccess) {
+      Clock clock) {
     this.repositoryService = repositoryService;
     this.trafficJdbcRepository = trafficJdbcRepository;
     this.statsJdbcRepository = statsJdbcRepository;
@@ -110,19 +107,18 @@ public class PortfolioDashboardService {
     this.highlightsService = highlightsService;
     this.planningWindow = planningWindow;
     this.clock = clock;
-    this.currentUserAccess = currentUserAccess;
   }
 
-  public DashboardResponse dashboard(String periodParam) {
-    return dashboard(periodParam, null);
+  public DashboardResponse dashboard(String periodParam, boolean includePrivate) {
+    return dashboard(periodParam, null, includePrivate);
   }
 
-  public DashboardResponse dashboard(String periodParam, String ownerLogin) {
+  public DashboardResponse dashboard(String periodParam, String ownerLogin, boolean includePrivate) {
     LocalDate today = LocalDate.now(clock);
     DashboardPeriod period =
         DashboardPeriod.of(
             periodParam, today, trafficJdbcRepository.earliestTrackedTrafficDate().orElse(null));
-    List<Repository> tracked = visibleTracked(repositoryService.tracked());
+    List<Repository> tracked = visibleTracked(repositoryService.tracked(), includePrivate);
     if (ownerLogin != null && !ownerLogin.isBlank()) {
       String needle = ownerLogin.trim().toLowerCase(Locale.ROOT) + "/";
       tracked =
@@ -138,12 +134,12 @@ public class PortfolioDashboardService {
     if (!trafficJdbcRepository.hasTrackedTraffic()) {
       return firstCollection(period, tracked);
     }
-    return ready(period, tracked);
+    return ready(period, tracked, includePrivate);
   }
 
-  public PortfolioSnapshot portfolio(String period) {
+  public PortfolioSnapshot portfolio(String period, boolean includePrivate) {
     LocalDate from = fromDate(period);
-    List<Repository> tracked = visibleTracked(repositoryService.tracked());
+    List<Repository> tracked = visibleTracked(repositoryService.tracked(), includePrivate);
     long stars = tracked.stream().mapToLong(Repository::stars).sum();
     List<RepositoryMetrics> rows =
         tracked.stream()
@@ -170,8 +166,8 @@ public class PortfolioDashboardService {
         tracked.size(), views, visitors, clones, uniqueCloners, stars, rows);
   }
 
-  private List<Repository> visibleTracked(List<Repository> tracked) {
-    if (currentUserAccess.canSeePrivateRepositories()) {
+  private static List<Repository> visibleTracked(List<Repository> tracked, boolean includePrivate) {
+    if (includePrivate) {
       return tracked;
     }
     return tracked.stream()
@@ -196,12 +192,13 @@ public class PortfolioDashboardService {
     return new TrafficTotals(views, uniqueVisitors, clones, uniqueCloners);
   }
 
-  private DashboardResponse ready(DashboardPeriod period, List<Repository> tracked) {
+  private DashboardResponse ready(
+      DashboardPeriod period, List<Repository> tracked, boolean includePrivate) {
     Set<Long> visibleIds = tracked.stream().map(Repository::id).collect(Collectors.toSet());
     // Owner-scoped Portfolio is a subset; never use the global portfolio totals shortcut.
     boolean fullPortfolio =
-        currentUserAccess.canSeePrivateRepositories()
-            && tracked.size() == visibleTracked(repositoryService.tracked()).size();
+        includePrivate
+            && tracked.size() == visibleTracked(repositoryService.tracked(), true).size();
     // Match chart honesty: incomplete Portfolio T−1 is not part of KPI totals or vs-prev.
     LocalDate end = trafficKpiEnd(visibleIds, period);
     LocalDate previousFrom = period.allTime() ? null : comparisonFrom(period, end);

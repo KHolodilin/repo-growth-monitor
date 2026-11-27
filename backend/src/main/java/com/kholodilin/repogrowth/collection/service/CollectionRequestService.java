@@ -6,7 +6,6 @@ import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
 import com.kholodilin.repogrowth.collection.repository.CollectionRequestJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.events.repository.GrowthEventSettingJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
@@ -19,7 +18,6 @@ import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -551,10 +549,7 @@ public class CollectionRequestService {
             .sorted(Comparator.comparing(OrchestrationProperties.Node::key))
             .toList();
     if (candidates.isEmpty())
-      throw new ApiException(
-          ErrorCode.INTERNAL_ERROR,
-          HttpStatus.SERVICE_UNAVAILABLE,
-          "No collector is configured for the repository pool");
+      throw ApiException.serviceUnavailable("No collector is configured for the repository pool");
     var node = candidates.get(Math.floorMod(routingKey.hashCode(), candidates.size()));
     Long id =
         requests.upsertCollectorNode(

@@ -2,7 +2,6 @@ package com.kholodilin.repogrowth.credentials.service;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.repogrowth.common.api.*;
-import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.credentials.configuration.CredentialVaultProperties;
 import com.kholodilin.repogrowth.credentials.model.CredentialMetadata;
 import com.kholodilin.repogrowth.credentials.repository.CredentialJdbcRepository;
@@ -10,7 +9,6 @@ import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -50,8 +48,7 @@ public class CredentialVault {
   }
 
   private ApiException denied() {
-    return new ApiException(
-        ErrorCode.FORBIDDEN, HttpStatus.FORBIDDEN, "Credential assignment is not authorized");
+    return ApiException.forbidden("Credential assignment is not authorized");
   }
 
   public Metadata rotate(String ref, String token, Instant expiresAt) {
@@ -117,10 +114,7 @@ public class CredentialVault {
       }
       var rows = credentials.activeRepositoryBinding(repositoryId);
       if (rows.isEmpty())
-        throw new ApiException(
-            ErrorCode.INTERNAL_ERROR,
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "Repository credential is not configured");
+        throw ApiException.serviceUnavailable("Repository credential is not configured");
       return new AuthorizationScope(
           rows.getFirst().get("authorization_context").toString(),
           (String) rows.getFirst().get("ref"));

@@ -4,7 +4,7 @@ import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.repository.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
-import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;

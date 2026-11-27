@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.collection.controller;
 
 import com.kholodilin.repogrowth.collection.service.CollectionStatusService;
+import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.collection.service.CollectionStatusService.CollectionStatusResponse;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,13 +18,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class CollectionStatusController {
 
   private final CollectionStatusService status;
+  private final CurrentUserAccess currentUser;
 
-  public CollectionStatusController(CollectionStatusService status) {
+  public CollectionStatusController(
+      CollectionStatusService status, CurrentUserAccess currentUser) {
     this.status = status;
+    this.currentUser = currentUser;
   }
 
   @GetMapping("/collection-status")
   public CollectionStatusResponse collectionStatus(@RequestParam(required = false) String owner) {
-    return status.status(owner);
+    return status.status(owner, currentUser.canSeePrivateRepositories());
   }
 }

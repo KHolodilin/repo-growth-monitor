@@ -15,12 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@EnableConfigurationProperties(PublicationProperties.class)
 public class PublicationService {
 
   /** @deprecated Prefer {@link PublicationPolicy}. Kept as a stable nested alias for callers. */

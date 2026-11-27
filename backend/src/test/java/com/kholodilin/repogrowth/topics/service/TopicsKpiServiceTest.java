@@ -2,17 +2,10 @@ package com.kholodilin.repogrowth.topics.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
-import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
-import com.kholodilin.repogrowth.catalog.model.OwnerType;
-import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.kpi.KpiScope;
-import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService.RankPoint;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService.TopicHistory;
@@ -34,51 +27,20 @@ class TopicsKpiServiceTest {
   private static final Clock CLOCK =
       Clock.fixed(TODAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
 
-  @Mock ResourceAccessPolicy access;
-  @Mock RepositoryService repositories;
   @Mock TopicVisibilityService topics;
 
   TopicsKpiService service;
   TopicWatch watch;
-  Repository repository;
 
   @BeforeEach
   void setUp() {
-    service = new TopicsKpiService(access, repositories, topics, CLOCK);
+    service = new TopicsKpiService(topics, CLOCK);
     Instant now = Instant.parse("2026-11-01T00:00:00Z");
     watch = new TopicWatch(7L, 13L, "outbox", null, "stars", "desc", true, 50, now, now);
-    repository =
-        new Repository(
-            13L,
-            99L,
-            1L,
-            "outbox",
-            "acme/outbox",
-            "d",
-            "PUBLIC",
-            "main",
-            "Java",
-            false,
-            false,
-            21,
-            0,
-            16,
-            1,
-            7,
-            true,
-            now,
-            now,
-            now,
-            now,
-            null,
-            null,
-            now,
-            now);
   }
 
   @Test
   void repositoryKpiUsesCarryForwardBands() {
-    doNothing().when(access).requireReadable(13L, PublicationService.Module.TOPICS);
     when(topics.visibility(13L, "all"))
         .thenReturn(
             List.of(
@@ -92,41 +54,23 @@ class TopicsKpiServiceTest {
   }
 
   @Test
-  void ownerKpiAndWatchListRejectEmptyOwners() {
-    when(repositories.owner(1L))
-        .thenReturn(
-            new GitHubOwner(
-                1L,
-                1L,
-                "acme",
-                OwnerType.USER,
-                null,
-                "https://github.com/acme",
-                Instant.now(),
-                Instant.now()));
-    when(repositories.list(false)).thenReturn(List.of(repository));
-    when(access.filterReadable(List.of(13L), PublicationService.Module.TOPICS))
-        .thenReturn(List.of(13L));
+  void ownerKpiAndWatchListAggregateReadableRepositories() {
     when(topics.visibility(13L, "language"))
         .thenReturn(List.of(history(List.of(new RankPoint(TODAY, 4, 1L)))));
-    assertThat(service.ownerKpi(1L, "7d", "language").scope()).isEqualTo(KpiScope.OWNER);
+    assertThat(service.ownerKpi(1L, List.of(13L), "7d", "language").scope())
+        .isEqualTo(KpiScope.OWNER);
 
-    doNothing().when(access).requireReadable(13L, PublicationService.Module.TOPICS);
     assertThat(service.repositoryWatchesWithHistory(13L, "language", true, 5)).hasSize(1);
     when(topics.visibility(13L, "all"))
         .thenReturn(List.of(history(List.of(new RankPoint(TODAY, 4, 1L)))));
     assertThat(service.repositoryWatchesWithHistory(13L, " ", false, 5)).hasSize(1);
 
-    when(access.filterReadable(List.of(13L), PublicationService.Module.TOPICS))
-        .thenReturn(List.of());
-    assertThatThrownBy(() -> service.ownerKpi(1L, "7d", "all")).isInstanceOf(ApiException.class);
     assertThatThrownBy(() -> service.repositoryKpi(13L, "7d", "nope"))
         .isInstanceOf(ApiException.class);
   }
 
   @Test
   void missingRanksSurfaceMissingKpiValues() {
-    doNothing().when(access).requireReadable(13L, PublicationService.Module.TOPICS);
     when(topics.visibility(13L, "all")).thenReturn(List.of(history(List.of())));
     var kpi = service.repositoryKpi(13L, "7d", null);
     assertThat(kpi.metrics().top3().value()).isNull();

@@ -15,6 +15,8 @@ import com.kholodilin.repogrowth.collection.integration.CollectorTransport;
 import com.kholodilin.repogrowth.collection.planner.*;
 import com.kholodilin.repogrowth.collection.service.CollectionPlanner;
 import com.kholodilin.repogrowth.collection.service.DailyPlanner;
+import com.kholodilin.repogrowth.collection.model.DispatchClaim;
+import com.kholodilin.repogrowth.collection.model.DispatchError;
 import com.kholodilin.repogrowth.collection.repository.DispatchRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.identity.mock.MockUserCatalog;
@@ -363,7 +365,7 @@ class OrchestrationIT extends AbstractPostgresTest {
   void claimConcurrencyFencesAndRejectsMismatchedAcknowledgment() throws Exception {
     service.manual(repositoryId, day);
     try (var pool = Executors.newFixedThreadPool(4)) {
-      List<Callable<Optional<DispatchRepository.Claim>>> work = new ArrayList<>();
+      List<Callable<Optional<DispatchClaim>>> work = new ArrayList<>();
       for (int i = 0; i < 12; i++) work.add(() -> dispatch.claim(UUID.randomUUID().toString()));
       Set<Long> ids = new HashSet<>();
       for (var future : pool.invokeAll(work))

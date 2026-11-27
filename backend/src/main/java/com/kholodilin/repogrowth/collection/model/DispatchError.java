@@ -1,4 +1,4 @@
-package com.kholodilin.repogrowth.collection.service;
+package com.kholodilin.repogrowth.collection.model;
 
 /** Bounded categories persisted on collector_dispatch.last_error for failed sends. */
 public enum DispatchError {

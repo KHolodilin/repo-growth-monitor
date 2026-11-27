@@ -1,9 +1,5 @@
 package com.kholodilin.repogrowth.search.service;
 
-import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.service.RepositoryService;
-import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.PeriodParser;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
 import com.kholodilin.repogrowth.common.model.kpi.KpiChange;
@@ -14,7 +10,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.controller.SearchKpiResponse;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.BandKpi;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.DayMode;
@@ -29,41 +24,30 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
+/** Search KPI and query-history reads. Access checks belong in the controller. */
 @Service
 public class SearchKpiService {
 
   /** Parity with frontend {@code SEARCH_QUERY_LIMIT}. */
   private static final int SEARCH_QUERY_LIMIT = 50;
 
-  private final ResourceAccessPolicy access;
-  private final RepositoryService repositories;
   private final SearchQueryService searchQueries;
   private final Clock clock;
 
-  public SearchKpiService(
-      ResourceAccessPolicy access,
-      RepositoryService repositories,
-      SearchQueryService searchQueries,
-      Clock clock) {
-    this.access = access;
-    this.repositories = repositories;
+  public SearchKpiService(SearchQueryService searchQueries, Clock clock) {
     this.searchQueries = searchQueries;
     this.clock = clock;
   }
 
   public SearchKpiResponse repositoryKpi(long repositoryId, String periodParam) {
-    access.requireReadable(repositoryId, PublicationService.Module.DASHBOARD);
     List<SearchHistory> histories = searchQueries.visibility(repositoryId);
     return build(KpiScope.REPOSITORY, Long.toString(repositoryId), histories, periodParam);
   }
 
-  public SearchKpiResponse ownerKpi(long ownerId, String periodParam) {
-    List<Long> readable = readableOwnerRepositories(ownerId);
-    if (readable.isEmpty()) {
-      throw ApiException.notFound("Owner not found");
-    }
+  public SearchKpiResponse ownerKpi(
+      long ownerId, List<Long> readableRepositoryIds, String periodParam) {
     List<SearchHistory> histories = new ArrayList<>();
-    for (Long repositoryId : readable) {
+    for (Long repositoryId : readableRepositoryIds) {
       histories.addAll(searchQueries.visibility(repositoryId));
     }
     return build(KpiScope.OWNER, Long.toString(ownerId), histories, periodParam);
@@ -75,7 +59,6 @@ public class SearchKpiService {
    */
   public List<SearchHistory> repositoryQueriesWithHistory(
       long repositoryId, boolean includeHistory, int limit) {
-    access.requireReadable(repositoryId, PublicationService.Module.DASHBOARD);
     int capped = Math.min(Math.max(limit, 1), 100);
     if (!includeHistory) {
       return searchQueries.list(repositoryId).stream()
@@ -143,15 +126,5 @@ public class SearchKpiService {
         .flatMap(history -> history.points().stream())
         .map(SearchQueryService.RankPoint::date)
         .min(LocalDate::compareTo);
-  }
-
-  private List<Long> readableOwnerRepositories(long ownerId) {
-    repositories.owner(ownerId);
-    return access.filterReadable(
-        repositories.list(false).stream()
-            .filter(repo -> repo.ownerId() == ownerId)
-            .map(Repository::id)
-            .toList(),
-        PublicationService.Module.DASHBOARD);
   }
 }

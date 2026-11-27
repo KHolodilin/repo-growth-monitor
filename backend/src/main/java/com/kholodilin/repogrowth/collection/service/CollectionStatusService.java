@@ -7,7 +7,6 @@ import com.kholodilin.repogrowth.collection.model.CollectionJob;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,21 +24,18 @@ public class CollectionStatusService {
   private final RepositoryService repositories;
   private final CollectionRunJdbcRepository runs;
   private final CollectionJobJdbcRepository jobs;
-  private final CurrentUserAccess currentUser;
 
   public CollectionStatusService(
       RepositoryService repositories,
       CollectionRunJdbcRepository runs,
-      CollectionJobJdbcRepository jobs,
-      CurrentUserAccess currentUser) {
+      CollectionJobJdbcRepository jobs) {
     this.repositories = repositories;
     this.runs = runs;
     this.jobs = jobs;
-    this.currentUser = currentUser;
   }
 
-  public CollectionStatusResponse status(String ownerLogin) {
-    List<Repository> tracked = visibleTracked(repositories.tracked());
+  public CollectionStatusResponse status(String ownerLogin, boolean includePrivate) {
+    List<Repository> tracked = visibleTracked(repositories.tracked(), includePrivate);
     if (ownerLogin != null && !ownerLogin.isBlank()) {
       String needle = ownerLogin.trim().toLowerCase(Locale.ROOT) + "/";
       tracked =
@@ -75,8 +71,8 @@ public class CollectionStatusService {
     return new CollectionStatusResponse(lastSync, rows);
   }
 
-  private List<Repository> visibleTracked(List<Repository> tracked) {
-    if (currentUser.canSeePrivateRepositories()) {
+  private static List<Repository> visibleTracked(List<Repository> tracked, boolean includePrivate) {
+    if (includePrivate) {
       return tracked;
     }
     return tracked.stream()

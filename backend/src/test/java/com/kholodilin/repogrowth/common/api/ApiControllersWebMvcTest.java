@@ -30,7 +30,7 @@ import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.OwnerType;
 import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
@@ -47,10 +47,10 @@ import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcReposito
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
+import com.kholodilin.repogrowth.collection.service.CollectionRunQueryService;
 import com.kholodilin.repogrowth.common.web.SpaController;
 import com.kholodilin.repogrowth.credentials.service.GitHubAccessStatusService;
 import com.kholodilin.repogrowth.events.controller.EventsResourceController;
-import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.events.model.GrowthEvent;
 import com.kholodilin.repogrowth.events.model.GrowthEventSetting;
@@ -64,7 +64,6 @@ import com.kholodilin.repogrowth.search.model.SearchRunStatus;
 import com.kholodilin.repogrowth.search.service.CompetitorCardService;
 import com.kholodilin.repogrowth.search.service.SearchKpiService;
 import com.kholodilin.repogrowth.topics.service.TopicsKpiService;
-import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
 import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import com.kholodilin.repogrowth.support.WebMvcTestSecurityConfig;
 import com.kholodilin.repogrowth.topics.controller.TopicVisibilityController;
@@ -112,6 +111,7 @@ class ApiControllersWebMvcTest {
   @Autowired MockMvc mockMvc;
   @Autowired CollectionController collectionController;
   @MockitoBean CollectionRunMapper collectionRunMapper;
+  @MockitoBean CollectionRunQueryService collectionRunQueryService;
   @Autowired SearchQueryController searchQueryController;
   @Autowired TopicVisibilityController topicVisibilityController;
 
@@ -129,10 +129,8 @@ class ApiControllersWebMvcTest {
   @MockitoBean SearchQueryService searchQueryService;
   @MockitoBean SearchKpiService searchKpiService;
   @MockitoBean TopicsKpiService topicsKpiService;
-  @MockitoBean TopicWatchJdbcRepository topicWatchJdbcRepository;
   @MockitoBean CompetitorCardService competitorCardService;
   @MockitoBean GrowthEventService growthEventService;
-  @MockitoBean GrowthEventJdbcRepository growthEventJdbcRepository;
   @MockitoBean ResourceAccessPolicy resourceAccessPolicy;
   @MockitoBean TopicVisibilityService topicVisibilityService;
   @MockitoBean TopicCompetitorService topicCompetitorService;
@@ -250,6 +248,25 @@ class ApiControllersWebMvcTest {
                 new CollectionRunMapper.CollectionJobView(
                     2L, "TRAFFIC", "SUCCESS", 1, null, null, now, now)));
     when(collectionRunMapper.toView(any(CollectionRun.class))).thenReturn(runView);
+    when(collectionRunQueryService.get(1L))
+        .thenReturn(
+            new CollectionRunMapper.CollectionRunResponse(
+                1L,
+                13L,
+                "2026-09-23",
+                "SUCCESS",
+                1,
+                1,
+                0,
+                Instant.parse("2026-09-23T06:00:00Z"),
+                Instant.parse("2026-09-23T06:00:00Z"),
+                List.of(
+                    new CollectionRunMapper.CollectionJobResponse(
+                        2L, "TRAFFIC", "SUCCESS", 1, null, null,
+                        Instant.parse("2026-09-23T06:00:00Z"),
+                        Instant.parse("2026-09-23T06:00:00Z")))));
+    when(collectionRunQueryService.get(99L))
+        .thenThrow(ApiException.notFound("Collection run not found"));
     when(collectionRunMapper.toResponse(any(CollectionRunMapper.CollectionRunView.class)))
         .thenReturn(
             new CollectionRunMapper.CollectionRunResponse(
@@ -270,7 +287,7 @@ class ApiControllersWebMvcTest {
     when(searchQueryService.list(13L)).thenReturn(List.of(query));
     when(searchKpiService.repositoryQueriesWithHistory(eq(13L), anyBoolean(), any(Integer.class)))
         .thenReturn(List.of());
-    when(topicWatchJdbcRepository.findById(7L)).thenReturn(Optional.of(watch));
+    when(topicVisibilityService.getWatch(7L)).thenReturn(watch);
     when(searchQueryService.create(eq(13L), any(), any(), any(), any())).thenReturn(query);
     when(searchQueryService.update(eq(5L), any(), any(), any(), any())).thenReturn(query);
     when(searchQueryService.getQuery(5L)).thenReturn(query);
@@ -339,7 +356,7 @@ class ApiControllersWebMvcTest {
         .thenReturn(List.of(new GrowthEventSetting(13L, "STAR_MILESTONE", true, now, now)));
     when(growthEventService.updateSettings(eq(13L), any()))
         .thenReturn(List.of(new GrowthEventSetting(13L, "STAR_MILESTONE", false, now, now)));
-    when(growthEventJdbcRepository.findById(1L)).thenReturn(Optional.of(event));
+    when(growthEventService.get(1L)).thenReturn(event);
     doNothing()
         .when(resourceAccessPolicy)
         .requireReadable(anyLong(), any(PublicationService.Module.class));
@@ -391,8 +408,8 @@ class ApiControllersWebMvcTest {
                 List.of(new HealthCheckItem("Repository description exists", true)),
                 List.of(
                     new CompetitorCardService.CompetitorPoint(LocalDate.of(2026, 9, 23), 10, 2))));
-    when(analyticsService.dashboard(anyString())).thenReturn(null);
-    when(analyticsService.portfolio(anyString())).thenReturn(null);
+    when(analyticsService.dashboard(anyString(), any(), anyBoolean())).thenReturn(null);
+    when(analyticsService.portfolio(anyString(), anyBoolean())).thenReturn(null);
     when(adminTrafficService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
     when(adminTrafficService.snapshotHistory(eq(13L), any(), any(), any(), anyBoolean()))
         .thenReturn(null);

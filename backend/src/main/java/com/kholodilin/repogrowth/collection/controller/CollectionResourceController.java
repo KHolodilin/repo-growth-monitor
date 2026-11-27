@@ -12,7 +12,7 @@ import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
 import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;
-import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
+import com.kholodilin.repogrowth.topics.service.TopicVisibilityService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -38,7 +38,7 @@ public class CollectionResourceController {
   private final IdempotentCollectionRequests idempotent;
   private final PlanningWindow window;
   private final SearchQueryService searchQueries;
-  private final TopicWatchJdbcRepository watches;
+  private final TopicVisibilityService topicWatches;
 
   @Autowired(required = false)
   private CollectionRequestService commands;
@@ -48,12 +48,12 @@ public class CollectionResourceController {
       IdempotentCollectionRequests idempotent,
       PlanningWindow window,
       SearchQueryService searchQueries,
-      TopicWatchJdbcRepository watches) {
+      TopicVisibilityService topicWatches) {
     this.access = access;
     this.idempotent = idempotent;
     this.window = window;
     this.searchQueries = searchQueries;
-    this.watches = watches;
+    this.topicWatches = topicWatches;
   }
 
   @PostMapping("/repositories/{repositoryId}/collections")
@@ -91,8 +91,7 @@ public class CollectionResourceController {
 
   @PostMapping("/topic-watches/{watchId}/run")
   public Object runTopicWatch(@PathVariable long watchId) {
-    TopicWatch watch =
-        watches.findById(watchId).orElseThrow(() -> ApiException.notFound("Topic watch not found"));
+    TopicWatch watch = topicWatches.getWatch(watchId);
     access.requireAction(
         watch.repositoryId(),
         ResourceAccessPolicy.ResourceAction.MUTATE,

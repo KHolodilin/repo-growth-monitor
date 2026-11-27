@@ -10,8 +10,8 @@ import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.OwnerType;
 import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel;
-import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel.OwnerRow;
+import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
+import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService.OwnerRow;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
@@ -29,7 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class CatalogControllerTest {
 
   @Mock ResourceAccessPolicy access;
-  @Mock OwnerDirectoryReadModel owners;
+  @Mock OwnerDirectoryService owners;
   @Mock RepositoryService repositories;
   @Mock RepositoryHealthService health;
   @Mock ActivityClassifier activity;

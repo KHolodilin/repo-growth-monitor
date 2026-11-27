@@ -23,7 +23,6 @@ import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.Clock;
@@ -138,9 +137,7 @@ class PortfolioDashboardFirstCollectionTest {
         .thenReturn(new RepositoryHealthService.DiscoverabilityScore(4, 13));
     when(activity.classify(anyBoolean(), nullable(Instant.class)))
         .thenReturn(ActivityStatus.ACTIVE);
-    CurrentUserAccess access = mock(CurrentUserAccess.class);
-    when(access.canSeePrivateRepositories()).thenReturn(true);
-    PortfolioDashboardService service =
+PortfolioDashboardService service =
         new PortfolioDashboardService(
         repositoryService,
         traffic,
@@ -152,10 +149,9 @@ class PortfolioDashboardFirstCollectionTest {
             health,
             mock(PortfolioHighlightsService.class),
             mock(PlanningWindow.class),
-            Clock.fixed(now, ZoneOffset.UTC),
-            access);
+            Clock.fixed(now, ZoneOffset.UTC));
 
-    var response = service.dashboard("30d");
+    var response = service.dashboard("30d", true);
 
     assertThat(response.state()).isEqualTo(DashboardState.FIRST_COLLECTION);
     assertThat(response.repositories())

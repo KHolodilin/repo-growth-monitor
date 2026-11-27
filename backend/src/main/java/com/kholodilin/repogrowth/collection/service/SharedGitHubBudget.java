@@ -138,12 +138,9 @@ public class SharedGitHubBudget {
           if (report.resetAt() != null)
             budgets.extendResetAt(report.resetAt(), identity, resource);
           Instant cooldown = report.retryAt();
-          if ((report.status() == org.springframework.http.HttpStatus.FORBIDDEN.value()
-                  || report.status()
-                      == org.springframework.http.HttpStatus.TOO_MANY_REQUESTS.value())
-              && cooldown == null) cooldown = Instant.now().plusSeconds(60);
-          if (report.status() == org.springframework.http.HttpStatus.UNAUTHORIZED.value()
-              || report.status() == org.springframework.http.HttpStatus.NOT_FOUND.value())
+          if ((report.status() == 403 || report.status() == 429) && cooldown == null)
+            cooldown = Instant.now().plusSeconds(60);
+          if (report.status() == 401 || report.status() == 404)
             cooldown = Instant.now().plusSeconds(30);
           if (cooldown != null) budgets.extendCooldown(cooldown, identity);
           budgets.insertReceipt(report.permitId());

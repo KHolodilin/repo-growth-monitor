@@ -8,7 +8,6 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.events.model.GrowthEvent;
 import com.kholodilin.repogrowth.events.model.GrowthEventSetting;
-import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.events.service.GrowthEventService;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
@@ -37,19 +36,16 @@ public class EventsResourceController {
   private final ResourceAccessPolicy access;
   private final CurrentUserAccess currentUser;
   private final GrowthEventService events;
-  private final GrowthEventJdbcRepository eventRepository;
   private final RepositoryService repositories;
 
   public EventsResourceController(
       ResourceAccessPolicy access,
       CurrentUserAccess currentUser,
       GrowthEventService events,
-      GrowthEventJdbcRepository eventRepository,
       RepositoryService repositories) {
     this.access = access;
     this.currentUser = currentUser;
     this.events = events;
-    this.eventRepository = eventRepository;
     this.repositories = repositories;
   }
 
@@ -158,9 +154,7 @@ public class EventsResourceController {
   }
 
   private GrowthEvent requireEvent(long eventId) {
-    return eventRepository
-        .findById(eventId)
-        .orElseThrow(() -> ApiException.notFound("Growth event not found"));
+    return events.get(eventId);
   }
 
   public record ManualEventRequest(

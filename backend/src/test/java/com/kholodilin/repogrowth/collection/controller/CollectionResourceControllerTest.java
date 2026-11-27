@@ -18,11 +18,10 @@ import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
 import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;
-import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
+import com.kholodilin.repogrowth.topics.service.TopicVisibilityService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,7 @@ class CollectionResourceControllerTest {
   @Mock IdempotentCollectionRequests idempotent;
   @Mock PlanningWindow window;
   @Mock SearchQueryService searchQueries;
-  @Mock TopicWatchJdbcRepository watches;
+  @Mock TopicVisibilityService topicWatches;
   @Mock CollectionRequestService commands;
 
   CollectionResourceController controller;
@@ -47,7 +46,7 @@ class CollectionResourceControllerTest {
   @BeforeEach
   void setUp() {
     controller =
-        new CollectionResourceController(access, idempotent, window, searchQueries, watches);
+        new CollectionResourceController(access, idempotent, window, searchQueries, topicWatches);
     ReflectionTestUtils.setField(controller, "commands", commands);
     when(window.businessDate()).thenReturn(LocalDate.of(2026, 11, 10));
   }
@@ -87,7 +86,7 @@ class CollectionResourceControllerTest {
             eq(ResourceAccessPolicy.ResourceAction.MUTATE),
             eq(PublicationService.Module.TOPICS));
     when(searchQueries.getQuery(5L)).thenReturn(query);
-    when(watches.findById(7L)).thenReturn(Optional.of(watch));
+    when(topicWatches.getWatch(7L)).thenReturn(watch);
     var created =
         new CollectionRequestService.Created(UUID.randomUUID(), List.of(UUID.randomUUID()), false);
     when(commands.searchCommand(anyLong(), any())).thenReturn(created);
@@ -99,7 +98,7 @@ class CollectionResourceControllerTest {
     assertThat(controller.runRepositorySearchQueries(13L)).isEqualTo(created);
     assertThat(controller.runTopicWatch(7L)).isEqualTo(created);
     assertThat(controller.runRepositoryTopicWatches(13L, "language")).isEqualTo(created);
-    when(watches.findById(9L)).thenReturn(Optional.empty());
+    when(topicWatches.getWatch(9L)).thenThrow(ApiException.notFound("Topic watch not found"));
     assertThatThrownBy(() -> controller.runTopicWatch(9L)).isInstanceOf(ApiException.class);
 
     ReflectionTestUtils.setField(controller, "commands", null);

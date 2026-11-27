@@ -13,8 +13,7 @@ import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.TrafficPoi
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
-import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService.DiscoverabilityScore;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.model.CollectionJob;
@@ -26,7 +25,6 @@ import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcReposito
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
@@ -70,7 +68,6 @@ public class AdminTrafficService {
   private final CollectionRunMapper collectionRunMapper;
   private final PlanningWindow planningWindow;
   private final Clock clock;
-  private final CurrentUserAccess currentUserAccess;
 
   public AdminTrafficService(
       RepositoryService repositoryService,
@@ -79,8 +76,7 @@ public class AdminTrafficService {
       CollectionJobJdbcRepository jobRepository,
       CollectionRunMapper collectionRunMapper,
       PlanningWindow planningWindow,
-      Clock clock,
-      CurrentUserAccess currentUserAccess) {
+      Clock clock) {
     this.repositoryService = repositoryService;
     this.trafficJdbcRepository = trafficJdbcRepository;
     this.runRepository = runRepository;
@@ -88,12 +84,11 @@ public class AdminTrafficService {
     this.collectionRunMapper = collectionRunMapper;
     this.planningWindow = planningWindow;
     this.clock = clock;
-    this.currentUserAccess = currentUserAccess;
   }
 
   public RepositoryTrafficSnapshot traffic(
       long repositoryId, String periodParam, boolean includeServicePaths) {
-    Repository repository = requireVisible(repositoryService.get(repositoryId));
+    Repository repository = repositoryService.get(repositoryId);
     GitHubOwner owner = repositoryService.owner(repository.ownerId());
     DashboardPeriod period = periodForRepository(repositoryId, periodParam);
     List<TrafficDaily> history = trafficJdbcRepository.history(repositoryId, period.from());
@@ -159,7 +154,6 @@ public class AdminTrafficService {
       String periodParam,
       Integer daysParam,
       boolean includeServicePaths) {
-    requireVisible(repositoryService.get(repositoryId));
     SnapshotKind kind = snapshotKind(kindParam);
     LocalDate today = LocalDate.now(clock);
     LocalDate from;
@@ -235,13 +229,6 @@ public class AdminTrafficService {
     return Math.min(MAX_HISTORY_DAYS, Math.max(1, days));
   }
 
-  private Repository requireVisible(Repository repository) {
-    if (currentUserAccess.canSeePrivateRepositories()
-        || RepositoryVisibility.isPublic(repository.visibility())) {
-      return repository;
-    }
-    throw ApiException.notFound("Repository not found");
-  }
 
   private DashboardPeriod periodForRepository(long repositoryId, String periodParam) {
     LocalDate today = LocalDate.now(clock);

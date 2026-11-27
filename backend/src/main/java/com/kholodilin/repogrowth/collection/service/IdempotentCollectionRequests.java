@@ -5,12 +5,12 @@ import com.kholodilin.idempotency.exception.IdempotencyConflictException;
 import com.kholodilin.idempotency.model.IdempotencyKey;
 import com.kholodilin.repogrowth.collection.idempotency.ScopedIdempotency;
 import com.kholodilin.repogrowth.collection.repository.CollectionRequestCommandJdbcRepository;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import java.time.LocalDate;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -42,7 +42,7 @@ public class IdempotentCollectionRequests {
     return tx.execute(status -> {
       // Revalidate authority before even looking at a replay, including after account revocation.
       if (!users.canMutate(users.findById(actorId).orElse(null)))
-        throw new AccessDeniedException("ADMIN role required");
+        throw ApiException.forbidden("ADMIN role required");
       String scoped = ScopedIdempotency.key("user:" + actorId, key);
       return idempotency
           .operation("CREATE_COLLECTION_REQUEST")

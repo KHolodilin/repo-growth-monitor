@@ -14,7 +14,9 @@ public class GrowthEventStateJdbcRepository {
 
   public GrowthEventStateJdbcRepository(JdbcClient jdbcClient, JsonMapper jsonMapper) {
     this.jdbcClient = jdbcClient;
-    this.jsonMapper = jsonMapper;
+    // Unknown historical keys stay repository-side — model must stay framework-free.
+    this.jsonMapper =
+        jsonMapper.rebuild().disable(tools.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
   }
 
   public GrowthEventState find(long repositoryId) {
@@ -27,7 +29,7 @@ public class GrowthEventStateJdbcRepository {
     if (raw.isEmpty() || raw.get().isBlank()) {
       return GrowthEventState.empty();
     }
-    return jsonMapper.readValue(raw.get(), GrowthEventState.class);
+    return this.jsonMapper.readValue(raw.get(), GrowthEventState.class);
   }
 
   public void upsert(long repositoryId, GrowthEventState state) {

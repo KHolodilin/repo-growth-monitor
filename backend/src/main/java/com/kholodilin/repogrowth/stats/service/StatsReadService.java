@@ -1,12 +1,8 @@
 package com.kholodilin.repogrowth.stats.service;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.common.model.GrowthMath;
-import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.service.RepositoryService;
-import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.PeriodParser;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
 import com.kholodilin.repogrowth.common.model.kpi.KpiChange;
@@ -17,7 +13,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.stats.controller.StatsKpiResponse;
 import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
@@ -32,44 +27,32 @@ import org.springframework.stereotype.Service;
 
 /**
  * Resource-API Stats reads. Stars/forks/watchers/contributors are tip levels at period end — not
- * summed traffic-style windows. Owner aggregates only include readable repositories.
+ * summed traffic-style windows. Owner aggregates only include readable repositories. Access checks
+ * belong in the controller.
  */
 @Service
 public class StatsReadService {
 
-  private final ResourceAccessPolicy access;
-  private final RepositoryService repositories;
   private final StatsJdbcRepository stats;
   private final Clock clock;
 
-  public StatsReadService(
-      ResourceAccessPolicy access,
-      RepositoryService repositories,
-      StatsJdbcRepository stats,
-      Clock clock) {
-    this.access = access;
-    this.repositories = repositories;
+  public StatsReadService(StatsJdbcRepository stats, Clock clock) {
     this.stats = stats;
     this.clock = clock;
   }
 
   public StatsKpiResponse repositoryKpi(long repositoryId, String periodParam) {
-    access.requireReadable(repositoryId, PublicationService.Module.DASHBOARD);
     History history = repositoryHistory(repositoryId, periodParam);
     return toKpi(KpiScope.REPOSITORY, Long.toString(repositoryId), history);
   }
 
-  public StatsKpiResponse ownerKpi(long ownerId, String periodParam) {
-    List<Long> readable = readableOwnerRepositories(ownerId);
-    if (readable.isEmpty()) {
-      throw ApiException.notFound("Owner not found");
-    }
-    History history = ownerHistory(ownerId, readable, periodParam);
+  public StatsKpiResponse ownerKpi(
+      long ownerId, List<Long> readableRepositoryIds, String periodParam) {
+    History history = ownerHistory(readableRepositoryIds, periodParam);
     return toKpi(KpiScope.OWNER, Long.toString(ownerId), history);
   }
 
   public StatsHistoryResponse repositoryHistoryResponse(long repositoryId, String periodParam) {
-    access.requireReadable(repositoryId, PublicationService.Module.DASHBOARD);
     History history = repositoryHistory(repositoryId, periodParam);
     return new StatsHistoryResponse(
         KpiScope.REPOSITORY,
@@ -80,12 +63,9 @@ public class StatsReadService {
         history.points());
   }
 
-  public StatsHistoryResponse ownerHistoryResponse(long ownerId, String periodParam) {
-    List<Long> readable = readableOwnerRepositories(ownerId);
-    if (readable.isEmpty()) {
-      throw ApiException.notFound("Owner not found");
-    }
-    History history = ownerHistory(ownerId, readable, periodParam);
+  public StatsHistoryResponse ownerHistoryResponse(
+      long ownerId, List<Long> readableRepositoryIds, String periodParam) {
+    History history = ownerHistory(readableRepositoryIds, periodParam);
     return new StatsHistoryResponse(
         KpiScope.OWNER,
         Long.toString(ownerId),
@@ -114,7 +94,7 @@ public class StatsReadService {
     return new History(resolved, range, totals, points);
   }
 
-  private History ownerHistory(long ownerId, List<Long> repositoryIds, String periodParam) {
+  private History ownerHistory(List<Long> repositoryIds, String periodParam) {
     DashboardPeriod period = periodForStats(repositoryIds, periodParam);
     TreeMap<LocalDate, int[]> byDate = new TreeMap<>();
     int tipStars = 0;
@@ -296,16 +276,6 @@ public class StatsReadService {
       }
     }
     return DashboardPeriod.of(periodParam, today, earliest);
-  }
-
-  private List<Long> readableOwnerRepositories(long ownerId) {
-    repositories.owner(ownerId);
-    List<Long> owned =
-        repositories.list(false).stream()
-            .filter(repo -> repo.ownerId() == ownerId)
-            .map(Repository::id)
-            .toList();
-    return access.filterReadable(owned, PublicationService.Module.DASHBOARD);
   }
 
   private record History(

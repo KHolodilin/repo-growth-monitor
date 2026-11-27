@@ -25,7 +25,6 @@ import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
@@ -85,9 +84,7 @@ class PortfolioDashboardTrafficNoticeTest {
                     "boom")));
     when(traffic.latestDate(13L)).thenReturn(Optional.of(TODAY.minusDays(3)));
     when(window.isOpen()).thenReturn(true);
-    CurrentUserAccess access = mock(CurrentUserAccess.class);
-    when(access.canSeePrivateRepositories()).thenReturn(true);
-    AdminTrafficService service =
+AdminTrafficService service =
         new AdminTrafficService(
             repositories,
             traffic,
@@ -95,8 +92,7 @@ class PortfolioDashboardTrafficNoticeTest {
             jobs,
             mock(CollectionRunMapper.class),
             window,
-            Clock.fixed(NOW, ZoneOffset.UTC),
-            access);
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
     assertThat(service.traffic(13L, "7d", false).trafficGap().reason())
         .isEqualTo("COLLECTION_FAILED");
@@ -168,9 +164,7 @@ class PortfolioDashboardTrafficNoticeTest {
     ActivityClassifier activity = mock(ActivityClassifier.class);
     when(activity.classify(anyBoolean(), nullable(Instant.class)))
         .thenReturn(ActivityStatus.ACTIVE);
-    CurrentUserAccess access = mock(CurrentUserAccess.class);
-    when(access.canSeePrivateRepositories()).thenReturn(true);
-    PortfolioDashboardService service =
+PortfolioDashboardService service =
         new PortfolioDashboardService(
             repositories,
             traffic,
@@ -182,10 +176,9 @@ class PortfolioDashboardTrafficNoticeTest {
             health,
             highlights,
             window,
-            Clock.fixed(NOW, ZoneOffset.UTC),
-            access);
+            Clock.fixed(NOW, ZoneOffset.UTC));
 
-    var dashboard = service.dashboard("7d");
+    var dashboard = service.dashboard("7d", true);
 
     assertThat(dashboard.repositories())
         .filteredOn(row -> row.id() == 13L)
@@ -206,9 +199,7 @@ class PortfolioDashboardTrafficNoticeTest {
       CollectionRunJdbcRepository runs,
       CollectionJobJdbcRepository jobs,
       PlanningWindow window) {
-    CurrentUserAccess access = mock(CurrentUserAccess.class);
-    when(access.canSeePrivateRepositories()).thenReturn(true);
-    return new PortfolioDashboardService(
+return new PortfolioDashboardService(
         repositories,
         traffic,
         mock(StatsJdbcRepository.class),
@@ -219,8 +210,7 @@ class PortfolioDashboardTrafficNoticeTest {
         mock(RepositoryHealthService.class),
         mock(PortfolioHighlightsService.class),
         window,
-        Clock.fixed(NOW, ZoneOffset.UTC),
-        access);
+        Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   private static Repository repository(long id, String fullName) {

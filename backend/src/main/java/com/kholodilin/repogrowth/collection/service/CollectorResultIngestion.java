@@ -11,7 +11,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.HttpStatus;
 import com.kholodilin.repogrowth.collection.repository.CollectorResultIngestionJdbcRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -61,10 +60,7 @@ public class CollectorResultIngestion {
       var task = tasks.getFirst();
       var attempts = ingestion.lockAttempt(result.attemptId(), task.get("id"));
       if (attempts.isEmpty() || !node.equals(attempts.getFirst().get("node_key")))
-        throw new ApiException(
-            com.kholodilin.repogrowth.common.api.ErrorCode.FORBIDDEN,
-            HttpStatus.FORBIDDEN,
-            "Result is not authorized for this assignment");
+        throw ApiException.forbidden("Result is not authorized for this assignment");
       var attempt = attempts.getFirst();
       JobRequest job = json.readValue(attempt.get("payload").toString(), JobRequest.class);
       if (!job.jobId().equals(result.jobId()) || job.type() != result.type())

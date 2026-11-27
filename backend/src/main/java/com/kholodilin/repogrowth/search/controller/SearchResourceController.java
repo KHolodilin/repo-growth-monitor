@@ -1,6 +1,9 @@
 package com.kholodilin.repogrowth.search.controller;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
+import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.service.RepositoryService;
+import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
@@ -31,16 +34,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class SearchResourceController {
 
   private final ResourceAccessPolicy access;
+  private final RepositoryService repositories;
   private final SearchKpiService kpi;
   private final SearchQueryService searchQueries;
   private final CompetitorCardService competitors;
 
   public SearchResourceController(
       ResourceAccessPolicy access,
+      RepositoryService repositories,
       SearchKpiService kpi,
       SearchQueryService searchQueries,
       CompetitorCardService competitors) {
     this.access = access;
+    this.repositories = repositories;
     this.kpi = kpi;
     this.searchQueries = searchQueries;
     this.competitors = competitors;
@@ -49,12 +55,13 @@ public class SearchResourceController {
   @GetMapping("/owners/{ownerId}/search/kpi")
   public SearchKpiResponse ownerSearchKpi(
       @PathVariable long ownerId, @RequestParam(defaultValue = "7d") String period) {
-    return kpi.ownerKpi(ownerId, period);
+    return kpi.ownerKpi(ownerId, readableOwnerRepositories(ownerId), period);
   }
 
   @GetMapping("/repositories/{repositoryId}/search/kpi")
   public SearchKpiResponse repositorySearchKpi(
       @PathVariable long repositoryId, @RequestParam(defaultValue = "7d") String period) {
+    access.requireReadable(repositoryId, PublicationService.Module.DASHBOARD);
     return kpi.repositoryKpi(repositoryId, period);
   }
 
@@ -63,6 +70,7 @@ public class SearchResourceController {
       @PathVariable long repositoryId,
       @RequestParam(required = false) String include,
       @RequestParam(defaultValue = "50") int limit) {
+    access.requireReadable(repositoryId, PublicationService.Module.DASHBOARD);
     boolean withHistory = include != null && include.toLowerCase().contains("history");
     return kpi.repositoryQueriesWithHistory(repositoryId, withHistory, limit);
   }
@@ -143,5 +151,20 @@ public class SearchResourceController {
     SearchRunResults results = searchQueries.results(runId);
     access.requireReadable(results.query().repositoryId(), PublicationService.Module.DASHBOARD);
     return results;
+  }
+
+  private List<Long> readableOwnerRepositories(long ownerId) {
+    repositories.owner(ownerId);
+    List<Long> readable =
+        access.filterReadable(
+            repositories.list(false).stream()
+                .filter(repo -> repo.ownerId() == ownerId)
+                .map(Repository::id)
+                .toList(),
+            PublicationService.Module.DASHBOARD);
+    if (readable.isEmpty()) {
+      throw ApiException.notFound("Owner not found");
+    }
+    return readable;
   }
 }

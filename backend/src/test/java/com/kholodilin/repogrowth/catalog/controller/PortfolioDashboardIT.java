@@ -61,7 +61,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
 
   @Test
   void noTrackedRepositoriesReturnsEmptyState() {
-    DashboardResponse dashboard = analyticsService.dashboard("30d");
+    DashboardResponse dashboard = analyticsService.dashboard("30d", true);
     assertThat(dashboard.state()).isEqualTo(DashboardState.NO_REPOSITORIES);
     assertThat(dashboard.summary().repositories()).isZero();
     assertThat(dashboard.traffic()).isEmpty();
@@ -74,7 +74,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
   @Test
   void trackedRepositoriesWithoutTrafficReturnFirstCollectionState() {
     createRepos();
-    DashboardResponse dashboard = analyticsService.dashboard("30d");
+    DashboardResponse dashboard = analyticsService.dashboard("30d", true);
     assertThat(dashboard.state()).isEqualTo(DashboardState.FIRST_COLLECTION);
     assertThat(dashboard.summary().repositories()).isEqualTo(2);
     assertThat(dashboard.summary().views().value()).isNull();
@@ -104,7 +104,17 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     repositoryJdbcRepository.upsertHealth(
         kafka.id(),
         new com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts(
-            "https://example.com", true, true, true, true, true, true, true, true, true, true));
+            "https://example.com",
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true));
 
     CollectionRun kafkaRun = runRepository.insertIgnore(kafka.id(), today, 4);
     jobRepository.insertIgnore(kafkaRun.id(), kafka.id(), today, CollectionJobType.TRAFFIC);
@@ -130,7 +140,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     jobRepository.findByRun(outboxRun.id()).forEach(job -> jobRepository.markSuccess(job.id()));
     runRepository.refreshAggregates(outboxRun.id());
 
-    DashboardResponse dashboard = analyticsService.dashboard("7d");
+    DashboardResponse dashboard = analyticsService.dashboard("7d", true);
     assertThat(dashboard.state()).isEqualTo(DashboardState.READY);
     assertThat(dashboard.period()).isEqualTo("7d");
     assertThat(dashboard.summary().repositories()).isEqualTo(2);
@@ -212,7 +222,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         .extracting(DashboardResponse.JobStatus::jobType)
         .contains("TRAFFIC", "POPULAR_PATHS");
 
-    DashboardResponse all = analyticsService.dashboard("all");
+    DashboardResponse all = analyticsService.dashboard("all", true);
     assertThat(all.summary().views().growthPercent()).isNull();
     assertThat(all.summary().stars().change()).isNull();
   }
@@ -516,12 +526,12 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         .hasMessageContaining("sources");
     assertThat(adminTrafficService.snapshotHistory(kafka.id(), "paths", null, true).days())
         .isPositive();
-    assertThat(analyticsService.portfolio("7d").repositories()).isEqualTo(2);
-    assertThat(analyticsService.portfolio("all").stars()).isEqualTo(169);
-    assertThat(analyticsService.portfolio("1d").repositories()).isEqualTo(2);
-    assertThat(analyticsService.portfolio("90d").repositories()).isEqualTo(2);
-    assertThat(analyticsService.portfolio("1y").repositories()).isEqualTo(2);
-    assertThat(analyticsService.portfolio("nope").repositories()).isEqualTo(2);
+    assertThat(analyticsService.portfolio("7d", true).repositories()).isEqualTo(2);
+    assertThat(analyticsService.portfolio("all", true).stars()).isEqualTo(169);
+    assertThat(analyticsService.portfolio("1d", true).repositories()).isEqualTo(2);
+    assertThat(analyticsService.portfolio("90d", true).repositories()).isEqualTo(2);
+    assertThat(analyticsService.portfolio("1y", true).repositories()).isEqualTo(2);
+    assertThat(analyticsService.portfolio("nope", true).repositories()).isEqualTo(2);
     assertThat(adminTrafficService.traffic(kafka.id(), "all", true).repository().id())
         .isEqualTo(kafka.id());
   }
@@ -582,7 +592,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         null,
         null);
 
-    DashboardResponse dashboard = analyticsService.dashboard("7d");
+    DashboardResponse dashboard = analyticsService.dashboard("7d", true);
     assertThat(dashboard.highlights().rankRise().queryName()).isEqualTo("outbox");
     assertThat(dashboard.highlights().rankRise().fromRank()).isEqualTo(22);
     assertThat(dashboard.highlights().rankRise().toRank()).isEqualTo(14);
@@ -619,7 +629,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     statsJdbcRepository.replaceContributorLogins(
         outbox.id(), today.minusDays(1), java.util.List.of("bob"));
 
-    DashboardResponse week = analyticsService.dashboard("7d");
+    DashboardResponse week = analyticsService.dashboard("7d", true);
     assertThat(week.stats().points())
         .extracting(DashboardResponse.StatsPoint::date)
         .containsExactly(
@@ -643,14 +653,14 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         .isEqualTo(new DashboardResponse.StatsTotal(2, null, null, false));
     assertThat(week.stats().points().get(3).contributors()).isEqualTo(2);
 
-    DashboardResponse day = analyticsService.dashboard("1d");
+    DashboardResponse day = analyticsService.dashboard("1d", true);
     assertThat(day.stats().points())
         .extracting(DashboardResponse.StatsPoint::date)
         .containsExactly(today.minusDays(1));
     assertThat(day.stats().totals().stars().value()).isEqualTo(160);
     assertThat(day.stats().totals().stars().absoluteChange()).isNull();
 
-    DashboardResponse all = analyticsService.dashboard("all");
+    DashboardResponse all = analyticsService.dashboard("all", true);
     assertThat(all.stats().totals().stars().value()).isEqualTo(160);
     assertThat(all.stats().totals().stars().absoluteChange()).isNull();
     assertThat(all.stats().totals().stars().growthPercent()).isNull();
@@ -711,7 +721,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     var zero = adminTrafficService.traffic(kafka.id(), "1d", false);
     assertThat(zero.totals().views().value()).isZero();
     assertThat(zero.totals().views().growthPercent()).isEqualTo(-100.0);
-    var portfolio = analyticsService.dashboard("1d");
+    var portfolio = analyticsService.dashboard("1d", true);
     assertThat(portfolio.summary().views().coverage().observedDays()).isEqualTo(1);
     assertThat(portfolio.summary().views().coverage().expectedDays()).isEqualTo(2);
     assertThat(portfolio.summary().views().growthPercent()).isNull();
@@ -740,7 +750,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         .sql("UPDATE repository SET visibility = 'PRIVATE' WHERE id = :id")
         .param("id", outbox.id())
         .update();
-    var dashboard = analyticsService.dashboard("1d");
+    var dashboard = analyticsService.dashboard("1d", true);
     assertThat(dashboard.summary().repositories()).isEqualTo(1);
     assertThat(dashboard.summary().views().value()).isEqualTo(5);
     assertThat(dashboard.summary().views().coverage().expectedDays()).isEqualTo(1);
@@ -768,7 +778,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
       trafficJdbcRepository.upsertDaily(kafka.id(), date, 5, 2, 1, 1);
       trafficJdbcRepository.upsertDaily(outbox.id(), date, 5, 2, 1, 1);
     }
-    var dashboard = analyticsService.dashboard("7d");
+    var dashboard = analyticsService.dashboard("7d", true);
     // Tip dropped → 5 complete days × 2 repos; KPI matches chart window, not partial tip sum.
     assertThat(dashboard.summary().views().coverage().expectedDays()).isEqualTo(10);
     assertThat(dashboard.summary().views().coverage().observedDays()).isEqualTo(10);

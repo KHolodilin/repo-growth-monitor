@@ -12,7 +12,6 @@ import com.kholodilin.repogrowth.collection.model.CollectionRun;
 import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,7 +27,6 @@ class CollectionStatusServiceTest {
   @Mock RepositoryService repositories;
   @Mock CollectionRunJdbcRepository runs;
   @Mock CollectionJobJdbcRepository jobs;
-  @Mock CurrentUserAccess currentUser;
 
   CollectionStatusService service;
   Repository publicRepo;
@@ -36,7 +34,7 @@ class CollectionStatusServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new CollectionStatusService(repositories, runs, jobs, currentUser);
+    service = new CollectionStatusService(repositories, runs, jobs);
     Instant now = Instant.parse("2026-11-10T06:00:00Z");
     publicRepo =
         new Repository(
@@ -96,7 +94,6 @@ class CollectionStatusServiceTest {
 
   @Test
   void adminSeesPrivateReposAndOwnerFilterNarrowsRows() {
-    when(currentUser.canSeePrivateRepositories()).thenReturn(true);
     when(repositories.tracked()).thenReturn(List.of(publicRepo, privateRepo));
     Instant sync = Instant.parse("2026-11-10T05:00:00Z");
     LocalDate day = LocalDate.of(2026, 11, 10);
@@ -123,23 +120,22 @@ class CollectionStatusServiceTest {
                     null,
                     null)));
 
-    var all = service.status(null);
+    var all = service.status(null, true);
     assertThat(all.repositories()).hasSize(2);
     assertThat(all.lastSyncAt()).isEqualTo(sync);
     assertThat(all.repositories().getFirst().jobs()).hasSize(1);
 
-    assertThat(service.status("Acme").repositories()).hasSize(2);
-    assertThat(service.status("other").repositories()).isEmpty();
+    assertThat(service.status("Acme", true).repositories()).hasSize(2);
+    assertThat(service.status("other", true).repositories()).isEmpty();
   }
 
   @Test
   void anonymousCallersOnlySeePublicTrackedRepositories() {
-    when(currentUser.canSeePrivateRepositories()).thenReturn(false);
     when(repositories.tracked()).thenReturn(List.of(publicRepo, privateRepo));
     when(runs.latestPerTrackedRepository()).thenReturn(List.of());
     when(runs.latestCompletedAtForTracked()).thenReturn(null);
     when(jobs.findByRunIds(List.of())).thenReturn(List.of());
-    var status = service.status(null);
+    var status = service.status(null, false);
     assertThat(status.repositories()).extracting(r -> r.fullName()).containsExactly("acme/outbox");
   }
 }

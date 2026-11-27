@@ -1,11 +1,8 @@
 package com.kholodilin.repogrowth.traffic.service;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.common.model.GrowthMath;
-import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.PeriodParser;
 import com.kholodilin.repogrowth.common.model.kpi.Coverage;
@@ -18,7 +15,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.traffic.controller.TrafficKpiResponse;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
@@ -42,6 +38,7 @@ import org.springframework.stereotype.Service;
 /**
  * Resource-API Traffic reads: typed KPI, daily series, referrers/paths snapshots and rolling-window
  * histories. Owner aggregates include only repositories the caller may read for the Traffic module.
+ * Access checks belong in the controller.
  */
 @Service
 public class TrafficReadService {
@@ -49,38 +46,25 @@ public class TrafficReadService {
   /** Compatibility ceiling for legacy {@code days} requests; period requests use the archive. */
   private static final int MAX_HISTORY_DAYS = 14;
 
-  private final ResourceAccessPolicy access;
-  private final RepositoryService repositories;
   private final TrafficJdbcRepository traffic;
   private final Clock clock;
 
-  public TrafficReadService(
-      ResourceAccessPolicy access,
-      RepositoryService repositories,
-      TrafficJdbcRepository traffic,
-      Clock clock) {
-    this.access = access;
-    this.repositories = repositories;
+  public TrafficReadService(TrafficJdbcRepository traffic, Clock clock) {
     this.traffic = traffic;
     this.clock = clock;
   }
 
   public TrafficKpiResponse repositoryKpi(long repositoryId, String periodParam) {
-    access.requireReadable(repositoryId, PublicationService.Module.TRAFFIC);
     return kpi(
         KpiScope.REPOSITORY, Long.toString(repositoryId), List.of(repositoryId), periodParam);
   }
 
-  public TrafficKpiResponse ownerKpi(long ownerId, String periodParam) {
-    List<Long> readable = readableOwnerRepositories(ownerId, PublicationService.Module.TRAFFIC);
-    if (readable.isEmpty()) {
-      throw ApiException.notFound("Owner not found");
-    }
-    return kpi(KpiScope.OWNER, Long.toString(ownerId), readable, periodParam);
+  public TrafficKpiResponse ownerKpi(
+      long ownerId, List<Long> readableRepositoryIds, String periodParam) {
+    return kpi(KpiScope.OWNER, Long.toString(ownerId), readableRepositoryIds, periodParam);
   }
 
   public DailyHistoryResponse dailyHistory(long repositoryId, String periodParam) {
-    access.requireReadable(repositoryId, PublicationService.Module.TRAFFIC);
     DashboardPeriod period = periodForTraffic(List.of(repositoryId), periodParam);
     LocalDate end = publishedEnd(period.to());
     List<TrafficDaily> history = traffic.history(repositoryId, period.from());
@@ -103,19 +87,16 @@ public class TrafficReadService {
         points);
   }
 
-  public DailyHistoryResponse ownerDailyHistory(long ownerId, String periodParam) {
-    List<Long> readable = readableOwnerRepositories(ownerId, PublicationService.Module.TRAFFIC);
-    if (readable.isEmpty()) {
-      throw ApiException.notFound("Owner not found");
-    }
-    DashboardPeriod period = periodForTraffic(readable, periodParam);
+  public DailyHistoryResponse ownerDailyHistory(
+      long ownerId, List<Long> readableRepositoryIds, String periodParam) {
+    DashboardPeriod period = periodForTraffic(readableRepositoryIds, periodParam);
     LocalDate end = publishedEnd(period.to());
     LocalDate from = period.from();
     // Aggregate per day across readable repositories; missing repo-days stay incomplete, not
     // zero-filled.
     java.util.Map<LocalDate, long[]> byDate = new java.util.TreeMap<>();
     java.util.Map<LocalDate, Integer> observed = new java.util.HashMap<>();
-    for (Long repositoryId : readable) {
+    for (Long repositoryId : readableRepositoryIds) {
       for (TrafficDaily day : traffic.history(repositoryId, from)) {
         if (day.trafficDate().isAfter(end)) {
           continue;
@@ -132,7 +113,7 @@ public class TrafficReadService {
     List<DailyPoint> points = new ArrayList<>();
     for (var entry : byDate.entrySet()) {
       long[] v = entry.getValue();
-      boolean complete = observed.getOrDefault(entry.getKey(), 0) == readable.size();
+      boolean complete = observed.getOrDefault(entry.getKey(), 0) == readableRepositoryIds.size();
       points.add(
           new DailyPoint(
               entry.getKey(),
@@ -150,7 +131,6 @@ public class TrafficReadService {
   }
 
   public SnapshotResponse latestReferrers(long repositoryId) {
-    access.requireReadable(repositoryId, PublicationService.Module.REFERRERS);
     ReferrerSnapshot snapshot = traffic.latestReferrerSnapshot(repositoryId);
     return new SnapshotResponse(
         Long.toString(repositoryId),
@@ -162,7 +142,6 @@ public class TrafficReadService {
   }
 
   public SnapshotResponse latestPaths(long repositoryId, boolean includeServicePaths) {
-    access.requireReadable(repositoryId, PublicationService.Module.PATHS);
     PathSnapshot snapshot = traffic.latestPathSnapshot(repositoryId, includeServicePaths);
     return new SnapshotResponse(
         Long.toString(repositoryId),
@@ -175,13 +154,11 @@ public class TrafficReadService {
 
   public SnapshotHistoryResponse referrerHistory(
       long repositoryId, String periodParam, Integer days) {
-    access.requireReadable(repositoryId, PublicationService.Module.REFERRERS);
     return snapshotHistory(repositoryId, SnapshotKind.REFERRERS, periodParam, days, false);
   }
 
   public SnapshotHistoryResponse pathHistory(
       long repositoryId, String periodParam, Integer days, boolean includeServicePaths) {
-    access.requireReadable(repositoryId, PublicationService.Module.PATHS);
     return snapshotHistory(
         repositoryId, SnapshotKind.PATHS, periodParam, days, includeServicePaths);
   }
@@ -197,11 +174,6 @@ public class TrafficReadService {
       Integer daysParam,
       boolean includeServicePaths) {
     SnapshotKind kind = snapshotKind(kindParam);
-    PublicationService.Module module =
-        kind == SnapshotKind.PATHS
-            ? PublicationService.Module.PATHS
-            : PublicationService.Module.REFERRERS;
-    access.requireReadable(repositoryId, module);
     return snapshotHistory(repositoryId, kind, periodParam, daysParam, includeServicePaths);
   }
 
@@ -370,16 +342,6 @@ public class TrafficReadService {
       }
     }
     return DashboardPeriod.of(periodParam, today, earliest);
-  }
-
-  private List<Long> readableOwnerRepositories(long ownerId, PublicationService.Module module) {
-    repositories.owner(ownerId);
-    List<Long> owned =
-        repositories.list(false).stream()
-            .filter(repo -> repo.ownerId() == ownerId)
-            .map(Repository::id)
-            .toList();
-    return access.filterReadable(owned, module);
   }
 
   private static SnapshotHistoryRow toHistoryRow(SnapshotHistoryMath.Row row) {

@@ -1,8 +1,5 @@
 package com.kholodilin.repogrowth.topics.service;
 
-import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.model.Repository;
-import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.PeriodParser;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
@@ -14,7 +11,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.service.BandKpiMath;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.BandKpi;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.DayMode;
@@ -31,41 +27,30 @@ import java.util.List;
 import java.util.Locale;
 import org.springframework.stereotype.Service;
 
+/** Topics KPI and watch-history reads. Access checks belong in the controller. */
 @Service
 public class TopicsKpiService {
 
-  private final ResourceAccessPolicy access;
-  private final RepositoryService repositories;
   private final TopicVisibilityService topics;
   private final Clock clock;
 
-  public TopicsKpiService(
-      ResourceAccessPolicy access,
-      RepositoryService repositories,
-      TopicVisibilityService topics,
-      Clock clock) {
-    this.access = access;
-    this.repositories = repositories;
+  public TopicsKpiService(TopicVisibilityService topics, Clock clock) {
     this.topics = topics;
     this.clock = clock;
   }
 
   public TopicsKpiResponse repositoryKpi(long repositoryId, String periodParam, String scope) {
-    access.requireReadable(repositoryId, PublicationService.Module.TOPICS);
     String topicScope = normalizeScope(scope);
     List<TopicHistory> histories = topics.visibility(repositoryId, topicScope);
     return build(
         KpiScope.REPOSITORY, Long.toString(repositoryId), histories, periodParam, topicScope);
   }
 
-  public TopicsKpiResponse ownerKpi(long ownerId, String periodParam, String scope) {
-    List<Long> readable = readableOwnerRepositories(ownerId);
-    if (readable.isEmpty()) {
-      throw ApiException.notFound("Owner not found");
-    }
+  public TopicsKpiResponse ownerKpi(
+      long ownerId, List<Long> readableRepositoryIds, String periodParam, String scope) {
     String topicScope = normalizeScope(scope);
     List<TopicHistory> histories = new ArrayList<>();
-    for (Long repositoryId : readable) {
+    for (Long repositoryId : readableRepositoryIds) {
       histories.addAll(topics.visibility(repositoryId, topicScope));
     }
     return build(KpiScope.OWNER, Long.toString(ownerId), histories, periodParam, topicScope);
@@ -73,7 +58,6 @@ public class TopicsKpiService {
 
   public List<TopicHistory> repositoryWatchesWithHistory(
       long repositoryId, String scope, boolean includeHistory, int limit) {
-    access.requireReadable(repositoryId, PublicationService.Module.TOPICS);
     int capped = Math.min(Math.max(limit, 1), 100);
     String topicScope = normalizeScope(scope);
     List<TopicHistory> histories = topics.visibility(repositoryId, topicScope);
@@ -149,15 +133,5 @@ public class TopicsKpiService {
       return normalized;
     }
     throw ApiException.validation("Unsupported topic scope: " + scope);
-  }
-
-  private List<Long> readableOwnerRepositories(long ownerId) {
-    repositories.owner(ownerId);
-    return access.filterReadable(
-        repositories.list(false).stream()
-            .filter(repo -> repo.ownerId() == ownerId)
-            .map(Repository::id)
-            .toList(),
-        PublicationService.Module.TOPICS);
   }
 }

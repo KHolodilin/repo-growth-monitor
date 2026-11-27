@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.catalog.controller;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel;
+import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.common.model.page.CursorPage;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
@@ -23,9 +23,9 @@ public class OwnerDirectoryController {
   public record OwnerCard(String ownerId, String login) {}
 
   private final ResourceAccessPolicy access;
-  private final OwnerDirectoryReadModel readModel;
+  private final OwnerDirectoryService readModel;
 
-  public OwnerDirectoryController(ResourceAccessPolicy access, OwnerDirectoryReadModel readModel) {
+  public OwnerDirectoryController(ResourceAccessPolicy access, OwnerDirectoryService readModel) {
     this.access = access;
     this.readModel = readModel;
   }
@@ -36,10 +36,10 @@ public class OwnerDirectoryController {
       @RequestParam(required = false) String cursor,
       @RequestParam(defaultValue = "20") int limit) {
     int pageSize = Math.min(Math.max(limit, 1), 100);
-    List<OwnerDirectoryReadModel.OwnerRow> rows = readModel.list(login);
+    List<OwnerDirectoryService.OwnerRow> rows = readModel.list(login);
     // Filter by readable repositories belonging to the owner before paging.
     List<OwnerCard> visible = new ArrayList<>();
-    for (OwnerDirectoryReadModel.OwnerRow row : rows) {
+    for (OwnerDirectoryService.OwnerRow row : rows) {
       List<Long> readable =
           access.filterReadable(row.repositoryIds(), PublicationService.Module.DASHBOARD);
       if (readable.isEmpty()) {

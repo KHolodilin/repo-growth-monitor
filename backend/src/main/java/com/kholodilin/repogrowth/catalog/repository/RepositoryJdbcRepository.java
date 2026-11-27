@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.catalog.repository;
 
 import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
 import java.sql.Timestamp;
@@ -255,7 +256,6 @@ public class RepositoryJdbcRepository {
     return signals;
   }
 
-  public record RepositorySignals(boolean accessible, boolean trafficPermissionMissing) {}
 
   public List<Repository> findTracked() {
     return jdbcClient
