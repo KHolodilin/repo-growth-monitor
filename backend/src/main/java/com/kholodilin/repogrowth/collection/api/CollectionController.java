@@ -48,6 +48,11 @@ public class CollectionController {
     return commands.manual(id, planningWindow.businessDate());
   }
 
+  /**
+   * @deprecated Ops-only planner trigger; prefer scheduled planning. Kept while Auth/security tests
+   *     still assert the admin surface — remove once consumers are zero (phase 7).
+   */
+  @Deprecated
   @org.springframework.web.bind.annotation.ResponseStatus(
       org.springframework.http.HttpStatus.CREATED)
   @PostMapping("/collection/plan")

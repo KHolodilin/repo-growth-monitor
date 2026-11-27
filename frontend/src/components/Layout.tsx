@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { api, ApiError, type Dashboard } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
 import { canMutate, mutationBlockedReason, type Me } from "../lib/auth";
-import { collectButtonLabel, collectionInProgress, headerProgress } from "../lib/collectProgress";
+import {
+  collectButtonLabel,
+  collectionInProgress,
+  headerProgress,
+  type ProgressRow,
+} from "../lib/collectProgress";
+
+type CollectionStatus = {
+  lastSyncAt: string | null;
+  repositories: ProgressRow[];
+};
 import {
   collectionBlocked,
   loadGitHubAccess,
@@ -30,7 +40,7 @@ export function Layout() {
   const [runAll, setRunAll] = useState<RunAllMenuAction | null>(null);
   const { me, loading: authLoading, logout } = useAuth();
   const [sync, setSync] = useState<string | null>(null);
-  const [rows, setRows] = useState<Dashboard["repositories"] | null>(null);
+  const [rows, setRows] = useState<ProgressRow[] | null>(null);
   const ownerScope = ownerLoginFromPath(location.pathname);
   const repositoryId = repositoryIdFromPath(location.pathname, rows);
   const [collecting, setCollecting] = useState(false);
@@ -55,31 +65,35 @@ export function Layout() {
   const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
-    const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=7d");
-    if (!dashboard?.repositories) {
+    const owner = ownerLoginFromPath(location.pathname);
+    const query = owner ? `?owner=${encodeURIComponent(owner)}` : "";
+    const status = await api<CollectionStatus>(`/api/v1/collection-status${query}`);
+    if (!status?.repositories) {
       setRows([]);
-      return dashboard;
+      return status;
     }
-    setSync(dashboard.lastSyncAt);
-    setRows(dashboard.repositories);
-    return dashboard;
-  }, []);
+    setSync(status.lastSyncAt);
+    setRows(status.repositories);
+    return status;
+  }, [location.pathname]);
 
   useEffect(() => {
     let cancelled = false;
     // Promise.resolve keeps mocks that return a bare value (or undefined) on the async path,
     // matching the previous refreshStatus() await semantics.
-    void Promise.resolve(api<Dashboard>("/api/v1/admin/dashboard?period=7d"))
-      .then((dashboard) => {
+    const owner = ownerLoginFromPath(location.pathname);
+    const query = owner ? `?owner=${encodeURIComponent(owner)}` : "";
+    void Promise.resolve(api<CollectionStatus>(`/api/v1/collection-status${query}`))
+      .then((status) => {
         if (cancelled) {
           return;
         }
-        if (!dashboard?.repositories) {
+        if (!status?.repositories) {
           setRows([]);
           return;
         }
-        setSync(dashboard.lastSyncAt);
-        setRows(dashboard.repositories);
+        setSync(status.lastSyncAt);
+        setRows(status.repositories);
       })
       .catch(() => {
         if (!cancelled) {
@@ -103,8 +117,8 @@ export function Layout() {
     }
     const timer = window.setInterval(() => {
       refreshStatus()
-        .then((dashboard) => {
-          const stillActive = (dashboard?.repositories ?? []).some((row) =>
+        .then((status) => {
+          const stillActive = (status?.repositories ?? []).some((row) =>
             collectionInProgress(row.collectionStatus),
           );
           if (!stillActive) {
@@ -135,13 +149,9 @@ export function Layout() {
       if (onlyId != null) {
         await startCollection(onlyId);
       } else {
-        const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=7d");
-        const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
+        const status = await refreshStatus();
+        const ids = status?.repositories?.map((row) => row.id) ?? [];
         await Promise.all(ids.map((id) => startCollection(id)));
-        if (dashboard?.repositories) {
-          setSync(dashboard.lastSyncAt);
-          setRows(dashboard.repositories);
-        }
       }
       window.dispatchEvent(new Event("repos-collected"));
       const refreshed = await refreshStatus();
@@ -463,18 +473,15 @@ function isNamedRepositoryPath(pathname: string): boolean {
   return parts.length >= 2 && parts[0] !== "admin";
 }
 
-/** Idempotent collection command — prefer /collections over the /collect alias. */
+/** Idempotent collection command on the resource API. */
 async function startCollection(repositoryId: number): Promise<void> {
-  await api(`/api/v1/admin/repositories/${repositoryId}/collections`, {
+  await api(`/api/v1/repositories/${repositoryId}/collections`, {
     method: "POST",
     headers: { "Idempotency-Key": crypto.randomUUID() },
   });
 }
 
-function repositoryIdFromPath(
-  pathname: string,
-  rows: Dashboard["repositories"] | null = null,
-): number | null {
+function repositoryIdFromPath(pathname: string, rows: ProgressRow[] | null = null): number | null {
   const admin = pathname.match(/^\/admin\/repositories\/(\d+)(?:\/|$)/);
   if (admin) {
     return Number(admin[1]);
