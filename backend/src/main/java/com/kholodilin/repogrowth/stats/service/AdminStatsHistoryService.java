@@ -1,54 +1,35 @@
 package com.kholodilin.repogrowth.stats.service;
 
-import com.kholodilin.repogrowth.traffic.service.TrafficCompleteness;
-import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
-import com.kholodilin.repogrowth.common.model.GrowthMath;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
-import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.common.model.GrowthMath;
+import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
-import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryPeriodTotals;
+import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.function.Function;
-import java.util.function.ToIntFunction;
-import java.util.function.ToLongFunction;
-import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AdminStatsHistoryService {
 
   private final RepositoryService repositoryService;
-  private final TrafficJdbcRepository trafficJdbcRepository;
+  private final StatsJdbcRepository statsJdbcRepository;
   private final Clock clock;
   private final CurrentUserAccess currentUserAccess;
 
   public AdminStatsHistoryService(
       RepositoryService repositoryService,
-      TrafficJdbcRepository trafficJdbcRepository,
+      StatsJdbcRepository statsJdbcRepository,
       Clock clock,
       CurrentUserAccess currentUserAccess) {
     this.repositoryService = repositoryService;
-    this.trafficJdbcRepository = trafficJdbcRepository;
+    this.statsJdbcRepository = statsJdbcRepository;
     this.clock = clock;
     this.currentUserAccess = currentUserAccess;
   }
@@ -56,8 +37,8 @@ public class AdminStatsHistoryService {
   public RepositoryStatsHistory statsHistory(long repositoryId, String periodParam) {
     requireVisible(repositoryService.get(repositoryId));
     DashboardPeriod period = periodForStats(repositoryId, periodParam);
-    List<TrafficJdbcRepository.RepositoryDailyStats> history =
-        trafficJdbcRepository.dailyStatsHistory(
+    List<RepositoryDailyStats> history =
+        statsJdbcRepository.dailyStatsHistory(
             repositoryId, period.allTime() ? null : period.from());
     List<StatsHistoryPoint> points =
         history.stream()
@@ -66,16 +47,14 @@ public class AdminStatsHistoryService {
                 new StatsHistoryPoint(
                     day.statDate(), day.stars(), day.forks(), day.watchers(), day.contributors()))
             .toList();
-    TrafficJdbcRepository.RepositoryDailyStats tip =
-        trafficJdbcRepository.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
+    RepositoryDailyStats tip =
+        statsJdbcRepository.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
     return new RepositoryStatsHistory(
         repositoryId, period.value(), statsTotals(tip, points, period.allTime()), points);
   }
 
   private static StatsTotals statsTotals(
-      TrafficJdbcRepository.RepositoryDailyStats latest,
-      List<StatsHistoryPoint> points,
-      boolean allTime) {
+      RepositoryDailyStats latest, List<StatsHistoryPoint> points, boolean allTime) {
     boolean comparable = !allTime && points.size() >= 2;
     StatsHistoryPoint first = comparable ? points.getFirst() : null;
     StatsHistoryPoint last = comparable ? points.getLast() : null;
@@ -115,7 +94,7 @@ public class AdminStatsHistoryService {
     String normalized = DashboardPeriod.normalize(periodParam);
     LocalDate earliest = null;
     if ("all".equals(normalized)) {
-      earliest = trafficJdbcRepository.earliestDailyStatsDate(repositoryId).orElse(today);
+      earliest = statsJdbcRepository.earliestDailyStatsDate(repositoryId).orElse(today);
     }
     return DashboardPeriod.of(periodParam, today, earliest);
   }

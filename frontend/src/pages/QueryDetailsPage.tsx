@@ -61,18 +61,18 @@ export function QueryDetailsPage() {
     }
     const [repository, queryHistory] = await Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
-      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`),
+      api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
     ]);
     setRepo(repository);
     setHistory(queryHistory);
     try {
-      setResults(await api<SearchRunResults>(`/api/v1/admin/search-queries/${queryId}/results`));
+      setResults(await api<SearchRunResults>(`/api/v1/search-queries/${queryId}/results`));
     } catch {
       setResults(null);
     }
     try {
       setSeries(
-        searchSeriesFromPayload(await api(`/api/v1/admin/search-queries/${queryId}/series`)),
+        searchSeriesFromPayload(await api(`/api/v1/search-queries/${queryId}/series`)),
       );
     } catch {
       setSeries([]);
@@ -87,7 +87,7 @@ export function QueryDetailsPage() {
     let cancelled = false;
     Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${repositoryId}`, { signal: abort.signal }),
-      api<SearchHistory>(`/api/v1/admin/search-queries/${queryId}/history`, {
+      api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`, {
         signal: abort.signal,
       }),
     ])
@@ -100,7 +100,7 @@ export function QueryDetailsPage() {
         setHistory(queryHistory);
         try {
           const nextResults = await api<SearchRunResults>(
-            `/api/v1/admin/search-queries/${queryId}/results`,
+            `/api/v1/search-queries/${queryId}/results`,
             { signal: abort.signal },
           );
           if (!cancelled && !abort.signal.aborted) {
@@ -113,7 +113,7 @@ export function QueryDetailsPage() {
         }
         try {
           const nextSeries = searchSeriesFromPayload(
-            await api(`/api/v1/admin/search-queries/${queryId}/series`, { signal: abort.signal }),
+            await api(`/api/v1/search-queries/${queryId}/series`, { signal: abort.signal }),
           );
           if (!cancelled && !abort.signal.aborted) {
             setSeries(nextSeries);
@@ -158,7 +158,7 @@ export function QueryDetailsPage() {
     setRunning(true);
     try {
       const created = await api<{ requestId?: string }>(
-        `/api/v1/admin/search-queries/${queryId}/run`,
+        `/api/v1/search-queries/${queryId}/run`,
         { method: "POST" },
       );
       if (created?.requestId) {

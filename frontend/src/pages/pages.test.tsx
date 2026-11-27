@@ -77,7 +77,7 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       if (
-        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/dashboard") ||
         String(path).includes("/api/v1/collection-status")
       ) {
         return Promise.resolve(json(dashboardReady));
@@ -126,7 +126,7 @@ describe("pages", () => {
         );
       }
       if (
-        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/dashboard") ||
         String(path).includes("/api/v1/collection-status")
       ) {
         return Promise.resolve(
@@ -613,7 +613,7 @@ describe("pages", () => {
       if (url.endsWith("/admin/repositories/13") || url.includes("/admin/repositories?refresh")) {
         return Promise.resolve(json(url.includes("refresh") ? [repository] : repository));
       }
-      if (url.includes("/api/v1/admin/dashboard") || url.includes("/api/v1/collection-status")) {
+      if (url.includes("/api/v1/dashboard") || url.includes("/api/v1/collection-status")) {
         return Promise.resolve(json(dashboardReady));
       }
       if (url.includes("/topics/") && url.includes("history")) {

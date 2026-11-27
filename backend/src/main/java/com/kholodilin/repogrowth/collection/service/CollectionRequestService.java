@@ -4,6 +4,7 @@ import com.kholodilin.collector.contracts.CollectorProtocol;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.repository.CollectionRequestJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
@@ -19,7 +20,6 @@ import java.time.*;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,7 +52,7 @@ public class CollectionRequestService {
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   private CollectorNodeMonitor nodeMonitor;
 
-  private final JdbcTemplate jdbc;
+  private final CollectionRequestJdbcRepository requests;
   private final TransactionTemplate tx;
   private final OrchestrationProperties properties;
   private final RepositoryJdbcRepository repositories;
@@ -64,7 +64,7 @@ public class CollectionRequestService {
   private final CollectorSearchProperties search;
 
   public CollectionRequestService(
-      JdbcTemplate jdbc,
+      CollectionRequestJdbcRepository requests,
       PlatformTransactionManager tm,
       OrchestrationProperties properties,
       RepositoryJdbcRepository repositories,
@@ -74,7 +74,7 @@ public class CollectionRequestService {
       TopicWatchSync watchSync,
       GrowthEventSettingJdbcRepository eventSettings,
       CollectorSearchProperties search) {
-    this.jdbc = jdbc;
+    this.requests = requests;
     this.tx = new TransactionTemplate(tm);
     this.properties = properties;
     this.watchSync = watchSync;
@@ -111,16 +111,11 @@ public class CollectionRequestService {
 
   public List<Created> refresh(LocalDate date) {
     // One explicit discovery task per owner/credential scope. The Collector never discovers work.
-    var seeds =
-        jdbc.queryForList(
-            "SELECT min(r.id) FROM repository r JOIN repository_credential b ON b.repository_id=r.id JOIN github_credential c ON c.id=b.credential_id AND NOT c.revoked GROUP BY r.owner_id,b.credential_id ORDER BY min(r.id)",
-            Long.class);
+    var seeds = requests.discoverySeedRepositoryIds();
     if (!seeds.isEmpty()) return seeds.stream().map(id -> create(id, date, null, true)).toList();
     // Empty install: discover from vault credentials without inventing a seed repository.
     if (credentialVault == null) throw discoveryCredentialRequired();
-    var refs =
-        jdbc.queryForList(
-            "SELECT ref FROM github_credential WHERE NOT revoked ORDER BY ref", String.class);
+    var refs = requests.activeCredentialRefs();
     if (refs.isEmpty()) throw discoveryCredentialRequired();
     return refs.stream().map(ref -> createCredentialDiscovery(ref, date)).toList();
   }
@@ -132,34 +127,21 @@ public class CollectionRequestService {
 
   private Created createCredentialDiscovery(String credentialRef, LocalDate date) {
     return tx.execute(status -> {
-      jdbc.queryForObject(
-          "SELECT pg_advisory_xact_lock(?)", Object.class, Objects.hash("discover", credentialRef));
+      requests.advisoryLock(Objects.hash("discover", credentialRef));
       AuthorizationScope authority = credentialVault.discoveryScope(credentialRef);
-      var existing =
-          jdbc.queryForList(
-              "SELECT id,public_id,state FROM collection_request WHERE repository_id IS NULL AND credential_ref=? AND state='ACTIVE' ORDER BY id DESC LIMIT 1 FOR UPDATE",
-              credentialRef);
+      var existing = requests.activeCredentialDiscovery(credentialRef);
       if (!existing.isEmpty()) {
         var row = existing.getFirst();
         long request = ((Number) row.get("id")).longValue();
-        if (jdbc.queryForObject(
-                "SELECT count(*) FROM collection_task WHERE request_id=? AND task_type='DISCOVER_REPOSITORIES'",
-                Long.class,
-                request)
-            > 0) return response(request, (UUID) row.get("public_id"), true);
+        if (requests.countDiscoverTasks(request) > 0)
+          return response(request, (UUID) row.get("public_id"), true);
         appendCredentialDiscovery(request, authority, date);
         return response(request, (UUID) row.get("public_id"), true);
       }
       AssignedNode assigned = ensureCollectorNode(properties.defaultPool(), credentialRef);
       Long nodeId = assigned.id();
       UUID requestId = UUID.randomUUID();
-      Long request =
-          jdbc.queryForObject(
-              "INSERT INTO collection_request(public_id,repository_id,trigger_type,trigger_key,business_date,credential_ref) VALUES (?,NULL,'MANUAL',NULL,?,?) RETURNING id",
-              Long.class,
-              requestId,
-              date,
-              credentialRef);
+      Long request = requests.insertCredentialRequest(requestId, date, credentialRef);
       UUID taskId = UUID.randomUUID(), attemptId = UUID.randomUUID();
       Instant deadline =
           Instant.now()
@@ -173,9 +155,7 @@ public class CollectionRequestService {
       long revision =
           revision(TaskType.DISCOVER_REPOSITORIES + "credential:" + credentialRef + frozen);
       Long task =
-          jdbc.queryForObject(
-              "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id,authorization_context,credential_ref) VALUES (?,?,NULL,'DISCOVER_REPOSITORIES',?,?::jsonb,?::jsonb,?,?,?::uuid,?) RETURNING id",
-              Long.class,
+          requests.insertDiscoverTask(
               taskId,
               request,
               "credential:" + credentialRef,
@@ -183,13 +163,9 @@ public class CollectionRequestService {
               frozen,
               revision,
               attemptId,
-              authority.context(),
+              UUID.fromString(authority.context()),
               authority.credentialRef());
-      jdbc.update(
-          "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
-          attemptId,
-          task,
-          nodeId);
+      requests.insertAttempt(attemptId, task, nodeId);
       var envelope =
           new JobRequest(
               CollectorProtocol.VERSION,
@@ -204,25 +180,18 @@ public class CollectionRequestService {
               properties.destinationRef(),
               deadline,
               authority);
-      jdbc.update(
-          "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
+      requests.insertDispatch(
           attemptId,
           OrchestrationProperties.endpoint(assigned.node()),
           json.writeValueAsString(envelope),
-          Timestamp.from(deadline));
+          deadline);
       return response(request, requestId, false);
     });
   }
 
   private void appendCredentialDiscovery(
       long request, AuthorizationScope authority, LocalDate date) {
-    var parent =
-        json.readValue(
-            jdbc.queryForObject(
-                "SELECT d.payload::text FROM collection_task t JOIN collector_dispatch d ON d.attempt_id=t.current_attempt_id WHERE t.request_id=? ORDER BY t.id LIMIT 1",
-                String.class,
-                request),
-            JobRequest.class);
+    var parent = json.readValue(requests.firstDispatchPayload(request), JobRequest.class);
     UUID taskId = UUID.randomUUID(), attemptId = UUID.randomUUID();
     Map<String, Object> configuration = new TreeMap<>();
     configuration.put("parameters", Parameters.repository());
@@ -246,15 +215,9 @@ public class CollectionRequestService {
             parent.destinationRef(),
             Instant.now().plus(properties.jobTimeout()),
             authority);
-    long node =
-        jdbc.queryForObject(
-            "SELECT node_id FROM collection_attempt WHERE public_id=?",
-            Long.class,
-            parent.attemptId());
+    long node = requests.nodeIdForAttempt(parent.attemptId());
     long task =
-        jdbc.queryForObject(
-            "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id,authorization_context,credential_ref) VALUES (?,?,NULL,'DISCOVER_REPOSITORIES',?,?::jsonb,?::jsonb,?,?,?::uuid,?) RETURNING id",
-            Long.class,
+        requests.insertDiscoverTask(
             taskId,
             request,
             "credential:" + authority.credentialRef(),
@@ -262,19 +225,11 @@ public class CollectionRequestService {
             frozen,
             revision,
             attemptId,
-            authority.context(),
+            UUID.fromString(authority.context()),
             authority.credentialRef());
-    jdbc.update(
-        "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
-        attemptId,
-        task,
-        node);
-    jdbc.update(
-        "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,(SELECT endpoint FROM collector_node WHERE id=?),?::jsonb,?)",
-        attemptId,
-        node,
-        json.writeValueAsString(envelope),
-        Timestamp.from(envelope.deadlineAt()));
+    requests.insertAttempt(attemptId, task, node);
+    requests.insertDispatchForNode(
+        attemptId, node, json.writeValueAsString(envelope), envelope.deadlineAt());
   }
 
   private Created create(long repositoryId, LocalDate date, String triggerKey) {
@@ -359,21 +314,12 @@ public class CollectionRequestService {
   private Created create(
       long repositoryId, LocalDate date, String triggerKey, boolean refresh, List<Spec> requested) {
     return tx.execute(status -> {
-      jdbc.queryForObject("SELECT pg_advisory_xact_lock(?)", Object.class, repositoryId);
+      requests.advisoryLock(repositoryId);
       // Serialize creation without blocking history writers under the request lock.
-      var rows =
-          jdbc.queryForList(
-              "SELECT r.*,o.login AS owner_login FROM repository r JOIN github_owner o ON o.id=r.owner_id WHERE r.id=?",
-              repositoryId);
+      var rows = requests.repositoryWithOwner(repositoryId);
       if (rows.isEmpty()) throw ApiException.notFound("Repository not found");
       var repository = rows.getFirst();
-      var existing =
-          jdbc.queryForList(
-              "SELECT id,public_id,business_date,state,trigger_key FROM collection_request WHERE repository_id=? AND (state='ACTIVE' OR (?::text IS NOT NULL AND trigger_key=?)) ORDER BY (trigger_key=?::text) DESC NULLS LAST,id DESC LIMIT 1",
-              repositoryId,
-              triggerKey,
-              triggerKey,
-              triggerKey);
+      var existing = requests.existingRequest(repositoryId, triggerKey);
       if (!existing.isEmpty()) {
         var row = existing.getFirst();
         long request = ((Number) row.get("id")).longValue();
@@ -384,11 +330,7 @@ public class CollectionRequestService {
         // keys.
         if (triggerHit || active) {
           if (requested == null && !refresh) {
-            String state =
-                jdbc.queryForObject(
-                    "SELECT state FROM collection_request WHERE id=? FOR UPDATE",
-                    String.class,
-                    request);
+            String state = requests.lockRequestState(request);
             if (!"ACTIVE".equals(state)) {
               if (triggerKey != null) return response(request, (UUID) row.get("public_id"), true);
               return create(repositoryId, date, triggerKey, false, null);
@@ -433,11 +375,7 @@ public class CollectionRequestService {
                     date);
           }
           if (requested != null) {
-            String state =
-                jdbc.queryForObject(
-                    "SELECT state FROM collection_request WHERE id=? FOR UPDATE",
-                    String.class,
-                    request);
+            String state = requests.lockRequestState(request);
             if (!state.equals("ACTIVE")) return create(repositoryId, date, null, false, requested);
             for (var spec : requested) {
               LocalDate taskDate = spec.dateOr(date);
@@ -445,23 +383,10 @@ public class CollectionRequestService {
             }
           }
           if (refresh) {
-            String state =
-                jdbc.queryForObject(
-                    "SELECT state FROM collection_request WHERE id=? FOR UPDATE",
-                    String.class,
-                    request);
+            String state = requests.lockRequestState(request);
             if (!state.equals("ACTIVE")) return create(repositoryId, date, null, true);
-            if (jdbc.queryForObject(
-                    "SELECT count(*) FROM collection_task WHERE request_id=? AND task_type='DISCOVER_REPOSITORIES'",
-                    Long.class,
-                    request)
-                == 0) {
-              var raw =
-                  jdbc.queryForObject(
-                      "SELECT d.payload::text FROM collection_task t JOIN collector_dispatch d ON d.attempt_id=t.current_attempt_id WHERE t.request_id=? ORDER BY t.id LIMIT 1",
-                      String.class,
-                      request);
-              var parent = json.readValue(raw, JobRequest.class);
+            if (requests.countDiscoverTasks(request) == 0) {
+              var parent = json.readValue(requests.firstDispatchPayload(request), JobRequest.class);
               var taskId = UUID.randomUUID();
               var attemptId = UUID.randomUUID();
               if (credentialVault == null) throw discoveryCredentialRequired();
@@ -480,36 +405,22 @@ public class CollectionRequestService {
                       parent.destinationRef(),
                       Instant.now().plus(properties.jobTimeout()),
                       authority);
-              Long nodeId =
-                  jdbc.queryForObject(
-                      "SELECT a.node_id FROM collection_attempt a WHERE public_id=?",
-                      Long.class,
-                      parent.attemptId());
+              Long nodeId = requests.nodeIdForAttempt(parent.attemptId());
               Long task =
-                  jdbc.queryForObject(
-                      "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id,authorization_context,credential_ref) VALUES (?,?,?,'DISCOVER_REPOSITORIES','repository','{}','{}',?,?,?::uuid,?) RETURNING id",
-                      Long.class,
+                  requests.insertDiscoverTaskWithRepository(
                       taskId,
                       request,
                       repositoryId,
                       payload.configurationRevision(),
                       attemptId,
-                      authority.context(),
+                      UUID.fromString(authority.context()),
                       authority.credentialRef());
-              jdbc.update(
-                  "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
+              requests.insertAttempt(attemptId, task, nodeId);
+              requests.insertDispatch(
                   attemptId,
-                  task,
-                  nodeId);
-              String endpoint =
-                  jdbc.queryForObject(
-                      "SELECT endpoint FROM collector_node WHERE id=?", String.class, nodeId);
-              jdbc.update(
-                  "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
-                  attemptId,
-                  endpoint,
+                  requests.nodeEndpoint(nodeId),
                   json.writeValueAsString(payload),
-                  Timestamp.from(payload.deadlineAt()));
+                  payload.deadlineAt());
             }
           }
           return response(request, (UUID) row.get("public_id"), true);
@@ -525,9 +436,7 @@ public class CollectionRequestService {
       Long nodeId = assigned.id();
       UUID requestId = UUID.randomUUID();
       Long request =
-          jdbc.queryForObject(
-              "INSERT INTO collection_request(public_id,repository_id,trigger_type,trigger_key,business_date) VALUES (?,?,?,?,?) RETURNING id",
-              Long.class,
+          requests.insertRepositoryRequest(
               requestId,
               repositoryId,
               triggerKey == null ? "MANUAL" : "SCHEDULED",
@@ -592,9 +501,7 @@ public class CollectionRequestService {
         String frozen = json.writeValueAsString(frozenConfiguration);
         long revision = revision(spec.type() + spec.key() + frozen);
         Long task =
-            jdbc.queryForObject(
-                "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id) VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?,?) RETURNING id",
-                Long.class,
+            requests.insertTask(
                 taskId,
                 request,
                 repositoryId,
@@ -605,16 +512,9 @@ public class CollectionRequestService {
                 revision,
                 attemptId);
         if (authorization != null)
-          jdbc.update(
-              "UPDATE collection_task SET authorization_context=?::uuid,credential_ref=? WHERE id=?",
-              authorization.context(),
-              authorization.credentialRef(),
-              task);
-        jdbc.update(
-            "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
-            attemptId,
-            task,
-            nodeId);
+          requests.setTaskAuthorization(
+              UUID.fromString(authorization.context()), authorization.credentialRef(), task);
+        requests.insertAttempt(attemptId, task, nodeId);
         var envelope =
             new JobRequest(
                 CollectorProtocol.VERSION,
@@ -629,12 +529,11 @@ public class CollectionRequestService {
                 properties.destinationRef(),
                 deadline,
                 authorization);
-        jdbc.update(
-            "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
+        requests.insertDispatch(
             attemptId,
             OrchestrationProperties.endpoint(assigned.node()),
             json.writeValueAsString(envelope),
-            Timestamp.from(deadline));
+            deadline);
       }
       return response(request, requestId, false);
     });
@@ -658,30 +557,14 @@ public class CollectionRequestService {
           "No collector is configured for the repository pool");
     var node = candidates.get(Math.floorMod(routingKey.hashCode(), candidates.size()));
     Long id =
-        jdbc.queryForObject(
-            "INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true,updated_at=clock_timestamp() RETURNING id",
-            Long.class,
-            node.key(),
-            node.pool(),
-            OrchestrationProperties.endpoint(node));
+        requests.upsertCollectorNode(
+            node.key(), node.pool(), OrchestrationProperties.endpoint(node));
     return new AssignedNode(id, node);
   }
 
   private void append(long request, long repository, Spec spec, LocalDate date) {
-    if (jdbc.queryForObject(
-            "SELECT count(*) FROM collection_task WHERE request_id=? AND task_type=? AND target_key=?",
-            Long.class,
-            request,
-            spec.type().name(),
-            spec.key())
-        > 0) return;
-    var parent =
-        json.readValue(
-            jdbc.queryForObject(
-                "SELECT d.payload::text FROM collection_task t JOIN collector_dispatch d ON d.attempt_id=t.current_attempt_id WHERE t.request_id=? ORDER BY t.id LIMIT 1",
-                String.class,
-                request),
-            JobRequest.class);
+    if (requests.countTasks(request, spec.type().name(), spec.key()) > 0) return;
+    var parent = json.readValue(requests.firstDispatchPayload(request), JobRequest.class);
     var authority = credentialVault == null ? null : credentialVault.scope(repository);
     var taskId = UUID.randomUUID();
     var attemptId = UUID.randomUUID();
@@ -710,15 +593,9 @@ public class CollectionRequestService {
             parent.destinationRef(),
             Instant.now().plus(properties.jobTimeout()),
             authority);
-    long node =
-        jdbc.queryForObject(
-            "SELECT node_id FROM collection_attempt WHERE public_id=?",
-            Long.class,
-            parent.attemptId());
+    long node = requests.nodeIdForAttempt(parent.attemptId());
     long task =
-        jdbc.queryForObject(
-            "INSERT INTO collection_task(public_id,request_id,repository_id,task_type,target_key,parameters,configuration_snapshot,configuration_revision,current_attempt_id) VALUES (?,?,?,?,?,?::jsonb,?::jsonb,?,?) RETURNING id",
-            Long.class,
+        requests.insertTask(
             taskId,
             request,
             repository,
@@ -729,22 +606,11 @@ public class CollectionRequestService {
             revision,
             attemptId);
     if (authority != null)
-      jdbc.update(
-          "UPDATE collection_task SET authorization_context=?::uuid,credential_ref=? WHERE id=?",
-          authority.context(),
-          authority.credentialRef(),
-          task);
-    jdbc.update(
-        "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,1,?)",
-        attemptId,
-        task,
-        node);
-    jdbc.update(
-        "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,(SELECT endpoint FROM collector_node WHERE id=?),?::jsonb,?)",
-        attemptId,
-        node,
-        json.writeValueAsString(envelope),
-        Timestamp.from(envelope.deadlineAt()));
+      requests.setTaskAuthorization(
+          UUID.fromString(authority.context()), authority.credentialRef(), task);
+    requests.insertAttempt(attemptId, task, node);
+    requests.insertDispatchForNode(
+        attemptId, node, json.writeValueAsString(envelope), envelope.deadlineAt());
   }
 
   /**
@@ -756,38 +622,13 @@ public class CollectionRequestService {
     // Only when Rank History prefers stars; best_match must not force a stars refill.
     if (!"stars".equals(search.sortModeLabel())) return;
     tx.executeWithoutResult(status -> {
-      jdbc.queryForObject("SELECT pg_advisory_xact_lock(?)", Object.class, repositoryId);
-      var active =
-          jdbc.queryForList(
-              "SELECT id,business_date FROM collection_request WHERE repository_id=? AND state='ACTIVE' ORDER BY id DESC LIMIT 1",
-              repositoryId);
+      requests.advisoryLock(repositoryId);
+      var active = requests.activeRequest(repositoryId);
       if (active.isEmpty()) return;
       long request = ((Number) active.getFirst().get("id")).longValue();
       LocalDate requestDate = businessDate(active.getFirst().get("business_date"));
       List<LocalDate> tips =
-          jdbc.query(
-              """
-              SELECT DISTINCT sr.business_date
-              FROM search_run sr
-              JOIN search_query sq ON sq.id=sr.search_query_id AND sq.repository_id=sr.repository_id
-              WHERE sq.repository_id=?
-                AND sq.enabled
-                AND sr.business_date>=?
-                AND sr.business_date<=?
-                AND sr.snapshot_at IS NOT NULL
-                AND COALESCE(NULLIF(sr.sort_mode,''),'stars')<>'stars'
-                AND EXISTS(
-                  SELECT 1 FROM search_run stars
-                  WHERE stars.search_query_id=sq.id
-                    AND stars.snapshot_at IS NOT NULL
-                    AND COALESCE(NULLIF(stars.sort_mode,''),'stars')='stars'
-                )
-              ORDER BY 1
-              """,
-              (rs, i) -> rs.getObject(1, LocalDate.class),
-              repositoryId,
-              asOf.minusDays(14),
-              asOf);
+          requests.incompatibleSearchTipDates(repositoryId, asOf.minusDays(14), asOf);
       for (LocalDate tip : tips) {
         for (var query : queries.findByRepository(repositoryId)) {
           if (!query.enabled() || !needsStarsRepair(query.id(), tip)) continue;
@@ -802,18 +643,7 @@ public class CollectionRequestService {
   }
 
   private boolean needsStarsRepair(long queryId, LocalDate tip) {
-    return Boolean.TRUE.equals(
-        jdbc.queryForObject(
-            """
-            SELECT EXISTS(
-              SELECT 1 FROM search_run
-              WHERE search_query_id=? AND business_date=? AND snapshot_at IS NOT NULL
-                AND COALESCE(NULLIF(sort_mode,''),'stars')<>'stars'
-            )
-            """,
-            Boolean.class,
-            queryId,
-            tip));
+    return requests.needsStarsRepair(queryId, tip);
   }
 
   private Spec datedSearchSpec(
@@ -851,58 +681,29 @@ public class CollectionRequestService {
 
   public void cancelSearch(long query) {
     tx.executeWithoutResult(status -> {
-      var requests =
-          jdbc.queryForList(
-              "SELECT DISTINCT request_id FROM collection_task WHERE task_type='SEARCH_QUERY' AND (target_key=? OR target_key LIKE ?) ORDER BY request_id",
-              Long.class,
-              "query:" + query,
-              "query:" + query + "@%");
-      for (long request : requests) {
-        jdbc.queryForList(
-            "SELECT id FROM collection_request WHERE id=? FOR UPDATE", Long.class, request);
-        var tasks =
-            jdbc.queryForList(
-                "SELECT id,current_attempt_id FROM collection_task WHERE request_id=? AND task_type='SEARCH_QUERY' AND (target_key=? OR target_key LIKE ?) AND state IN ('READY','ACCEPTED','RUNNING','RETRY') FOR UPDATE",
-                request,
-                "query:" + query,
-                "query:" + query + "@%");
-        for (var task : tasks) {
-          jdbc.update(
-              "UPDATE collection_task SET state='CANCELLED',completed_at=clock_timestamp() WHERE id=?",
-              task.get("id"));
-          jdbc.update(
-              "UPDATE collection_attempt SET state='CANCELLED',completed_at=clock_timestamp() WHERE public_id=?",
-              task.get("current_attempt_id"));
-          jdbc.update(
-              "UPDATE collector_dispatch SET state='BLOCKED',last_error=?,locked_by=NULL,locked_until=NULL WHERE attempt_id=?",
-              OrchestrationStates.LAST_ERROR_DEFINITION_DELETED,
-              task.get("current_attempt_id"));
+      for (long request : requests.searchTaskRequestIds(query)) {
+        requests.lockRequest(request);
+        for (var task : requests.openSearchTasks(request, query)) {
+          requests.cancelTask(task.get("id"));
+          requests.cancelAttempt(task.get("current_attempt_id"));
+          requests.blockDispatch(
+              task.get("current_attempt_id"), OrchestrationStates.LAST_ERROR_DEFINITION_DELETED);
         }
-        jdbc.update(
-            "UPDATE collection_request r SET state='CANCELLED',completed_at=clock_timestamp() WHERE r.id=? AND r.state='ACTIVE' AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))",
-            request);
+        requests.cancelRequestIfIdle(request);
       }
     });
   }
 
   private Created response(long id, UUID publicId, boolean coalesced) {
-    return new Created(
-        publicId,
-        jdbc.queryForList(
-            "SELECT public_id FROM collection_task WHERE request_id=? ORDER BY id", UUID.class, id),
-        coalesced);
+    return new Created(publicId, requests.taskPublicIds(id), coalesced);
   }
 
   private boolean searchPublic(long id) {
-    return Boolean.TRUE.equals(
-        jdbc.queryForObject(
-            "SELECT public_enabled FROM search_query WHERE id=?", Boolean.class, id));
+    return requests.searchPublic(id);
   }
 
   private boolean topicsPublic(long id) {
-    return Boolean.TRUE.equals(
-        jdbc.queryForObject(
-            "SELECT public_topics_enabled FROM repository WHERE id=?", Boolean.class, id));
+    return requests.topicsPublic(id);
   }
 
   /**

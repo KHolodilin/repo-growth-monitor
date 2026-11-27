@@ -12,7 +12,7 @@ export async function waitForCollectionRequest(
   const intervalMs = options?.intervalMs ?? 1000;
   for (;;) {
     const state = await api<CollectionRequestState>(
-      `/api/v1/admin/collection-requests/${requestId}`,
+      `/api/v1/collection-requests/${requestId}`,
       {
         signal: options?.signal,
       },

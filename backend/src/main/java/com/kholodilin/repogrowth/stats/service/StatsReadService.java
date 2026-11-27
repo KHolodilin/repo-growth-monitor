@@ -19,8 +19,8 @@ import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.stats.controller.StatsKpiResponse;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryDailyStats;
+import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -39,17 +39,17 @@ public class StatsReadService {
 
   private final ResourceAccessPolicy access;
   private final RepositoryService repositories;
-  private final TrafficJdbcRepository traffic;
+  private final StatsJdbcRepository stats;
   private final Clock clock;
 
   public StatsReadService(
       ResourceAccessPolicy access,
       RepositoryService repositories,
-      TrafficJdbcRepository traffic,
+      StatsJdbcRepository stats,
       Clock clock) {
     this.access = access;
     this.repositories = repositories;
-    this.traffic = traffic;
+    this.stats = stats;
     this.clock = clock;
   }
 
@@ -98,7 +98,7 @@ public class StatsReadService {
   private History repositoryHistory(long repositoryId, String periodParam) {
     DashboardPeriod period = periodForStats(List.of(repositoryId), periodParam);
     List<RepositoryDailyStats> raw =
-        traffic.dailyStatsHistory(repositoryId, period.allTime() ? null : period.from());
+        stats.dailyStatsHistory(repositoryId, period.allTime() ? null : period.from());
     List<StatsHistoryPoint> points =
         raw.stream()
             .filter(day -> !day.statDate().isAfter(period.to()))
@@ -107,7 +107,7 @@ public class StatsReadService {
                     day.statDate(), day.stars(), day.forks(), day.watchers(), day.contributors()))
             .toList();
     RepositoryDailyStats tip =
-        traffic.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
+        stats.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
     StatsTotals totals = statsTotals(tip, points, period.allTime());
     Period resolved = PeriodParser.parse(period.value());
     DateRange range = new DateRange(period.from(), period.to());
@@ -124,7 +124,7 @@ public class StatsReadService {
     int tipCount = 0;
     for (Long repositoryId : repositoryIds) {
       List<RepositoryDailyStats> raw =
-          traffic.dailyStatsHistory(repositoryId, period.allTime() ? null : period.from());
+          stats.dailyStatsHistory(repositoryId, period.allTime() ? null : period.from());
       for (RepositoryDailyStats day : raw) {
         if (day.statDate().isAfter(period.to())) {
           continue;
@@ -137,7 +137,7 @@ public class StatsReadService {
         bucket[4] += 1;
       }
       RepositoryDailyStats tip =
-          traffic.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
+          stats.latestDailyStatsOnOrBefore(repositoryId, period.to()).orElse(null);
       if (tip != null) {
         tipStars += tip.stars();
         tipForks += tip.forks();
@@ -286,7 +286,7 @@ public class StatsReadService {
     LocalDate earliest = null;
     if ("all".equals(normalized)) {
       for (Long repositoryId : repositoryIds) {
-        LocalDate repoEarliest = traffic.earliestDailyStatsDate(repositoryId).orElse(null);
+        LocalDate repoEarliest = stats.earliestDailyStatsDate(repositoryId).orElse(null);
         if (repoEarliest != null && (earliest == null || repoEarliest.isBefore(earliest))) {
           earliest = repoEarliest;
         }

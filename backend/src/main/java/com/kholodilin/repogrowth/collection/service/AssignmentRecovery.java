@@ -2,12 +2,12 @@ package com.kholodilin.repogrowth.collection.service;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.JobRequest;
 import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.repository.AssignmentRecoveryJdbcRepository;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.Environment;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class AssignmentRecovery {
   public record Reassigned(boolean changed, UUID jobId, UUID attemptId, String reason) {}
 
-  private final JdbcTemplate jdbc;
+  private final AssignmentRecoveryJdbcRepository recovery;
   private final TransactionTemplate tx;
   private final OrchestrationProperties properties;
   private final JsonMapper json;
@@ -30,12 +30,12 @@ public class AssignmentRecovery {
   private final int maximumAttempts;
 
   public AssignmentRecovery(
-      JdbcTemplate jdbc,
+      AssignmentRecoveryJdbcRepository recovery,
       PlatformTransactionManager tm,
       OrchestrationProperties properties,
       JsonMapper json,
       Environment env) {
-    this.jdbc = jdbc;
+    this.recovery = recovery;
     this.tx = new TransactionTemplate(tm);
     this.properties = properties;
     this.json = json;
@@ -50,14 +50,8 @@ public class AssignmentRecovery {
 
   public Reassigned reassign(UUID jobId, UUID expectedAttempt, String targetNode) {
     return tx.execute(status -> {
-      jdbc.queryForList(
-          "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR UPDATE OF r",
-          Long.class,
-          jobId);
-      var tasks =
-          jdbc.queryForList(
-              "SELECT t.* FROM collection_task t JOIN collection_request r ON r.id=t.request_id WHERE t.public_id=? AND r.state='ACTIVE' FOR UPDATE OF t",
-              jobId);
+      recovery.lockRequestByJob(jobId);
+      var tasks = recovery.lockActiveTask(jobId);
       if (tasks.isEmpty())
         return new Reassigned(false, jobId, expectedAttempt, OrchestrationStates.REASON_NOT_ACTIVE);
       var task = tasks.getFirst();
@@ -69,30 +63,18 @@ public class AssignmentRecovery {
             OrchestrationStates.REASON_NOT_CURRENT);
       if (!OrchestrationStates.OPEN_TASK.contains(task.get("state")))
         return new Reassigned(false, jobId, expectedAttempt, OrchestrationStates.REASON_TERMINAL);
-      var prior =
-          jdbc.queryForMap(
-              "SELECT a.*,n.node_key,n.pool,d.payload FROM collection_attempt a JOIN collector_node n ON n.id=a.node_id JOIN collector_dispatch d ON d.attempt_id=a.public_id WHERE a.public_id=? FOR UPDATE OF a,d",
-              expectedAttempt);
+      var prior = recovery.lockAttemptDispatch(expectedAttempt);
       if (!OrchestrationStates.ACTIVE_ATTEMPT.contains(prior.get("state")))
         return new Reassigned(false, jobId, expectedAttempt, OrchestrationStates.REASON_NOT_ACTIVE);
-      Instant now = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp.class).toInstant();
+      Instant now = recovery.clockTimestamp();
       if (((Timestamp) prior.get("assigned_at")).toInstant().plus(minimumAge).isAfter(now))
         return new Reassigned(false, jobId, expectedAttempt, OrchestrationStates.REASON_TOO_RECENT);
       int number = ((Number) prior.get("attempt_no")).intValue();
       if (number >= maximumAttempts) {
-        jdbc.update(
-            "UPDATE collection_attempt SET state='FAILED',completed_at=clock_timestamp() WHERE public_id=?",
-            expectedAttempt);
-        jdbc.update(
-            "UPDATE collection_task SET state='FAILED',completed_at=clock_timestamp() WHERE id=?",
-            task.get("id"));
-        jdbc.update(
-            "UPDATE collector_dispatch SET state='BLOCKED',last_error=?,locked_by=NULL,locked_until=NULL WHERE attempt_id=?",
-            OrchestrationStates.LAST_ERROR_ATTEMPT_LIMIT,
-            expectedAttempt);
-        jdbc.update(
-            "UPDATE collection_request r SET state='FAILED',completed_at=clock_timestamp() WHERE r.id=? AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))",
-            task.get("request_id"));
+        recovery.failAttempt(expectedAttempt);
+        recovery.failTask(task.get("id"));
+        recovery.blockDispatch(expectedAttempt, OrchestrationStates.LAST_ERROR_ATTEMPT_LIMIT);
+        recovery.failRequestIfIdle(task.get("request_id"));
         return new Reassigned(
             false, jobId, expectedAttempt, OrchestrationStates.REASON_ATTEMPT_LIMIT);
       }
@@ -108,12 +90,8 @@ public class AssignmentRecovery {
                   new IllegalArgumentException(
                       "Reassignment requires another configured node in the same pool"));
       Long nodeId =
-          jdbc.queryForObject(
-              "INSERT INTO collector_node(node_key,pool,endpoint,enabled) VALUES (?,?,?,true) ON CONFLICT(node_key) DO UPDATE SET pool=excluded.pool,endpoint=excluded.endpoint,enabled=true RETURNING id",
-              Long.class,
-              target.key(),
-              target.pool(),
-              OrchestrationProperties.endpoint(target));
+          recovery.upsertCollectorNode(
+              target.key(), target.pool(), OrchestrationProperties.endpoint(target));
       JobRequest original = json.readValue(prior.get("payload").toString(), JobRequest.class);
       UUID next = UUID.randomUUID();
       Instant deadline =
@@ -132,30 +110,15 @@ public class AssignmentRecovery {
               original.destinationRef(),
               deadline,
               original.authorization());
-      jdbc.update(
-          "UPDATE collection_attempt SET state='SUPERSEDED',completed_at=? WHERE public_id=?",
-          Timestamp.from(now),
-          expectedAttempt);
-      jdbc.update(
-          "UPDATE collector_dispatch SET state='BLOCKED',locked_by=NULL,locked_until=NULL,last_error=? WHERE attempt_id=?",
-          OrchestrationStates.LAST_ERROR_SUPERSEDED,
-          expectedAttempt);
-      jdbc.update(
-          "INSERT INTO collection_attempt(public_id,task_id,attempt_no,node_id) VALUES (?,?,?,?)",
-          next,
-          task.get("id"),
-          number + 1,
-          nodeId);
-      jdbc.update(
-          "UPDATE collection_task SET current_attempt_id=?,state='READY',completed_at=NULL WHERE id=?",
-          next,
-          task.get("id"));
-      jdbc.update(
-          "INSERT INTO collector_dispatch(attempt_id,endpoint,payload,deadline_at) VALUES (?,?,?::jsonb,?)",
+      recovery.supersedeAttempt(expectedAttempt, now);
+      recovery.blockDispatchSuperseded(expectedAttempt, OrchestrationStates.LAST_ERROR_SUPERSEDED);
+      recovery.insertAttempt(next, task.get("id"), number + 1, nodeId);
+      recovery.setCurrentAttemptReady(next, task.get("id"));
+      recovery.insertDispatch(
           next,
           OrchestrationProperties.endpoint(target),
           json.writeValueAsString(replacement),
-          Timestamp.from(deadline));
+          deadline);
       return new Reassigned(true, jobId, next, OrchestrationStates.REASON_REASSIGNED);
     });
   }

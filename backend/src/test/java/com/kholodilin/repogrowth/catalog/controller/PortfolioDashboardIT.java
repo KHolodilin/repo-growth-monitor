@@ -22,6 +22,7 @@ import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -41,6 +42,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
   @Autowired GitHubOwnerJdbcRepository ownerJdbcRepository;
   @Autowired RepositoryJdbcRepository repositoryJdbcRepository;
   @Autowired TrafficJdbcRepository trafficJdbcRepository;
+  @Autowired StatsJdbcRepository statsJdbcRepository;
   @Autowired CollectionRunJdbcRepository runRepository;
   @Autowired CollectionJobJdbcRepository jobRepository;
   @Autowired JdbcClient jdbcClient;
@@ -97,8 +99,8 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(6), 50, 25, 5, 4);
     trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(4), 30, 15, 3, 2);
 
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 0);
-    trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1, 0);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 0);
+    statsJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(10), 120, 20, 4, 1, 0);
     repositoryJdbcRepository.upsertHealth(
         kafka.id(),
         new com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts(
@@ -417,9 +419,9 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
   void statsHistoryReturnsCollectedDaysInTheRequestedPeriod() {
     createRepos();
     LocalDate today = LocalDate.now(clock);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 4);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(3), 40, 9, 3, 0, 5);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today, 41, 10, 3, 0, 6);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 4);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(3), 40, 9, 3, 0, 5);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today, 41, 10, 3, 0, 6);
 
     AdminStatsHistoryService.RepositoryStatsHistory week = adminStatsHistoryService.statsHistory(kafka.id(), "7d");
     assertThat(week.period()).isEqualTo("7d");
@@ -456,7 +458,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     assertThat(empty.totals().stars().value()).isNull();
     assertThat(empty.totals().stars().absoluteChange()).isNull();
 
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 4);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(10), 35, 8, 2, 0, 4);
 
     AdminStatsHistoryService.RepositoryStatsHistory day = adminStatsHistoryService.statsHistory(kafka.id(), "1d");
     assertThat(day.points()).isEmpty();
@@ -480,8 +482,8 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
   void statsHistoryUsesTheLevelChangeInsideTheWindow() {
     createRepos();
     LocalDate today = LocalDate.now(clock);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 0, 0, 22, 0, 8);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today, 6, 0, 19, 0, 10);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 0, 0, 22, 0, 8);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today, 6, 0, 19, 0, 10);
 
     AdminStatsHistoryService.RepositoryStatsHistory month =
         adminStatsHistoryService.statsHistory(kafka.id(), "30d");
@@ -607,14 +609,14 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
     LocalDate today = LocalDate.now(clock);
     trafficJdbcRepository.upsertDaily(kafka.id(), today.minusDays(1), 1, 1, 0, 0);
     trafficJdbcRepository.upsertDaily(outbox.id(), today.minusDays(1), 1, 1, 0, 0);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(4), 100, 4, 2, 0, 0);
-    trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(4), 50, 1, 1, 0, 0);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(2), 106, 4, 2, 0, 4);
-    trafficJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 110, 4, 2, 0, 4);
-    trafficJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(1), 50, 1, 1, 0, 0);
-    trafficJdbcRepository.replaceContributorLogins(
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(4), 100, 4, 2, 0, 0);
+    statsJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(4), 50, 1, 1, 0, 0);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(2), 106, 4, 2, 0, 4);
+    statsJdbcRepository.upsertDailyStats(kafka.id(), today.minusDays(1), 110, 4, 2, 0, 4);
+    statsJdbcRepository.upsertDailyStats(outbox.id(), today.minusDays(1), 50, 1, 1, 0, 0);
+    statsJdbcRepository.replaceContributorLogins(
         kafka.id(), today.minusDays(1), java.util.List.of("alice", "bob"));
-    trafficJdbcRepository.replaceContributorLogins(
+    statsJdbcRepository.replaceContributorLogins(
         outbox.id(), today.minusDays(1), java.util.List.of("bob"));
 
     DashboardResponse week = analyticsService.dashboard("7d");

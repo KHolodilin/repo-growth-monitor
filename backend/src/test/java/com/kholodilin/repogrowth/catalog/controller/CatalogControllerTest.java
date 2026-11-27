@@ -131,7 +131,8 @@ class CatalogControllerTest {
     when(activity.classify(false, repository.activityAt())).thenReturn(ActivityStatus.ACTIVE);
     when(activity.classify(false, kafka.activityAt())).thenReturn(ActivityStatus.ACTIVE);
     when(publication.allows(
-            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()))
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any(PublicationService.Module.class)))
         .thenReturn(true);
 
     var named = controller.ownerRepositories("1", "kafka", null, 20);
@@ -192,7 +193,8 @@ class CatalogControllerTest {
     when(repositories.list(false)).thenReturn(List.of(repository, kafka));
     when(activity.classify(false, repository.activityAt())).thenReturn(ActivityStatus.ACTIVE);
     when(publication.allows(
-            org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any()))
+            org.mockito.ArgumentMatchers.anyLong(),
+            org.mockito.ArgumentMatchers.any(PublicationService.Module.class)))
         .thenReturn(true);
     var page = controller.ownerRepositories("1", null, null, 20);
     assertThat(page.items()).extracting(c -> c.repositoryId()).containsExactly("13");

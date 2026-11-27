@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.events.controller;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
@@ -11,6 +12,7 @@ import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.events.service.GrowthEventService;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -82,8 +84,7 @@ public class EventsResourceController {
 
   @PostMapping("/repositories/{repositoryId}/growth-events")
   public GrowthEvent create(
-      @PathVariable long repositoryId,
-      @RequestBody GrowthEventController.ManualEventRequest request) {
+      @PathVariable long repositoryId, @RequestBody ManualEventRequest request) {
     access.requireAction(
         repositoryId,
         ResourceAccessPolicy.ResourceAction.MUTATE,
@@ -99,7 +100,7 @@ public class EventsResourceController {
 
   @PutMapping("/growth-events/{eventId}")
   public GrowthEvent update(
-      @PathVariable long eventId, @RequestBody GrowthEventController.ManualEventRequest request) {
+      @PathVariable long eventId, @RequestBody ManualEventRequest request) {
     GrowthEvent existing = requireEvent(eventId);
     access.requireAction(
         existing.repositoryId(),
@@ -136,8 +137,7 @@ public class EventsResourceController {
 
   @PutMapping("/repositories/{repositoryId}/growth-event-settings")
   public List<GrowthEventSetting> updateSettings(
-      @PathVariable long repositoryId,
-      @RequestBody List<GrowthEventController.SettingUpdateRequest> settings) {
+      @PathVariable long repositoryId, @RequestBody List<SettingUpdateRequest> settings) {
     requireSettingsAccess(repositoryId);
     return events.updateSettings(
         repositoryId,
@@ -162,4 +162,10 @@ public class EventsResourceController {
         .findById(eventId)
         .orElseThrow(() -> ApiException.notFound("Growth event not found"));
   }
+
+  public record ManualEventRequest(
+      String type, Instant eventAt, String title, String url, String description) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record SettingUpdateRequest(String eventType, boolean enabled) {}
 }

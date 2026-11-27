@@ -67,6 +67,7 @@ public class SearchResourceController {
     return kpi.repositoryQueriesWithHistory(repositoryId, withHistory, limit);
   }
 
+  @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
   @PostMapping("/repositories/{repositoryId}/search-queries")
   public SearchQuery create(
       @PathVariable long repositoryId,

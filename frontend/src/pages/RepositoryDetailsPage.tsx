@@ -148,7 +148,7 @@ function fetchRepositoryDetailsBundle(
   return Promise.all([
     api<Repository>(`/api/v1/admin/repositories/${id}`, { signal }),
     api<RepositoryTraffic>(
-      `/api/v1/admin/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
+      `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
       { signal },
     ),
     api<SearchHistory[]>(`/api/v1/repositories/${id}/search-queries?include=history`, { signal }),
@@ -509,7 +509,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/admin/repositories/${id}/search-queries`, {
+      await api(`/api/v1/repositories/${id}/search-queries`, {
         method: "POST",
         body: JSON.stringify({ name: query, query, enabled: true, resultLimit: 50 }),
       });
@@ -527,7 +527,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(queryId);
     try {
-      await api(`/api/v1/admin/search-queries/${queryId}/run`, { method: "POST" });
+      await api(`/api/v1/search-queries/${queryId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -547,7 +547,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/admin/repositories/${id}/search-queries/run`, { method: "POST" });
+      await api(`/api/v1/repositories/${id}/search-queries/run`, { method: "POST" });
       await load();
     } catch (err) {
       setQueryError((err as Error).message);
@@ -562,7 +562,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningQueryId(watchId);
     try {
-      await api(`/api/v1/admin/topic-watches/${watchId}/run`, { method: "POST" });
+      await api(`/api/v1/topic-watches/${watchId}/run`, { method: "POST" });
       await load();
     } finally {
       setRunningQueryId(null);
@@ -582,7 +582,7 @@ export function RepositoryDetailsPage() {
     }
     setRunningAll(true);
     try {
-      await api(`/api/v1/admin/repositories/${id}/topic-watches/run?scope=${scope}`, {
+      await api(`/api/v1/repositories/${id}/topic-watches/run?scope=${scope}`, {
         method: "POST",
       });
       await load();
@@ -647,7 +647,7 @@ export function RepositoryDetailsPage() {
       return;
     }
     try {
-      await api(`/api/v1/admin/search-queries/${queryId}`, { method: "DELETE" });
+      await api(`/api/v1/search-queries/${queryId}`, { method: "DELETE" });
       pruneChartSelection(
         repoSearchChartId(id),
         visibility.filter((item) => item.query.id !== queryId).map((item) => String(item.query.id)),

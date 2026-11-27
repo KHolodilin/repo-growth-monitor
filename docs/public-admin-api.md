@@ -70,7 +70,7 @@ until the agreed final activation; legacy execution remains available only in th
 - POST `/admin/repositories/{id}/collections`: starter-backed manual command with Idempotency-Key.
 - POST `/admin/repositories/{id}/collect`: Collect button command using the same orchestration service.
 - POST `/admin/repositories/refresh`: durable discovery, 201 plus committed request/task IDs.
-- GET `/admin/collection-requests/{uuid}`: state and task progress; no job payload/secret.
+- GET `/api/v1/collection-requests/{uuid}` (resource; was `/admin`): state and task progress; no job payload/secret.
 - GET repositories with refresh=true is rejected. Initial list load does not initiate a refresh.
   Browser Refresh posts explicitly and follows request status until saved data updates; unmount aborts polling.
 - POST `/admin/repositories/{id}/publication`: `{enabled, traffic?, referrers?, paths?, topics?}`.

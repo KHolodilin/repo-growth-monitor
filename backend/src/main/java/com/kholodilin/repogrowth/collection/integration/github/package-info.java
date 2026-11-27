@@ -11,11 +11,5 @@
  * <p><b>Consumers:</b> {@code collection.service} (ingestion), {@code search.service} (search item
  * enrich), {@code events.detect} (activity snapshots), {@code administration.service} (publication
  * remote repo shape).
- *
- * <p><b>Currently unused by product code</b> (kept as documented wire shapes for collector JSON
- * that may still appear in snapshots): {@code GitHubTrafficViewsResponse}, {@code
- * GitHubTrafficClonesResponse}, {@code GitHubTrafficDay}, {@code GitHubReferrerResponse}, {@code
- * GitHubPathResponse}, {@code GitHubSidebarResponse}, {@code GitHubSocialPreview}, {@code
- * GitHubSocialPreviewResponse}, {@code GitHubReleaseResponse}, {@code GitHubSearchResponse}.
  */
 package com.kholodilin.repogrowth.collection.integration.github;

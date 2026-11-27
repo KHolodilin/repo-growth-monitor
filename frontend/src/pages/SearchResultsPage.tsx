@@ -24,7 +24,7 @@ export function SearchResultsPage() {
     }
     const abort = new AbortController();
     let cancelled = false;
-    api<SearchRunResults>(`/api/v1/admin/search-runs/${id}/results`, { signal: abort.signal })
+    api<SearchRunResults>(`/api/v1/search-runs/${id}/results`, { signal: abort.signal })
       .then((next) => {
         if (cancelled || abort.signal.aborted) return;
         setData(next);

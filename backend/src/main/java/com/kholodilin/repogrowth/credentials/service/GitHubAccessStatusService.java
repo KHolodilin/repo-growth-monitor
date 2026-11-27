@@ -3,10 +3,12 @@ package com.kholodilin.repogrowth.credentials.service;
 import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
 import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.collection.service.CollectorNodeMonitor;
+import com.kholodilin.repogrowth.credentials.model.GitHubAccessStatus;
+import com.kholodilin.repogrowth.credentials.model.TokenState;
+import com.kholodilin.repogrowth.credentials.repository.CredentialJdbcRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -22,42 +24,63 @@ import org.springframework.stereotype.Service;
 @Service
 public class GitHubAccessStatusService {
 
+  /** @deprecated Prefer {@link TokenState}. */
   public enum TokenState {
     MISSING,
     UNVERIFIED,
     ORCHESTRATION_DISABLED,
-    COLLECTOR_UNAVAILABLE
+    COLLECTOR_UNAVAILABLE;
+
+    public com.kholodilin.repogrowth.credentials.model.TokenState toModel() {
+      return com.kholodilin.repogrowth.credentials.model.TokenState.valueOf(name());
+    }
+
+    public static TokenState from(com.kholodilin.repogrowth.credentials.model.TokenState state) {
+      return TokenState.valueOf(state.name());
+    }
   }
 
-  public record Status(boolean credentialsConfigured, TokenState tokenState) {}
+  /** @deprecated Prefer {@link GitHubAccessStatus}. */
+  public record Status(boolean credentialsConfigured, TokenState tokenState) {
+    public static Status from(GitHubAccessStatus status) {
+      return new Status(status.credentialsConfigured(), TokenState.from(status.tokenState()));
+    }
+  }
 
-  private final JdbcTemplate jdbc;
+  private final CredentialJdbcRepository credentials;
   private final ObjectProvider<CollectionRequestService> orchestration;
   private final ObjectProvider<OrchestrationProperties> orchestrationProperties;
   private final ObjectProvider<CollectorNodeMonitor> nodeMonitor;
 
   public GitHubAccessStatusService(
-      JdbcTemplate jdbc,
+      CredentialJdbcRepository credentials,
       ObjectProvider<CollectionRequestService> orchestration,
       ObjectProvider<OrchestrationProperties> orchestrationProperties,
       ObjectProvider<CollectorNodeMonitor> nodeMonitor) {
-    this.jdbc = jdbc;
+    this.credentials = credentials;
     this.orchestration = orchestration;
     this.orchestrationProperties = orchestrationProperties;
     this.nodeMonitor = nodeMonitor;
   }
 
   public Status status() {
+    return Status.from(accessStatus());
+  }
+
+  public GitHubAccessStatus accessStatus() {
     if (!vaultCredentialConfigured()) {
-      return new Status(false, TokenState.MISSING);
+      return new GitHubAccessStatus(false, com.kholodilin.repogrowth.credentials.model.TokenState.MISSING);
     }
     if (orchestration.getIfAvailable() == null) {
-      return new Status(true, TokenState.ORCHESTRATION_DISABLED);
+      return new GitHubAccessStatus(
+          true, com.kholodilin.repogrowth.credentials.model.TokenState.ORCHESTRATION_DISABLED);
     }
     if (!collectorReachable()) {
-      return new Status(true, TokenState.COLLECTOR_UNAVAILABLE);
+      return new GitHubAccessStatus(
+          true, com.kholodilin.repogrowth.credentials.model.TokenState.COLLECTOR_UNAVAILABLE);
     }
-    return new Status(true, TokenState.UNVERIFIED);
+    return new GitHubAccessStatus(
+        true, com.kholodilin.repogrowth.credentials.model.TokenState.UNVERIFIED);
   }
 
   private boolean collectorReachable() {
@@ -80,8 +103,7 @@ public class GitHubAccessStatusService {
 
   private boolean vaultCredentialConfigured() {
     try {
-      return !jdbc.queryForList("SELECT 1 FROM github_credential WHERE NOT revoked LIMIT 1")
-          .isEmpty();
+      return credentials.hasActiveCredential();
     } catch (DataAccessException e) {
       // Credentials disabled or the vault table is not migrated: nothing is configured.
       log.debug(

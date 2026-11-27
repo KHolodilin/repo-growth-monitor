@@ -101,7 +101,7 @@ export function RepositoriesPage() {
       try {
         const states = await Promise.all(
           pendingRefresh.map((id) =>
-            api<{ state: string }>(`/api/v1/admin/collection-requests/${id}`, {
+            api<{ state: string }>(`/api/v1/collection-requests/${id}`, {
               signal: abort.signal,
             }),
           ),

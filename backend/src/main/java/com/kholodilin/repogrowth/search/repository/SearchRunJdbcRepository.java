@@ -261,6 +261,48 @@ public class SearchRunJdbcRepository {
         .update();
   }
 
+  public void updateSnapshotScope(long id, Instant observedAt, boolean publicScopeVerified) {
+    jdbcClient
+        .sql(
+            """
+            UPDATE search_run
+            SET snapshot_at = :observedAt,
+                completed_at = :observedAt,
+                public_scope_verified = :publicScopeVerified
+            WHERE id = :id
+            """)
+        .param("id", id)
+        .param("observedAt", SqlTime.ts(observedAt))
+        .param("publicScopeVerified", publicScopeVerified)
+        .update();
+  }
+
+  public void upsertFailed(
+      long searchQueryId,
+      long repositoryId,
+      LocalDate businessDate,
+      String errorCode,
+      String errorMessage) {
+    jdbcClient
+        .sql(
+            """
+            INSERT INTO search_run(
+                search_query_id,repository_id,business_date,status,error_code,error_message,completed_at)
+            VALUES (:searchQueryId,:repositoryId,:businessDate,'FAILED',:errorCode,:errorMessage,clock_timestamp())
+            ON CONFLICT(search_query_id,business_date) DO UPDATE SET
+                status='FAILED',
+                error_code=excluded.error_code,
+                error_message=excluded.error_message,
+                completed_at=excluded.completed_at
+            """)
+        .param("searchQueryId", searchQueryId)
+        .param("repositoryId", repositoryId)
+        .param("businessDate", businessDate)
+        .param("errorCode", errorCode)
+        .param("errorMessage", errorMessage)
+        .update();
+  }
+
   /**
    * Runs that already stored a snapshot, oldest first. A run queued for another attempt keeps its
    * snapshot, so a re-run of today does not remove today from the series.

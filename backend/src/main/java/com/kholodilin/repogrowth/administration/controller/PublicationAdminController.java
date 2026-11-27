@@ -5,7 +5,6 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.web.AppHttpHeaders;
 import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
 import java.util.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -15,23 +14,16 @@ import tools.jackson.databind.json.JsonMapper;
 @RequestMapping("/api/v1/admin")
 public class PublicationAdminController {
   private final PublicationService policy;
-  private final JdbcTemplate jdbc;
   private final JsonMapper json;
 
-  public PublicationAdminController(PublicationService policy, JdbcTemplate jdbc, JsonMapper json) {
+  public PublicationAdminController(PublicationService policy, JsonMapper json) {
     this.policy = policy;
-    this.jdbc = jdbc;
     this.json = json;
   }
 
   @GetMapping("/repositories/{id}/publication")
   public Object get(@PathVariable long id) {
-    var rows =
-        jdbc.queryForList(
-            "SELECT (SELECT '/'||o.login||'/'||r.name FROM repository r JOIN github_owner o ON o.id=r.owner_id WHERE r.id=repository.id) AS \"canonicalPath\",public_dashboard_enabled,public_traffic_enabled,public_referrers_enabled,public_paths_enabled,public_topics_enabled,publication_revision,visibility_verified_at FROM repository WHERE id=?",
-            id);
-    if (rows.isEmpty()) throw ApiException.notFound("Repository not found");
-    return rows.getFirst();
+    return policy.adminPublication(id);
   }
 
   public record Request(
@@ -45,7 +37,7 @@ public class PublicationAdminController {
       Authentication auth,
       @RequestHeader(value = AppHttpHeaders.REQUEST_ID, required = false) String requestId) {
     if (request.enabled() == null) throw ApiException.validation("enabled is required");
-    jdbc.queryForList("SELECT id FROM repository WHERE id=? FOR UPDATE", id);
+    policy.lockRepository(id);
     var before = get(id);
     policy.publish(
         id,
@@ -70,14 +62,12 @@ public class PublicationAdminController {
       Authentication auth,
       @RequestHeader(value = AppHttpHeaders.REQUEST_ID, required = false) String requestId) {
     if (request.enabled() == null) throw ApiException.validation("enabled is required");
-    var rows =
-        jdbc.queryForList(
-            "SELECT public_enabled,repository_id FROM search_query WHERE id=? FOR UPDATE", id);
+    var rows = policy.lockSearchQuery(id);
     if (rows.isEmpty()) throw ApiException.notFound("Search query not found");
     var before = rows.getFirst();
     if (request.enabled() && !policy.eligible(((Number) before.get("repository_id")).longValue()))
       throw ApiException.validation("Published parent required");
-    jdbc.update("UPDATE search_query SET public_enabled=? WHERE id=?", request.enabled(), id);
+    policy.setSearchQueryPublicEnabled(id, request.enabled());
     var after = Map.of("public_enabled", request.enabled());
     audit(auth, "QUERY", id, before, after, requestId);
     return after;
@@ -91,8 +81,7 @@ public class PublicationAdminController {
       Authentication auth, String type, long id, Object before, Object after, String request) {
     if (request != null && request.length() > 128)
       throw ApiException.validation("Request ID too long");
-    jdbc.update(
-        "INSERT INTO publication_audit(actor_id,entity_type,entity_id,before_policy,after_policy,request_id) VALUES (?,?,?,?::jsonb,?::jsonb,?)",
+    policy.audit(
         ((AppUserPrincipal) auth.getPrincipal()).userId(),
         type,
         id,

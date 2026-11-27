@@ -14,7 +14,7 @@ import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;
 import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/v1")
-@ConditionalOnBean(IdempotentCollectionRequests.class)
+@ConditionalOnProperty(name = "rgm.orchestration.enabled", havingValue = "true")
 public class CollectionResourceController {
 
   private final ResourceAccessPolicy access;

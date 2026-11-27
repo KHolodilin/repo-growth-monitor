@@ -42,16 +42,13 @@ public class StatsController {
     return stats.ownerHistoryResponse(ownerId, period);
   }
 
+  /**
+   * Repository stats history in the FE composite shape (totals + points). Owner history keeps the
+   * resource {@link StatsHistoryResponse} contract.
+   */
   @GetMapping("/repositories/{repositoryId}/stats-history")
-  public StatsHistoryResponse repositoryStatsHistory(
+  public AdminStatsHistoryService.RepositoryStatsHistory repositoryStatsHistory(
       @PathVariable long repositoryId, @RequestParam(defaultValue = "7d") String period) {
-    return stats.repositoryHistoryResponse(repositoryId, period);
-  }
-
-  /** Legacy admin stats history composite; prefer resource /stats-history. */
-  @GetMapping("/admin/repositories/{id}/stats-history")
-  public AdminStatsHistoryService.RepositoryStatsHistory adminStatsHistory(
-      @PathVariable("id") long id, @RequestParam(defaultValue = "7d") String period) {
-    return adminStatsHistory.statsHistory(id, period);
+    return adminStatsHistory.statsHistory(repositoryId, period);
   }
 }

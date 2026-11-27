@@ -109,7 +109,7 @@ export function DashboardPage() {
   const load = useCallback(async () => {
     const version = ++requestVersion.current;
     const ownerQuery = owner ? `&owner=${encodeURIComponent(owner)}` : "";
-    const dashboard = await api<Dashboard>(`/api/v1/admin/dashboard?period=${period}${ownerQuery}`);
+    const dashboard = await api<Dashboard>(`/api/v1/dashboard?period=${period}${ownerQuery}`);
     if (version === requestVersion.current) setData(dashboard);
     return dashboard;
   }, [period, owner]);
@@ -118,7 +118,7 @@ export function DashboardPage() {
     let cancelled = false;
     const version = ++requestVersion.current;
     const ownerQuery = owner ? `&owner=${encodeURIComponent(owner)}` : "";
-    api<Dashboard>(`/api/v1/admin/dashboard?period=${period}${ownerQuery}`)
+    api<Dashboard>(`/api/v1/dashboard?period=${period}${ownerQuery}`)
       .then((dashboard) => {
         if (!cancelled && version === requestVersion.current) {
           setData(dashboard);

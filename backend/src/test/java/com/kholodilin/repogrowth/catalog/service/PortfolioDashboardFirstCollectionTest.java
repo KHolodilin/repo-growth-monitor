@@ -24,6 +24,7 @@ import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcReposito
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -141,9 +142,10 @@ class PortfolioDashboardFirstCollectionTest {
     when(access.canSeePrivateRepositories()).thenReturn(true);
     PortfolioDashboardService service =
         new PortfolioDashboardService(
-            repositoryService,
-            traffic,
-            runs,
+        repositoryService,
+        traffic,
+        mock(StatsJdbcRepository.class),
+        runs,
             jobs,
             mock(CollectionRunMapper.class),
             activity,

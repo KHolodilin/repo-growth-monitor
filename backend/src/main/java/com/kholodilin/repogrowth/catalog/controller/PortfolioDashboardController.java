@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Admin portfolio/dashboard composite reads (legacy until FE finishes resource migration). */
+/** Portfolio/dashboard composite reads on the unified resource API (no {@code /admin} prefix). */
 @RestController
-@RequestMapping("/api/v1/admin")
+@RequestMapping("/api/v1")
 public class PortfolioDashboardController {
 
   @Autowired(required = false)

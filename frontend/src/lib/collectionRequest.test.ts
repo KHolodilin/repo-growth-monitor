@@ -20,7 +20,7 @@ describe("waitForCollectionRequest", () => {
     await vi.advanceTimersByTimeAsync(10);
     await expect(done).resolves.toEqual({ state: "SUCCEEDED" });
     expect(api).toHaveBeenCalledTimes(2);
-    expect(api).toHaveBeenCalledWith("/api/v1/admin/collection-requests/req-1", expect.any(Object));
+    expect(api).toHaveBeenCalledWith("/api/v1/collection-requests/req-1", expect.any(Object));
   });
 
   it("rejects with the abort Error reason while waiting between polls", async () => {

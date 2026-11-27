@@ -1,18 +1,17 @@
 package com.kholodilin.repogrowth.collection.controller;
 
-import com.kholodilin.repogrowth.collection.model.CollectionRun;
-import com.kholodilin.repogrowth.collection.planner.DailyPlanner;
+import com.kholodilin.repogrowth.collection.service.DailyPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
-import com.kholodilin.repogrowth.collection.service.CollectionRunMapper.CollectionRunResponse;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Ops-only collection commands. Resource reads/runs live on {@link CollectionRunResourceController}
+ * / {@link CollectionResourceController}; no GET surface here.
+ */
 @RestController
 @RequestMapping("/api/v1/admin")
 public class CollectionController {
@@ -22,18 +21,10 @@ public class CollectionController {
 
   private final PlanningWindow planningWindow;
   private final DailyPlanner dailyPlanner;
-  private final CollectionRunJdbcRepository runRepository;
-  private final CollectionRunMapper runMapper;
 
-  public CollectionController(
-      PlanningWindow planningWindow,
-      DailyPlanner dailyPlanner,
-      CollectionRunJdbcRepository runRepository,
-      CollectionRunMapper runMapper) {
+  public CollectionController(PlanningWindow planningWindow, DailyPlanner dailyPlanner) {
     this.planningWindow = planningWindow;
     this.dailyPlanner = dailyPlanner;
-    this.runRepository = runRepository;
-    this.runMapper = runMapper;
   }
 
   @org.springframework.web.bind.annotation.ResponseStatus(
@@ -56,14 +47,5 @@ public class CollectionController {
   @PostMapping("/collection/plan")
   public DailyPlanner.PlannerResult plan() {
     return dailyPlanner.planNow(true);
-  }
-
-  @GetMapping("/collection-runs/{id}")
-  public CollectionRunResponse getRun(@PathVariable long id) {
-    CollectionRun run =
-        runRepository
-            .findById(id)
-            .orElseThrow(() -> ApiException.notFound("Collection run not found"));
-    return runMapper.toResponse(runMapper.toView(run));
   }
 }

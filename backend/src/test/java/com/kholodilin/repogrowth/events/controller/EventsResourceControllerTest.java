@@ -130,7 +130,7 @@ class EventsResourceControllerTest {
     assertThat(
             controller.create(
                 13L,
-                new GrowthEventController.ManualEventRequest(
+                new EventsResourceController.ManualEventRequest(
                     "LINKEDIN_POST", Instant.parse("2026-11-10T06:00:00Z"), "Launch", null, null)))
         .isEqualTo(event);
 
@@ -139,7 +139,7 @@ class EventsResourceControllerTest {
     assertThat(
             controller.update(
                 5L,
-                new GrowthEventController.ManualEventRequest(
+                new EventsResourceController.ManualEventRequest(
                     "LINKEDIN_POST", Instant.parse("2026-11-10T06:00:00Z"), "Launch", null, null)))
         .isEqualTo(event);
     controller.delete(5L);
@@ -154,7 +154,7 @@ class EventsResourceControllerTest {
     assertThat(
             controller.updateSettings(
                 13L,
-                List.of(new GrowthEventController.SettingUpdateRequest("STAR_MILESTONE", false))))
+                List.of(new EventsResourceController.SettingUpdateRequest("STAR_MILESTONE", false))))
         .isEmpty();
 
     when(currentUser.canSeePrivateRepositories()).thenReturn(false);

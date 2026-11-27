@@ -4,12 +4,13 @@ import com.kholodilin.collector.contracts.CollectorProtocol.*;
 import com.kholodilin.repogrowth.common.api.*;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.credentials.configuration.CredentialVaultProperties;
+import com.kholodilin.repogrowth.credentials.model.CredentialMetadata;
+import com.kholodilin.repogrowth.credentials.repository.CredentialJdbcRepository;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -17,21 +18,31 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 @ConditionalOnProperty(name = "rgm.credentials.enabled", havingValue = "true")
 public class CredentialVault {
+  /** @deprecated Prefer {@link CredentialMetadata}. */
   public record Metadata(
-      String ref, long version, boolean revoked, Instant expiresAt, String quotaIdentity) {}
+      String ref, long version, boolean revoked, Instant expiresAt, String quotaIdentity) {
+    public static Metadata from(CredentialMetadata metadata) {
+      return new Metadata(
+          metadata.ref(),
+          metadata.version(),
+          metadata.revoked(),
+          metadata.expiresAt(),
+          metadata.quotaIdentity());
+    }
+  }
 
-  private final JdbcTemplate jdbc;
+  private final CredentialJdbcRepository credentials;
   private final TransactionTemplate tx;
   private final CredentialEncryption encryption;
   private final CredentialVaultProperties properties;
   private final Clock clock;
 
   public CredentialVault(
-      JdbcTemplate jdbc,
+      CredentialJdbcRepository credentials,
       PlatformTransactionManager tm,
       CredentialVaultProperties properties,
       Clock clock) {
-    this.jdbc = jdbc;
+    this.credentials = credentials;
     this.tx = new TransactionTemplate(tm);
     this.properties = properties;
     this.clock = clock;
@@ -62,60 +73,35 @@ public class CredentialVault {
     if (storedExpiry != null && !storedExpiry.isAfter(clock.instant()))
       throw ApiException.validation("Token expiry must be in the future");
     return tx.execute(status -> {
-      jdbc.update(
-          "INSERT INTO github_credential(ref,current_version) VALUES (?,0) ON CONFLICT(ref) DO NOTHING",
-          ref);
-      var row =
-          jdbc.queryForMap(
-              "SELECT id,current_version,quota_identity FROM github_credential WHERE ref=? FOR UPDATE",
-              ref);
+      credentials.ensureCredentialRow(ref);
+      var row = credentials.lockCredentialByRef(ref);
       long id = ((Number) row.get("id")).longValue(),
           version = ((Number) row.get("current_version")).longValue() + 1;
       var encrypted = encryption.encrypt(ref, version, token);
-      jdbc.update(
-          "INSERT INTO github_credential_version(credential_id,version,key_id,nonce,ciphertext,expires_at) VALUES (?,?,?,?,?,?)",
-          id,
-          version,
-          encrypted.keyId(),
-          encrypted.nonce(),
-          encrypted.ciphertext(),
-          storedExpiry == null ? null : Timestamp.from(storedExpiry));
-      jdbc.update(
-          "UPDATE github_credential SET current_version=?,revoked=false,updated_at=clock_timestamp() WHERE id=?",
-          version,
-          id);
+      credentials.insertCredentialVersion(id, version, encrypted, storedExpiry);
+      credentials.activateCredentialVersion(id, version);
       String identity = quotaIdentity == null ? (String) row.get("quota_identity") : quotaIdentity;
-      jdbc.update("UPDATE github_credential SET quota_identity=? WHERE id=?", identity, id);
+      credentials.updateQuotaIdentity(id, identity);
       return new Metadata(ref, version, false, storedExpiry, identity);
     });
   }
 
   public AuthorizationScope bind(long repositoryId, String ref) {
     return tx.execute(status -> {
-      if (jdbc.queryForList(
-              "SELECT id FROM repository WHERE id=? FOR UPDATE", Long.class, repositoryId)
-          .isEmpty()) throw ApiException.notFound("Repository not found");
-      var rows =
-          jdbc.queryForList(
-              "SELECT id FROM github_credential WHERE ref=? AND NOT revoked FOR SHARE",
-              Long.class,
-              ref);
-      if (rows.isEmpty()) throw ApiException.notFound("Active credential not found");
+      if (!credentials.repositoryExistsForUpdate(repositoryId))
+        throw ApiException.notFound("Repository not found");
+      long credentialId =
+          credentials
+              .activeCredentialIdByRef(ref)
+              .orElseThrow(() -> ApiException.notFound("Active credential not found"));
       UUID context = UUID.randomUUID();
-      jdbc.update(
-          "INSERT INTO repository_credential(repository_id,credential_id,authorization_context) VALUES (?,?,?) ON CONFLICT(repository_id) DO UPDATE SET credential_id=excluded.credential_id,authorization_context=excluded.authorization_context,updated_at=clock_timestamp()",
-          repositoryId,
-          rows.getFirst(),
-          context);
+      credentials.upsertRepositoryBinding(repositoryId, credentialId, context);
       return new AuthorizationScope(context.toString(), ref);
     });
   }
 
   public boolean revoke(String ref) {
-    return jdbc.update(
-            "UPDATE github_credential SET revoked=true,updated_at=clock_timestamp() WHERE ref=?",
-            ref)
-        == 1;
+    return credentials.revokeByRef(ref);
   }
 
   @org.springframework.beans.factory.annotation.Value("${rgm.credentials.default-ref:}")
@@ -126,18 +112,10 @@ public class CredentialVault {
       // Serialize first-use binding; an explicit/revoked assignment must never be replaced by a
       // default.
       if (!defaultRef.isBlank()) {
-        jdbc.queryForList(
-            "SELECT id FROM repository WHERE id=? FOR UPDATE", Long.class, repositoryId);
-        if (jdbc.queryForObject(
-                "SELECT count(*) FROM repository_credential WHERE repository_id=?",
-                Long.class,
-                repositoryId)
-            == 0L) bind(repositoryId, defaultRef);
+        credentials.lockRepositoryForUpdate(repositoryId);
+        if (credentials.repositoryBindingCount(repositoryId) == 0L) bind(repositoryId, defaultRef);
       }
-      var rows =
-          jdbc.queryForList(
-              "SELECT b.authorization_context,c.ref FROM repository_credential b JOIN github_credential c ON c.id=b.credential_id WHERE b.repository_id=? AND NOT c.revoked",
-              repositoryId);
+      var rows = credentials.activeRepositoryBinding(repositoryId);
       if (rows.isEmpty())
         throw new ApiException(
             ErrorCode.INTERNAL_ERROR,
@@ -155,24 +133,15 @@ public class CredentialVault {
    */
   public AuthorizationScope discoveryScope(String ref) {
     return tx.execute(status -> {
-      var rows =
-          jdbc.queryForList(
-              "SELECT id FROM github_credential WHERE ref=? AND NOT revoked FOR UPDATE",
-              Long.class,
-              ref);
-      if (rows.isEmpty()) throw ApiException.notFound("Active credential not found");
-      long credentialId = rows.getFirst();
-      var existing =
-          jdbc.queryForList(
-              "SELECT authorization_context FROM credential_discovery_scope WHERE credential_id=?",
-              credentialId);
+      long credentialId =
+          credentials
+              .lockActiveCredentialIdByRef(ref)
+              .orElseThrow(() -> ApiException.notFound("Active credential not found"));
+      var existing = credentials.discoveryScopes(credentialId);
       UUID context;
       if (existing.isEmpty()) {
         context = UUID.randomUUID();
-        jdbc.update(
-            "INSERT INTO credential_discovery_scope(credential_id,authorization_context) VALUES (?,?)",
-            credentialId,
-            context);
+        credentials.insertDiscoveryScope(credentialId, context);
       } else {
         context = (UUID) existing.getFirst().get("authorization_context");
       }
@@ -182,45 +151,11 @@ public class CredentialVault {
 
   public CredentialLease resolve(String node, CredentialRequest request) {
     return tx.execute(status -> {
-      jdbc.queryForList(
-          "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR SHARE OF r",
-          Long.class,
-          request.jobId());
-      jdbc.queryForList(
-          "SELECT id FROM collection_task WHERE public_id=? FOR SHARE",
-          Long.class,
-          request.jobId());
+      credentials.shareLockCollectionRequestForTask(request.jobId().toString());
+      credentials.shareLockCollectionTask(request.jobId().toString());
       var rows =
-          jdbc.queryForList(
-              """
-              SELECT t.authorization_context,c.ref,c.quota_identity,c.current_version,v.key_id,v.nonce,v.ciphertext,v.expires_at,d.deadline_at
-              FROM collection_task t JOIN collection_attempt a ON a.task_id=t.id AND a.public_id=t.current_attempt_id
-              JOIN collector_node n ON n.id=a.node_id JOIN collector_dispatch d ON d.attempt_id=a.public_id
-              JOIN collection_request r ON r.id=t.request_id
-              JOIN github_credential c ON c.ref=t.credential_ref AND NOT c.revoked
-              JOIN github_credential_version v ON v.credential_id=c.id AND v.version=c.current_version
-              WHERE t.public_id=? AND a.public_id=? AND n.node_key=? AND n.enabled AND r.state='ACTIVE'
-                AND a.state IN ('ASSIGNED','ACCEPTED','RUNNING') AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY')
-                AND t.authorization_context IS NOT NULL AND t.credential_ref IS NOT NULL
-                AND (
-                  EXISTS (
-                    SELECT 1 FROM repository_credential b
-                    WHERE b.repository_id=t.repository_id
-                      AND b.authorization_context=t.authorization_context
-                      AND b.credential_id=c.id
-                  )
-                  OR EXISTS (
-                    SELECT 1 FROM credential_discovery_scope s
-                    WHERE s.credential_id=c.id
-                      AND s.authorization_context=t.authorization_context
-                      AND t.task_type='DISCOVER_REPOSITORIES'
-                  )
-                )
-              FOR SHARE OF a,t,r,n,c,v
-              """,
-              request.jobId(),
-              request.attemptId(),
-              node);
+          credentials.resolveLeaseRows(
+              request.jobId().toString(), request.attemptId().toString(), node);
       if (rows.isEmpty()) throw denied();
       var row = rows.getFirst();
       Instant now = clock.instant();

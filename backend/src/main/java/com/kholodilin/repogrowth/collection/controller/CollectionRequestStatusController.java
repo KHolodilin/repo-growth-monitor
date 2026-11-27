@@ -1,32 +1,25 @@
 package com.kholodilin.repogrowth.collection.controller;
 
-import com.kholodilin.repogrowth.common.api.ApiException;
-import java.util.*;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.web.bind.annotation.*;
+import com.kholodilin.repogrowth.collection.service.CollectionRequestStatusService;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
+/** Resource read for collection-request status (ТЗ {@code GET /collection-requests/{requestId}}). */
 @RestController
-@RequestMapping("/api/v1/admin/collection-requests")
+@RequestMapping("/api/v1/collection-requests")
 public class CollectionRequestStatusController {
-  private final JdbcTemplate jdbc;
+  private final CollectionRequestStatusService requests;
 
-  public CollectionRequestStatusController(JdbcTemplate jdbc) {
-    this.jdbc = jdbc;
+  public CollectionRequestStatusController(CollectionRequestStatusService requests) {
+    this.requests = requests;
   }
 
   @GetMapping("/{id}")
-  public Object status(@PathVariable UUID id) {
-    var rows =
-        jdbc.queryForList(
-            "SELECT public_id::text AS \"requestId\",state,created_at AS \"createdAt\",completed_at AS \"completedAt\" FROM collection_request WHERE public_id=?",
-            id);
-    if (rows.isEmpty()) throw ApiException.notFound("Collection request not found");
-    var response = rows.getFirst();
-    response.put(
-        "tasks",
-        jdbc.queryForList(
-            "SELECT t.public_id::text AS \"jobId\",t.task_type AS type,t.state,t.current_attempt_id::text AS \"attemptId\" FROM collection_task t JOIN collection_request r ON r.id=t.request_id WHERE r.public_id=? ORDER BY t.id",
-            id));
-    return response;
+  public Map<String, Object> status(@PathVariable UUID id) {
+    return requests.status(id);
   }
 }

@@ -33,13 +33,13 @@ import com.kholodilin.repogrowth.topics.repository.*;
 import com.kholodilin.repogrowth.topics.repository.TopicResultJdbcRepository;
 import com.kholodilin.repogrowth.topics.repository.TopicRunJdbcRepository;
 import com.kholodilin.repogrowth.topics.service.TopicWatchSync;
+import com.kholodilin.repogrowth.collection.repository.CollectorHistoryJdbcRepository;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.service.ServicePathClassifier;
-import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -53,11 +53,12 @@ public class CollectorHistoryApplier {
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   private com.kholodilin.repogrowth.credentials.service.CredentialVault credentialVault;
 
-  private final JdbcTemplate jdbc;
+  private final CollectorHistoryJdbcRepository history;
   private final JsonMapper json;
   private final RepositoryJdbcRepository repositories;
   private final GitHubOwnerJdbcRepository owners;
   private final TrafficJdbcRepository traffic;
+  private final StatsJdbcRepository stats;
   private final TopicWatchSync watches;
   private final ServicePathClassifier paths;
   private final GrowthEventStateJdbcRepository eventState;
@@ -69,11 +70,12 @@ public class CollectorHistoryApplier {
   private final TopicResultJdbcRepository topicResults;
 
   public CollectorHistoryApplier(
-      JdbcTemplate jdbc,
+      CollectorHistoryJdbcRepository history,
       JsonMapper json,
       RepositoryJdbcRepository repositories,
       GitHubOwnerJdbcRepository owners,
       TrafficJdbcRepository traffic,
+      StatsJdbcRepository stats,
       TopicWatchSync watches,
       ServicePathClassifier paths,
       GrowthEventStateJdbcRepository eventState,
@@ -83,11 +85,12 @@ public class CollectorHistoryApplier {
       RepositoryEnricher enricher,
       TopicRunJdbcRepository topicRuns,
       TopicResultJdbcRepository topicResults) {
-    this.jdbc = jdbc;
+    this.history = history;
     this.json = json;
     this.repositories = repositories;
     this.owners = owners;
     this.traffic = traffic;
+    this.stats = stats;
     this.watches = watches;
     this.paths = paths;
     this.eventState = eventState;
@@ -123,10 +126,6 @@ public class CollectorHistoryApplier {
     return value == null ? fallback : Math.toIntExact(value);
   }
 
-  private static Timestamp ts(Instant instant) {
-    return Timestamp.from(instant);
-  }
-
   public void apply(Map<String, Object> task, JobRequest job, ResultDelivery result) {
     Long repositoryId =
         task.get("repository_id") == null ? null : ((Number) task.get("repository_id")).longValue();
@@ -159,17 +158,7 @@ public class CollectorHistoryApplier {
                 Math.toIntExact(day.clones()),
                 Math.toIntExact(day.uniqueCloners()));
           else
-            jdbc.update(
-                """
-                INSERT INTO traffic_daily (repository_id, traffic_date, views, unique_visitors, clones, unique_cloners)
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT (repository_id, traffic_date) DO UPDATE SET
-                  views = coalesce(EXCLUDED.views, traffic_daily.views),
-                  unique_visitors = coalesce(EXCLUDED.unique_visitors, traffic_daily.unique_visitors),
-                  clones = coalesce(EXCLUDED.clones, traffic_daily.clones),
-                  unique_cloners = coalesce(EXCLUDED.unique_cloners, traffic_daily.unique_cloners),
-                  updated_at = clock_timestamp()
-                """,
+            traffic.upsertDailyPartial(
                 repository,
                 day.date(),
                 day.views(),
@@ -203,12 +192,8 @@ public class CollectorHistoryApplier {
                 Math.toIntExact(row.views()),
                 Math.toIntExact(row.visitors()),
                 paths.isServicePath(row.key()));
-        jdbc.update(
-            "INSERT INTO collector_snapshot_header VALUES (?,?,?,?) ON CONFLICT(repository_id,family,business_date) DO UPDATE SET observed_at=excluded.observed_at",
-            repository,
-            job.type().name(),
-            date,
-            ts(snapshot.observedAt()));
+        history.upsertSnapshotHeader(
+            repository, job.type().name(), date, snapshot.observedAt());
         repositories.setTrafficPermissionMissing(repository, false);
       }
       case GROWTH_EVENTS -> growth(requireRepository(repositoryId), task, job, snapshot);
@@ -354,7 +339,7 @@ public class CollectorHistoryApplier {
       var release = read(snapshot, "latestRelease", GitHubReleaseItem.class);
       repositories.updateLastReleaseAt(id, release == null ? null : release.timestamp());
     }
-    traffic.upsertDailyStats(
+    stats.upsertDailyStats(
         id,
         job.businessDate(),
         remote.stargazersCount(),
@@ -363,7 +348,7 @@ public class CollectorHistoryApplier {
         remote.openIssuesCount(),
         contributors);
     if (snapshot.contributorLogins() != null)
-      traffic.replaceContributorLogins(id, job.businessDate(), snapshot.contributorLogins());
+      stats.replaceContributorLogins(id, job.businessDate(), snapshot.contributorLogins());
   }
 
   private void growth(long id, Map<String, Object> task, JobRequest job, Snapshot snapshot) {
@@ -415,24 +400,15 @@ public class CollectorHistoryApplier {
   private void rank(long task, long repository, JobRequest job, Snapshot snapshot, String target) {
     long targetId = CollectionRequestService.targetId(target);
     boolean topic = job.type() == TaskType.TOPIC_WATCH;
-    String table = topic ? "topic_run" : "search_run",
-        column = topic ? "topic_watch_id" : "search_query_id";
     // Existing history remains a daily compatibility view; no run rows are moved/deleted.
-    jdbc.update(
-        "INSERT INTO "
-            + table
-            + "("
-            + column
-            + ",repository_id,business_date,status) VALUES (?,?,?,'READY') ON CONFLICT DO NOTHING",
-        targetId,
-        repository,
-        job.businessDate());
-    long run =
-        jdbc.queryForObject(
-            "SELECT id FROM " + table + " WHERE " + column + "=? AND business_date=?",
-            Long.class,
-            targetId,
-            job.businessDate());
+    long run;
+    if (topic) {
+      topicRuns.insertIgnore(targetId, repository, job.businessDate());
+      run = topicRuns.find(targetId, job.businessDate()).orElseThrow().id();
+    } else {
+      searchRuns.insertIgnore(targetId, repository, job.businessDate());
+      run = searchRuns.find(targetId, job.businessDate()).orElseThrow().id();
+    }
     var raw = json.readTree(snapshot.metadata().getOrDefault("search", "{\"items\":[]}"));
     if (topic) {
       List<TopicResult> rows = new ArrayList<>();
@@ -476,53 +452,35 @@ public class CollectorHistoryApplier {
       if (!item.hasNonNull("private")
           || !item.get("private").isBoolean()
           || item.get("private").asBoolean()) publicRows = false;
-    jdbc.update(
-        "UPDATE " + table + " SET snapshot_at=?,completed_at=?,public_scope_verified=? WHERE id=?",
-        ts(snapshot.observedAt()),
-        ts(snapshot.observedAt()),
-        publicRows,
-        run);
-    jdbc.update(
-        "INSERT INTO collection_history_mapping VALUES (?,?,?) ON CONFLICT(task_id) DO NOTHING",
-        task,
-        job.type().name(),
-        run);
+    if (topic) topicRuns.updateSnapshotScope(run, snapshot.observedAt(), publicRows);
+    else searchRuns.updateSnapshotScope(run, snapshot.observedAt(), publicRows);
+    history.insertHistoryMapping(task, job.type().name(), run);
   }
 
   private void legacy(long task, long repository, JobRequest job, ResultDelivery result) {
     boolean rank = job.type() == TaskType.SEARCH_QUERY || job.type() == TaskType.TOPIC_WATCH;
     if (rank) {
-      long target =
-          CollectionRequestService.targetId(
-              jdbc.queryForObject(
-                  "SELECT target_key FROM collection_task WHERE id=?", String.class, task));
-      String table = job.type() == TaskType.SEARCH_QUERY ? "search_run" : "topic_run",
-          column = job.type() == TaskType.SEARCH_QUERY ? "search_query_id" : "topic_watch_id";
-      jdbc.update(
-          "INSERT INTO "
-              + table
-              + "("
-              + column
-              + ",repository_id,business_date,status,error_code,error_message,completed_at) VALUES (?,?,?,'FAILED',?,?,clock_timestamp()) ON CONFLICT("
-              + column
-              + ",business_date) DO UPDATE SET status='FAILED',error_code=excluded.error_code,error_message=excluded.error_message,completed_at=excluded.completed_at",
-          target,
-          repository,
-          job.businessDate(),
-          result.failure().code().name(),
-          result.failure().message());
+      long target = CollectionRequestService.targetId(history.targetKeyForTask(task));
+      if (job.type() == TaskType.SEARCH_QUERY)
+        searchRuns.upsertFailed(
+            target,
+            repository,
+            job.businessDate(),
+            result.failure().code().name(),
+            result.failure().message());
+      else
+        topicRuns.upsertFailed(
+            target,
+            repository,
+            job.businessDate(),
+            result.failure().code().name(),
+            result.failure().message());
       return;
     }
-    long run =
-        jdbc.queryForObject(
-            "INSERT INTO collection_run(repository_id,business_date,status,planned_jobs) VALUES (?,?,'RUNNING',5) ON CONFLICT(repository_id,business_date) DO UPDATE SET planned_jobs=greatest(collection_run.planned_jobs,5) RETURNING id",
-            Long.class,
-            repository,
-            job.businessDate());
+    long run = history.ensureLegacyRun(repository, job.businessDate());
     String type = job.type() == TaskType.STATS ? "REPOSITORY_STATS" : job.type().name(),
         state = result.status() == JobState.SUCCEEDED ? "SUCCESS" : "FAILED";
-    jdbc.update(
-        "INSERT INTO collection_job(collection_run_id,repository_id,job_type,business_date,status,completed_at,error_code,error_message) VALUES (?,?,?,?,?,clock_timestamp(),?,?) ON CONFLICT(repository_id,business_date,job_type) DO UPDATE SET status=excluded.status,completed_at=excluded.completed_at,error_code=excluded.error_code,error_message=excluded.error_message",
+    history.upsertLegacyJob(
         run,
         repository,
         type,
@@ -530,13 +488,7 @@ public class CollectorHistoryApplier {
         state,
         result.failure() == null ? null : result.failure().code().name(),
         result.failure() == null ? null : result.failure().message());
-    jdbc.update(
-        "UPDATE collection_run r SET successful_jobs=(SELECT count(*) FROM collection_job j WHERE j.collection_run_id=r.id AND j.status='SUCCESS'),failed_jobs=(SELECT count(*) FROM collection_job j WHERE j.collection_run_id=r.id AND j.status='FAILED'),status=CASE WHEN (SELECT count(*) FROM collection_job j WHERE j.collection_run_id=r.id AND j.status IN ('SUCCESS','FAILED'))>=r.planned_jobs THEN CASE WHEN EXISTS(SELECT 1 FROM collection_job j WHERE j.collection_run_id=r.id AND j.status='FAILED') THEN 'PARTIAL' ELSE 'SUCCESS' END ELSE 'RUNNING' END,completed_at=CASE WHEN (SELECT count(*) FROM collection_job j WHERE j.collection_run_id=r.id AND j.status IN ('SUCCESS','FAILED'))>=r.planned_jobs THEN clock_timestamp() ELSE NULL END WHERE id=?",
-        run);
-    jdbc.update(
-        "INSERT INTO collection_history_mapping VALUES (?,?,?) ON CONFLICT(task_id) DO NOTHING",
-        task,
-        job.type().name(),
-        run);
+    history.refreshLegacyRun(run);
+    history.insertHistoryMapping(task, job.type().name(), run);
   }
 }

@@ -323,9 +323,9 @@ export function EventDetailsDialog({
     let cancelled = false;
     const day = today ?? new Date().toISOString().slice(0, 10);
     Promise.all([
-      api<RepositoryTraffic>(`/api/v1/admin/repositories/${repositoryId}/traffic?period=all`),
+      api<RepositoryTraffic>(`/api/v1/repositories/${repositoryId}/traffic?period=all`),
       api<RepositoryStatsHistory>(
-        `/api/v1/admin/repositories/${repositoryId}/stats-history?period=all`,
+        `/api/v1/repositories/${repositoryId}/stats-history?period=all`,
       ),
       api<SearchHistory[]>(`/api/v1/repositories/${repositoryId}/search-queries?include=history`),
     ])

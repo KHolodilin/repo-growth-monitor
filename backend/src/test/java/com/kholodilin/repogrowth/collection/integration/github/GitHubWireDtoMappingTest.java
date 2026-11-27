@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -110,130 +109,7 @@ class GitHubWireDtoMappingTest {
   }
 
   @Test
-  void trafficSearchReleaseAndSidebarHelpersCoverNullAndPresentBranches() throws Exception {
-    GitHubTrafficViewsResponse emptyViews =
-        mapper.readValue(
-            """
-            {"count":0,"uniques":0,"views":null}
-            """,
-            GitHubTrafficViewsResponse.class);
-    assertThat(emptyViews.days()).isEmpty();
-
-    GitHubTrafficViewsResponse views =
-        mapper.readValue(
-            """
-            {
-              "count": 3,
-              "uniques": 2,
-              "views": [{"timestamp":"2026-11-01T00:00:00Z","count":3,"uniques":2}]
-            }
-            """,
-            GitHubTrafficViewsResponse.class);
-    assertThat(views.days()).hasSize(1);
-    assertThat(views.days().getFirst().date()).isEqualTo(LocalDate.of(2026, 11, 1));
-
-    GitHubTrafficClonesResponse emptyClones =
-        mapper.readValue(
-            """
-            {"count":0,"uniques":0,"clones":null}
-            """,
-            GitHubTrafficClonesResponse.class);
-    assertThat(emptyClones.days()).isEmpty();
-    assertThat(
-            mapper
-                .readValue(
-                    """
-                    {
-                      "count": 1,
-                      "uniques": 1,
-                      "clones": [{"timestamp":"2026-11-02T00:00:00Z","count":1,"uniques":1}]
-                    }
-                    """,
-                    GitHubTrafficClonesResponse.class)
-                .days())
-        .hasSize(1);
-
-    assertThat(
-            mapper
-                .readValue(
-                    """
-                    {"total_count":0,"items":null}
-                    """,
-                    GitHubSearchResponse.class)
-                .itemsOrEmpty())
-        .isEmpty();
-    assertThat(
-            mapper
-                .readValue(
-                    """
-                    {"total_count":1,"items":[{"id":1,"full_name":"a/b","stargazers_count":1}]}
-                    """,
-                    GitHubSearchResponse.class)
-                .itemsOrEmpty())
-        .hasSize(1);
-
-    GitHubReleaseResponse published =
-        mapper.readValue(
-            """
-            {"draft":false,"published_at":"2026-11-01T10:00:00Z","created_at":"2026-10-31T10:00:00Z"}
-            """,
-            GitHubReleaseResponse.class);
-    assertThat(published.timestamp()).isEqualTo(Instant.parse("2026-11-01T10:00:00Z"));
-    assertThat(
-            mapper
-                .readValue(
-                    """
-                    {"draft":true,"published_at":null,"created_at":"2026-10-31T10:00:00Z"}
-                    """,
-                    GitHubReleaseResponse.class)
-                .timestamp())
-        .isEqualTo(Instant.parse("2026-10-31T10:00:00Z"));
-
-    GitHubSidebarResponse sidebar =
-        mapper.readValue(
-            """
-            {"contributors":{"contributorCount":4}}
-            """,
-            GitHubSidebarResponse.class);
-    assertThat(sidebar.contributors().contributorCount()).isEqualTo(4);
-
-    assertThat(
-            mapper
-                .readValue(
-                    """
-                    {"path":"/docs","title":"Docs","count":2,"uniques":1}
-                    """,
-                    GitHubPathResponse.class)
-                .path())
-        .isEqualTo("/docs");
-    assertThat(
-            mapper
-                .readValue(
-                    """
-                    {"referrer":"github.com","count":5,"uniques":3}
-                    """,
-                    GitHubReferrerResponse.class)
-                .referrer())
-        .isEqualTo("github.com");
-    assertThat(new GitHubSocialPreview(true, "https://img.example/og.png").custom()).isTrue();
-
-    GitHubSocialPreviewResponse social =
-        mapper.readValue(
-            """
-            {
-              "data": {
-                "repository": {
-                  "usesCustomOpenGraphImage": true,
-                  "openGraphImageUrl": "https://img.example/og.png"
-                }
-              },
-              "errors": [{"message":"ok"}]
-            }
-            """,
-            GitHubSocialPreviewResponse.class);
-    assertThat(social.data().repository().usesCustomOpenGraphImage()).isTrue();
-    assertThat(social.errors()).hasSize(1);
-
+  void issueAndCommunityHelpersCoverNullAndPresentBranches() throws Exception {
     assertThat(
             mapper
                 .readValue(

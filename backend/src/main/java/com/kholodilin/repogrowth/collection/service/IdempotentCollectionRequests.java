@@ -4,12 +4,12 @@ import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.exception.IdempotencyConflictException;
 import com.kholodilin.idempotency.model.IdempotencyKey;
 import com.kholodilin.repogrowth.collection.idempotency.ScopedIdempotency;
+import com.kholodilin.repogrowth.collection.repository.CollectionRequestCommandJdbcRepository;
 import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import java.time.LocalDate;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -22,19 +22,19 @@ public class IdempotentCollectionRequests {
   private final IdempotencyService idempotency;
   private final TransactionTemplate tx;
   private final UserAccountService users;
-  private final JdbcTemplate jdbc;
+  private final CollectionRequestCommandJdbcRepository commands;
 
   public IdempotentCollectionRequests(
       CollectionRequestService service,
       @Qualifier("rgmIdempotency") IdempotencyService idempotency,
       PlatformTransactionManager tm,
       UserAccountService users,
-      JdbcTemplate jdbc) {
+      CollectionRequestCommandJdbcRepository commands) {
     this.service = service;
     this.idempotency = idempotency;
     this.tx = new TransactionTemplate(tm);
     this.users = users;
-    this.jdbc = jdbc;
+    this.commands = commands;
   }
 
   public CollectionRequestService.Created create(
@@ -51,10 +51,7 @@ public class IdempotentCollectionRequests {
           .execute(
               CollectionRequestService.Created.class,
               () -> {
-                var bindings =
-                    jdbc.queryForList(
-                        "SELECT c.*,r.public_id FROM collection_request_command c JOIN collection_request r ON r.id=c.request_id WHERE c.command_key=?",
-                        scoped);
+                var bindings = commands.findBinding(scoped);
                 if (!bindings.isEmpty()) {
                   var binding = bindings.getFirst();
                   if (((Number) binding.get("repository_id")).longValue() != repositoryId)
@@ -66,20 +63,12 @@ public class IdempotentCollectionRequests {
                   return ExecutionResult.success(
                       new CollectionRequestService.Created(
                           (java.util.UUID) binding.get("public_id"),
-                          jdbc.queryForList(
-                              "SELECT public_id FROM collection_task WHERE request_id=? ORDER BY id",
-                              java.util.UUID.class,
-                              request),
+                          commands.taskPublicIds(request),
                           (Boolean) binding.get("coalesced")));
                 }
                 var created = service.manual(repositoryId, date);
-                jdbc.update(
-                    "INSERT INTO collection_request_command(command_key,actor_id,repository_id,request_id,coalesced) SELECT ?,?,?,id,? FROM collection_request WHERE public_id=?",
-                    scoped,
-                    actorId,
-                    repositoryId,
-                    created.coalesced(),
-                    created.requestId());
+                commands.insertBinding(
+                    scoped, actorId, repositoryId, created.coalesced(), created.requestId());
                 return ExecutionResult.success(created);
               })
           .valueOrThrow();

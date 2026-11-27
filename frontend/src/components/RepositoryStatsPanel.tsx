@@ -40,7 +40,7 @@ export function RepositoryStatsPanel({
   useEffect(() => {
     let cancelled = false;
     api<RepositoryStatsHistory>(
-      `/api/v1/admin/repositories/${repositoryId}/stats-history?period=${period}`,
+      `/api/v1/repositories/${repositoryId}/stats-history?period=${period}`,
     )
       .then((data) => {
         if (!cancelled) {

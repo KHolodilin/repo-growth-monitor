@@ -409,7 +409,7 @@ class PublicApiIT extends AbstractPostgresTest {
     assertThat(jdbc.queryForObject("SELECT task_type FROM collection_task", String.class))
         .isEqualTo("SEARCH_QUERY");
     mvc.perform(
-            post("/api/v1/admin/topic-watches/" + watch + "/run").with(as("admin")).with(csrf()))
+            post("/api/v1/topic-watches/" + watch + "/run").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.taskIds.length()").value(2));
     assertThat(jdbc.queryForObject("SELECT count(*) FROM collection_attempt", Long.class))
@@ -506,7 +506,7 @@ class PublicApiIT extends AbstractPostgresTest {
             jdbc.queryForObject(
                 "SELECT count(*) FROM collection_task WHERE task_type='SEARCH_QUERY'", Long.class))
         .isEqualTo(1);
-    mvc.perform(get("/api/v1/admin/dashboard").with(as("admin")))
+    mvc.perform(get("/api/v1/dashboard").with(as("admin")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.activeCollection.status").value("RUNNING"))
         .andExpect(jsonPath("$.repositories[0].collectionStatus").value("RUNNING"));
@@ -561,11 +561,11 @@ class PublicApiIT extends AbstractPostgresTest {
         .andExpect(status().isCreated());
     String request =
         jdbc.queryForObject("SELECT public_id::text FROM collection_request", String.class);
-    mvc.perform(get("/api/v1/admin/collection-requests/" + request).with(as("admin")))
+    mvc.perform(get("/api/v1/collection-requests/" + request).with(as("admin")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.state").value("ACTIVE"))
         .andExpect(jsonPath("$.tasks.length()").value(1));
-    mvc.perform(get("/api/v1/admin/collection-requests/" + request))
+    mvc.perform(get("/api/v1/collection-requests/" + request))
         .andExpect(status().isUnauthorized());
     mvc.perform(get("/api/v1/admin/repositories?refresh=true").with(as("admin")))
         .andExpect(status().isBadRequest());

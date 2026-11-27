@@ -62,7 +62,7 @@ export function TopicDetailsPage() {
     const [repository, topicHistory] = await Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
       api<TopicHistory>(
-        `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
+        `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
       ),
     ]);
     if (version !== generation.current) return;
@@ -70,10 +70,10 @@ export function TopicDetailsPage() {
     setHistory(topicHistory);
     const [nextResults, nextSeries] = await Promise.all([
       api<TopicRunResults>(
-        `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`,
+        `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`,
       ).catch(() => null),
       api<typeof competitors>(
-        `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`,
+        `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`,
       ).catch(() => []),
     ]);
     if (version !== generation.current) return;
@@ -90,7 +90,7 @@ export function TopicDetailsPage() {
     Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
       api<TopicHistory>(
-        `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
+        `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
       ),
     ])
       .then(async ([repository, topicHistory]) => {
@@ -99,10 +99,10 @@ export function TopicDetailsPage() {
         setHistory(topicHistory);
         const [nextResults, nextSeries] = await Promise.all([
           api<TopicRunResults>(
-            `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`,
+            `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/results?scope=${scope}`,
           ).catch(() => null),
           api<typeof competitors>(
-            `/api/v1/admin/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`,
+            `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/series?scope=${scope}`,
           ).catch(() => []),
         ]);
         if (cancelled || version !== generation.current) return;
@@ -139,7 +139,7 @@ export function TopicDetailsPage() {
     setRunning(true);
     try {
       const created = await api<{ requestId?: string }>(
-        `/api/v1/admin/topic-watches/${history.watch.id}/run`,
+        `/api/v1/topic-watches/${history.watch.id}/run`,
         { method: "POST" },
       );
       if (created?.requestId) {

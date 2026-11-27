@@ -115,7 +115,8 @@ class ResourceAccessPolicyTest {
     assertThat(policy.isOpsSurface("/api/v1/admin/system")).isTrue();
     assertThat(policy.isOpsSurface("/api/v1/admin/collection/plan")).isTrue();
     assertThat(policy.isOpsSurface("/api/v1/admin/credentials")).isTrue();
-    assertThat(policy.isOpsSurface("/api/v1/admin/dashboard")).isTrue();
+    assertThat(policy.isOpsSurface("/api/v1/dashboard")).isFalse();
+    assertThat(policy.isOpsSurface("/api/v1/admin/system/status")).isTrue();
     assertThat(policy.isOpsSurface("/admin")).isTrue();
     assertThat(policy.isOpsSurface("/internal/v1/collectors")).isTrue();
     assertThat(policy.surfaceOf(null)).isEqualTo(ApiSurface.RESOURCE);

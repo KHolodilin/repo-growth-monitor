@@ -313,7 +313,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
         .isFalse();
     var restarted =
         new SharedGitHubBudget(
-            jdbc,
+            new com.kholodilin.repogrowth.collection.repository.GitHubBudgetJdbcRepository(jdbc),
             new org.springframework.jdbc.datasource.DataSourceTransactionManager(
                 jdbc.getDataSource()),
             vault);
@@ -600,7 +600,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
         .thenReturn(true);
     return new com.kholodilin.repogrowth.collection.service.CollectorNodeMonitor(
-        jdbc,
+        new com.kholodilin.repogrowth.collection.repository.CollectorNodeMonitorJdbcRepository(jdbc),
         transactionManager,
         orchestration,
         new com.kholodilin.repogrowth.collection.configuration.RecoveryProperties(
@@ -694,7 +694,11 @@ class CredentialVaultIT extends AbstractPostgresTest {
             JobRequest.class);
     assertThat(vault.resolve("node-b", credentialRequest(next)).token())
         .isEqualTo("github-secret-v1");
-    var restartedBudget = new SharedGitHubBudget(jdbc, transactionManager, vault);
+    var restartedBudget =
+        new SharedGitHubBudget(
+            new com.kholodilin.repogrowth.collection.repository.GitHubBudgetJdbcRepository(jdbc),
+            transactionManager,
+            vault);
     assertThat(
             restartedBudget
                 .acquire(

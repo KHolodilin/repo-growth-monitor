@@ -1,9 +1,8 @@
 package com.kholodilin.repogrowth.collection.service;
 
 import com.kholodilin.repogrowth.catalog.controller.DashboardResponse;
+import com.kholodilin.repogrowth.collection.repository.AdminCollectionProgressJdbcRepository;
 import java.util.*;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -12,21 +11,19 @@ import tools.jackson.databind.node.ObjectNode;
 /** Admin operational projection only; Public APIs never use this payload. */
 @Component
 public class AdminCollectionProgress {
-  private final NamedParameterJdbcTemplate jdbc;
+  private final AdminCollectionProgressJdbcRepository progress;
   private final JsonMapper json;
 
-  public AdminCollectionProgress(JdbcTemplate jdbc, JsonMapper json) {
-    this.jdbc = new NamedParameterJdbcTemplate(jdbc);
+  public AdminCollectionProgress(
+      AdminCollectionProgressJdbcRepository progress, JsonMapper json) {
+    this.progress = progress;
     this.json = json;
   }
 
   public Object apply(DashboardResponse dashboard) {
     if (dashboard == null || dashboard.repositories().isEmpty()) return dashboard;
     var ids = dashboard.repositories().stream().map(row -> row.id()).toList();
-    var tasks =
-        jdbc.queryForList(
-            "SELECT r.repository_id,t.task_type,t.state FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE r.state='ACTIVE' AND r.repository_id IN (:ids) ORDER BY t.id",
-            Map.of("ids", ids));
+    var tasks = progress.activeTasks(ids);
     if (tasks.isEmpty()) return dashboard;
     ObjectNode result = json.valueToTree(dashboard);
     int successful = 0;

@@ -82,23 +82,28 @@ public class TrafficController {
     return traffic.pathHistory(repositoryId, period, days, includeServicePaths);
   }
 
-  /** Legacy admin composite traffic card; prefer resource KPI/referrers/paths. */
-  @GetMapping("/admin/repositories/{id}/traffic")
-  public AdminTrafficService.RepositoryTrafficSnapshot adminTraffic(
-      @PathVariable("id") long id,
+  /**
+   * Legacy composite traffic card used by Repository Details. Prefer KPI/referrers/paths once FE
+   * consumes those shapes; no {@code /admin} prefix.
+   */
+  @GetMapping("/repositories/{repositoryId}/traffic")
+  public AdminTrafficService.RepositoryTrafficSnapshot repositoryTraffic(
+      @PathVariable long repositoryId,
       @RequestParam(defaultValue = "7d") String period,
       @RequestParam(defaultValue = "false") boolean includeServicePaths) {
-    return adminTraffic.traffic(id, period, includeServicePaths);
+    return adminTraffic.traffic(repositoryId, period, includeServicePaths);
   }
 
-  /** Legacy admin referrer/path history (?kind=); prefer referrer-history / path-history. */
-  @GetMapping("/admin/repositories/{id}/traffic-history")
-  public AdminTrafficService.SnapshotHistoryResponse adminTrafficHistory(
-      @PathVariable("id") long id,
+  /**
+   * Legacy combined referrer/path history ({@code ?kind=}). Prefer referrer-history / path-history.
+   */
+  @GetMapping("/repositories/{repositoryId}/traffic/snapshot-history")
+  public AdminTrafficService.SnapshotHistoryResponse repositorySnapshotHistory(
+      @PathVariable long repositoryId,
       @RequestParam(required = false) String kind,
       @RequestParam(required = false) Integer days,
       @RequestParam(required = false) String period,
       @RequestParam(defaultValue = "false") boolean includeServicePaths) {
-    return adminTraffic.snapshotHistory(id, kind, period, days, includeServicePaths);
+    return adminTraffic.snapshotHistory(repositoryId, kind, period, days, includeServicePaths);
   }
 }

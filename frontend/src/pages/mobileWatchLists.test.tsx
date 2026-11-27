@@ -163,7 +163,7 @@ describe("mobile repository watch-lists", () => {
           screen.getByRole("link", { name: searchHistory.query.name }).closest("article")!,
         ).getByRole("button", { name: "Delete" }),
       );
-      expect(state.api).toHaveBeenCalledWith("/api/v1/admin/search-queries/5", {
+      expect(state.api).toHaveBeenCalledWith("/api/v1/search-queries/5", {
         method: "DELETE",
       });
     }

@@ -8,12 +8,11 @@ import com.kholodilin.repogrowth.catalog.service.*;
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.common.model.GrowthMath;
 import com.kholodilin.repogrowth.search.service.PortfolioHighlightMath;
+import com.kholodilin.repogrowth.catalog.repository.PublicReadJdbcRepository;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import java.time.*;
 import java.util.*;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 /**
@@ -42,8 +41,7 @@ public class PublicReadService {
       Long absoluteChange,
       Double growthPercent) {}
 
-  private final JdbcTemplate jdbc;
-  private final NamedParameterJdbcTemplate sql;
+  private final PublicReadJdbcRepository reads;
   private final PublicationService policy;
   private final PublicationProperties properties;
   private final ActivityClassifier activityClassifier;
@@ -51,14 +49,13 @@ public class PublicReadService {
   private final RepositoryJdbcRepository repositoryJdbc;
 
   public PublicReadService(
-      JdbcTemplate jdbc,
+      PublicReadJdbcRepository reads,
       PublicationService policy,
       PublicationProperties properties,
       ActivityClassifier activityClassifier,
       RepositoryHealthService healthService,
       RepositoryJdbcRepository repositoryJdbc) {
-    this.jdbc = jdbc;
-    this.sql = new NamedParameterJdbcTemplate(jdbc);
+    this.reads = reads;
     this.policy = policy;
     this.properties = properties;
     this.activityClassifier = activityClassifier;
@@ -70,12 +67,8 @@ public class PublicReadService {
     return ApiException.notFound("Page not found");
   }
 
-  private String gate() {
-    return "r.public_dashboard_enabled AND r.visibility='PUBLIC' AND r.visibility_verified_at<=clock_timestamp() AND r.visibility_verified_at>clock_timestamp()-(:age*interval '1 millisecond')";
-  }
-
-  private Map<String, Object> params() {
-    return new HashMap<>(Map.of("age", properties.verificationMaxAge().toMillis()));
+  private long ageMillis() {
+    return properties.verificationMaxAge().toMillis();
   }
 
   private int limit(int value) {
@@ -94,9 +87,6 @@ public class PublicReadService {
 
   public List<Long> scope(String owner, String repository, PublicationService.Module module) {
     var resolved = policy.resolve("/" + owner + (repository == null ? "" : "/" + repository));
-    var p = params();
-    p.put("owner", resolved.ownerId());
-    p.put("repository", resolved.repositoryId());
     String flag =
         switch (module) {
           case DASHBOARD -> "public_dashboard_enabled";
@@ -106,14 +96,8 @@ public class PublicReadService {
           case TOPICS -> "public_topics_enabled";
         };
     var ids =
-        sql.queryForList(
-            "SELECT r.id FROM repository r WHERE r.owner_id=:owner AND (:repository::bigint IS NULL OR r.id=:repository) AND "
-                + gate()
-                + " AND r."
-                + flag
-                + " ORDER BY r.id",
-            p,
-            Long.class);
+        reads.scopedRepositoryIds(
+            resolved.ownerId(), resolved.repositoryId(), flag, ageMillis());
     if (ids.isEmpty()) throw missing();
     return ids;
   }
@@ -124,24 +108,22 @@ public class PublicReadService {
 
   public Page repositories(String owner, long after, int size, String rawPeriod) {
     var ids = scope(owner, null, PublicationService.Module.DASHBOARD);
-    var p = params();
-    p.put("ids", ids);
-    p.put("after", cursor(after));
-    p.put("limit", limit(size) + 1);
     var range = period(ids, rawPeriod, true);
-    p.put("from", range.from());
-    p.put("to", range.to());
-    p.put(
-        "trafficTo",
+    LocalDate trafficTo =
         range.to().isBefore(LocalDate.now(ZoneOffset.UTC))
             ? range.to()
-            : LocalDate.now(ZoneOffset.UTC).minusDays(1));
+            : LocalDate.now(ZoneOffset.UTC).minusDays(1);
     // Traffic row values are observed period sums (same basis as owner KPI observedValue), not null
     // when a day is missing.
     var rows =
-        sql.queryForList(
-            "SELECT s.stars,s.forks,t.views,t.visitors,t.clones,t.\"trafficComplete\" AS \"trafficComplete\",r.id,r.github_id::text AS \"githubId\",r.name,r.description,r.language,r.archived,r.publication_revision AS \"publicationRevision\",r.enriched_at AS \"lastObservedAt\",coalesce(r.last_commit_at,r.github_pushed_at) AS \"activityAt\" FROM repository r LEFT JOIN LATERAL (SELECT stars,forks FROM repository_daily_stats WHERE repository_id=r.id AND stat_date<=:to ORDER BY stat_date DESC LIMIT 1) s ON true LEFT JOIN LATERAL (SELECT sum(views) AS views,sum(unique_visitors) AS visitors,sum(clones) AS clones,count(*)=(:trafficTo::date-:from::date+1) AS \"trafficComplete\" FROM traffic_daily WHERE repository_id=r.id AND traffic_date BETWEEN :from AND :trafficTo AND r.public_traffic_enabled) t ON true WHERE r.id IN (:ids) AND r.id>:after ORDER BY r.id LIMIT :limit",
-            p);
+        reads.repositoryPage(
+            ids,
+            cursor(after),
+            limit(size) + 1,
+            range.from(),
+            range.to(),
+            trafficTo,
+            ageMillis());
     var growth = visitorRows(ids, range);
     for (var row : rows) {
       long id = ((Number) row.get("id")).longValue();
@@ -239,32 +221,18 @@ public class PublicReadService {
   }
 
   private DashboardPeriod period(List<Long> ids, String raw, boolean traffic) {
-    var p = Map.of("ids", ids);
-    String table = traffic ? "traffic_daily" : "repository_daily_stats",
-        date = traffic ? "traffic_date" : "stat_date";
-    var earliest =
-        sql.queryForObject(
-            "SELECT min(" + date + ") FROM " + table + " WHERE repository_id IN (:ids)",
-            p,
-            LocalDate.class);
-    return DashboardPeriod.of(raw, LocalDate.now(ZoneOffset.UTC), earliest);
+    return DashboardPeriod.of(
+        raw, LocalDate.now(ZoneOffset.UTC), reads.earliestDate(ids, traffic));
   }
 
   public Map<String, Object> stats(String owner, String repository, String period) {
     var ids = scope(owner, repository, PublicationService.Module.DASHBOARD);
     var range = period(ids, period, false);
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("to", range.to());
-    p.put("baseline", range.allTime() ? range.from() : range.previousTo());
-    // Per-repo tip (same as admin/main): do not gate on a shared tip day.
-    String latest =
-        "SELECT DISTINCT ON (repository_id) repository_id,stars,forks,watchers,contributors,contributor_logins_collected,stat_date FROM repository_daily_stats WHERE repository_id IN (:ids) AND stat_date<=:to ORDER BY repository_id,stat_date DESC";
-    var current = sql.queryForList(latest, p);
-    var priorParams = new HashMap<>(p);
-    priorParams.put("to", p.get("baseline"));
+    var current = reads.latestDailyStats(ids, range.to());
     var previous =
-        range.allTime() ? List.<Map<String, Object>>of() : sql.queryForList(latest, priorParams);
+        range.allTime()
+            ? List.<Map<String, Object>>of()
+            : reads.latestDailyStats(ids, range.previousTo());
     Map<String, Object> totals = new LinkedHashMap<>();
     for (String metric : List.of("stars", "forks", "watchers")) {
       long value = current.stream().mapToLong(row -> ((Number) row.get(metric)).longValue()).sum();
@@ -315,11 +283,7 @@ public class PublicReadService {
     }
     Map<String, Set<String>> loginsByTip = new HashMap<>();
     if (!tipDates.isEmpty()) {
-      var loginRows =
-          sql.queryForList(
-              "SELECT repository_id,stat_date,login FROM repository_daily_contributor_login WHERE repository_id IN (:ids) AND stat_date IN (:tipDates)",
-              Map.of("ids", ids, "tipDates", tipDates));
-      for (var row : loginRows) {
+      for (var row : reads.contributorLogins(ids, tipDates)) {
         LocalDate day = localDate(row.get("stat_date"));
         if (row.get("repository_id") == null || day == null || row.get("login") == null) continue;
         String key = ((Number) row.get("repository_id")).longValue() + "|" + day;
@@ -361,16 +325,10 @@ public class PublicReadService {
   }
 
   private Map<String, Object> highlights(List<Long> ids, DashboardPeriod range) {
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("from", range.from());
-    p.put("to", range.to());
-    // SUCCESS + public_enabled (admin Portfolio parity). public_scope_verified alone only covers
-    // recent flat tips.
     var ranks =
-        sql.query(
-            "SELECT r.id,r.full_name,q.name AS query,s.business_date,s.tracked_repository_position FROM search_run s JOIN search_query q ON q.id=s.search_query_id AND q.repository_id=s.repository_id JOIN repository r ON r.id=s.repository_id WHERE r.id IN (:ids) AND q.public_enabled AND s.status='SUCCESS' AND s.tracked_repository_position IS NOT NULL AND s.business_date<=:to",
-            p,
+        reads.successfulRanks(
+            ids,
+            range.to(),
             (rs, n) ->
                 new com.kholodilin.repogrowth.search.model.SuccessfulRank(
                     rs.getLong("id"),
@@ -379,9 +337,10 @@ public class PublicReadService {
                     rs.getObject("business_date", LocalDate.class),
                     rs.getInt("tracked_repository_position")));
     var promotions =
-        sql.query(
-            "SELECT r.id,r.full_name,count(*) AS count FROM growth_event e JOIN repository r ON r.id=e.repository_id WHERE r.id IN (:ids) AND e.category='PROMOTION' AND (e.event_at AT TIME ZONE 'UTC')::date BETWEEN :from AND :to GROUP BY r.id,r.full_name",
-            p,
+        reads.promotionCounts(
+            ids,
+            range.from(),
+            range.to(),
             (rs, n) ->
                 new com.kholodilin.repogrowth.events.model.PromotionCount(
                     rs.getLong("id"), rs.getString("full_name"), rs.getInt("count")));
@@ -427,15 +386,14 @@ public class PublicReadService {
             : LocalDate.now(ZoneOffset.UTC).minusDays(1);
     long days = java.time.temporal.ChronoUnit.DAYS.between(range.from(), to) + 1;
     if (days <= 0) return List.of();
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("from", range.from());
-    p.put("to", to);
-    p.put("previousTo", range.previousTo());
-    p.put("previousFrom", range.previousTo().minusDays(days - 1));
-    return sql.query(
-        "SELECT r.id,r.full_name,count(t.traffic_date) FILTER(WHERE t.traffic_date BETWEEN :from AND :to) AS observed,count(t.traffic_date) FILTER(WHERE t.traffic_date BETWEEN :previousFrom AND :previousTo) AS prior_observed,sum(t.unique_visitors) FILTER(WHERE t.traffic_date BETWEEN :from AND :to) AS visitors,sum(t.unique_visitors) FILTER(WHERE t.traffic_date BETWEEN :previousFrom AND :previousTo) AS prior FROM repository r LEFT JOIN traffic_daily t ON t.repository_id=r.id AND t.traffic_date BETWEEN :previousFrom AND :to WHERE r.id IN (:ids) AND r.public_traffic_enabled GROUP BY r.id,r.full_name",
-        p,
+    LocalDate previousTo = range.previousTo();
+    LocalDate previousFrom = previousTo.minusDays(days - 1);
+    return reads.visitorRows(
+        ids,
+        range.from(),
+        to,
+        previousFrom,
+        previousTo,
         (rs, n) -> {
           Long value = rs.getLong("observed") == days ? rs.getLong("visitors") : null;
           Double growth =
@@ -468,25 +426,11 @@ public class PublicReadService {
       String owner, String repository, String period, LocalDate before, int size) {
     var ids = scope(owner, repository, PublicationService.Module.DASHBOARD);
     var range = period(ids, period, false);
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("from", range.from());
-    p.put("to", before == null ? range.to() : before.minusDays(1));
-    p.put("limit", limit(size) + 1);
-    var rows =
-        sql.queryForList(
-            "SELECT stat_date AS date,sum(stars) AS stars,sum(forks) AS forks,sum(watchers) AS watchers,count(*) AS observed FROM repository_daily_stats WHERE repository_id IN (:ids) AND stat_date BETWEEN :from AND :to GROUP BY stat_date ORDER BY stat_date DESC LIMIT :limit",
-            p);
+    LocalDate to = before == null ? range.to() : before.minusDays(1);
+    var rows = reads.statsHistory(ids, range.from(), to, limit(size) + 1);
     if (!rows.isEmpty()) {
-      p.put("dates", rows.stream().map(row -> row.get("date")).toList());
-      var counts =
-          sql.queryForList(
-              "SELECT s.stat_date AS date,count(DISTINCT lower(c.login)) AS contributors,bool_and(s.contributor_logins_collected AND s.contributors=(SELECT count(*) FROM repository_daily_contributor_login x WHERE x.repository_id=s.repository_id AND x.stat_date=s.stat_date)) AND count(DISTINCT s.repository_id)=:expected AS complete FROM repository_daily_stats s LEFT JOIN repository_daily_contributor_login c ON c.repository_id=s.repository_id AND c.stat_date=s.stat_date WHERE s.repository_id IN (:ids) AND s.stat_date IN (:dates) GROUP BY s.stat_date",
-              new HashMap<>(p) {
-                {
-                  put("expected", ids.size());
-                }
-              });
+      var dates = rows.stream().map(row -> row.get("date")).toList();
+      var counts = reads.statsHistoryContributorCounts(ids, dates, ids.size());
       for (var row : rows) {
         var contributors =
             counts.stream()
@@ -516,28 +460,17 @@ public class PublicReadService {
   public Map<String, Object> traffic(String owner, String repository, String period) {
     var ids = scope(owner, repository, PublicationService.Module.TRAFFIC);
     var range = period(ids, period, true);
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("from", range.from());
-    p.put("to", trafficKpiEnd(ids, range));
-    String totalsSql =
-        "SELECT count(*) AS observed,coalesce(sum(views),0) AS views,coalesce(sum(unique_visitors),0) AS visitors,coalesce(sum(clones),0) AS clones,coalesce(sum(unique_cloners),0) AS \"uniqueCloners\" FROM traffic_daily WHERE repository_id IN (:ids) AND traffic_date BETWEEN :from AND :to";
-    var result = sql.queryForMap(totalsSql, p);
-    long
-        expected =
-            Math.max(
-                    0,
-                    java.time.temporal.ChronoUnit.DAYS.between(
-                            range.from(), (LocalDate) p.get("to"))
-                        + 1)
+    LocalDate to = trafficKpiEnd(ids, range);
+    var result = reads.trafficTotals(ids, range.from(), to);
+    long expected =
+            Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(range.from(), to) + 1)
                 * ids.size(),
         observed = ((Number) result.get("observed")).longValue();
     Map<String, Object> prior = new HashMap<>();
     if (!range.allTime() && expected > 0) {
-      var previous = new HashMap<>(p);
-      previous.put("to", range.previousTo());
-      previous.put("from", range.previousTo().minusDays(expected / ids.size() - 1));
-      prior = sql.queryForMap(totalsSql, previous);
+      LocalDate previousTo = range.previousTo();
+      LocalDate previousFrom = previousTo.minusDays(expected / ids.size() - 1);
+      prior = reads.trafficTotals(ids, previousFrom, previousTo);
     }
     boolean comparable =
         !prior.isEmpty()
@@ -583,11 +516,7 @@ public class PublicReadService {
         || "1d".equals(range.value())
         || ids.isEmpty()
         || end.isBefore(range.from())) return end;
-    Long tip =
-        sql.queryForObject(
-            "SELECT count(*) FROM traffic_daily WHERE repository_id IN (:ids) AND traffic_date=:tip",
-            Map.of("ids", ids, "tip", end),
-            Long.class);
+    Long tip = reads.trafficTipCount(ids, end);
     if (tip != null && tip < ids.size()) {
       LocalDate prior = end.minusDays(1);
       return prior.isBefore(range.from()) ? end : prior;
@@ -599,15 +528,8 @@ public class PublicReadService {
       String owner, String repository, String period, LocalDate before, int size) {
     var ids = scope(owner, repository, PublicationService.Module.TRAFFIC);
     var range = period(ids, period, true);
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("from", range.from());
-    p.put("to", before == null ? publishedEnd(range.to()) : before.minusDays(1));
-    p.put("limit", limit(size) + 1);
-    var rows =
-        sql.queryForList(
-            "SELECT traffic_date AS date,sum(views) AS views,sum(unique_visitors) AS visitors,sum(clones) AS clones,sum(unique_cloners) AS \"uniqueCloners\",count(*) AS observed FROM traffic_daily WHERE repository_id IN (:ids) AND traffic_date BETWEEN :from AND :to GROUP BY traffic_date ORDER BY traffic_date DESC LIMIT :limit",
-            p);
+    LocalDate to = before == null ? publishedEnd(range.to()) : before.minusDays(1);
+    var rows = reads.trafficHistory(ids, range.from(), to, limit(size) + 1);
     for (var row : rows) {
       boolean complete = ((Number) row.get("observed")).longValue() == ids.size();
       row.put("complete", complete);
@@ -625,11 +547,7 @@ public class PublicReadService {
     if (items.isEmpty()) return;
     List<LocalDate> dates = distinctItemDates(items);
     if (dates.isEmpty()) return;
-    var byDate =
-        sharesByDate(
-            sql.queryForList(
-                "SELECT t.traffic_date AS date,r.full_name AS \"fullName\",t.views,t.unique_visitors AS visitors,t.clones FROM traffic_daily t JOIN repository r ON r.id=t.repository_id WHERE t.repository_id IN (:ids) AND t.traffic_date IN (:dates)",
-                Map.of("ids", ids, "dates", dates)));
+    var byDate = sharesByDate(reads.trafficShares(ids, dates));
     for (var row : items) {
       List<Map<String, Object>> day = byDate.getOrDefault(localDate(row.get("date")), List.of());
       row.put("viewsLeaders", topLeaders(day, "views"));
@@ -642,11 +560,7 @@ public class PublicReadService {
     if (items.isEmpty()) return;
     List<LocalDate> dates = distinctItemDates(items);
     if (dates.isEmpty()) return;
-    var byDate =
-        sharesByDate(
-            sql.queryForList(
-                "SELECT s.stat_date AS date,r.full_name AS \"fullName\",s.stars,s.forks,s.watchers,s.contributors FROM repository_daily_stats s JOIN repository r ON r.id=s.repository_id WHERE s.repository_id IN (:ids) AND s.stat_date IN (:dates)",
-                Map.of("ids", ids, "dates", dates)));
+    var byDate = sharesByDate(reads.statShares(ids, dates));
     for (var row : items) {
       List<Map<String, Object>> day = byDate.getOrDefault(localDate(row.get("date")), List.of());
       row.put("starsLeaders", topLeaders(day, "stars"));
@@ -708,29 +622,8 @@ public class PublicReadService {
             owner,
             repository,
             paths ? PublicationService.Module.PATHS : PublicationService.Module.REFERRERS);
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("after", cursor(after));
-    p.put("limit", limit(size) + 1);
-    String table = paths ? "traffic_path_snapshot" : "traffic_referrer_snapshot",
-        column = paths ? "path" : "referrer",
-        family = paths ? "POPULAR_PATHS" : "REFERRERS";
     return page(
-        sql.queryForList(
-            "SELECT s.id,s.repository_id AS \"repositoryId\",s."
-                + column
-                + " AS label,s.views,s.unique_visitors AS visitors,s.snapshot_at AS \"observedAt\" FROM "
-                + table
-                + " s WHERE s.repository_id IN (:ids) AND s.id>:after "
-                + (paths ? "AND NOT s.service_path " : "")
-                + "AND s.snapshot_date=(SELECT max(day) FROM (SELECT snapshot_date AS day FROM "
-                + table
-                + " WHERE repository_id=s.repository_id UNION ALL SELECT business_date FROM collector_snapshot_header WHERE repository_id=s.repository_id AND family='"
-                + family
-                + "') dates) ORDER BY s.id LIMIT :limit",
-            p),
-        size,
-        "id");
+        reads.latestSources(ids, paths, cursor(after), limit(size) + 1), size, "id");
   }
 
   public Page definitions(String owner, String repository, boolean topics, long after, int size) {
@@ -739,47 +632,12 @@ public class PublicReadService {
             owner,
             repository,
             topics ? PublicationService.Module.TOPICS : PublicationService.Module.DASHBOARD);
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("after", cursor(after));
-    p.put("limit", limit(size) + 1);
     return page(
-        sql.queryForList(
-            "SELECT id,repository_id AS \"repositoryId\","
-                + (topics
-                    ? "topic,language,result_limit AS \"resultLimit\""
-                    : "name,query,result_limit AS \"resultLimit\"")
-                + " FROM "
-                + (topics ? "topic_watch" : "search_query")
-                + " WHERE repository_id IN (:ids) AND "
-                + (topics ? "enabled" : "public_enabled")
-                + " AND id>:after ORDER BY id LIMIT :limit",
-            p),
-        size,
-        "id");
+        reads.definitions(ids, topics, cursor(after), limit(size) + 1), size, "id");
   }
 
   private long parent(boolean topics, long id, boolean run) {
-    String table =
-        run ? (topics ? "topic_run" : "search_run") : topics ? "topic_watch" : "search_query";
-    String join =
-        run
-            ? " JOIN "
-                + (topics
-                    ? "topic_watch q ON q.id=t.topic_watch_id"
-                    : "search_query q ON q.id=t.search_query_id")
-            : "";
-    var rows =
-        jdbc.queryForList(
-            "SELECT t.repository_id,"
-                + (run ? "q.id" : "t.id")
-                + " AS definition FROM "
-                + table
-                + " t"
-                + join
-                + " WHERE t.id=?"
-                + (run ? " AND t.repository_id=q.repository_id" : ""),
-            id);
+    var rows = reads.parentDefinitionOrRun(topics, id, run);
     if (rows.isEmpty()) throw missing();
     long repository = ((Number) rows.getFirst().get("repository_id")).longValue();
     if (topics
@@ -798,78 +656,33 @@ public class PublicReadService {
   public long validateTopic(String owner, String repository, String topic) {
     if (topic == null || topic.isBlank() || topic.length() > 200) throw missing();
     var ids = scope(owner, repository, PublicationService.Module.TOPICS);
-    var rows =
-        sql.queryForList(
-            "SELECT id FROM topic_watch WHERE repository_id IN (:ids) AND topic=:topic AND enabled ORDER BY id LIMIT 1",
-            Map.of("ids", ids, "topic", topic));
+    var rows = reads.topicWatchByTopic(ids, topic);
     if (rows.isEmpty()) throw missing();
     return ((Number) rows.getFirst().get("id")).longValue();
   }
 
   public Map<String, Object> definition(boolean topics, long id) {
     parent(topics, id, false);
-    return safeIds(
-            jdbc.queryForList(
-                "SELECT id,repository_id AS \"repositoryId\","
-                    + (topics
-                        ? "topic,language,result_limit AS \"resultLimit\""
-                        : "name,query,result_limit AS \"resultLimit\"")
-                    + " FROM "
-                    + (topics ? "topic_watch" : "search_query")
-                    + " WHERE id=?",
-                id))
-        .getFirst();
+    return safeIds(reads.definitionById(topics, id)).getFirst();
   }
 
   public Page rankHistory(boolean topics, long definition, long before, int size) {
     parent(topics, definition, false);
     return page(
-        jdbc.queryForList(
-            "SELECT id,business_date AS date,snapshot_at AS \"observedAt\",total_count AS \"totalResults\",tracked_repository_position AS position FROM "
-                + (topics ? "topic_run" : "search_run")
-                + " WHERE "
-                + (topics ? "topic_watch_id" : "search_query_id")
-                + "=? AND snapshot_at IS NOT NULL AND public_scope_verified AND (?=0 OR id<?) ORDER BY id DESC LIMIT ?",
-            definition,
-            cursor(before),
-            before,
-            limit(size) + 1),
-        size,
-        "id");
+        reads.rankHistory(topics, definition, cursor(before), limit(size) + 1), size, "id");
   }
 
   public Page rankResults(boolean topics, long run, long after, int size) {
     parent(topics, run, true);
-    String prefix = topics ? "topic" : "search";
-    if (!Boolean.TRUE.equals(
-        jdbc.queryForObject(
-            "SELECT snapshot_at IS NOT NULL AND public_scope_verified FROM "
-                + prefix
-                + "_run WHERE id=?",
-            Boolean.class,
-            run))) throw missing();
+    if (!Boolean.TRUE.equals(reads.runPubliclyVerified(topics, run))) throw missing();
     return page(
-        jdbc.queryForList(
-            "SELECT position AS id,position,github_repository_id::text AS \"githubId\",full_name AS \"fullName\",stars,forks,language,description FROM "
-                + prefix
-                + "_result WHERE "
-                + prefix
-                + "_run_id=? AND position>? ORDER BY position LIMIT ?",
-            run,
-            cursor(after),
-            limit(size) + 1),
-        size,
-        "id");
+        reads.rankResults(topics, run, cursor(after), limit(size) + 1), size, "id");
   }
 
   public Page events(String owner, String repository, long before, int size) {
     var ids = scope(owner, repository, PublicationService.Module.DASHBOARD);
     return page(
-        sql.queryForList(
-            "SELECT id,repository_id AS \"repositoryId\",category,source,type,event_at AS \"eventAt\",title FROM growth_event WHERE repository_id IN (:ids) AND (:before=0 OR id<:before) ORDER BY id DESC LIMIT :limit",
-            Map.of("ids", ids, "before", cursor(before), "limit", limit(size) + 1)),
-        size,
-        "id");
+        reads.events(ids, cursor(before), limit(size) + 1), size, "id");
   }
 
   public Page sourceHistory(
@@ -880,73 +693,31 @@ public class PublicReadService {
             repository,
             paths ? PublicationService.Module.PATHS : PublicationService.Module.REFERRERS);
     var range = period(ids, period, true);
-    String table = paths ? "traffic_path_snapshot" : "traffic_referrer_snapshot",
-        key = paths ? "path" : "referrer";
-    var p = new HashMap<String, Object>();
-    p.put("ids", ids);
-    p.put("from", range.from());
-    p.put("to", publishedEnd(range.to()));
-    p.put("before", cursor(before));
-    p.put("limit", limit(size) + 1);
     return page(
-        sql.queryForList(
-            "SELECT id,repository_id AS \"repositoryId\",snapshot_date AS date,"
-                + key
-                + " AS label,views,unique_visitors AS visitors FROM "
-                + table
-                + " WHERE repository_id IN (:ids) AND snapshot_date BETWEEN :from AND :to AND (:before=0 OR id<:before) "
-                + (paths ? "AND NOT service_path " : "")
-                + "ORDER BY id DESC LIMIT :limit",
-            p),
+        reads.sourceHistory(
+            ids,
+            paths,
+            range.from(),
+            publishedEnd(range.to()),
+            cursor(before),
+            limit(size) + 1),
         size,
         "id");
   }
 
   public Page rankSeries(boolean topics, long definition, long before, int size) {
     parent(topics, definition, false);
-    String prefix = topics ? "topic" : "search";
     return page(
-        jdbc.queryForList(
-            "SELECT s.id,r.business_date AS date,s.github_repository_id::text AS \"githubId\",s.full_name AS \"fullName\",s.position,s.stars,s.forks FROM "
-                + prefix
-                + "_result s JOIN "
-                + prefix
-                + "_run r ON r.id=s."
-                + prefix
-                + "_run_id WHERE r."
-                + (topics ? "topic_watch_id" : "search_query_id")
-                + "=? AND r.snapshot_at IS NOT NULL AND r.public_scope_verified AND (?=0 OR s.id<?) ORDER BY s.id DESC LIMIT ?",
-            definition,
-            cursor(before),
-            before,
-            limit(size) + 1),
-        size,
-        "id");
+        reads.rankSeries(topics, definition, cursor(before), limit(size) + 1), size, "id");
   }
 
   public Object competitor(boolean topics, long definition, long githubId) {
     parent(topics, definition, false);
-    String prefix = topics ? "topic" : "search";
-    var rows =
-        jdbc.queryForList(
-            "SELECT s.github_repository_id::text AS \"githubId\",s.full_name AS \"fullName\",s.description,s.language,s.stars,s.forks FROM "
-                + prefix
-                + "_result s JOIN "
-                + prefix
-                + "_run r ON r.id=s."
-                + prefix
-                + "_run_id WHERE r."
-                + (topics ? "topic_watch_id" : "search_query_id")
-                + "=? AND s.github_repository_id=? AND r.snapshot_at IS NOT NULL AND r.public_scope_verified ORDER BY r.business_date DESC LIMIT 1",
-            definition,
-            githubId);
+    var rows = reads.competitor(topics, definition, githubId);
     if (rows.isEmpty()) throw missing();
     var answer = rows.getFirst();
     answer.put("metadataComplete", false);
-    var profiles =
-        jdbc.queryForList(
-            "SELECT topics,archived,last_commit_at AS \"lastCommitAt\",last_release_at AS \"lastReleaseAt\",has_readme AS \"hasReadme\",has_license AS \"hasLicense\",has_social_preview AS \"hasSocialPreview\" FROM competitor_profile p WHERE p.github_repository_id=? AND EXISTS(SELECT 1 FROM repository v WHERE v.github_id=p.github_repository_id AND v.visibility='PUBLIC' AND v.visibility_verified_at>clock_timestamp()-interval '24 hours' AND v.visibility_verified_at<=clock_timestamp())",
-            githubId);
+    var profiles = reads.competitorProfile(githubId);
     if (!profiles.isEmpty()) {
       answer.put("profile", profiles.getFirst());
       answer.put("metadataComplete", true);
@@ -956,15 +727,7 @@ public class PublicReadService {
 
   public Object latestResults(boolean topics, long definition, long after, int size) {
     parent(topics, definition, false);
-    var ids =
-        jdbc.queryForList(
-            "SELECT id FROM "
-                + (topics ? "topic_run" : "search_run")
-                + " WHERE "
-                + (topics ? "topic_watch_id" : "search_query_id")
-                + "=? AND snapshot_at IS NOT NULL AND public_scope_verified ORDER BY business_date DESC LIMIT 1",
-            Long.class,
-            definition);
+    var ids = reads.latestPublicRunId(topics, definition);
     if (ids.isEmpty()) throw missing();
     return rankResults(topics, ids.getFirst(), after, size);
   }
@@ -972,48 +735,24 @@ public class PublicReadService {
   public Object overview(String owner, String repository) {
     var resolved = resolve("/" + owner + (repository == null ? "" : "/" + repository));
     var ids = scope(owner, repository, PublicationService.Module.DASHBOARD);
-    var p = Map.of("ids", ids);
-    var metadata =
-        jdbc.queryForMap(
-            "SELECT github_id::text AS \"githubId\",login,owner_type AS type FROM github_owner WHERE id=?",
-            resolved.ownerId());
+    var metadata = reads.ownerMetadata(resolved.ownerId());
     metadata.put("id", Long.toString(resolved.ownerId()));
     Map<String, Object> answer = new LinkedHashMap<>();
     answer.put("owner", metadata);
     answer.put("canonicalPath", resolved.canonicalPath());
     answer.put("repositoryCount", ids.size());
-    var modules =
-        sql.queryForMap(
-            "SELECT bool_or(public_traffic_enabled) AS traffic,bool_or(public_referrers_enabled) AS referrers,bool_or(public_paths_enabled) AS paths,bool_or(public_topics_enabled) AS topics FROM repository WHERE id IN (:ids)",
-            p);
-    modules.put(
-        "search",
-        sql.queryForObject(
-            "SELECT count(*)>0 FROM search_query WHERE repository_id IN (:ids) AND public_enabled",
-            p,
-            Boolean.class));
+    var modules = reads.moduleFlags(ids);
+    modules.put("search", reads.hasPublicSearch(ids));
     answer.put("modules", modules);
-    java.sql.Timestamp stamp =
-        sql.queryForObject(
-            "SELECT max(enriched_at) FROM repository WHERE id IN (:ids)",
-            p,
-            java.sql.Timestamp.class);
+    java.sql.Timestamp stamp = reads.maxEnrichedAt(ids);
     var freshness = new LinkedHashMap<String, Object>();
     freshness.put("lastSuccessfulSnapshotAt", stamp == null ? null : stamp.toInstant());
     freshness.put("state", stamp == null ? "EMPTY" : "READY");
     answer.put("freshness", freshness);
     if (repository != null) {
-      var item =
-          jdbc.queryForMap(
-              "SELECT github_id::text AS \"githubId\",name,description,language,archived,publication_revision AS \"publicationRevision\" FROM repository WHERE id=?",
-              resolved.repositoryId());
+      var item = reads.repositoryCard(resolved.repositoryId());
       item.put("id", resolved.repositoryId().toString());
-      item.put(
-          "pathPrefixes",
-          jdbc.queryForList(
-              "SELECT '/'||owner_login||'/'||repository_name FROM repository_path_alias WHERE repository_id=? ORDER BY id DESC LIMIT 100",
-              String.class,
-              resolved.repositoryId()));
+      item.put("pathPrefixes", reads.repositoryPathPrefixes(resolved.repositoryId()));
       answer.put("repository", item);
     }
     return answer;
@@ -1037,19 +776,9 @@ public class PublicReadService {
             .get(sort);
     if (column == null || !Set.of("asc", "desc").contains(order) || offset < 0 || offset > 10000)
       throw ApiException.validation("Invalid directory pagination or sort");
-    var p = params();
-    p.put("reserved", PublicRoutes.RESERVED);
-    p.put("offset", offset);
-    p.put("limit", limit(size) + 1);
-    String query =
-        "WITH published AS (SELECT r.* FROM repository r JOIN github_owner o ON o.id=r.owner_id WHERE "
-            + gate()
-            + " AND lower(o.login) NOT IN (:reserved) AND lower(o.login) NOT LIKE 'swagger-ui%' AND o.login ~ '^[A-Za-z0-9][A-Za-z0-9-]{0,99}$'),latest AS (SELECT DISTINCT ON (s.repository_id) s.* FROM repository_daily_stats s JOIN published p ON p.id=s.repository_id WHERE s.stat_date<=CURRENT_DATE ORDER BY s.repository_id,s.stat_date DESC),totals AS (SELECT p.owner_id,count(*) AS repositories,count(s.repository_id)=count(*) AS complete,CASE WHEN count(s.repository_id)=count(*) THEN sum(s.stars) END AS stars,CASE WHEN count(s.repository_id)=count(*) THEN sum(s.forks) END AS forks,CASE WHEN count(s.repository_id)=count(*) THEN sum(s.watchers) END AS watchers FROM published p LEFT JOIN latest s ON s.repository_id=p.id GROUP BY p.owner_id),contributors AS (SELECT p.owner_id,count(DISTINCT lower(c.login)) AS known,bool_and(coalesce(s.contributor_logins_collected,false) AND s.contributors=(SELECT count(*) FROM repository_daily_contributor_login x WHERE x.repository_id=s.repository_id AND x.stat_date=s.stat_date)) AS complete FROM published p LEFT JOIN latest s ON s.repository_id=p.id LEFT JOIN repository_daily_contributor_login c ON c.repository_id=s.repository_id AND c.stat_date=s.stat_date GROUP BY p.owner_id) SELECT o.id,o.login,o.owner_type AS type,'/'||o.login AS \"canonicalPath\",t.repositories,t.stars,t.forks,t.watchers,t.complete,CASE WHEN c.complete THEN c.known END AS contributors,c.complete AS \"contributorsComplete\" FROM totals t JOIN github_owner o ON o.id=t.owner_id JOIN contributors c ON c.owner_id=o.id ORDER BY "
-            + column
-            + " "
-            + order
-            + " NULLS LAST,o.id LIMIT :limit OFFSET :offset";
-    var rows = sql.queryForList(query, p);
+    var rows =
+        reads.ownersDirectory(
+            column, order, offset, limit(size) + 1, ageMillis(), PublicRoutes.RESERVED);
     boolean more = rows.size() > size;
     return new Page(safeIds(more ? rows.subList(0, size) : rows), more ? offset + size : null);
   }

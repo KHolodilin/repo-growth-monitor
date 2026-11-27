@@ -22,7 +22,7 @@ describe("missing traffic", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       if (!(
-        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/dashboard") ||
         String(path).includes("/api/v1/collection-status")
       )) {
         return Promise.resolve({});

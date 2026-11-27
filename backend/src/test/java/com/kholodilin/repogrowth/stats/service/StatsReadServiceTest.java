@@ -16,8 +16,8 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
 import com.kholodilin.repogrowth.common.model.kpi.KpiScope;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryDailyStats;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
+import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -39,7 +39,7 @@ class StatsReadServiceTest {
 
   @Mock ResourceAccessPolicy access;
   @Mock RepositoryService repositories;
-  @Mock TrafficJdbcRepository traffic;
+  @Mock StatsJdbcRepository stats;
 
   StatsReadService service;
   Repository repository;
@@ -47,7 +47,7 @@ class StatsReadServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new StatsReadService(access, repositories, traffic, CLOCK);
+    service = new StatsReadService(access, repositories, stats, CLOCK);
     Instant now = Instant.parse("2026-11-01T00:00:00Z");
     repository =
         new Repository(
@@ -114,8 +114,8 @@ class StatsReadServiceTest {
             stats(from, 10, 2, 1, 1),
             stats(TODAY.minusDays(1), 20, 4, 2, 2),
             stats(TODAY, 21, 4, 2, 2));
-    when(traffic.dailyStatsHistory(13L, from)).thenReturn(days);
-    when(traffic.latestDailyStatsOnOrBefore(13L, TODAY)).thenReturn(Optional.of(days.getLast()));
+    when(stats.dailyStatsHistory(13L, from)).thenReturn(days);
+    when(stats.latestDailyStatsOnOrBefore(13L, TODAY)).thenReturn(Optional.of(days.getLast()));
     var kpi = service.repositoryKpi(13L, "7d");
     assertThat(kpi.scope()).isEqualTo(KpiScope.REPOSITORY);
     assertThat(kpi.metrics().stars().dataStatus()).isEqualTo(DataStatus.COMPLETE);
@@ -142,13 +142,13 @@ class StatsReadServiceTest {
     when(access.filterReadable(List.of(13L, 14L), PublicationService.Module.DASHBOARD))
         .thenReturn(List.of(13L, 14L));
     LocalDate from = TODAY.minusDays(6);
-    when(traffic.dailyStatsHistory(eq(13L), any()))
+    when(stats.dailyStatsHistory(eq(13L), any()))
         .thenReturn(List.of(stats(from, 10, 1, 1, 1), stats(TODAY, 12, 2, 1, 1)));
-    when(traffic.dailyStatsHistory(eq(14L), any()))
+    when(stats.dailyStatsHistory(eq(14L), any()))
         .thenReturn(List.of(stats(from, 5, 1, 1, 1), stats(TODAY, 6, 1, 1, 1)));
-    when(traffic.latestDailyStatsOnOrBefore(eq(13L), any()))
+    when(stats.latestDailyStatsOnOrBefore(eq(13L), any()))
         .thenReturn(Optional.of(stats(TODAY, 12, 2, 1, 1)));
-    when(traffic.latestDailyStatsOnOrBefore(eq(14L), any()))
+    when(stats.latestDailyStatsOnOrBefore(eq(14L), any()))
         .thenReturn(Optional.of(stats(TODAY, 6, 1, 1, 1)));
     var kpi = service.ownerKpi(1L, "7d");
     assertThat(kpi.scope()).isEqualTo(KpiScope.OWNER);
@@ -164,10 +164,10 @@ class StatsReadServiceTest {
   @Test
   void allTimeUsesEarliestStatsDateAndSkipsComparison() {
     doNothing().when(access).requireReadable(13L, PublicationService.Module.DASHBOARD);
-    when(traffic.earliestDailyStatsDate(13L)).thenReturn(Optional.of(TODAY.minusDays(3)));
-    when(traffic.dailyStatsHistory(13L, null))
+    when(stats.earliestDailyStatsDate(13L)).thenReturn(Optional.of(TODAY.minusDays(3)));
+    when(stats.dailyStatsHistory(13L, null))
         .thenReturn(List.of(stats(TODAY.minusDays(3), 1, 0, 0, 0), stats(TODAY, 4, 1, 0, 1)));
-    when(traffic.latestDailyStatsOnOrBefore(13L, TODAY))
+    when(stats.latestDailyStatsOnOrBefore(13L, TODAY))
         .thenReturn(Optional.of(stats(TODAY, 4, 1, 0, 1)));
     var kpi = service.repositoryKpi(13L, "all");
     assertThat(kpi.comparison()).isNull();
@@ -177,8 +177,8 @@ class StatsReadServiceTest {
   @Test
   void missingTipIsReportedAsMissingMetric() {
     doNothing().when(access).requireReadable(13L, PublicationService.Module.DASHBOARD);
-    when(traffic.dailyStatsHistory(eq(13L), any())).thenReturn(List.of());
-    when(traffic.latestDailyStatsOnOrBefore(eq(13L), any())).thenReturn(Optional.empty());
+    when(stats.dailyStatsHistory(eq(13L), any())).thenReturn(List.of());
+    when(stats.latestDailyStatsOnOrBefore(eq(13L), any())).thenReturn(Optional.empty());
     var kpi = service.repositoryKpi(13L, "7d");
     assertThat(kpi.metrics().stars().dataStatus()).isEqualTo(DataStatus.MISSING);
   }

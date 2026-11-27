@@ -12,7 +12,7 @@ import java.util.*;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.kholodilin.repogrowth.collection.repository.CollectorResultIngestionJdbcRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -25,19 +25,19 @@ import tools.jackson.databind.json.JsonMapper;
 public class CollectorResultIngestion {
   public record Applied(UUID eventId, String outcome) {}
 
-  private final JdbcTemplate jdbc;
+  private final CollectorResultIngestionJdbcRepository ingestion;
   private final TransactionTemplate tx;
   private final IdempotencyService idempotency;
   private final CollectorHistoryApplier history;
   private final JsonMapper json;
 
   public CollectorResultIngestion(
-      JdbcTemplate jdbc,
+      CollectorResultIngestionJdbcRepository ingestion,
       PlatformTransactionManager tm,
       @Qualifier("rgmIdempotency") IdempotencyService idempotency,
       CollectorHistoryApplier history,
       JsonMapper json) {
-    this.jdbc = jdbc;
+    this.ingestion = ingestion;
     this.tx = new TransactionTemplate(tm);
     this.idempotency = idempotency;
     this.history = history;
@@ -55,21 +55,11 @@ public class CollectorResultIngestion {
     if (json.writeValueAsString(result).getBytes(StandardCharsets.UTF_8).length > 5 * 1024 * 1024)
       throw ApiException.validation("Collector result exceeds 5MB");
     return tx.execute(status -> {
-      var requests =
-          jdbc.queryForList(
-              "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR UPDATE OF r",
-              Long.class,
-              result.jobId());
+      var requests = ingestion.lockRequestByJob(result.jobId());
       if (requests.isEmpty()) throw ApiException.notFound("Assigned task not found");
-      var tasks =
-          jdbc.queryForList(
-              "SELECT * FROM collection_task WHERE public_id=? FOR UPDATE", result.jobId());
+      var tasks = ingestion.lockTask(result.jobId());
       var task = tasks.getFirst();
-      var attempts =
-          jdbc.queryForList(
-              "SELECT a.*,n.node_key,d.payload FROM collection_attempt a JOIN collector_node n ON n.id=a.node_id JOIN collector_dispatch d ON d.attempt_id=a.public_id WHERE a.public_id=? AND a.task_id=? FOR UPDATE OF a",
-              result.attemptId(),
-              task.get("id"));
+      var attempts = ingestion.lockAttempt(result.attemptId(), task.get("id"));
       if (attempts.isEmpty() || !node.equals(attempts.getFirst().get("node_key")))
         throw new ApiException(
             com.kholodilin.repogrowth.common.api.ErrorCode.FORBIDDEN,
@@ -103,11 +93,7 @@ public class CollectorResultIngestion {
       ResultDelivery result) {
     String hash = new CanonicalJsonFingerprintStrategy().calculate(result);
     var receipts =
-        jdbc.queryForList(
-            "SELECT * FROM collector_result_receipt WHERE attempt_id=? OR event_id=? OR result_id=? FOR UPDATE",
-            result.attemptId(),
-            result.eventId(),
-            result.resultId());
+        ingestion.lockReceipts(result.attemptId(), result.eventId(), result.resultId());
     if (!receipts.isEmpty()) {
       var old = receipts.getFirst();
       if (!hash.equals(old.get("payload_hash"))
@@ -122,19 +108,10 @@ public class CollectorResultIngestion {
     if (current) {
       history.apply(task, job, result);
       String state = result.status().name();
-      jdbc.update(
-          "UPDATE collection_task SET state=?,completed_at=clock_timestamp() WHERE id=? AND current_attempt_id=?",
-          state,
-          task.get("id"),
-          result.attemptId());
-      jdbc.update(
-          "UPDATE collection_attempt SET state=?,collector_job_id=coalesce(collector_job_id,?),completed_at=clock_timestamp() WHERE public_id=?",
-          state,
-          result.collectorJobId(),
-          result.attemptId());
+      ingestion.completeTask(state, task.get("id"), result.attemptId());
+      ingestion.completeAttempt(state, result.collectorJobId(), result.attemptId());
     }
-    jdbc.update(
-        "INSERT INTO collector_result_receipt(event_id,result_id,attempt_id,task_id,node_id,payload_hash,outcome) VALUES (?,?,?,?,?,?,?)",
+    ingestion.insertReceipt(
         result.eventId(),
         result.resultId(),
         result.attemptId(),
@@ -142,12 +119,7 @@ public class CollectorResultIngestion {
         attempt.get("node_id"),
         hash,
         outcome);
-    jdbc.update(
-        """
-        UPDATE collection_request r SET state=CASE WHEN EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state='FAILED') THEN 'FAILED' WHEN EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state='CANCELLED') THEN 'CANCELLED' ELSE 'SUCCEEDED' END,completed_at=clock_timestamp()
-        WHERE r.id=? AND r.state='ACTIVE' AND NOT EXISTS(SELECT 1 FROM collection_task t WHERE t.request_id=r.id AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY'))
-        """,
-        task.get("request_id"));
+    ingestion.completeRequestIfIdle(task.get("request_id"));
     return new Applied(result.eventId(), outcome);
   }
 

@@ -38,12 +38,13 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
+import com.kholodilin.repogrowth.stats.model.RepositoryStatDay;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerSnapshot;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryDayTotals;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryPeriodTotals;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryStatDay;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
 import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath;
 import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
@@ -74,6 +75,7 @@ public class PortfolioDashboardService {
 
   private final RepositoryService repositoryService;
   private final TrafficJdbcRepository trafficJdbcRepository;
+  private final StatsJdbcRepository statsJdbcRepository;
   private final CollectionRunJdbcRepository runRepository;
   private final CollectionJobJdbcRepository jobRepository;
   private final CollectionRunMapper collectionRunMapper;
@@ -87,6 +89,7 @@ public class PortfolioDashboardService {
   public PortfolioDashboardService(
       RepositoryService repositoryService,
       TrafficJdbcRepository trafficJdbcRepository,
+      StatsJdbcRepository statsJdbcRepository,
       CollectionRunJdbcRepository runRepository,
       CollectionJobJdbcRepository jobRepository,
       CollectionRunMapper collectionRunMapper,
@@ -98,6 +101,7 @@ public class PortfolioDashboardService {
       CurrentUserAccess currentUserAccess) {
     this.repositoryService = repositoryService;
     this.trafficJdbcRepository = trafficJdbcRepository;
+    this.statsJdbcRepository = statsJdbcRepository;
     this.runRepository = runRepository;
     this.jobRepository = jobRepository;
     this.collectionRunMapper = collectionRunMapper;
@@ -216,7 +220,7 @@ public class PortfolioDashboardService {
                 : sumVisibleTotals(previousFrom, period.previousTo(), visibleIds);
     long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
     Long starsChange =
-        period.allTime() ? null : trafficJdbcRepository.starsChangeSince(period.from());
+        period.allTime() ? null : statsJdbcRepository.starsChangeSince(period.from());
     List<TrafficPoint> traffic = series(period, tracked);
     Map<Long, TrafficNotice> notices = trafficNotices(period, tracked);
     Map<Long, Long> previousVisitors = previousVisitorsByRepo(period);
@@ -540,7 +544,7 @@ public class PortfolioDashboardService {
     int trackedCount = tracked.size();
     Map<LocalDate, List<RepositoryStatDay>> byDate = new TreeMap<>();
     for (RepositoryStatDay row :
-        trafficJdbcRepository.trackedDailyStats(period.from(), period.to())) {
+        statsJdbcRepository.trackedDailyStats(period.from(), period.to())) {
       if (!visibleIds.contains(row.repositoryId())) {
         continue;
       }
@@ -552,7 +556,7 @@ public class PortfolioDashboardService {
     // Per-repo tip on or before the period end (same honesty as public owner Stats / 1d).
     // Absolute latest() would pull today's unfinished tip into a 1d window that ends yesterday.
     List<RepositoryStatDay> latest =
-        trafficJdbcRepository.latestTrackedDailyStatsOnOrBefore(period.to()).stream()
+        statsJdbcRepository.latestTrackedDailyStatsOnOrBefore(period.to()).stream()
             .filter(row -> visibleIds.contains(row.repositoryId()))
             .toList();
     return portfolioStats(latest, period.allTime(), trackedCount, points);

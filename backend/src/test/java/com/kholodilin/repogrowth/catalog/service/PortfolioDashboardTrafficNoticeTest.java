@@ -27,6 +27,7 @@ import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcReposito
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.LatestTrafficDate;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
@@ -117,6 +118,7 @@ class PortfolioDashboardTrafficNoticeTest {
     Repository missing = repository(14L, "acme/missing");
     RepositoryService repositories = mock(RepositoryService.class);
     TrafficJdbcRepository traffic = mock(TrafficJdbcRepository.class);
+    StatsJdbcRepository stats = mock(StatsJdbcRepository.class);
     CollectionRunJdbcRepository runs = mock(CollectionRunJdbcRepository.class);
     CollectionJobJdbcRepository jobs = mock(CollectionJobJdbcRepository.class);
     PlanningWindow window = mock(PlanningWindow.class);
@@ -126,10 +128,10 @@ class PortfolioDashboardTrafficNoticeTest {
     when(traffic.earliestTrackedTrafficDate()).thenReturn(Optional.of(TODAY.minusDays(6)));
     when(traffic.hasTrackedTraffic()).thenReturn(true);
     when(traffic.portfolioTotalsInRange(any(), any())).thenReturn(new TrafficTotals(1, 1, 1, 1));
-    when(traffic.starsChangeSince(any())).thenReturn(0L);
+    when(stats.starsChangeSince(any())).thenReturn(0L);
     when(traffic.dailyByRepository(any(), any())).thenReturn(List.of());
-    when(traffic.trackedDailyStats(any(), any())).thenReturn(List.of());
-    when(traffic.latestTrackedDailyStatsOnOrBefore(any())).thenReturn(List.of());
+    when(stats.trackedDailyStats(any(), any())).thenReturn(List.of());
+    when(stats.latestTrackedDailyStatsOnOrBefore(any())).thenReturn(List.of());
     when(traffic.trackedTrafficDays(any(), any()))
         .thenReturn(
             List.of(
@@ -172,6 +174,7 @@ class PortfolioDashboardTrafficNoticeTest {
         new PortfolioDashboardService(
             repositories,
             traffic,
+            stats,
             runs,
             jobs,
             mock(CollectionRunMapper.class),
@@ -208,6 +211,7 @@ class PortfolioDashboardTrafficNoticeTest {
     return new PortfolioDashboardService(
         repositories,
         traffic,
+        mock(StatsJdbcRepository.class),
         runs,
         jobs,
         mock(CollectionRunMapper.class),

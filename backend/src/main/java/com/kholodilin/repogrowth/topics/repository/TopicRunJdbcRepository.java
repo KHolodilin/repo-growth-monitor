@@ -239,6 +239,48 @@ public class TopicRunJdbcRepository {
         .update();
   }
 
+  public void updateSnapshotScope(long id, Instant observedAt, boolean publicScopeVerified) {
+    jdbcClient
+        .sql(
+            """
+            UPDATE topic_run
+            SET snapshot_at = :observedAt,
+                completed_at = :observedAt,
+                public_scope_verified = :publicScopeVerified
+            WHERE id = :id
+            """)
+        .param("id", id)
+        .param("observedAt", SqlTime.ts(observedAt))
+        .param("publicScopeVerified", publicScopeVerified)
+        .update();
+  }
+
+  public void upsertFailed(
+      long topicWatchId,
+      long repositoryId,
+      LocalDate businessDate,
+      String errorCode,
+      String errorMessage) {
+    jdbcClient
+        .sql(
+            """
+            INSERT INTO topic_run(
+                topic_watch_id,repository_id,business_date,status,error_code,error_message,completed_at)
+            VALUES (:topicWatchId,:repositoryId,:businessDate,'FAILED',:errorCode,:errorMessage,clock_timestamp())
+            ON CONFLICT(topic_watch_id,business_date) DO UPDATE SET
+                status='FAILED',
+                error_code=excluded.error_code,
+                error_message=excluded.error_message,
+                completed_at=excluded.completed_at
+            """)
+        .param("topicWatchId", topicWatchId)
+        .param("repositoryId", repositoryId)
+        .param("businessDate", businessDate)
+        .param("errorCode", errorCode)
+        .param("errorMessage", errorMessage)
+        .update();
+  }
+
   public List<TopicRun> snapshots(long topicWatchId) {
     return jdbcClient
         .sql(

@@ -129,7 +129,6 @@ public class ResourceAccessPolicy {
         || path.startsWith("/api/v1/admin/system")
         || path.startsWith("/api/v1/admin/collection/plan")
         || path.startsWith("/api/v1/admin/credentials")
-        || path.startsWith("/api/v1/admin/dashboard")
         || path.equals("/api/v1/admin/collectors")
         || path.startsWith("/admin")) {
       return ApiSurface.OPS;

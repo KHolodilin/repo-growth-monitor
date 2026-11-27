@@ -66,7 +66,7 @@ beforeEach(() => {
   run = () => Promise.resolve({});
   api.mockImplementation((path: string, options?: { method?: string }) => {
     if (options?.method === "POST") return Promise.resolve(run());
-    if (path.startsWith("/api/v1/admin/dashboard") || path.startsWith("/api/v1/collection-status"))
+    if (path.startsWith("/api/v1/dashboard") || path.startsWith("/api/v1/collection-status"))
       return Promise.resolve(dashboardReady);
     if (/\/repositories\/\d+$/.test(path))
       return Promise.resolve({ ...repository, id: path.endsWith("/8") ? 8 : 13 });
@@ -88,7 +88,7 @@ describe("repository Run all account action", () => {
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/search-queries/run", {
+      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/search-queries/run", {
         method: "POST",
       }),
     );
@@ -100,7 +100,7 @@ describe("repository Run all account action", () => {
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith(
-        "/api/v1/admin/repositories/13/topic-watches/run?scope=language",
+        "/api/v1/repositories/13/topic-watches/run?scope=language",
         { method: "POST" },
       ),
     );
@@ -109,7 +109,7 @@ describe("repository Run all account action", () => {
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/8/search-queries/run", {
+      expect(api).toHaveBeenCalledWith("/api/v1/repositories/8/search-queries/run", {
         method: "POST",
       }),
     );

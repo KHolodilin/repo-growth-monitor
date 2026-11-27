@@ -24,6 +24,7 @@ import com.kholodilin.repogrowth.topics.model.TopicResult;
 import com.kholodilin.repogrowth.topics.repository.TopicResultJdbcRepository;
 import com.kholodilin.repogrowth.topics.repository.TopicRunJdbcRepository;
 import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
+import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -47,6 +48,7 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
   @Autowired TopicRunJdbcRepository topicRunJdbcRepository;
   @Autowired TopicResultJdbcRepository topicResultJdbcRepository;
   @Autowired TrafficJdbcRepository trafficJdbcRepository;
+  @Autowired StatsJdbcRepository statsJdbcRepository;
 
   @Autowired
   com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository
@@ -320,15 +322,15 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
     assertThat(trafficJdbcRepository.latestPathSnapshot(repository.id(), false).rows()).isEmpty();
 
     trafficJdbcRepository.upsertDaily(repository.id(), today, 8, 3, 2, 1);
-    trafficJdbcRepository.upsertDailyStats(repository.id(), today, 10, 1, 2, 0, 3);
-    trafficJdbcRepository.replaceContributorLogins(
+    statsJdbcRepository.upsertDailyStats(repository.id(), today, 10, 1, 2, 0, 3);
+    statsJdbcRepository.replaceContributorLogins(
         repository.id(), today, java.util.List.of("alice", "bob"));
-    assertThat(trafficJdbcRepository.trackedDailyStats(today, today).getFirst().contributorLogins())
+    assertThat(statsJdbcRepository.trackedDailyStats(today, today).getFirst().contributorLogins())
         .containsExactly("alice", "bob");
-    assertThat(trafficJdbcRepository.latestTrackedDailyStats().getFirst().contributorLogins())
+    assertThat(statsJdbcRepository.latestTrackedDailyStats().getFirst().contributorLogins())
         .containsExactly("alice", "bob");
-    trafficJdbcRepository.replaceContributorLogins(repository.id(), today, java.util.List.of());
-    assertThat(trafficJdbcRepository.trackedDailyStats(today, today).getFirst().contributorLogins())
+    statsJdbcRepository.replaceContributorLogins(repository.id(), today, java.util.List.of());
+    assertThat(statsJdbcRepository.trackedDailyStats(today, today).getFirst().contributorLogins())
         .isEmpty();
     trafficJdbcRepository.insertReferrers(
         repository.id(), today, Instant.parse("2026-09-23T00:00:00Z"), "github.com", 4, 2);
@@ -351,14 +353,14 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
         1,
         true);
     assertThat(trafficJdbcRepository.history(repository.id(), today.minusDays(1))).hasSize(1);
-    assertThat(trafficJdbcRepository.dailyStatsHistory(repository.id(), null)).hasSize(1);
-    assertThat(trafficJdbcRepository.earliestDailyStatsDate(repository.id())).contains(today);
+    assertThat(statsJdbcRepository.dailyStatsHistory(repository.id(), null)).hasSize(1);
+    assertThat(statsJdbcRepository.earliestDailyStatsDate(repository.id())).contains(today);
     assertThat(trafficJdbcRepository.totalsByTrackedRepository(today.minusDays(1), today))
         .isNotEmpty();
     assertThat(trafficJdbcRepository.dailyPortfolio(today.minusDays(1), today)).isNotEmpty();
     assertThat(trafficJdbcRepository.hasTrackedTraffic()).isTrue();
     assertThat(trafficJdbcRepository.earliestTrackedTrafficDate()).contains(today);
-    assertThat(trafficJdbcRepository.starsChangeSince(today.minusDays(30))).isNull();
+    assertThat(statsJdbcRepository.starsChangeSince(today.minusDays(30))).isNull();
     assertThat(
             trafficJdbcRepository.referrerSnapshotsForDelta(
                 repository.id(), today.minusDays(1), today))

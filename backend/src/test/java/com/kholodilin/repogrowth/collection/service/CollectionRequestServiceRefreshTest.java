@@ -1,13 +1,12 @@
 package com.kholodilin.repogrowth.collection.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.repository.CollectionRequestJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.events.repository.GrowthEventSettingJdbcRepository;
@@ -17,7 +16,6 @@ import com.kholodilin.repogrowth.topics.service.TopicWatchSync;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,11 +23,11 @@ class CollectionRequestServiceRefreshTest {
 
   @Test
   void refreshWithoutAVaultNeverBuildsAnUnauthorizedDiscoverJob() {
-    JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    when(jdbc.queryForList(any(String.class), eq(Long.class))).thenReturn(List.of());
+    CollectionRequestJdbcRepository requests = mock(CollectionRequestJdbcRepository.class);
+    when(requests.discoverySeedRepositoryIds()).thenReturn(List.of());
     CollectionRequestService service =
         new CollectionRequestService(
-            jdbc,
+            requests,
             mock(PlatformTransactionManager.class),
             mock(OrchestrationProperties.class),
             mock(RepositoryJdbcRepository.class),

@@ -269,7 +269,7 @@ describe("repository filters", () => {
         return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
       if (
-        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/dashboard") ||
         String(path).includes("/api/v1/collection-status")
       ) {
         return Promise.resolve({
@@ -504,7 +504,7 @@ describe("repository filters", () => {
         return Promise.resolve({ tokenState: "RATE_LIMITED", rateLimitReset: null });
       }
       if (
-        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/dashboard") ||
         String(path).includes("/api/v1/collection-status")
       ) {
         return Promise.resolve(dashboardReady);
@@ -532,7 +532,7 @@ describe("repository filters", () => {
         });
       }
       if (
-        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/dashboard") ||
         String(path).includes("/api/v1/collection-status")
       ) {
         return Promise.resolve({
