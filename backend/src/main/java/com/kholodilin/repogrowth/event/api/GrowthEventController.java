@@ -28,7 +28,7 @@ public class GrowthEventController {
 
   @GetMapping("/repositories/{id}/growth-events")
   public List<GrowthEvent> list(
-      @PathVariable long id, @RequestParam(defaultValue = "30d") String period) {
+      @PathVariable long id, @RequestParam(defaultValue = "7d") String period) {
     return growthEventService.list(id, period);
   }
 

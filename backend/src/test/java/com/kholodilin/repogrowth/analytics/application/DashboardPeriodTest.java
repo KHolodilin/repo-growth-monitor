@@ -57,8 +57,17 @@ class DashboardPeriodTest {
   }
 
   @Test
-  void unknownPeriodDefaultsToThirtyDays() {
-    assertThat(DashboardPeriod.of("weird", TODAY, null).value()).isEqualTo("30d");
-    assertThat(DashboardPeriod.of(null, TODAY, null).value()).isEqualTo("30d");
+  void blankPeriodDefaultsToSevenDays() {
+    assertThat(DashboardPeriod.of(null, TODAY, null).value()).isEqualTo("7d");
+    assertThat(DashboardPeriod.of("  ", TODAY, null).value()).isEqualTo("7d");
+    assertThat(DashboardPeriod.normalize(null)).isEqualTo(DashboardPeriod.DEFAULT);
+  }
+
+  @Test
+  void unknownPeriodIsValidationError() {
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> DashboardPeriod.of("weird", TODAY, null))
+        .isInstanceOf(com.kholodilin.repogrowth.common.api.ApiException.class)
+        .hasMessageContaining("Unsupported period");
   }
 }

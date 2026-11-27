@@ -22,7 +22,7 @@ public class AnalyticsController {
 
   @GetMapping("/dashboard")
   public Object dashboard(
-      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "7d") String period,
       @RequestParam(required = false) String owner) {
     var result = analyticsService.dashboard(period, owner);
     return progress == null ? result : progress.apply(result);
@@ -30,14 +30,14 @@ public class AnalyticsController {
 
   @GetMapping("/portfolio")
   public AnalyticsService.PortfolioSnapshot portfolio(
-      @RequestParam(defaultValue = "30d") String period) {
+      @RequestParam(defaultValue = "7d") String period) {
     return analyticsService.portfolio(period);
   }
 
   @GetMapping("/repositories/{id}/traffic")
   public AnalyticsService.RepositoryTrafficSnapshot traffic(
       @PathVariable long id,
-      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "7d") String period,
       @RequestParam(defaultValue = "false") boolean includeServicePaths) {
     return analyticsService.traffic(id, period, includeServicePaths);
   }
@@ -54,7 +54,7 @@ public class AnalyticsController {
 
   @GetMapping("/repositories/{id}/stats-history")
   public AnalyticsService.RepositoryStatsHistory statsHistory(
-      @PathVariable long id, @RequestParam(defaultValue = "30d") String period) {
+      @PathVariable long id, @RequestParam(defaultValue = "7d") String period) {
     return analyticsService.statsHistory(id, period);
   }
 }

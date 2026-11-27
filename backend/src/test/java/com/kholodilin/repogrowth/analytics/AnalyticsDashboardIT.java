@@ -390,11 +390,10 @@ class AnalyticsDashboardIT extends AbstractPostgresTest {
     assertThat(
             analyticsService.snapshotHistory(outbox.id(), "referrers", "all", null, false).from())
         .isEqualTo(today);
-    assertThat(
-            analyticsService
-                .snapshotHistory(kafka.id(), "referrers", "invalid", null, false)
-                .days())
-        .isEqualTo(30);
+    org.assertj.core.api.Assertions.assertThatThrownBy(
+            () -> analyticsService.snapshotHistory(kafka.id(), "referrers", "invalid", null, false))
+        .isInstanceOf(com.kholodilin.repogrowth.common.api.ApiException.class)
+        .hasMessageContaining("Unsupported period");
   }
 
   @Test

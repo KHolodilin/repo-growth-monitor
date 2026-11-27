@@ -30,7 +30,7 @@ public class PublicApiController {
       @PathVariable String owner,
       @RequestParam(defaultValue = "0") long after,
       @RequestParam(defaultValue = "50") int limit,
-      @RequestParam(defaultValue = "30d") String period) {
+      @RequestParam(defaultValue = "7d") String period) {
     return reads.repositories(owner, after, limit, period);
   }
 
@@ -38,7 +38,7 @@ public class PublicApiController {
   public Object stats(
       @PathVariable String owner,
       @PathVariable(required = false) String repository,
-      @RequestParam(defaultValue = "30d") String period) {
+      @RequestParam(defaultValue = "7d") String period) {
     return reads.stats(owner, repository, period);
   }
 
@@ -46,7 +46,7 @@ public class PublicApiController {
   public Object statsHistory(
       @PathVariable String owner,
       @PathVariable(required = false) String repository,
-      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "7d") String period,
       @RequestParam(required = false) LocalDate before,
       @RequestParam(defaultValue = "50") int limit) {
     return reads.statsHistory(owner, repository, period, before, limit);
@@ -56,7 +56,7 @@ public class PublicApiController {
   public Object traffic(
       @PathVariable String owner,
       @PathVariable(required = false) String repository,
-      @RequestParam(defaultValue = "30d") String period) {
+      @RequestParam(defaultValue = "7d") String period) {
     return reads.traffic(owner, repository, period);
   }
 
@@ -67,7 +67,7 @@ public class PublicApiController {
   public Object trafficHistory(
       @PathVariable String owner,
       @PathVariable(required = false) String repository,
-      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "7d") String period,
       @RequestParam(required = false) LocalDate before,
       @RequestParam(defaultValue = "50") int limit) {
     return reads.trafficHistory(owner, repository, period, before, limit);
@@ -170,7 +170,7 @@ public class PublicApiController {
   public Object referrerHistory(
       @PathVariable String owner,
       @PathVariable(required = false) String repository,
-      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "7d") String period,
       @RequestParam(defaultValue = "0") long before,
       @RequestParam(defaultValue = "50") int limit) {
     return reads.sourceHistory(owner, repository, false, period, before, limit);
@@ -180,7 +180,7 @@ public class PublicApiController {
   public Object pathHistory(
       @PathVariable String owner,
       @PathVariable(required = false) String repository,
-      @RequestParam(defaultValue = "30d") String period,
+      @RequestParam(defaultValue = "7d") String period,
       @RequestParam(defaultValue = "0") long before,
       @RequestParam(defaultValue = "50") int limit) {
     return reads.sourceHistory(owner, repository, true, period, before, limit);

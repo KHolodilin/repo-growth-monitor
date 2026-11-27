@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.analytics.application;
 
+import com.kholodilin.repogrowth.common.api.ApiException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
@@ -9,6 +10,7 @@ public record DashboardPeriod(
     String value, LocalDate from, LocalDate to, LocalDate previousFrom, LocalDate previousTo) {
 
   private static final Set<String> ALLOWED = Set.of("1d", "7d", "30d", "90d", "1y", "all");
+  public static final String DEFAULT = "7d";
 
   public static DashboardPeriod of(String raw, LocalDate today, LocalDate earliestTrafficDate) {
     String period = normalize(raw);
@@ -37,11 +39,18 @@ public record DashboardPeriod(
     return "all".equals(value);
   }
 
+  /**
+   * Null/blank become the product default ({@value #DEFAULT}). Any other unsupported value is a
+   * validation error — never a silent fallback to another period.
+   */
   public static String normalize(String raw) {
     if (raw == null || raw.isBlank()) {
-      return "30d";
+      return DEFAULT;
     }
     String period = raw.trim().toLowerCase(Locale.ROOT);
-    return ALLOWED.contains(period) ? period : "30d";
+    if (!ALLOWED.contains(period)) {
+      throw ApiException.validation("Unsupported period: " + raw.trim());
+    }
+    return period;
   }
 }

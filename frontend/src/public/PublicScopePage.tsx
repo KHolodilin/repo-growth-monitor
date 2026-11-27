@@ -41,7 +41,7 @@ export function PublicScopePage() {
     : undefined;
   const period: Period = PERIODS.includes(params.get("period") as Period)
     ? (params.get("period") as Period)
-    : (stored ?? "30d");
+    : (stored ?? "7d");
   const rawTab = params.get("tab");
   const tab = rawTab === "stats" ? "stats" : "traffic";
   const ownerLoadKey = `${owner}:${retry}:${location.pathname}:${location.search}`;

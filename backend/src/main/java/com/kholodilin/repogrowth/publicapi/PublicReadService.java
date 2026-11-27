@@ -115,7 +115,7 @@ public class PublicReadService {
   }
 
   public Page repositories(String owner, long after, int size) {
-    return repositories(owner, after, size, "30d");
+    return repositories(owner, after, size, "7d");
   }
 
   public Page repositories(String owner, long after, int size, String rawPeriod) {
