@@ -55,7 +55,7 @@ export function Layout() {
   const briefState = showOperationalStatus ? collectionBriefState(live, access?.planner) : null;
 
   const refreshStatus = useCallback(async () => {
-    const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
+    const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=7d");
     if (!dashboard?.repositories) {
       setRows([]);
       return dashboard;
@@ -69,7 +69,7 @@ export function Layout() {
     let cancelled = false;
     // Promise.resolve keeps mocks that return a bare value (or undefined) on the async path,
     // matching the previous refreshStatus() await semantics.
-    void Promise.resolve(api<Dashboard>("/api/v1/admin/dashboard?period=30d"))
+    void Promise.resolve(api<Dashboard>("/api/v1/admin/dashboard?period=7d"))
       .then((dashboard) => {
         if (cancelled) {
           return;
@@ -125,15 +125,19 @@ export function Layout() {
     setWatching(true);
     setError(null);
     try {
-      const onlyId = repositoryIdFromPath(location.pathname);
+      // Named HTML paths need rows to resolve; never fall through to collect-all.
+      const onlyId = repositoryIdFromPath(location.pathname, rows);
+      if (isNamedRepositoryPath(location.pathname) && onlyId == null) {
+        setWatching(false);
+        setError("Repository is still loading. Try Collect again in a moment.");
+        return;
+      }
       if (onlyId != null) {
-        await api(`/api/v1/admin/repositories/${onlyId}/collect`, { method: "POST" });
+        await startCollection(onlyId);
       } else {
-        const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=30d");
+        const dashboard = await api<Dashboard>("/api/v1/admin/dashboard?period=7d");
         const ids = dashboard?.repositories?.map((row) => row.id) ?? [];
-        await Promise.all(
-          ids.map((id) => api(`/api/v1/admin/repositories/${id}/collect`, { method: "POST" })),
-        );
+        await Promise.all(ids.map((id) => startCollection(id)));
         if (dashboard?.repositories) {
           setSync(dashboard.lastSyncAt);
           setRows(dashboard.repositories);
@@ -160,9 +164,12 @@ export function Layout() {
   }
 
   const label = collectButtonLabel(rows == null ? null : rows.length, repositoryId != null);
+  const namedPathUnresolved =
+    isNamedRepositoryPath(location.pathname) && repositoryId == null && rows != null;
   const collectDisabled =
     collecting ||
     collectionBlocked(access) ||
+    namedPathUnresolved ||
     (repositoryId == null && rows != null && rows.length === 0);
   const noToken = showOperationalStatus && access?.tokenState === "MISSING";
   const accessBanner = showOperationalStatus ? tokenBanner(access) : null;
@@ -448,6 +455,20 @@ function ownerLoginFromPath(pathname: string): string | null {
     return null;
   }
   return decodeURIComponent(parts[0]);
+}
+
+/** HTML repository path `/:owner/:repo` (not admin). */
+function isNamedRepositoryPath(pathname: string): boolean {
+  const parts = pathname.split("/").filter(Boolean);
+  return parts.length >= 2 && parts[0] !== "admin";
+}
+
+/** Idempotent collection command — prefer /collections over the /collect alias. */
+async function startCollection(repositoryId: number): Promise<void> {
+  await api(`/api/v1/admin/repositories/${repositoryId}/collections`, {
+    method: "POST",
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+  });
 }
 
 function repositoryIdFromPath(

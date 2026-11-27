@@ -98,7 +98,10 @@ describe("pages", () => {
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith(
+        "/api/v1/admin/repositories/13/collections",
+        expect.objectContaining({ method: "POST" }),
+      ),
     );
     await user.click(screen.getByRole("button", { name: "7d" }));
   });

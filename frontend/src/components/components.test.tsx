@@ -32,6 +32,17 @@ vi.mock("../lib/api", async (importOriginal) => {
   return { ...actual, api };
 });
 
+function expectCollectionPost(apiMock: typeof api, repositoryId: number) {
+  const call = apiMock.mock.calls.find(
+    ([url]) => String(url) === `/api/v1/admin/repositories/${repositoryId}/collections`,
+  );
+  expect(call).toBeDefined();
+  const init = call?.[1] as RequestInit | undefined;
+  expect(init?.method).toBe("POST");
+  const headers = new Headers(init?.headers);
+  expect(headers.get("Idempotency-Key")).toBeTruthy();
+}
+
 describe("components", () => {
   it("renders primitives icons layout and period selector", async () => {
     const user = userEvent.setup();
@@ -85,9 +96,7 @@ describe("components", () => {
     expect(screen.queryByText(/Last updated/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
-    await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
-    );
+    await waitFor(() => expectCollectionPost(api, 13));
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Repositories" }));
     expect(screen.getByText("repos")).toBeInTheDocument();
@@ -263,12 +272,11 @@ describe("components", () => {
     );
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
-    await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
+    await waitFor(() => expectCollectionPost(api, 13));
+    expect(api).not.toHaveBeenCalledWith(
+      "/api/v1/admin/repositories/8/collections",
+      expect.anything(),
     );
-    expect(api).not.toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", {
-      method: "POST",
-    });
     repo.unmount();
 
     api.mockClear();
@@ -290,9 +298,12 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/8/collect", { method: "POST" }),
+      expect(api).toHaveBeenCalledWith(
+        "/api/v1/admin/repositories/8/collections",
+        expect.objectContaining({ method: "POST" }),
+      ),
     );
-    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" });
+    expectCollectionPost(api, 13);
   });
 
   it("shows job progress under the header until the run finishes", async () => {
@@ -355,9 +366,7 @@ describe("components", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
-    await waitFor(() =>
-      expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories/13/collect", { method: "POST" }),
-    );
+    await waitFor(() => expectCollectionPost(api, 13));
     expect(timers.length).toBeGreaterThan(0);
     const fireTimers = async () => {
       await act(async () => {
@@ -382,6 +391,69 @@ describe("components", () => {
     expect(clear).toHaveBeenCalled();
     spy.mockRestore();
     clear.mockRestore();
+  });
+
+  it("does not silent-collect-all on an unresolved named repository path", async () => {
+    const user = userEvent.setup();
+    const portfolio = {
+      ...dashboardReady,
+      repositories: [
+        dashboardReady.repositories[0],
+        { ...dashboardReady.repositories[0], id: 8, fullName: "KHolodilin/other" },
+      ],
+    };
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return Promise.resolve({});
+      }
+      return Promise.resolve(portfolio);
+    });
+    render(
+      <MemoryRouter initialEntries={["/UnknownOwner/missing-repo"]}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/:owner/:repo" element={<p>repo</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    // Rows loaded but path does not match — Collect must stay disabled (no collect-all).
+    expect(screen.getByRole("menuitem", { name: "Collect 2 repositories" })).toBeDisabled();
+    expect(api).not.toHaveBeenCalledWith(
+      expect.stringMatching(/\/repositories\/\d+\/collections$/),
+      expect.anything(),
+    );
+  });
+
+  it("collects a named HTML repository path using loaded rows", async () => {
+    const user = userEvent.setup();
+    api.mockImplementation((path: string) => {
+      if (String(path).includes("/collect")) {
+        return Promise.resolve({});
+      }
+      return Promise.resolve(dashboardReady);
+    });
+    render(
+      <MemoryRouter
+        initialEntries={[
+          `/${dashboardReady.repositories[0].fullName.split("/")[0]}/${dashboardReady.repositories[0].fullName.split("/")[1]}`,
+        ]}
+      >
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/:owner/:repo" element={<p>repo</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole("button", { name: "Account menu" }));
+    await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
+    await waitFor(() => expectCollectionPost(api, 13));
+    expect(api).not.toHaveBeenCalledWith(
+      "/api/v1/admin/repositories/8/collections",
+      expect.anything(),
+    );
   });
 
   it("does not collect when no repository is tracked", async () => {
