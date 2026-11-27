@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.administration.controller;
 
-import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthResponse;
 import java.time.Instant;
 import java.util.List;
 

@@ -406,11 +406,14 @@ class OrchestrationIT extends AbstractPostgresTest {
   }
 
   @Test
-  void adminPostRequiresSessionRoleAndCsrfAndReturnsCommittedIds() throws Exception {
-    String url = "/api/v1/admin/repositories/" + repositoryId + "/collections";
-    mvc.perform(post(url).with(csrf())).andExpect(status().isUnauthorized());
-    mvc.perform(post(url).with(asUser("user")).with(csrf())).andExpect(status().isForbidden());
-    mvc.perform(post(url).with(asUser("admin"))).andExpect(status().isForbidden());
+  void resourcePostRequiresSessionRoleAndCsrfAndReturnsCommittedIds() throws Exception {
+    String url = "/api/v1/repositories/" + repositoryId + "/collections";
+    mvc.perform(post(url).header("Idempotency-Key", "manual-test").with(csrf()))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(post(url).header("Idempotency-Key", "manual-test").with(asUser("user")).with(csrf()))
+        .andExpect(status().isForbidden());
+    mvc.perform(post(url).header("Idempotency-Key", "manual-test").with(asUser("admin")))
+        .andExpect(status().isForbidden());
     assertThat(count("collection_request")).isZero();
     mvc.perform(
             post(url).header("Idempotency-Key", "manual-test").with(asUser("admin")).with(csrf()))
@@ -419,7 +422,13 @@ class OrchestrationIT extends AbstractPostgresTest {
         .andExpect(jsonPath("$.taskIds.length()").value(8));
     assertThat(count("collector_dispatch")).isEqualTo(8);
     mvc.perform(
-            post("/api/v1/repositories/" + repositoryId + "/collect")
+            post("/api/v1/admin/repositories/" + repositoryId + "/collect")
+                .with(asUser("admin"))
+                .with(csrf()))
+        .andExpect(status().isNotFound());
+    mvc.perform(
+            post("/api/v1/admin/repositories/" + repositoryId + "/collections")
+                .header("Idempotency-Key", "legacy-alias")
                 .with(asUser("admin"))
                 .with(csrf()))
         .andExpect(status().isNotFound());

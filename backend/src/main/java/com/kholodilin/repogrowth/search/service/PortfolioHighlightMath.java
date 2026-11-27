@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.search.service;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.EventHighlight;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.RankHighlight;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.VisitorHighlight;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.EventHighlight;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.RankHighlight;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.VisitorHighlight;
 import com.kholodilin.repogrowth.events.model.PromotionCount;
 import com.kholodilin.repogrowth.search.model.SuccessfulRank;
 import java.time.LocalDate;

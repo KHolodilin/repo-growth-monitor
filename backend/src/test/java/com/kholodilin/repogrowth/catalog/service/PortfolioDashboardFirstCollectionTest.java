@@ -8,7 +8,7 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.DashboardState;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.DashboardState;
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;

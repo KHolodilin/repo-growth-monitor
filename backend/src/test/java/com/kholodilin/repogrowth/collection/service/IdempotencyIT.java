@@ -85,7 +85,7 @@ class IdempotencyIT extends AbstractPostgresTest {
   }
 
   String manualUrl(long id) {
-    return "/api/v1/admin/repositories/" + id + "/collections";
+    return "/api/v1/repositories/" + id + "/collections";
   }
 
   RequestPostProcessor user(String sub) {

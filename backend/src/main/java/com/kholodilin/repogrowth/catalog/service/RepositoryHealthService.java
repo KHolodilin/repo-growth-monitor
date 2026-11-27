@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.catalog.service;
 
-import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
-import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
+import com.kholodilin.repogrowth.catalog.service.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;

@@ -1,20 +1,16 @@
-package com.kholodilin.repogrowth.common.observability;
+package com.kholodilin.repogrowth.collection.observability;
 
 import com.kholodilin.repogrowth.collection.model.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.search.model.SearchRunStatus;
-import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;
 
 @Component
-public class QueueMetricsBinder {
+public class CollectionQueueMetricsBinder {
 
-  public QueueMetricsBinder(
-      MeterRegistry registry,
-      CollectionJobJdbcRepository collectionJobJdbcRepository,
-      SearchRunJdbcRepository searchRunJdbcRepository) {
+  public CollectionQueueMetricsBinder(
+      MeterRegistry registry, CollectionJobJdbcRepository collectionJobJdbcRepository) {
     Gauge.builder(
             "collection.jobs.ready",
             collectionJobJdbcRepository,
@@ -29,16 +25,6 @@ public class QueueMetricsBinder {
             "collection.jobs.failed",
             collectionJobJdbcRepository,
             repo -> repo.countByStatus(CollectionJobStatus.FAILED))
-        .register(registry);
-    Gauge.builder(
-            "search.jobs.ready",
-            searchRunJdbcRepository,
-            repo -> repo.countByStatus(SearchRunStatus.READY))
-        .register(registry);
-    Gauge.builder(
-            "search.jobs.failed",
-            searchRunJdbcRepository,
-            repo -> repo.countByStatus(SearchRunStatus.FAILED))
         .register(registry);
   }
 }

@@ -8,7 +8,7 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 /**
- * Maps collection runs to API DTOs. Lives outside {@code CollectionController} so application
+ * Maps collection runs to API DTOs. Lives outside {@code CollectionRunResourceController} so application
  * services never depend on the HTTP layer.
  */
 @Component

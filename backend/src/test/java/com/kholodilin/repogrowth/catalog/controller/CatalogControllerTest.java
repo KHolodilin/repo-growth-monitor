@@ -19,6 +19,7 @@ import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
 import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService.OwnerRow;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.GlobalExceptionHandler;

@@ -2,11 +2,11 @@ package com.kholodilin.repogrowth.catalog.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.PortfolioStats;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.StatsPoint;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.TrafficLeader;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.TrafficPoint;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.PortfolioStats;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.StatsPoint;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficLeader;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryDayTotals;
 import com.kholodilin.repogrowth.stats.model.RepositoryStatDay;
 import java.time.LocalDate;

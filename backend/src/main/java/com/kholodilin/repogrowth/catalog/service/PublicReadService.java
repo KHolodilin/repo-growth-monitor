@@ -406,7 +406,7 @@ public class PublicReadService {
   }
 
   private Object rankHighlight(
-      com.kholodilin.repogrowth.catalog.controller.DashboardResponse.RankHighlight value) {
+      com.kholodilin.repogrowth.catalog.service.DashboardResponse.RankHighlight value) {
     return value == null
         ? null
         : Map.of(

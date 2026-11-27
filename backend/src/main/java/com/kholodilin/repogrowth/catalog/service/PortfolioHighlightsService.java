@@ -4,8 +4,8 @@ import com.kholodilin.repogrowth.search.service.PortfolioHighlightMath;
 
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.Highlights;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.RepositoryRow;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.Highlights;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.RepositoryRow;
 import com.kholodilin.repogrowth.search.service.PortfolioHighlightMath.VisitorRow;
 import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;

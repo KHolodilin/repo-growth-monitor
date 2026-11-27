@@ -4,7 +4,7 @@ import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.TrafficCoverage;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficCoverage;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 

@@ -3,7 +3,7 @@ package com.kholodilin.repogrowth.search.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.service.HealthCheckItem;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.OwnerType;
 import com.kholodilin.repogrowth.catalog.model.Repository;

@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -19,9 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kholodilin.repogrowth.administration.controller.RepositoryController;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.service.HealthCheckItem;
 import com.kholodilin.repogrowth.catalog.controller.PortfolioDashboardController;
-import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.OwnerType;
@@ -31,7 +30,6 @@ import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.PortfolioDashboardService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
-import com.kholodilin.repogrowth.collection.controller.CollectionController;
 import com.kholodilin.repogrowth.collection.controller.SystemStatusController;
 import com.kholodilin.repogrowth.collection.model.CollectionJob;
 import com.kholodilin.repogrowth.collection.model.CollectionJobStatus;
@@ -41,7 +39,6 @@ import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.service.CollectionRunQueryService;
 import com.kholodilin.repogrowth.common.web.SpaController;
@@ -75,7 +72,6 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,13 +79,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
     controllers = {
       RepositoryController.class,
-      CollectionController.class,
       com.kholodilin.repogrowth.collection.controller.CollectionRunResourceController.class,
       SearchQueryController.class,
       com.kholodilin.repogrowth.search.controller.SearchResourceController.class,
@@ -106,14 +100,10 @@ import org.springframework.test.web.servlet.MockMvc;
 class ApiControllersWebMvcTest {
 
   @Autowired MockMvc mockMvc;
-  @Autowired CollectionController collectionController;
   @MockitoBean CollectionRunMapper collectionRunMapper;
   @MockitoBean CollectionRunQueryService collectionRunQueryService;
   @Autowired SearchQueryController searchQueryController;
   @Autowired TopicVisibilityController topicVisibilityController;
-
-  private final CollectionRequestService collectionRequestService =
-      mock(CollectionRequestService.class);
 
   @MockitoBean RepositoryService repositoryService;
   @MockitoBean RepositoryHealthService repositoryHealthService;
@@ -144,7 +134,6 @@ class ApiControllersWebMvcTest {
 
   @BeforeEach
   void stubs() {
-    ReflectionTestUtils.setField(collectionController, "commands", collectionRequestService);
     when(accessStatusService.status())
         .thenReturn(
             new GitHubAccessStatusService.Status(
@@ -198,18 +187,9 @@ class ApiControllersWebMvcTest {
     when(planningWindow.from()).thenReturn(LocalTime.of(9, 30));
     when(planningWindow.to()).thenReturn(LocalTime.of(17, 0));
     when(planningWindow.isOpen()).thenReturn(true);
-    CollectionRequestService.Created created =
-        new CollectionRequestService.Created(UUID.randomUUID(), List.of(UUID.randomUUID()), false);
     CollectionRun run =
         new CollectionRun(
             1L, 13L, LocalDate.of(2026, 9, 23), CollectionRunStatus.SUCCESS, 1, 1, 0, now, now);
-    when(collectionRequestService.manual(13L, LocalDate.of(2026, 9, 23))).thenReturn(created);
-    when(collectionRequestService.searchCommand(5L, LocalDate.of(2026, 9, 23))).thenReturn(created);
-    when(collectionRequestService.searchAllCommand(13L, LocalDate.of(2026, 9, 23)))
-        .thenReturn(created);
-    when(collectionRequestService.topicCommand(7L, LocalDate.of(2026, 9, 23))).thenReturn(created);
-    when(collectionRequestService.topicsCommand(13L, "all", LocalDate.of(2026, 9, 23)))
-        .thenReturn(created);
     when(runRepository.findById(1L)).thenReturn(Optional.of(run));
     when(jobRepository.findByRun(1L))
         .thenReturn(
@@ -446,11 +426,6 @@ class ApiControllersWebMvcTest {
                 .content("{\"enabled\":true}"))
         .andExpect(status().isOk());
     mockMvc
-        .perform(post("/api/v1/admin/repositories/13/collect"))
-        .andExpect(status().isCreated())
-        .andExpect(jsonPath("$.coalesced").value(false));
-    verify(collectionRequestService).manual(13L, LocalDate.of(2026, 9, 23));
-    mockMvc
         .perform(get("/api/v1/collection-runs/1"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.jobs[0].jobType").value("TRAFFIC"));
@@ -646,18 +621,6 @@ class ApiControllersWebMvcTest {
     mockMvc
         .perform(get("/api/v1/admin/system/status"))
         .andExpect(jsonPath("$.tokenState").value("COLLECTOR_UNAVAILABLE"));
-  }
-
-  @Test
-  void collectIsUnavailableWithoutCollectorOrchestration() throws Exception {
-    ReflectionTestUtils.setField(collectionController, "commands", null);
-    try {
-      mockMvc
-          .perform(post("/api/v1/admin/repositories/13/collect"))
-          .andExpect(status().isServiceUnavailable());
-    } finally {
-      ReflectionTestUtils.setField(collectionController, "commands", collectionRequestService);
-    }
   }
 
   @Test

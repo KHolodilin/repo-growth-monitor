@@ -3,8 +3,8 @@ package com.kholodilin.repogrowth.catalog.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse;
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.DashboardState;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.DashboardState;
 import com.kholodilin.repogrowth.catalog.service.PortfolioDashboardService;
 import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
 import com.kholodilin.repogrowth.stats.service.AdminStatsHistoryService;

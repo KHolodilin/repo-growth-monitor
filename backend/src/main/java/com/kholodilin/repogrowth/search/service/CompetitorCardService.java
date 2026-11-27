@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.search.service;
 
-import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.service.HealthCheckItem;
 import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthEvaluator;
 import com.kholodilin.repogrowth.common.api.ApiException;

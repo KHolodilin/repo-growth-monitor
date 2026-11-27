@@ -1,4 +1,4 @@
-package com.kholodilin.repogrowth.catalog.controller;
+package com.kholodilin.repogrowth.catalog.service;
 
 import java.util.List;
 

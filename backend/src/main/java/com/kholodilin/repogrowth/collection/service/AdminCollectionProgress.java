@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.collection.service;
 
-import com.kholodilin.repogrowth.catalog.controller.DashboardResponse;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse;
 import com.kholodilin.repogrowth.collection.repository.AdminCollectionProgressJdbcRepository;
 import java.util.*;
 import org.springframework.stereotype.Component;

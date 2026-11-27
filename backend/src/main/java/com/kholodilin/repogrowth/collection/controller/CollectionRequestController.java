@@ -1,45 +1,31 @@
 package com.kholodilin.repogrowth.collection.controller;
 
-import com.kholodilin.collector.contracts.CollectorHttpHeaders;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
-import com.kholodilin.repogrowth.collection.service.IdempotentCollectionRequests;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-/** POST is protected by the existing Admin authorization manager and CSRF filter. */
+/**
+ * Admin-only repository discovery refresh. Per-repository collect aliases removed; use {@link
+ * CollectionResourceController} {@code POST /api/v1/repositories/{id}/collections}.
+ */
 @RestController
 @ConditionalOnProperty(name = "rgm.orchestration.enabled", havingValue = "true")
 @RequestMapping("/api/v1/admin/repositories")
 public class CollectionRequestController {
-  private final IdempotentCollectionRequests service;
   private final PlanningWindow window;
   @org.springframework.beans.factory.annotation.Autowired private CollectionRequestService requests;
 
-  public CollectionRequestController(IdempotentCollectionRequests service, PlanningWindow window) {
-    this.service = service;
+  public CollectionRequestController(PlanningWindow window) {
     this.window = window;
   }
 
   @PostMapping("/refresh")
   public ResponseEntity<java.util.List<CollectionRequestService.Created>> refresh() {
     return ResponseEntity.status(HttpStatus.CREATED).body(requests.refresh(window.businessDate()));
-  }
-
-  @PostMapping("/{id}/collections")
-  public ResponseEntity<CollectionRequestService.Created> create(
-      @PathVariable long id,
-      @RequestHeader(CollectorHttpHeaders.IDEMPOTENCY_KEY) String key,
-      org.springframework.security.core.Authentication authentication) {
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .body(
-            service.create(
-                ((com.kholodilin.repogrowth.identity.security.AppUserPrincipal)
-                        authentication.getPrincipal())
-                    .userId(),
-                key,
-                id,
-                window.businessDate()));
   }
 }

@@ -495,7 +495,11 @@ class PublicApiIT extends AbstractPostgresTest {
     mvc.perform(
             post("/api/v1/admin/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated());
-    mvc.perform(post("/api/v1/admin/repositories/" + a + "/collect").with(as("admin")).with(csrf()))
+    mvc.perform(
+            post("/api/v1/repositories/" + a + "/collections")
+                .header("Idempotency-Key", "public-api-it-collect")
+                .with(as("admin"))
+                .with(csrf()))
         .andExpect(status().isCreated());
     assertThat(
             jdbc.queryForObject(
