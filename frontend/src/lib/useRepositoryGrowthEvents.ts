@@ -7,10 +7,9 @@ export function fetchRepositoryGrowthEvents(
   period: string,
   signal: AbortSignal,
 ): Promise<GrowthEvent[]> {
-  return api<GrowthEvent[]>(
-    `/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`,
-    { signal },
-  ).then(asGrowthEvents);
+  return api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`, {
+    signal,
+  }).then(asGrowthEvents);
 }
 
 function bindGrowthEventsRequest(

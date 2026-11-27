@@ -539,7 +539,7 @@ function useTrackedEvents(repositoryIds: number[], period: string) {
     let cancelled = false;
     void Promise.all(
       ids.map((id) =>
-        api<GrowthEvent[]>(`/api/v1/admin/repositories/${id}/growth-events?period=${period}`)
+        api<GrowthEvent[]>(`/api/v1/repositories/${id}/growth-events?period=${period}`)
           .then((rows) => asGrowthEvents(rows))
           .catch(() => [] as GrowthEvent[]),
       ),

@@ -151,11 +151,11 @@ function fetchRepositoryDetailsBundle(
       `/api/v1/admin/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
       { signal },
     ),
-    api<SearchHistory[]>(`/api/v1/admin/repositories/${id}/search-visibility`, { signal }),
-    api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=all`, {
+    api<SearchHistory[]>(`/api/v1/repositories/${id}/search-queries?include=history`, { signal }),
+    api<TopicHistory[]>(`/api/v1/repositories/${id}/topic-watches?scope=all&include=history`, {
       signal,
     }),
-    api<TopicHistory[]>(`/api/v1/admin/repositories/${id}/topics-visibility?scope=language`, {
+    api<TopicHistory[]>(`/api/v1/repositories/${id}/topic-watches?scope=language&include=history`, {
       signal,
     }),
   ]).then(([repository, traffic, search, plainTopics, languageTopics]) => ({

@@ -20,7 +20,7 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
   useEffect(() => {
     const abort = new AbortController();
     let cancelled = false;
-    api<GrowthEventSetting[]>(`/api/v1/admin/repositories/${repositoryId}/growth-event-settings`, {
+    api<GrowthEventSetting[]>(`/api/v1/repositories/${repositoryId}/growth-event-settings`, {
       signal: abort.signal,
     })
       .then((data) => {
@@ -52,7 +52,7 @@ export function GrowthEventSettingsCard({ repositoryId }: { repositoryId: number
     );
     try {
       const updated = await api<GrowthEventSetting[]>(
-        `/api/v1/admin/repositories/${repositoryId}/growth-event-settings`,
+        `/api/v1/repositories/${repositoryId}/growth-event-settings`,
         {
           method: "PUT",
           body: JSON.stringify([{ eventType, enabled }]),

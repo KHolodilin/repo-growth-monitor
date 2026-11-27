@@ -79,7 +79,9 @@ export function TrafficHistoryPage() {
     Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${id}`),
       api<SnapshotHistory>(
-        `/api/v1/admin/repositories/${id}/traffic-history?kind=${kind}&period=${period}&includeServicePaths=${includeService}`,
+        kind === "paths"
+          ? `/api/v1/repositories/${id}/path-history?period=${period}&includeServicePaths=${includeService}`
+          : `/api/v1/repositories/${id}/referrer-history?period=${period}`,
       ),
     ])
       .then(([repository, data]) => {

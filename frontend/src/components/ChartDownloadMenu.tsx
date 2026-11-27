@@ -245,9 +245,7 @@ export function ChartCard({
     }
     let cancelled = false;
     Promise.resolve(
-      api<GrowthEvent[]>(
-        `/api/v1/admin/repositories/${repositoryId}/growth-events?period=${period}`,
-      ),
+      api<GrowthEvent[]>(`/api/v1/repositories/${repositoryId}/growth-events?period=${period}`),
     )
       .then((rows) => {
         if (!cancelled) {
