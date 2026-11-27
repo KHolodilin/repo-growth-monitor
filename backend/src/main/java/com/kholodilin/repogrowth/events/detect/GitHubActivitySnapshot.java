@@ -1,10 +1,10 @@
 package com.kholodilin.repogrowth.events.detect;
 
-import com.kholodilin.repogrowth.github.model.GitHubContributorItem;
-import com.kholodilin.repogrowth.github.model.GitHubIssueItem;
-import com.kholodilin.repogrowth.github.model.GitHubPullItem;
-import com.kholodilin.repogrowth.github.model.GitHubReleaseItem;
-import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
+import com.kholodilin.repogrowth.collection.integration.github.GitHubContributorItem;
+import com.kholodilin.repogrowth.collection.integration.github.GitHubIssueItem;
+import com.kholodilin.repogrowth.collection.integration.github.GitHubPullItem;
+import com.kholodilin.repogrowth.collection.integration.github.GitHubReleaseItem;
+import com.kholodilin.repogrowth.collection.integration.github.GitHubRepositoryResponse;
 import java.time.Instant;
 import java.util.List;
 

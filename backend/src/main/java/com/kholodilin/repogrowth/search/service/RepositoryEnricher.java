@@ -4,7 +4,7 @@ import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
-import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
+import com.kholodilin.repogrowth.collection.integration.github.GitHubSearchItem;
 import com.kholodilin.repogrowth.search.model.SearchResult;
 import java.time.Instant;
 import org.springframework.stereotype.Component;

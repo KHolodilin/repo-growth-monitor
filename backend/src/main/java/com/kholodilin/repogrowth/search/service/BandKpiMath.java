@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.search.service;
 
-import com.kholodilin.repogrowth.analytics.service.GrowthMath;
+import com.kholodilin.repogrowth.common.model.GrowthMath;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import java.time.LocalDate;
 import java.util.ArrayList;

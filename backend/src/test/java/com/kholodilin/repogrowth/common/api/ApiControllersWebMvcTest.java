@@ -19,8 +19,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kholodilin.repogrowth.administration.controller.RepositoryController;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.analytics.controller.AnalyticsController;
-import com.kholodilin.repogrowth.analytics.service.AnalyticsService;
+import com.kholodilin.repogrowth.catalog.controller.PortfolioDashboardController;
+import com.kholodilin.repogrowth.catalog.service.PortfolioDashboardService;
+import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
+import com.kholodilin.repogrowth.stats.service.AdminStatsHistoryService;
 import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
 import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
@@ -50,7 +52,7 @@ import com.kholodilin.repogrowth.events.controller.GrowthEventController;
 import com.kholodilin.repogrowth.events.model.GrowthEvent;
 import com.kholodilin.repogrowth.events.model.GrowthEventSetting;
 import com.kholodilin.repogrowth.events.service.GrowthEventService;
-import com.kholodilin.repogrowth.github.exception.GitHubException;
+import com.kholodilin.repogrowth.common.api.GitHubException;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.search.controller.SearchQueryController;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
@@ -89,7 +91,9 @@ import org.springframework.test.web.servlet.MockMvc;
       SearchQueryController.class,
       GrowthEventController.class,
       TopicVisibilityController.class,
-      AnalyticsController.class,
+      PortfolioDashboardController.class,
+      com.kholodilin.repogrowth.traffic.controller.TrafficController.class,
+      com.kholodilin.repogrowth.stats.controller.StatsController.class,
       SystemStatusController.class,
       SpaController.class
     })
@@ -118,7 +122,11 @@ class ApiControllersWebMvcTest {
   @MockitoBean GrowthEventService growthEventService;
   @MockitoBean TopicVisibilityService topicVisibilityService;
   @MockitoBean TopicCompetitorService topicCompetitorService;
-  @MockitoBean AnalyticsService analyticsService;
+  @MockitoBean PortfolioDashboardService analyticsService;
+  @MockitoBean AdminTrafficService adminTrafficService;
+  @MockitoBean AdminStatsHistoryService adminStatsHistoryService;
+  @MockitoBean com.kholodilin.repogrowth.traffic.service.TrafficReadService trafficReadService;
+  @MockitoBean com.kholodilin.repogrowth.stats.service.StatsReadService statsReadService;
   @MockitoBean CurrentUserAccess currentUserAccess;
   @MockitoBean PublicationService publicationService;
 
@@ -360,10 +368,10 @@ class ApiControllersWebMvcTest {
                     new CompetitorCardService.CompetitorPoint(LocalDate.of(2026, 9, 23), 10, 2))));
     when(analyticsService.dashboard(anyString())).thenReturn(null);
     when(analyticsService.portfolio(anyString())).thenReturn(null);
-    when(analyticsService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
-    when(analyticsService.snapshotHistory(eq(13L), any(), any(), any(), anyBoolean()))
+    when(adminTrafficService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
+    when(adminTrafficService.snapshotHistory(eq(13L), any(), any(), any(), anyBoolean()))
         .thenReturn(null);
-    when(analyticsService.statsHistory(eq(13L), anyString())).thenReturn(null);
+    when(adminStatsHistoryService.statsHistory(eq(13L), anyString())).thenReturn(null);
   }
 
   @Test
@@ -501,7 +509,7 @@ class ApiControllersWebMvcTest {
             get(
                 "/api/v1/admin/repositories/13/traffic-history?kind=paths&period=all&days=14&includeServicePaths=true"))
         .andExpect(status().isOk());
-    verify(analyticsService).snapshotHistory(13L, "paths", "all", 14, true);
+    verify(adminTrafficService).snapshotHistory(13L, "paths", "all", 14, true);
     mockMvc.perform(get("/api/v1/admin/repositories/13/stats-history")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/admin/system/status")).andExpect(status().isOk());
     mockMvc.perform(get("/dashboard")).andExpect(status().isNotFound());

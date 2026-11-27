@@ -1,0 +1,40 @@
+package com.kholodilin.repogrowth.catalog.service;
+
+import com.kholodilin.repogrowth.search.service.PortfolioHighlightMath;
+
+import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
+
+import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.Highlights;
+import com.kholodilin.repogrowth.catalog.controller.DashboardResponse.RepositoryRow;
+import com.kholodilin.repogrowth.search.service.PortfolioHighlightMath.VisitorRow;
+import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
+import java.util.List;
+import org.springframework.stereotype.Service;
+
+@Service
+public class PortfolioHighlightsService {
+
+  private final SearchRunJdbcRepository searchRunRepository;
+  private final GrowthEventJdbcRepository eventRepository;
+
+  public PortfolioHighlightsService(
+      SearchRunJdbcRepository searchRunRepository, GrowthEventJdbcRepository eventRepository) {
+    this.searchRunRepository = searchRunRepository;
+    this.eventRepository = eventRepository;
+  }
+
+  public Highlights build(DashboardPeriod period, List<RepositoryRow> rows) {
+    var ranks = searchRunRepository.successfulPositions(period.to());
+    return new Highlights(
+        PortfolioHighlightMath.strongestRise(ranks, period.from()),
+        PortfolioHighlightMath.worstDrop(ranks, period.from()),
+        PortfolioHighlightMath.promotionEvents(
+            eventRepository.promotionCounts(period.from(), period.to())),
+        PortfolioHighlightMath.strongestVisitorGrowth(
+            rows.stream()
+                .map(row ->
+                    new VisitorRow(row.id(), row.fullName(), row.visitors(), row.growthPercent()))
+                .toList()));
+  }
+}

@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.traffic.controller;
 
 import com.kholodilin.repogrowth.common.api.ApiSurface;
+import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
 import com.kholodilin.repogrowth.traffic.service.TrafficReadService;
 import com.kholodilin.repogrowth.traffic.service.TrafficReadService.DailyHistoryResponse;
 import com.kholodilin.repogrowth.traffic.service.TrafficReadService.SnapshotHistoryResponse;
@@ -20,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class TrafficController {
 
   private final TrafficReadService traffic;
+  private final AdminTrafficService adminTraffic;
 
-  public TrafficController(TrafficReadService traffic) {
+  public TrafficController(
+      TrafficReadService traffic, AdminTrafficService adminTraffic) {
     this.traffic = traffic;
+    this.adminTraffic = adminTraffic;
   }
 
   @GetMapping("/owners/{ownerId}/traffic/kpi")
@@ -76,5 +80,25 @@ public class TrafficController {
       @RequestParam(required = false) Integer days,
       @RequestParam(defaultValue = "false") boolean includeServicePaths) {
     return traffic.pathHistory(repositoryId, period, days, includeServicePaths);
+  }
+
+  /** Legacy admin composite traffic card; prefer resource KPI/referrers/paths. */
+  @GetMapping("/admin/repositories/{id}/traffic")
+  public AdminTrafficService.RepositoryTrafficSnapshot adminTraffic(
+      @PathVariable("id") long id,
+      @RequestParam(defaultValue = "7d") String period,
+      @RequestParam(defaultValue = "false") boolean includeServicePaths) {
+    return adminTraffic.traffic(id, period, includeServicePaths);
+  }
+
+  /** Legacy admin referrer/path history (?kind=); prefer referrer-history / path-history. */
+  @GetMapping("/admin/repositories/{id}/traffic-history")
+  public AdminTrafficService.SnapshotHistoryResponse adminTrafficHistory(
+      @PathVariable("id") long id,
+      @RequestParam(required = false) String kind,
+      @RequestParam(required = false) Integer days,
+      @RequestParam(required = false) String period,
+      @RequestParam(defaultValue = "false") boolean includeServicePaths) {
+    return adminTraffic.snapshotHistory(id, kind, period, days, includeServicePaths);
   }
 }

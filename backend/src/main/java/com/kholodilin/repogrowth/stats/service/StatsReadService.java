@@ -2,8 +2,8 @@ package com.kholodilin.repogrowth.stats.service;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.analytics.service.DashboardPeriod;
-import com.kholodilin.repogrowth.analytics.service.GrowthMath;
+import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
+import com.kholodilin.repogrowth.common.model.GrowthMath;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;

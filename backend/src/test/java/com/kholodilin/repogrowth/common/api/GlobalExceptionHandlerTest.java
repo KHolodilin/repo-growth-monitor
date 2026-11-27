@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.collection.idempotency.InvalidIdempotencyKeyException;
-import com.kholodilin.repogrowth.github.exception.GitHubException;
+import com.kholodilin.repogrowth.common.api.GitHubException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;

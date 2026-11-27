@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.common.api;
 
-import com.kholodilin.repogrowth.github.exception.GitHubException;
+import com.kholodilin.repogrowth.common.api.GitHubException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;

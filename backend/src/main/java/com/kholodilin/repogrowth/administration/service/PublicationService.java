@@ -1,5 +1,7 @@
 package com.kholodilin.repogrowth.administration.service;
 
+import com.kholodilin.repogrowth.collection.integration.github.GitHubRepositoryResponse;
+
 import com.kholodilin.repogrowth.administration.configuration.PublicRoutes;
 import com.kholodilin.repogrowth.administration.configuration.PublicationProperties;
 import com.kholodilin.repogrowth.common.api.ApiException;
@@ -114,7 +116,7 @@ public class PublicationService {
 
   @Transactional
   public void metadata(
-      long id, com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse remote, Instant at) {
+      long id, com.kholodilin.repogrowth.collection.integration.github.GitHubRepositoryResponse remote, Instant at) {
     if (!verify(id, remote.id(), remote.resolvedVisibility(), at)) return;
     if (remote.owner() != null) {
       var owner = remote.owner();

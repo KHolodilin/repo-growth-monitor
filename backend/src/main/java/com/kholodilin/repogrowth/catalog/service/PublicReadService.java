@@ -4,10 +4,10 @@ import com.kholodilin.repogrowth.administration.configuration.PublicRoutes;
 import com.kholodilin.repogrowth.administration.configuration.PublicationProperties;
 import com.kholodilin.repogrowth.administration.service.*;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.analytics.service.*;
-import com.kholodilin.repogrowth.analytics.service.DashboardPeriod;
-import com.kholodilin.repogrowth.analytics.service.GrowthMath;
-import com.kholodilin.repogrowth.analytics.service.PortfolioHighlightMath;
+import com.kholodilin.repogrowth.catalog.service.*;
+import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
+import com.kholodilin.repogrowth.common.model.GrowthMath;
+import com.kholodilin.repogrowth.search.service.PortfolioHighlightMath;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import java.time.*;
@@ -448,7 +448,7 @@ public class PublicReadService {
   }
 
   private Object rankHighlight(
-      com.kholodilin.repogrowth.analytics.controller.DashboardResponse.RankHighlight value) {
+      com.kholodilin.repogrowth.catalog.controller.DashboardResponse.RankHighlight value) {
     return value == null
         ? null
         : Map.of(

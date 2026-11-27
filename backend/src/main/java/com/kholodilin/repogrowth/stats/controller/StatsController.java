@@ -1,6 +1,7 @@
 package com.kholodilin.repogrowth.stats.controller;
 
 import com.kholodilin.repogrowth.common.api.ApiSurface;
+import com.kholodilin.repogrowth.stats.service.AdminStatsHistoryService;
 import com.kholodilin.repogrowth.stats.service.StatsReadService;
 import com.kholodilin.repogrowth.stats.service.StatsReadService.StatsHistoryResponse;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,9 +16,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class StatsController {
 
   private final StatsReadService stats;
+  private final AdminStatsHistoryService adminStatsHistory;
 
-  public StatsController(StatsReadService stats) {
+  public StatsController(
+      StatsReadService stats, AdminStatsHistoryService adminStatsHistory) {
     this.stats = stats;
+    this.adminStatsHistory = adminStatsHistory;
   }
 
   @GetMapping("/owners/{ownerId}/stats/kpi")
@@ -42,5 +46,12 @@ public class StatsController {
   public StatsHistoryResponse repositoryStatsHistory(
       @PathVariable long repositoryId, @RequestParam(defaultValue = "7d") String period) {
     return stats.repositoryHistoryResponse(repositoryId, period);
+  }
+
+  /** Legacy admin stats history composite; prefer resource /stats-history. */
+  @GetMapping("/admin/repositories/{id}/stats-history")
+  public AdminStatsHistoryService.RepositoryStatsHistory adminStatsHistory(
+      @PathVariable("id") long id, @RequestParam(defaultValue = "7d") String period) {
+    return adminStatsHistory.statsHistory(id, period);
   }
 }

@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.events.service;
 
-import com.kholodilin.repogrowth.analytics.service.DashboardPeriod;
+import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.common.api.ApiException;
