@@ -93,6 +93,7 @@
     "count": 30,
     "loginPattern": "atlas-01..atlas-30",
     "reposPerOwner": "1 or 2",
+    "metrics": "full (~30d traffic/stats, referrers/paths, search, topics, events)",
     "seededBy": "NorthstarMockSeed"
   }
 }

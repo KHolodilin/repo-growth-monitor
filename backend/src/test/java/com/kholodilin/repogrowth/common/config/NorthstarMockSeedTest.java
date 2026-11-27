@@ -72,4 +72,11 @@ class NorthstarMockSeedTest {
                 .count())
         .isEqualTo(NorthstarMockSeed.DIRECTORY_OWNER_COUNT);
   }
+
+  @Test
+  void directoryTopicsRotateAcrossBundles() {
+    assertThat(NorthstarMockSeed.directoryTopics(0, 0)).hasSize(3).contains("observability");
+    assertThat(NorthstarMockSeed.directoryTopics(1, 0)).isNotEqualTo(NorthstarMockSeed.directoryTopics(0, 0));
+    assertThat(NorthstarMockSeed.directoryTopics(0, 1)).hasSize(3);
+  }
 }

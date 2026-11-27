@@ -44,108 +44,41 @@ public class NorthstarMockSeed implements ApplicationRunner {
   private static final List<String> DIRECTORY_LANGUAGES =
       List.of("Java", "Go", "Python", "TypeScript", "Rust");
 
+  private static final List<List<String>> DIRECTORY_TOPIC_BUNDLES =
+      List.of(
+          List.of("observability", "metrics", "ops"),
+          List.of("data", "etl", "pipeline"),
+          List.of("cache", "cdn", "edge"),
+          List.of("security", "secrets", "iam"),
+          List.of("charts", "kpi", "ui"),
+          List.of("search", "ranking", "index"),
+          List.of("agent", "fleet", "runtime"),
+          List.of("schema", "codegen", "api"),
+          List.of("audit", "ledger", "compliance"),
+          List.of("messaging", "events", "queue"));
+
   private static final List<RepoSpec> REPOS =
       List.of(
-          new RepoSpec(
-              91_001L,
-              "pulse-board",
-              false,
-              "Java",
-              240,
-              24,
-              20,
-              1,
-              List.of("observability", "dashboard", "metrics")),
-          new RepoSpec(
-              91_002L,
-              "signal-router",
-              false,
-              "Java",
-              180,
-              18,
-              15,
-              2,
-              List.of("kafka", "routing", "events")),
-          new RepoSpec(
-              91_003L,
-              "lake-ingest",
-              false,
-              "Python",
-              95,
-              9,
-              7,
-              3,
-              List.of("etl", "data", "batch")),
-          new RepoSpec(
-              91_004L,
-              "edge-cache",
-              false,
-              "Go",
-              310,
-              31,
-              28,
-              4,
-              List.of("cache", "cdn", "performance")),
-          new RepoSpec(
-              91_005L,
-              "trust-vault",
-              true,
-              "Java",
-              150,
-              15,
-              12,
-              2,
-              List.of("security", "secrets", "vault")),
-          new RepoSpec(
-              91_006L,
-              "schema-forge",
-              false,
-              "TypeScript",
-              88,
-              8,
-              6,
-              1,
-              List.of("schema", "codegen", "api")),
-          new RepoSpec(
-              91_007L,
-              "fleet-agent",
-              false,
-              "Go",
-              122,
-              12,
-              10,
-              2,
-              List.of("agent", "ops", "fleet")),
-          new RepoSpec(
-              91_008L,
-              "chart-kit",
-              false,
-              "TypeScript",
-              64,
-              6,
-              5,
-              1,
-              List.of("charts", "kpi", "ui")),
-          new RepoSpec(
-              91_009L,
-              "rank-engine",
-              false,
-              "Java",
-              205,
-              20,
-              17,
-              3,
-              List.of("search", "ranking", "topics")),
-          new RepoSpec(
-              91_010L,
-              "audit-ledger",
-              false,
-              "Java",
-              73,
-              7,
-              5,
-              1,
-              List.of("audit", "ledger", "compliance")));
+          northstarRepo(
+              91_001L, "pulse-board", false, "Java", 240, 24, 20, 1, "observability", "dashboard", "metrics"),
+          northstarRepo(
+              91_002L, "signal-router", false, "Java", 180, 18, 15, 2, "kafka", "routing", "events"),
+          northstarRepo(
+              91_003L, "lake-ingest", false, "Python", 95, 9, 7, 3, "etl", "data", "batch"),
+          northstarRepo(
+              91_004L, "edge-cache", false, "Go", 310, 31, 28, 4, "cache", "cdn", "performance"),
+          northstarRepo(
+              91_005L, "trust-vault", true, "Java", 150, 15, 12, 2, "security", "secrets", "vault"),
+          northstarRepo(
+              91_006L, "schema-forge", false, "TypeScript", 88, 8, 6, 1, "schema", "codegen", "api"),
+          northstarRepo(
+              91_007L, "fleet-agent", false, "Go", 122, 12, 10, 2, "agent", "ops", "fleet"),
+          northstarRepo(
+              91_008L, "chart-kit", false, "TypeScript", 64, 6, 5, 1, "charts", "kpi", "ui"),
+          northstarRepo(
+              91_009L, "rank-engine", false, "Java", 205, 20, 17, 3, "search", "ranking", "topics"),
+          northstarRepo(
+              91_010L, "audit-ledger", false, "Java", 73, 7, 5, 1, "audit", "ledger", "compliance"));
 
   private final JdbcClient jdbc;
   private final Clock clock;
@@ -158,24 +91,17 @@ public class NorthstarMockSeed implements ApplicationRunner {
   @Override
   @Transactional
   public void run(ApplicationArguments args) {
-    long ownerId = upsertOwner();
+    long ownerId = upsertOwner(OWNER_GITHUB_ID, OWNER_LOGIN);
     Instant now = clock.instant();
     LocalDate today = LocalDate.now(clock);
     int ordinal = 0;
     for (RepoSpec spec : REPOS) {
-      long repositoryId = upsertRepository(ownerId, spec, now);
-      boolean publishPublic = !spec.privateRepo();
-      publishAndTrack(repositoryId, publishPublic, now);
-      seedMetrics(repositoryId, ordinal, today, spec);
-      seedReferrersAndPaths(repositoryId, ordinal, today, spec);
-      seedSearch(repositoryId, ordinal, today, spec, publishPublic);
-      seedTopics(repositoryId, ordinal, today, spec);
-      seedEvents(repositoryId, ordinal, today, spec);
+      seedRichRepository(ownerId, spec, ordinal, today, now);
       ordinal++;
     }
-    int directoryRepos = seedDirectoryOwners(today, now);
+    int directoryRepos = seedDirectoryOwners(today, now, ordinal);
     log.info(
-        "Seeded northstar mock fixture: owner={} repos={} trafficDays={} directoryOwners={} directoryRepos={} (referrers/paths/search/topics/events)",
+        "Seeded northstar mock fixture: owner={} repos={} trafficDays={} directoryOwners={} directoryRepos={} (full metrics)",
         OWNER_LOGIN,
         REPOS.size(),
         TRAFFIC_DAYS,
@@ -184,33 +110,17 @@ public class NorthstarMockSeed implements ApplicationRunner {
   }
 
   /**
-   * Lightweight published owners (1–2 public repos each) so {@code /api/v1/public/owners} has enough
-   * rows for pagination. Intentionally thinner than the rich {@code northstar} fixture.
+   * Published owners ({@code atlas-01}…{@code atlas-30}, 1–2 repos each) with the same rich ~30d
+   * metric surface as northstar — traffic/stats, referrers/paths, search, topics, growth events —
+   * for homepage cards, DB load and variant testing.
    */
-  private int seedDirectoryOwners(LocalDate today, Instant now) {
+  private int seedDirectoryOwners(LocalDate today, Instant now, int startingOrdinal) {
     int repos = 0;
+    int ordinal = startingOrdinal;
     long nextRepoGithubId = DIRECTORY_REPO_GITHUB_ID_BASE;
     for (int index = 0; index < DIRECTORY_OWNER_COUNT; index++) {
       String login = directoryOwnerLogin(index);
-      long ownerGithubId = DIRECTORY_OWNER_GITHUB_ID_BASE + index;
-      long ownerId =
-          jdbc.sql(
-                  """
-                  INSERT INTO github_owner (github_id, login, owner_type, avatar_url, html_url)
-                  VALUES (:githubId, :login, 'USER', :avatarUrl, :htmlUrl)
-                  ON CONFLICT (github_id) DO UPDATE SET
-                    login = EXCLUDED.login,
-                    avatar_url = EXCLUDED.avatar_url,
-                    html_url = EXCLUDED.html_url,
-                    updated_at = NOW()
-                  RETURNING id
-                  """)
-              .param("githubId", ownerGithubId)
-              .param("login", login)
-              .param("avatarUrl", "https://avatars.githubusercontent.com/u/" + ownerGithubId + "?v=4")
-              .param("htmlUrl", "https://github.com/" + login)
-              .query(Long.class)
-              .single();
+      long ownerId = upsertOwner(DIRECTORY_OWNER_GITHUB_ID_BASE + index, login);
       int repoCount = index % 2 == 0 ? 2 : 1;
       for (int repoIndex = 0; repoIndex < repoCount; repoIndex++) {
         String repoName = repoIndex == 0 ? "core" : "tools";
@@ -218,83 +128,39 @@ public class NorthstarMockSeed implements ApplicationRunner {
         int stars = 12 + index * 3 + repoIndex * 5;
         int watchers = 2 + index % 7;
         int forks = 1 + index % 5;
-        long repositoryId =
-            jdbc.sql(
-                    """
-                    INSERT INTO repository (
-                      github_id, owner_id, name, full_name, description, visibility, default_branch,
-                      language, fork, archived, stars, watchers, forks, open_issues, contributors,
-                      tracking_enabled, account_accessible, github_created_at, github_updated_at,
-                      github_pushed_at, last_commit_at, enriched_at
-                    ) VALUES (
-                      :githubId, :ownerId, :name, :fullName, :description, 'PUBLIC', 'main',
-                      :language, FALSE, FALSE, :stars, :watchers, :forks, 0, :contributors,
-                      TRUE, TRUE, :createdAt, :updatedAt, :pushedAt, :pushedAt, :enrichedAt
-                    )
-                    ON CONFLICT (github_id) DO UPDATE SET
-                      owner_id = EXCLUDED.owner_id,
-                      name = EXCLUDED.name,
-                      full_name = EXCLUDED.full_name,
-                      description = EXCLUDED.description,
-                      visibility = 'PUBLIC',
-                      language = EXCLUDED.language,
-                      stars = EXCLUDED.stars,
-                      watchers = EXCLUDED.watchers,
-                      forks = EXCLUDED.forks,
-                      contributors = EXCLUDED.contributors,
-                      tracking_enabled = TRUE,
-                      account_accessible = TRUE,
-                      github_updated_at = EXCLUDED.github_updated_at,
-                      github_pushed_at = EXCLUDED.github_pushed_at,
-                      last_commit_at = EXCLUDED.last_commit_at,
-                      enriched_at = EXCLUDED.enriched_at,
-                      updated_at = NOW()
-                    RETURNING id
-                    """)
-                .param("githubId", nextRepoGithubId++)
-                .param("ownerId", ownerId)
-                .param("name", repoName)
-                .param("fullName", login + "/" + repoName)
-                .param("description", "Directory fixture " + login + "/" + repoName)
-                .param("language", language)
-                .param("stars", stars)
-                .param("watchers", watchers)
-                .param("forks", forks)
-                .param("contributors", Math.max(1, watchers / 2))
-                .param("createdAt", Timestamp.from(Instant.parse("2024-06-01T10:00:00Z")))
-                .param("updatedAt", Timestamp.from(Instant.parse("2026-11-01T12:00:00Z")))
-                .param("pushedAt", Timestamp.from(Instant.parse("2026-11-01T08:00:00Z")))
-                .param("enrichedAt", Timestamp.from(now))
-                .query(Long.class)
-                .single();
-        publishAndTrack(repositoryId, true, now);
-        jdbc.sql(
-                """
-                INSERT INTO repository_daily_stats (
-                  repository_id, stat_date, stars, watchers, forks, open_issues, contributors
-                ) VALUES (
-                  :repositoryId, :statDate, :stars, :watchers, :forks, 0, :contributors
-                )
-                ON CONFLICT (repository_id, stat_date) DO UPDATE SET
-                  stars = EXCLUDED.stars,
-                  watchers = EXCLUDED.watchers,
-                  forks = EXCLUDED.forks,
-                  contributors = EXCLUDED.contributors
-                """)
-            .param("repositoryId", repositoryId)
-            .param("statDate", today)
-            .param("stars", stars)
-            .param("watchers", watchers)
-            .param("forks", forks)
-            .param("contributors", Math.max(1, watchers / 2))
-            .update();
+        RepoSpec spec =
+            new RepoSpec(
+                nextRepoGithubId++,
+                login,
+                repoName,
+                false,
+                language,
+                stars,
+                watchers,
+                forks,
+                index % 4,
+                directoryTopics(index, repoIndex));
+        seedRichRepository(ownerId, spec, ordinal, today, now);
+        ordinal++;
         repos++;
       }
     }
     return repos;
   }
 
-  private long upsertOwner() {
+  private void seedRichRepository(
+      long ownerId, RepoSpec spec, int ordinal, LocalDate today, Instant now) {
+    long repositoryId = upsertRepository(ownerId, spec, now);
+    boolean publishPublic = !spec.privateRepo();
+    publishAndTrack(repositoryId, publishPublic, now);
+    seedMetrics(repositoryId, ordinal, today, spec);
+    seedReferrersAndPaths(repositoryId, ordinal, today, spec);
+    seedSearch(repositoryId, ordinal, today, spec, publishPublic);
+    seedTopics(repositoryId, ordinal, today, spec);
+    seedEvents(repositoryId, ordinal, today, spec);
+  }
+
+  private long upsertOwner(long githubId, String login) {
     return jdbc.sql(
             """
             INSERT INTO github_owner (github_id, login, owner_type, avatar_url, html_url)
@@ -306,10 +172,10 @@ public class NorthstarMockSeed implements ApplicationRunner {
               updated_at = NOW()
             RETURNING id
             """)
-        .param("githubId", OWNER_GITHUB_ID)
-        .param("login", OWNER_LOGIN)
-        .param("avatarUrl", "https://avatars.githubusercontent.com/u/90042?v=4")
-        .param("htmlUrl", "https://github.com/northstar")
+        .param("githubId", githubId)
+        .param("login", login)
+        .param("avatarUrl", "https://avatars.githubusercontent.com/u/" + githubId + "?v=4")
+        .param("htmlUrl", "https://github.com/" + login)
         .query(Long.class)
         .single();
   }
@@ -350,10 +216,14 @@ public class NorthstarMockSeed implements ApplicationRunner {
         .param("githubId", spec.githubId())
         .param("ownerId", ownerId)
         .param("name", spec.name())
-        .param("fullName", OWNER_LOGIN + "/" + spec.name())
+        .param("fullName", spec.ownerLogin() + "/" + spec.name())
         .param(
             "description",
-            "Deterministic mock repository " + spec.name() + " for RGM UI regression")
+            "Deterministic mock repository "
+                + spec.ownerLogin()
+                + "/"
+                + spec.name()
+                + " for RGM UI regression")
         .param("visibility", spec.privateRepo() ? "PRIVATE" : "PUBLIC")
         .param("language", spec.language())
         .param("stars", spec.stars())
@@ -448,7 +318,7 @@ public class NorthstarMockSeed implements ApplicationRunner {
 
   private void seedReferrersAndPaths(
       long repositoryId, int ordinal, LocalDate today, RepoSpec spec) {
-    String full = OWNER_LOGIN + "/" + spec.name();
+    String full = spec.ownerLogin() + "/" + spec.name();
     for (int dayIndex = 0; dayIndex < TRAFFIC_DAYS; dayIndex++) {
       LocalDate date = today.minusDays(TRAFFIC_DAYS - 1L - dayIndex);
       Instant snapshotAt = date.atTime(LocalTime.of(10, 15)).toInstant(ZoneOffset.UTC);
@@ -725,7 +595,8 @@ public class NorthstarMockSeed implements ApplicationRunner {
   }
 
   private void seedEvents(long repositoryId, int ordinal, LocalDate today, RepoSpec spec) {
-    String html = "https://github.com/" + OWNER_LOGIN + "/" + spec.name();
+    String html = "https://github.com/" + spec.ownerLogin() + "/" + spec.name();
+    String idPrefix = spec.ownerLogin() + ":" + spec.githubId();
     // Automatic / system-style detections spread across the window.
     insertEvent(
         repositoryId,
@@ -733,10 +604,10 @@ public class NorthstarMockSeed implements ApplicationRunner {
         "DISCOVERABILITY",
         "README_SIGNIFICANTLY_CHANGED",
         "README significantly changed",
-        "Seeded northstar README refresh for " + spec.name(),
+        "Seeded README refresh for " + spec.ownerLogin() + "/" + spec.name(),
         html,
         "GITHUB",
-        "northstar-readme:" + spec.githubId());
+        idPrefix + ":readme");
     insertEvent(
         repositoryId,
         today.minusDays(21),
@@ -746,17 +617,17 @@ public class NorthstarMockSeed implements ApplicationRunner {
         String.join(", ", spec.topics()),
         html,
         "GITHUB",
-        "northstar-topics:" + spec.githubId());
+        idPrefix + ":topics");
     insertEvent(
         repositoryId,
         today.minusDays(14),
         "RELEASE",
         "RELEASE_PUBLISHED",
-        "Release v1." + ordinal + ".0",
-        "v1." + ordinal + ".0",
-        html + "/releases/tag/v1." + ordinal + ".0",
+        "Release v1." + (ordinal % 20) + ".0",
+        "v1." + (ordinal % 20) + ".0",
+        html + "/releases/tag/v1." + (ordinal % 20) + ".0",
         "GITHUB",
-        "northstar-release:" + spec.githubId() + ":v1." + ordinal + ".0");
+        idPrefix + ":release:v1." + (ordinal % 20) + ".0");
     insertEvent(
         repositoryId,
         today.minusDays(10),
@@ -766,7 +637,7 @@ public class NorthstarMockSeed implements ApplicationRunner {
         "Improve " + spec.name() + " docs",
         html + "/pull/" + (10 + ordinal),
         "GITHUB",
-        "northstar-pr-merged:" + spec.githubId());
+        idPrefix + ":pr-merged");
     insertEvent(
         repositoryId,
         today.minusDays(7),
@@ -776,7 +647,7 @@ public class NorthstarMockSeed implements ApplicationRunner {
         null,
         html,
         "SYSTEM",
-        "northstar-stars:" + spec.githubId() + ":" + nearestStarThreshold(spec.stars()));
+        idPrefix + ":stars:" + nearestStarThreshold(spec.stars()));
     // Promotion-style manual events (public highlight + Recent Growth Events).
     insertEvent(
         repositoryId,
@@ -785,9 +656,9 @@ public class NorthstarMockSeed implements ApplicationRunner {
         "DEVTO_ARTICLE",
         "Dev.to: Introducing " + spec.name(),
         "Walkthrough of " + spec.name() + " for operators",
-        "https://dev.to/northstar/" + spec.name(),
+        "https://dev.to/" + spec.ownerLogin() + "/" + spec.name(),
         "MANUAL",
-        "northstar-devto:" + spec.githubId());
+        idPrefix + ":devto");
     insertEvent(
         repositoryId,
         today.minusDays(2),
@@ -795,9 +666,9 @@ public class NorthstarMockSeed implements ApplicationRunner {
         "REDDIT_POST",
         "Reddit: " + spec.name() + " deep dive",
         "Community discussion for " + spec.name(),
-        "https://reddit.com/r/programming/comments/northstar-" + spec.name(),
+        "https://reddit.com/r/programming/comments/" + spec.ownerLogin() + "-" + spec.name(),
         "MANUAL",
-        "northstar-reddit:" + spec.githubId());
+        idPrefix + ":reddit");
     if (ordinal % 2 == 0) {
       insertEvent(
           repositoryId,
@@ -806,9 +677,9 @@ public class NorthstarMockSeed implements ApplicationRunner {
           "HACKER_NEWS_POST",
           "HN: " + spec.name(),
           null,
-          "https://news.ycombinator.com/item?id=northstar" + spec.githubId(),
+          "https://news.ycombinator.com/item?id=" + spec.ownerLogin() + spec.githubId(),
           "MANUAL",
-          "northstar-hn:" + spec.githubId());
+          idPrefix + ":hn");
     }
   }
 
@@ -921,8 +792,41 @@ public class NorthstarMockSeed implements ApplicationRunner {
     return "atlas-%02d".formatted(index + 1);
   }
 
+  static List<String> directoryTopics(int ownerIndex, int repoIndex) {
+    List<String> bundle =
+        DIRECTORY_TOPIC_BUNDLES.get(
+            (ownerIndex + repoIndex) % DIRECTORY_TOPIC_BUNDLES.size());
+    return List.copyOf(bundle);
+  }
+
+  private static RepoSpec northstarRepo(
+      long githubId,
+      String name,
+      boolean privateRepo,
+      String language,
+      int stars,
+      int watchers,
+      int forks,
+      int openIssues,
+      String topicA,
+      String topicB,
+      String topicC) {
+    return new RepoSpec(
+        githubId,
+        OWNER_LOGIN,
+        name,
+        privateRepo,
+        language,
+        stars,
+        watchers,
+        forks,
+        openIssues,
+        List.of(topicA, topicB, topicC));
+  }
+
   private record RepoSpec(
       long githubId,
+      String ownerLogin,
       String name,
       boolean privateRepo,
       String language,

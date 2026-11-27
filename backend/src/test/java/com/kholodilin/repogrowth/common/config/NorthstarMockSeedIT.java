@@ -159,6 +159,61 @@ class NorthstarMockSeedIT extends AbstractPostgresTest {
                 .query(Long.class)
                 .single())
         .isEqualTo(45L); // 15 owners × 2 repos + 15 owners × 1 repo
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM traffic_daily t
+                    JOIN repository r ON r.id = t.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login LIKE 'atlas-%'
+                    """)
+                .query(Long.class)
+                .single())
+        .isEqualTo(45L * NorthstarMockSeed.TRAFFIC_DAYS);
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM traffic_referrer_snapshot s
+                    JOIN repository r ON r.id = s.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-01'
+                    """)
+                .query(Long.class)
+                .single())
+        .isEqualTo(2L * NorthstarMockSeed.TRAFFIC_DAYS * 5L);
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM search_query q
+                    JOIN repository r ON r.id = q.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-02' AND q.public_enabled
+                    """)
+                .query(Long.class)
+                .single())
+        .isEqualTo(2L); // one repo × two queries
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM topic_watch w
+                    JOIN repository r ON r.id = w.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-03' AND w.language IS NOT NULL AND w.enabled
+                    """)
+                .query(Long.class)
+                .single())
+        .isEqualTo(2L * 3L); // two repos × three topics (language-scoped)
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM growth_event e
+                    JOIN repository r ON r.id = e.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-01'
+                    """)
+                .query(Long.class)
+                .single())
+        .isGreaterThanOrEqualTo(14L);
 
     // Second pass exercises ON CONFLICT update paths.
     seed.run(new DefaultApplicationArguments());
