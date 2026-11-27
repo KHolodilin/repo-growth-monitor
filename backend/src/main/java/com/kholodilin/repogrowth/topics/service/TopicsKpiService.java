@@ -16,7 +16,6 @@ import com.kholodilin.repogrowth.search.service.BandKpiMath.BandKpi;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.DayMode;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.RankPoint;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.RankSample;
-import com.kholodilin.repogrowth.topics.controller.TopicsKpiResponse;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService.TopicHistory;
 import java.math.BigDecimal;
 import java.time.Clock;

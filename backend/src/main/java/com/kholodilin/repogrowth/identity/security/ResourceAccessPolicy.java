@@ -127,7 +127,6 @@ public class ResourceAccessPolicy {
     if (path.startsWith("/api/v1/admin/collectors")
         || path.startsWith("/api/v1/admin/github-budget")
         || path.startsWith("/api/v1/admin/system")
-        || path.startsWith("/api/v1/admin/collection/plan")
         || path.startsWith("/api/v1/admin/credentials")
         || path.equals("/api/v1/admin/collectors")
         || path.startsWith("/admin")) {

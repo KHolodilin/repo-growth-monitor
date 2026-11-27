@@ -8,6 +8,7 @@ import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
 import com.kholodilin.repogrowth.search.service.CompetitorCardService;
+import com.kholodilin.repogrowth.search.service.SearchKpiResponse;
 import com.kholodilin.repogrowth.search.service.SearchKpiService;
 import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import com.kholodilin.repogrowth.search.service.SearchQueryService.SearchHistory;

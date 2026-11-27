@@ -12,6 +12,7 @@ import com.kholodilin.repogrowth.topics.service.TopicCompetitorService;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService.TopicHistory;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService.TopicRunResults;
+import com.kholodilin.repogrowth.topics.service.TopicsKpiResponse;
 import com.kholodilin.repogrowth.topics.service.TopicsKpiService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;

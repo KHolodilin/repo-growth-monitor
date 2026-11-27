@@ -10,7 +10,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.search.controller.SearchKpiResponse;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.BandKpi;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.DayMode;
 import com.kholodilin.repogrowth.search.service.BandKpiMath.RankPoint;

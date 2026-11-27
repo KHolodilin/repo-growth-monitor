@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.stats.service.AdminStatsHistoryService;
+import com.kholodilin.repogrowth.stats.service.StatsKpiResponse;
 import com.kholodilin.repogrowth.stats.service.StatsReadService;
 import com.kholodilin.repogrowth.stats.service.StatsReadService.StatsHistoryResponse;
 import java.util.List;

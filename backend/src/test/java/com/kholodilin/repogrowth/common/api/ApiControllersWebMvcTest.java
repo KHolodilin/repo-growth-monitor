@@ -44,7 +44,6 @@ import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcReposito
 import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.service.CollectionRunQueryService;
-import com.kholodilin.repogrowth.collection.service.DailyPlanner;
 import com.kholodilin.repogrowth.common.web.SpaController;
 import com.kholodilin.repogrowth.credentials.service.GitHubAccessStatusService;
 import com.kholodilin.repogrowth.events.controller.EventsResourceController;
@@ -121,7 +120,6 @@ class ApiControllersWebMvcTest {
   @MockitoBean ActivityClassifier activityClassifier;
   @MockitoBean GitHubAccessStatusService accessStatusService;
   @MockitoBean PlanningWindow planningWindow;
-  @MockitoBean DailyPlanner dailyPlanner;
   @MockitoBean CollectionRunJdbcRepository runRepository;
   @MockitoBean CollectionJobJdbcRepository jobRepository;
   @MockitoBean SearchQueryService searchQueryService;
@@ -285,8 +283,6 @@ class ApiControllersWebMvcTest {
                 List.of(
                     new CollectionRunMapper.CollectionJobResponse(
                         2L, "TRAFFIC", "SUCCESS", 1, null, null, now, now))));
-    when(dailyPlanner.planNow(true))
-        .thenReturn(new DailyPlanner.PlannerResult(true, 1, 0, 0, "2026-09-23"));
     when(searchQueryService.list(13L)).thenReturn(List.of(query));
     when(searchKpiService.repositoryQueriesWithHistory(eq(13L), anyBoolean(), any(Integer.class)))
         .thenReturn(List.of());
@@ -454,7 +450,6 @@ class ApiControllersWebMvcTest {
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.coalesced").value(false));
     verify(collectionRequestService).manual(13L, LocalDate.of(2026, 9, 23));
-    mockMvc.perform(post("/api/v1/admin/collection/plan")).andExpect(status().isCreated());
     mockMvc
         .perform(get("/api/v1/collection-runs/1"))
         .andExpect(status().isOk())

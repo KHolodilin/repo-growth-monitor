@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
+import com.kholodilin.repogrowth.traffic.service.TrafficKpiResponse;
 import com.kholodilin.repogrowth.traffic.service.TrafficReadService;
 import com.kholodilin.repogrowth.traffic.service.TrafficReadService.DailyHistoryResponse;
 import com.kholodilin.repogrowth.traffic.service.TrafficReadService.SnapshotHistoryResponse;

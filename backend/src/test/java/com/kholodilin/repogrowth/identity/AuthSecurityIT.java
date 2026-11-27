@@ -59,7 +59,11 @@ class AuthSecurityIT extends AbstractPostgresTest {
   @Test
   void guestCannotMutate() throws Exception {
     mockMvc
-        .perform(post("/api/v1/admin/collection/plan").with(csrf()))
+        .perform(
+            post("/api/v1/admin/repositories/13/tracking")
+                .with(csrf())
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}"))
         .andExpect(status().isUnauthorized())
         .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
   }
@@ -68,7 +72,12 @@ class AuthSecurityIT extends AbstractPostgresTest {
   void userCannotMutate() throws Exception {
     AppUser user = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "user").orElseThrow();
     mockMvc
-        .perform(post("/api/v1/admin/collection/plan").with(csrf()).with(asPrincipal(user)))
+        .perform(
+            post("/api/v1/admin/repositories/13/tracking")
+                .with(csrf())
+                .with(asPrincipal(user))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}"))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.code").value("FORBIDDEN"));
   }
@@ -78,8 +87,13 @@ class AuthSecurityIT extends AbstractPostgresTest {
     AppUser admin = users.findByIssuerAndSub(MockUserCatalog.ISSUER, "admin").orElseThrow();
     assertThat(admin.isAdmin()).isTrue();
     mockMvc
-        .perform(post("/api/v1/admin/collection/plan").with(csrf()).with(asPrincipal(admin)))
-        .andExpect(status().isCreated());
+        .perform(
+            post("/api/v1/admin/repositories/13/tracking")
+                .with(csrf())
+                .with(asPrincipal(admin))
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"enabled\":true}"))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -88,7 +102,12 @@ class AuthSecurityIT extends AbstractPostgresTest {
     users.revokeAdmin(admin.id());
     try {
       mockMvc
-          .perform(post("/api/v1/admin/collection/plan").with(csrf()).with(asPrincipal(admin)))
+          .perform(
+              post("/api/v1/admin/repositories/13/tracking")
+                  .with(csrf())
+                  .with(asPrincipal(admin))
+                  .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                  .content("{\"enabled\":true}"))
           .andExpect(status().isForbidden());
     } finally {
       users.grantAdmin(admin.id());

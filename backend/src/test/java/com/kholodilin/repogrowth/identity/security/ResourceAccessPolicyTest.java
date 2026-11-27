@@ -113,7 +113,6 @@ class ResourceAccessPolicyTest {
     assertThat(policy.isOpsSurface("/api/v1/admin/collectors")).isTrue();
     assertThat(policy.isOpsSurface("/api/v1/admin/github-budget")).isTrue();
     assertThat(policy.isOpsSurface("/api/v1/admin/system")).isTrue();
-    assertThat(policy.isOpsSurface("/api/v1/admin/collection/plan")).isTrue();
     assertThat(policy.isOpsSurface("/api/v1/admin/credentials")).isTrue();
     assertThat(policy.isOpsSurface("/api/v1/dashboard")).isFalse();
     assertThat(policy.isOpsSurface("/api/v1/admin/system/status")).isTrue();

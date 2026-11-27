@@ -15,7 +15,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.traffic.controller.TrafficKpiResponse;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;

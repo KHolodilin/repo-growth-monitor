@@ -13,7 +13,6 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
-import com.kholodilin.repogrowth.stats.controller.StatsKpiResponse;
 import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import java.math.BigDecimal;
