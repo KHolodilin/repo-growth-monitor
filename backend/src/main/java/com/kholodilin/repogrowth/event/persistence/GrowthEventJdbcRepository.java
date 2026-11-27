@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.event.persistence;
 
-import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.PromotionCount;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
 import com.kholodilin.repogrowth.event.detect.CandidateEvent;
 import com.kholodilin.repogrowth.event.domain.GrowthEvent;
+import com.kholodilin.repogrowth.event.domain.PromotionCount;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
