@@ -54,5 +54,25 @@ class CollectionRunMapperTest {
     assertThat(view.jobs()).hasSize(1);
     assertThat(view.jobs().getFirst().jobType()).isEqualTo("TRAFFIC");
     assertThat(view.jobs().getFirst().status()).isEqualTo("SUCCESS");
+
+    var response = mapper.toResponse(view);
+    assertThat(response.id()).isEqualTo(9L);
+    assertThat(response.repositoryId()).isEqualTo(13L);
+    assertThat(response.businessDate()).isEqualTo("2026-11-10");
+    assertThat(response.status()).isEqualTo("SUCCESS");
+    assertThat(response.plannedJobs()).isEqualTo(2);
+    assertThat(response.successfulJobs()).isEqualTo(2);
+    assertThat(response.failedJobs()).isZero();
+    assertThat(response.createdAt()).isEqualTo(now);
+    assertThat(response.completedAt()).isEqualTo(now);
+    assertThat(response.jobs()).hasSize(1);
+    assertThat(response.jobs().getFirst().id()).isEqualTo(1L);
+    assertThat(response.jobs().getFirst().jobType()).isEqualTo("TRAFFIC");
+    assertThat(response.jobs().getFirst().status()).isEqualTo("SUCCESS");
+    assertThat(response.jobs().getFirst().attempt()).isEqualTo(1);
+    assertThat(response.jobs().getFirst().errorCode()).isNull();
+    assertThat(response.jobs().getFirst().errorMessage()).isNull();
+    assertThat(response.jobs().getFirst().startedAt()).isEqualTo(now);
+    assertThat(response.jobs().getFirst().completedAt()).isEqualTo(now);
   }
 }
