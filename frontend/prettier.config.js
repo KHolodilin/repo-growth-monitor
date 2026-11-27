@@ -4,4 +4,6 @@ export default {
   singleQuote: false,
   trailingComma: "all",
   semi: true,
+  // Windows checkouts often use CRLF via core.autocrlf; keep style checks EOL-agnostic.
+  endOfLine: "auto",
 };

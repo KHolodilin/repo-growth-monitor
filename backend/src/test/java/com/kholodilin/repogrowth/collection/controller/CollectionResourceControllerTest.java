@@ -94,10 +94,11 @@ class CollectionResourceControllerTest {
     when(commands.topicCommand(anyLong(), any())).thenReturn(created);
     when(commands.topicsCommand(anyLong(), any(), any())).thenReturn(created);
 
-    assertThat(controller.runSearchQuery(5L)).isEqualTo(created);
-    assertThat(controller.runRepositorySearchQueries(13L)).isEqualTo(created);
-    assertThat(controller.runTopicWatch(7L)).isEqualTo(created);
-    assertThat(controller.runRepositoryTopicWatches(13L, "language")).isEqualTo(created);
+    assertThat(controller.runSearchQuery(5L).getBody()).isEqualTo(created);
+    assertThat(controller.runSearchQuery(5L).getStatusCode().value()).isEqualTo(201);
+    assertThat(controller.runRepositorySearchQueries(13L).getBody()).isEqualTo(created);
+    assertThat(controller.runTopicWatch(7L).getBody()).isEqualTo(created);
+    assertThat(controller.runRepositoryTopicWatches(13L, "language").getBody()).isEqualTo(created);
     when(topicWatches.getWatch(9L)).thenThrow(ApiException.notFound("Topic watch not found"));
     assertThatThrownBy(() -> controller.runTopicWatch(9L)).isInstanceOf(ApiException.class);
 

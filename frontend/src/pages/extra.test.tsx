@@ -165,7 +165,7 @@ describe("extra coverage", () => {
       if (url.includes("/search-queries/") && url.includes("results")) {
         return Promise.reject(new Error("no search snapshot"));
       }
-      if (url.includes("/admin/search-runs/")) {
+      if (url.includes("/search-runs/")) {
         return Promise.resolve({
           ...searchResults,
           run: { ...searchResults.run, enrichmentStatus: "PARTIAL" },

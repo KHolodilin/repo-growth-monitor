@@ -369,19 +369,19 @@ class PublicApiIT extends AbstractPostgresTest {
 
   @Test
   void adminRoleCsrfAndRemovedMappingsAreEnforced() throws Exception {
-    for (String path : List.of("/repositories", "/system/status", "/dashboard")) {
+    for (String path : List.of("/repositories", "/system/status")) {
       mvc.perform(get("/api/v1/admin" + path)).andExpect(status().isUnauthorized());
       mvc.perform(get("/api/v1/admin" + path).with(as("user"))).andExpect(status().isForbidden());
       mvc.perform(get("/api/v1" + path).with(as("admin"))).andExpect(status().isNotFound());
     }
-    // Shared dashboard GETs reuse admin handlers; Spring Security is permitAll and publication
-    // fencing is separate.
-    mvc.perform(get("/api/v1/admin/search-queries/" + query)).andExpect(status().isOk());
-    mvc.perform(get("/api/v1/admin/search-queries/" + query).with(as("user")))
-        .andExpect(status().isOk());
-    // Resource Search API is live; admin may read the query card through /api/v1.
+    mvc.perform(get("/api/v1/admin/dashboard")).andExpect(status().isUnauthorized());
+    mvc.perform(get("/api/v1/admin/dashboard").with(as("user"))).andExpect(status().isForbidden());
+    // Shared portfolio dashboard lives on the resource API (not under /admin).
+    mvc.perform(get("/api/v1/dashboard").with(as("admin"))).andExpect(status().isOk());
+    // Resource Search API is live; admin and user may read the query card through /api/v1.
     mvc.perform(get("/api/v1/search-queries/" + query).with(as("admin")))
         .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/search-queries/" + query).with(as("user"))).andExpect(status().isOk());
     mvc.perform(get("/api/v1/admin/repositories/" + a)).andExpect(status().isOk());
     mvc.perform(get("/api/v1/admin/repositories/" + hidden)).andExpect(status().isNotFound());
     String publication = "/api/v1/admin/repositories/" + a + "/publication";
@@ -403,7 +403,7 @@ class PublicApiIT extends AbstractPostgresTest {
   @Test
   void adminRunOneAndTopicsUseExplicitDurableTargets() throws Exception {
     mvc.perform(
-            post("/api/v1/admin/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
+            post("/api/v1/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.taskIds.length()").value(1));
     assertThat(jdbc.queryForObject("SELECT task_type FROM collection_task", String.class))
@@ -493,7 +493,7 @@ class PublicApiIT extends AbstractPostgresTest {
   void collectAfterSingleQueryAddsMissingFamiliesAndCoalescesSafely() throws Exception {
     jdbc.update("UPDATE repository SET tracking_enabled=true WHERE id=?", a);
     mvc.perform(
-            post("/api/v1/admin/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
+            post("/api/v1/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated());
     mvc.perform(post("/api/v1/admin/repositories/" + a + "/collect").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated());
@@ -557,7 +557,7 @@ class PublicApiIT extends AbstractPostgresTest {
   @Test
   void adminCanReadDurableRequestStatusAndPublicCannot() throws Exception {
     mvc.perform(
-            post("/api/v1/admin/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
+            post("/api/v1/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated());
     String request =
         jdbc.queryForObject("SELECT public_id::text FROM collection_request", String.class);
@@ -581,16 +581,16 @@ class PublicApiIT extends AbstractPostgresTest {
         .andExpect(status().isNotFound());
     mvc.perform(get("/api/v1/public/search-queries/" + query + "/competitors/555"))
         .andExpect(status().isNotFound());
-    mvc.perform(get("/api/v1/admin/search-runs/" + run + "/results").with(as("admin")))
+    mvc.perform(get("/api/v1/search-runs/" + run + "/results").with(as("admin")))
         .andExpect(status().isOk());
   }
 
   @Test
   void deletingQueuedQueryCancelsItsAssignmentBeforeRemovingDefinition() throws Exception {
     mvc.perform(
-            post("/api/v1/admin/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
+            post("/api/v1/search-queries/" + query + "/run").with(as("admin")).with(csrf()))
         .andExpect(status().isCreated());
-    mvc.perform(delete("/api/v1/admin/search-queries/" + query).with(as("admin")).with(csrf()))
+    mvc.perform(delete("/api/v1/search-queries/" + query).with(as("admin")).with(csrf()))
         .andExpect(status().isOk());
     assertThat(jdbc.queryForObject("SELECT state FROM collection_task", String.class))
         .isEqualTo("CANCELLED");

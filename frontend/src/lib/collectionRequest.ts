@@ -11,12 +11,9 @@ export async function waitForCollectionRequest(
 ): Promise<CollectionRequestState> {
   const intervalMs = options?.intervalMs ?? 1000;
   for (;;) {
-    const state = await api<CollectionRequestState>(
-      `/api/v1/collection-requests/${requestId}`,
-      {
-        signal: options?.signal,
-      },
-    );
+    const state = await api<CollectionRequestState>(`/api/v1/collection-requests/${requestId}`, {
+      signal: options?.signal,
+    });
     if (state.state !== "ACTIVE") {
       return state;
     }

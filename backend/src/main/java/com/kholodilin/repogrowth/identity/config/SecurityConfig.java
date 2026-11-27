@@ -105,6 +105,12 @@ public class SecurityConfig {
               .permitAll()
               .requestMatchers("/admin", "/admin/**", "/api/v1/admin/**")
               .access(adminAuthorizationManager)
+              // Durable orchestration status is authenticated (not the anonymous public surface).
+              .requestMatchers(
+                  HttpMethod.GET,
+                  "/api/v1/collection-requests/**",
+                  "/api/v1/collection-runs/**")
+              .authenticated()
               .requestMatchers(HttpMethod.GET, "/api/v1/me")
               .permitAll()
               .requestMatchers(HttpMethod.GET, "/api/v1/**")

@@ -94,7 +94,7 @@ public class GitHubBudgetJdbcRepository {
       String resource,
       Instant leasedUntil) {
     jdbc.update(
-        "INSERT INTO github_request_permit(permit_id,identity_key,node_key,attempt_id,resource,generation,leased_until) VALUES (?,?,?,?,?,1,?)",
+        "INSERT INTO github_request_permit(permit_id,identity_key,node_key,attempt_id,resource,generation,leased_until) VALUES (?,?,?,?::uuid,?,1,?)",
         permitId,
         identity,
         node,

@@ -141,14 +141,16 @@ public class CredentialJdbcRepository {
 
   public void shareLockCollectionRequestForTask(String taskPublicId) {
     jdbc.queryForList(
-        "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=? FOR SHARE OF r",
+        "SELECT r.id FROM collection_request r JOIN collection_task t ON t.request_id=r.id WHERE t.public_id=?::uuid FOR SHARE OF r",
         Long.class,
         taskPublicId);
   }
 
   public void shareLockCollectionTask(String taskPublicId) {
     jdbc.queryForList(
-        "SELECT id FROM collection_task WHERE public_id=? FOR SHARE", Long.class, taskPublicId);
+        "SELECT id FROM collection_task WHERE public_id=?::uuid FOR SHARE",
+        Long.class,
+        taskPublicId);
   }
 
   public List<Map<String, Object>> resolveLeaseRows(String taskPublicId, String attemptId, String node) {
@@ -160,7 +162,7 @@ public class CredentialJdbcRepository {
         JOIN collection_request r ON r.id=t.request_id
         JOIN github_credential c ON c.ref=t.credential_ref AND NOT c.revoked
         JOIN github_credential_version v ON v.credential_id=c.id AND v.version=c.current_version
-        WHERE t.public_id=? AND a.public_id=? AND n.node_key=? AND n.enabled AND r.state='ACTIVE'
+        WHERE t.public_id=?::uuid AND a.public_id=?::uuid AND n.node_key=? AND n.enabled AND r.state='ACTIVE'
           AND a.state IN ('ASSIGNED','ACCEPTED','RUNNING') AND t.state IN ('READY','ACCEPTED','RUNNING','RETRY')
           AND t.authorization_context IS NOT NULL AND t.credential_ref IS NOT NULL
           AND (

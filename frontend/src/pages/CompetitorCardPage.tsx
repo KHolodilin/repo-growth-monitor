@@ -44,9 +44,7 @@ export function CompetitorCardPage() {
     Promise.all([
       api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
       api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
-      api<CompetitorCard>(
-        `/api/v1/search-queries/${queryId}/competitors/${githubRepositoryId}`,
-      ),
+      api<CompetitorCard>(`/api/v1/search-queries/${queryId}/competitors/${githubRepositoryId}`),
     ])
       .then(([repository, queryHistory, competitor]) => {
         if (cancelled) return;

@@ -750,7 +750,7 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         .sql("UPDATE repository SET visibility = 'PRIVATE' WHERE id = :id")
         .param("id", outbox.id())
         .update();
-    var dashboard = analyticsService.dashboard("1d", true);
+    var dashboard = analyticsService.dashboard("1d", false);
     assertThat(dashboard.summary().repositories()).isEqualTo(1);
     assertThat(dashboard.summary().views().value()).isEqualTo(5);
     assertThat(dashboard.summary().views().coverage().expectedDays()).isEqualTo(1);

@@ -99,10 +99,9 @@ describe("repository Run all account action", () => {
     await openMenu(user);
     await user.click(screen.getByRole("menuitem", { name: "Run all" }));
     await waitFor(() =>
-      expect(api).toHaveBeenCalledWith(
-        "/api/v1/repositories/13/topic-watches/run?scope=language",
-        { method: "POST" },
-      ),
+      expect(api).toHaveBeenCalledWith("/api/v1/repositories/13/topic-watches/run?scope=language", {
+        method: "POST",
+      }),
     );
     await user.click(screen.getByRole("link", { name: "Next repository" }));
     await screen.findByRole("button", { name: "Add query" });

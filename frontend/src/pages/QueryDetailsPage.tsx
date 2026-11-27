@@ -71,9 +71,7 @@ export function QueryDetailsPage() {
       setResults(null);
     }
     try {
-      setSeries(
-        searchSeriesFromPayload(await api(`/api/v1/search-queries/${queryId}/series`)),
-      );
+      setSeries(searchSeriesFromPayload(await api(`/api/v1/search-queries/${queryId}/series`)));
     } catch {
       setSeries([]);
     }
@@ -157,10 +155,9 @@ export function QueryDetailsPage() {
     }
     setRunning(true);
     try {
-      const created = await api<{ requestId?: string }>(
-        `/api/v1/search-queries/${queryId}/run`,
-        { method: "POST" },
-      );
+      const created = await api<{ requestId?: string }>(`/api/v1/search-queries/${queryId}/run`, {
+        method: "POST",
+      });
       if (created?.requestId) {
         await waitForCollectionRequest(created.requestId);
       }

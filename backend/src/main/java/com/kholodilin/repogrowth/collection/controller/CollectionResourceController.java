@@ -71,40 +71,44 @@ public class CollectionResourceController {
   }
 
   @PostMapping("/search-queries/{queryId}/run")
-  public Object runSearchQuery(@PathVariable long queryId) {
+  public ResponseEntity<Object> runSearchQuery(@PathVariable long queryId) {
     SearchQuery query = searchQueries.getQuery(queryId);
     access.requireAction(
         query.repositoryId(),
         ResourceAccessPolicy.ResourceAction.MUTATE,
         PublicationService.Module.DASHBOARD);
-    return requireCommands().searchCommand(queryId, window.businessDate());
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(requireCommands().searchCommand(queryId, window.businessDate()));
   }
 
   @PostMapping("/repositories/{repositoryId}/search-queries/run")
-  public Object runRepositorySearchQueries(@PathVariable long repositoryId) {
+  public ResponseEntity<Object> runRepositorySearchQueries(@PathVariable long repositoryId) {
     access.requireAction(
         repositoryId,
         ResourceAccessPolicy.ResourceAction.MUTATE,
         PublicationService.Module.DASHBOARD);
-    return requireCommands().searchAllCommand(repositoryId, window.businessDate());
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(requireCommands().searchAllCommand(repositoryId, window.businessDate()));
   }
 
   @PostMapping("/topic-watches/{watchId}/run")
-  public Object runTopicWatch(@PathVariable long watchId) {
+  public ResponseEntity<Object> runTopicWatch(@PathVariable long watchId) {
     TopicWatch watch = topicWatches.getWatch(watchId);
     access.requireAction(
         watch.repositoryId(),
         ResourceAccessPolicy.ResourceAction.MUTATE,
         PublicationService.Module.TOPICS);
-    return requireCommands().topicCommand(watchId, window.businessDate());
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(requireCommands().topicCommand(watchId, window.businessDate()));
   }
 
   @PostMapping("/repositories/{repositoryId}/topic-watches/run")
-  public Object runRepositoryTopicWatches(
+  public ResponseEntity<Object> runRepositoryTopicWatches(
       @PathVariable long repositoryId, @RequestParam(defaultValue = "all") String scope) {
     access.requireAction(
         repositoryId, ResourceAccessPolicy.ResourceAction.MUTATE, PublicationService.Module.TOPICS);
-    return requireCommands().topicsCommand(repositoryId, scope, window.businessDate());
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(requireCommands().topicsCommand(repositoryId, scope, window.businessDate()));
   }
 
   private CollectionRequestService requireCommands() {
