@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.credentials.configuration;
 
-import com.kholodilin.repogrowth.orchestration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

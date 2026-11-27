@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TopicVisibilityController {
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+  private com.kholodilin.repogrowth.collection.service.CollectionRequestService commands;
 
   @org.springframework.beans.factory.annotation.Autowired
   private com.kholodilin.repogrowth.collection.planner.PlanningWindow commandWindow;
@@ -52,7 +52,7 @@ public class TopicVisibilityController {
     return requireCommands().topicCommand(id, commandWindow.businessDate());
   }
 
-  private com.kholodilin.repogrowth.orchestration.CollectionRequestService requireCommands() {
+  private com.kholodilin.repogrowth.collection.service.CollectionRequestService requireCommands() {
     if (commands == null) {
       throw ApiException.serviceUnavailable("Collector orchestration is required");
     }

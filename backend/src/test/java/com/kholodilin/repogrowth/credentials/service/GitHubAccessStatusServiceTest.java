@@ -6,10 +6,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
+import com.kholodilin.repogrowth.collection.service.CollectorNodeMonitor;
 import com.kholodilin.repogrowth.credentials.service.GitHubAccessStatusService.TokenState;
-import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
-import com.kholodilin.repogrowth.orchestration.CollectorNodeMonitor;
-import com.kholodilin.repogrowth.orchestration.OrchestrationProperties;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;

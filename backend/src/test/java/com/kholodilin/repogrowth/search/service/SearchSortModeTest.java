@@ -34,18 +34,19 @@ class SearchSortModeTest {
   @Test
   void datedSearchTargetKeysKeepQueryIdParseable() {
     assertThat(
-            com.kholodilin.repogrowth.orchestration.CollectionRequestService.targetId("query:12"))
+            com.kholodilin.repogrowth.collection.service.CollectionRequestService.targetId(
+                "query:12"))
         .isEqualTo(12L);
     assertThat(
-            com.kholodilin.repogrowth.orchestration.CollectionRequestService.targetId(
+            com.kholodilin.repogrowth.collection.service.CollectionRequestService.targetId(
                 "query:12@2026-11-17"))
         .isEqualTo(12L);
     assertThat(
-            com.kholodilin.repogrowth.orchestration.CollectionRequestService.searchTargetKey(
+            com.kholodilin.repogrowth.collection.service.CollectionRequestService.searchTargetKey(
                 12L, LocalDate.parse("2026-11-17"), LocalDate.parse("2026-11-18")))
         .isEqualTo("query:12@2026-11-17");
     assertThat(
-            com.kholodilin.repogrowth.orchestration.CollectionRequestService.searchTargetKey(
+            com.kholodilin.repogrowth.collection.service.CollectionRequestService.searchTargetKey(
                 12L, LocalDate.parse("2026-11-18"), LocalDate.parse("2026-11-18")))
         .isEqualTo("query:12");
   }

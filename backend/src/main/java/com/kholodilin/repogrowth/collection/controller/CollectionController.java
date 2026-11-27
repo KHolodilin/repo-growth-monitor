@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class CollectionController {
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+  private com.kholodilin.repogrowth.collection.service.CollectionRequestService commands;
 
   private final PlanningWindow planningWindow;
   private final DailyPlanner dailyPlanner;

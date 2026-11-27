@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RepositoryService {
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+  private com.kholodilin.repogrowth.collection.service.CollectionRequestService commands;
 
   private final GitHubOwnerJdbcRepository ownerRepository;
   private final RepositoryJdbcRepository repositoryJdbcRepository;

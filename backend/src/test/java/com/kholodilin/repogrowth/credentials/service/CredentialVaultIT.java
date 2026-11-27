@@ -6,13 +6,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
+import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
+import com.kholodilin.repogrowth.collection.service.SharedGitHubBudget;
 import com.kholodilin.repogrowth.credentials.controller.CredentialController;
 import com.kholodilin.repogrowth.identity.mock.MockUserCatalog;
 import com.kholodilin.repogrowth.identity.security.*;
 import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
 import com.kholodilin.repogrowth.identity.security.SecurityAuthorities;
 import com.kholodilin.repogrowth.identity.service.UserAccountService;
-import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import java.time.*;
 import java.util.*;
@@ -327,9 +328,9 @@ class CredentialVaultIT extends AbstractPostgresTest {
         .isZero();
   }
 
-  @Autowired com.kholodilin.repogrowth.orchestration.CollectorResultIngestion ingestion;
-  @Autowired com.kholodilin.repogrowth.orchestration.AssignmentRecovery recovery;
-  @Autowired com.kholodilin.repogrowth.orchestration.DispatchRepository dispatch;
+  @Autowired com.kholodilin.repogrowth.collection.service.CollectorResultIngestion ingestion;
+  @Autowired com.kholodilin.repogrowth.collection.service.AssignmentRecovery recovery;
+  @Autowired com.kholodilin.repogrowth.collection.repository.DispatchRepository dispatch;
 
   JobRequest typedTask(TaskType type) {
     requests.manual(repositoryId, LocalDate.now());
@@ -584,21 +585,25 @@ class CredentialVaultIT extends AbstractPostgresTest {
   }
 
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
-  @Autowired com.kholodilin.repogrowth.orchestration.OrchestrationProperties orchestration;
-  com.kholodilin.repogrowth.orchestration.CollectorNodeClient nodeClient;
 
-  com.kholodilin.repogrowth.orchestration.CollectorNodeMonitor monitor() {
+  @Autowired
+  com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties orchestration;
+
+  com.kholodilin.repogrowth.collection.integration.CollectorNodeClient nodeClient;
+
+  com.kholodilin.repogrowth.collection.service.CollectorNodeMonitor monitor() {
     nodeClient =
-        org.mockito.Mockito.mock(com.kholodilin.repogrowth.orchestration.CollectorNodeClient.class);
+        org.mockito.Mockito.mock(
+            com.kholodilin.repogrowth.collection.integration.CollectorNodeClient.class);
     org.mockito.Mockito.when(
             nodeClient.ready(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString()))
         .thenReturn(true);
-    return new com.kholodilin.repogrowth.orchestration.CollectorNodeMonitor(
+    return new com.kholodilin.repogrowth.collection.service.CollectorNodeMonitor(
         jdbc,
         transactionManager,
         orchestration,
-        new com.kholodilin.repogrowth.orchestration.RecoveryProperties(
+        new com.kholodilin.repogrowth.collection.configuration.RecoveryProperties(
             true, Duration.ofMillis(100), Duration.ZERO, Duration.ofSeconds(1), 2, 100, 3),
         nodeClient,
         recovery,

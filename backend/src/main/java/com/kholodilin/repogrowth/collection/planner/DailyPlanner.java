@@ -19,7 +19,7 @@ public class DailyPlanner {
   private boolean plannerEnabled = true;
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.orchestration.CollectionRequestService requestService;
+  private com.kholodilin.repogrowth.collection.service.CollectionRequestService requestService;
 
   private final PlanningWindow planningWindow;
   private final CollectionProperties collectionProperties;

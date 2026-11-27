@@ -10,11 +10,11 @@ import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
+import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
+import com.kholodilin.repogrowth.collection.service.IdempotentCollectionRequests;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
-import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
-import com.kholodilin.repogrowth.orchestration.IdempotentCollectionRequests;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
 import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;

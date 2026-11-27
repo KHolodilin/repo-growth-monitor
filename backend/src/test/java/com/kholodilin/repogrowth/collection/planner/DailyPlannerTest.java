@@ -9,9 +9,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.collection.repository.PlannerSlotJdbcRepository;
+import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
-import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;

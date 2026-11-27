@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.kholodilin.repogrowth.collection.idempotency.InvalidIdempotencyKeyException;
 import com.kholodilin.repogrowth.github.exception.GitHubException;
-import com.kholodilin.repogrowth.orchestration.idempotency.InvalidIdempotencyKeyException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;

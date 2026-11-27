@@ -26,7 +26,7 @@ import org.springframework.stereotype.Service;
 public class SearchQueryService {
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.orchestration.CollectionRequestService commands;
+  private com.kholodilin.repogrowth.collection.service.CollectionRequestService commands;
 
   private final SearchQueryJdbcRepository queryRepository;
   private final SearchRunJdbcRepository runRepository;

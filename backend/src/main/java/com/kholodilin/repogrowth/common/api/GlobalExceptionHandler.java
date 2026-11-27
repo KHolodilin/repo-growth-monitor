@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler({
     org.springframework.web.bind.MissingRequestHeaderException.class,
-    com.kholodilin.repogrowth.orchestration.idempotency.InvalidIdempotencyKeyException.class
+    com.kholodilin.repogrowth.collection.idempotency.InvalidIdempotencyKeyException.class
   })
   public ResponseEntity<ApiError> handleInvalidRequest(Exception ex) {
     return ResponseEntity.badRequest()

@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.credentials.service;
 
-import com.kholodilin.repogrowth.orchestration.CollectionRequestService;
-import com.kholodilin.repogrowth.orchestration.CollectorNodeMonitor;
-import com.kholodilin.repogrowth.orchestration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.configuration.OrchestrationProperties;
+import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
+import com.kholodilin.repogrowth.collection.service.CollectorNodeMonitor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
