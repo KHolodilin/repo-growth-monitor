@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { repository, searchHistory, searchResults } from "../test/fixtures";
+import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
@@ -17,6 +18,7 @@ describe("QueryDetailsPage run now", () => {
     const requestStates = [{ state: "ACTIVE" }, { state: "SUCCEEDED" }];
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/api/v1/public/resolve")) {
         return Promise.resolve({
           ownerId: "1",

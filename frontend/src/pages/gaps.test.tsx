@@ -43,7 +43,7 @@ describe("coverage gaps", () => {
   it("covers dashboard first collection, all-period KPIs and failed collect", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.reject(new Error("busy"));
       }
       return Promise.resolve({

@@ -268,7 +268,10 @@ describe("repository filters", () => {
       if (String(path).includes("/system/status")) {
         return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      if (String(path).includes("/admin/dashboard")) {
+      if (
+        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/collection-status")
+      ) {
         return Promise.resolve({
           ...dashboardReady,
           repositories: [
@@ -500,7 +503,10 @@ describe("repository filters", () => {
       if (String(path).includes("/system/status")) {
         return Promise.resolve({ tokenState: "RATE_LIMITED", rateLimitReset: null });
       }
-      if (String(path).includes("/admin/dashboard")) {
+      if (
+        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/collection-status")
+      ) {
         return Promise.resolve(dashboardReady);
       }
       return Promise.resolve({ tokenState: "WEIRD" });
@@ -525,7 +531,10 @@ describe("repository filters", () => {
           releaseStatus = resolve;
         });
       }
-      if (String(path).includes("/admin/dashboard")) {
+      if (
+        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/collection-status")
+      ) {
         return Promise.resolve({
           ...dashboardReady,
           repositories: [

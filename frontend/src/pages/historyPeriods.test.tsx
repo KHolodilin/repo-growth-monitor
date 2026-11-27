@@ -4,7 +4,12 @@ import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrafficHistoryPage } from "./TrafficHistoryPage";
 import { repository, snapshotHistory } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
+import {
+  isPublicResolve,
+  publicResolveResponse,
+  emptyCursorPage,
+  isOwnersCatalog,
+} from "../test/repoRoutes";
 import { writeStoredRepoPeriod, PERIODS } from "../components/PeriodSelector";
 import { periodDates } from "../lib/searchVisibilityKpi";
 import * as downloads from "../lib/chartExport";
@@ -25,13 +30,23 @@ vi.mock("echarts-for-react", async () => {
   };
 });
 const dates = ["2026-09-01", "2026-10-20", "2026-11-05", "2026-11-06"];
+function historyKind(url: string) {
+  if (
+    url.includes("path-history") ||
+    new URL(url, "http://local").searchParams.get("kind") === "paths"
+  ) {
+    return "PATHS";
+  }
+  return "REFERRERS";
+}
+
 function data(url: string) {
   const params = new URL(url, "http://local").searchParams;
   const days = periodDates(params.get("period") as (typeof PERIODS)[number], "2026-11-06");
   const shown = days ? dates.filter((date) => days.includes(date)) : dates;
   return {
     ...snapshotHistory,
-    kind: params.get("kind") === "paths" ? "PATHS" : "REFERRERS",
+    kind: historyKind(url),
     dates: shown,
     rows: [
       {
@@ -47,6 +62,10 @@ function data(url: string) {
       },
     ],
   };
+}
+
+function historyPathFor(kind: string, period: string) {
+  return kind === "paths" ? `path-history?period=${period}` : `referrer-history?period=${period}`;
 }
 function Probe() {
   return <p data-testid="history-url">{useLocation().search}</p>;
@@ -77,18 +96,22 @@ beforeEach(() => {
   writeStoredRepoPeriod("13", "90d");
   api.mockImplementation((url: string) =>
     Promise.resolve(
-      url.includes("/api/v1/public/resolve")
-        ? {
-            ownerId: String(repository.owner.id),
-            repositoryId: String(repository.id),
-            canonicalPath: `/${repository.owner.login}/${repository.name}`,
-            redirect: false,
-          }
-        : url.includes("traffic-history")
-          ? data(url)
-          : url.endsWith("/admin/repositories/13")
-            ? repository
-            : [],
+      isOwnersCatalog(url)
+        ? emptyCursorPage
+        : url.includes("/api/v1/public/resolve")
+          ? {
+              ownerId: String(repository.owner.id),
+              repositoryId: String(repository.id),
+              canonicalPath: `/${repository.owner.login}/${repository.name}`,
+              redirect: false,
+            }
+          : url.includes("traffic-history") ||
+              url.includes("referrer-history") ||
+              url.includes("path-history")
+            ? data(url)
+            : url.endsWith("/admin/repositories/13")
+              ? repository
+              : [],
     ),
   );
 });
@@ -113,12 +136,14 @@ describe.each([false, true])("History shared periods mobile=%s", (mobile) => {
         await user.click(within(group).getByRole("button", { name: period }));
         await waitFor(() =>
           expect(
-            api.mock.calls.some(([url]) => String(url).includes(`kind=${kind}&period=${period}`)),
+            api.mock.calls.some(([url]) => String(url).includes(historyPathFor(kind, period))),
           ).toBe(true),
         );
         await waitFor(() =>
           expect(screen.getByTestId("history-option").textContent).toContain(
-            JSON.stringify(data(`http://local?kind=${kind}&period=${period}`).dates),
+            JSON.stringify(
+              data(`http://local/api/v1/repositories/13/${historyPathFor(kind, period)}`).dates,
+            ),
           ),
         );
         expect(within(group).getByRole("button", { name: period })).toHaveAttribute(
@@ -177,13 +202,17 @@ it("uses repository preference for an invalid period and preserves restricted fi
 it("uses the saved period for an empty archive and keeps the empty state honest", async () => {
   api.mockImplementation((url: string) =>
     Promise.resolve(
-      isPublicResolve(url)
-        ? publicResolveResponse()
-        : url.includes("traffic-history")
-          ? { ...snapshotHistory, dates: [], rows: [] }
-          : url.endsWith("/admin/repositories/13")
-            ? repository
-            : [],
+      isOwnersCatalog(url)
+        ? emptyCursorPage
+        : isPublicResolve(url)
+          ? publicResolveResponse()
+          : url.includes("traffic-history") ||
+              url.includes("referrer-history") ||
+              url.includes("path-history")
+            ? { ...snapshotHistory, dates: [], rows: [] }
+            : url.endsWith("/admin/repositories/13")
+              ? repository
+              : [],
     ),
   );
   mount();
@@ -198,7 +227,12 @@ it("does not apply a late response from an older period", async () => {
   const original = api.getMockImplementation()!;
   let release!: (value: unknown) => void;
   api.mockImplementation(async (url: string) => {
-    if (url.includes("traffic-history") && url.includes("period=30d")) {
+    if (
+      (url.includes("traffic-history") ||
+        url.includes("referrer-history") ||
+        url.includes("path-history")) &&
+      url.includes("period=30d")
+    ) {
       return await new Promise<unknown>((resolve) => {
         release = resolve;
       });

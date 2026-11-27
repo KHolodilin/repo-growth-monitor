@@ -215,6 +215,28 @@ class ApiControllersWebMvcTest {
                     now,
                     null,
                     null)));
+    when(collectionRunMapper.toView(any(CollectionRun.class)))
+        .thenReturn(
+            new CollectionRunMapper.CollectionRunView(
+                1L,
+                13L,
+                "2026-09-23",
+                "SUCCESS",
+                1,
+                1,
+                0,
+                now,
+                now,
+                List.of(
+                    new CollectionRunMapper.CollectionJobView(
+                        2L,
+                        "TRAFFIC",
+                        "SUCCESS",
+                        1,
+                        null,
+                        null,
+                        now,
+                        now))));
     when(dailyPlanner.planNow(true))
         .thenReturn(new DailyPlanner.PlannerResult(true, 1, 0, 0, "2026-09-23"));
     when(searchQueryService.list(13L)).thenReturn(List.of(query));

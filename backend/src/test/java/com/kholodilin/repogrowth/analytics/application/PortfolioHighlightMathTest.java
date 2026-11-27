@@ -15,7 +15,7 @@ class PortfolioHighlightMathTest {
 
   @Test
   void picksTheStrongestRiseAndTheWorstDrop() {
-    List<RankPoint> points =
+    List<SuccessfulRank> points =
         List.of(
             new SuccessfulRank(1, "acme/outbox", "outbox", LocalDate.of(2026, 9, 20), 22),
             new SuccessfulRank(1, "acme/outbox", "outbox", LocalDate.of(2026, 10, 8), 14),
@@ -40,7 +40,7 @@ class PortfolioHighlightMathTest {
 
   @Test
   void breaksEqualMovesByTheFinishAndTheQueryName() {
-    List<RankPoint> points =
+    List<SuccessfulRank> points =
         List.of(
             new SuccessfulRank(1, "acme/a", "zeta", FROM.plusDays(1), 30),
             new SuccessfulRank(1, "acme/a", "zeta", FROM.plusDays(2), 22),
@@ -60,7 +60,7 @@ class PortfolioHighlightMathTest {
 
   @Test
   void ignoresAQueryThatNeverMovesInsideTheWindow() {
-    List<RankPoint> points =
+    List<SuccessfulRank> points =
         List.of(new SuccessfulRank(1, "acme/outbox", "outbox", LocalDate.of(2026, 10, 8), 14));
     assertThat(PortfolioHighlightMath.strongestRise(points, FROM)).isNull();
     assertThat(PortfolioHighlightMath.worstDrop(List.of(), FROM)).isNull();
@@ -115,7 +115,7 @@ class PortfolioHighlightMathTest {
     constructor.setAccessible(true);
     constructor.newInstance();
 
-    List<RankPoint> points =
+    List<SuccessfulRank> points =
         List.of(
             new SuccessfulRank(9, "acme/old", "old", FROM.minusDays(2), 3),
             new SuccessfulRank(1, "acme/first", "first-rise", FROM.plusDays(1), 20),

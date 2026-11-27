@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { dashboardReady, repository, traffic } from "../test/fixtures";
+import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
 import { DashboardPage } from "./DashboardPage";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 
@@ -165,6 +166,7 @@ describe("portfolio highlights", () => {
   it("opens Growth Events from a legacy events tab and applies period from the URL", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/api/v1/public/resolve")) {
         return Promise.resolve({
           ownerId: "1",
@@ -214,6 +216,7 @@ describe("portfolio highlights", () => {
     scrollIntoView.mockClear();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }

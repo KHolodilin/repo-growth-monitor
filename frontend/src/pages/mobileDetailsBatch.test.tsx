@@ -24,6 +24,7 @@ import {
   topicHistory,
   topicResults,
 } from "../test/fixtures";
+import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
 import { anonymousMe } from "../lib/auth";
 const { api, auth } = vi.hoisted(() => ({
   api: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("../lib/AuthContext", () => ({ useAuth: () => auth }));
 let mobile = true;
 let listeners: (() => void)[] = [];
 function respond(url: string) {
+  if (isOwnersCatalog(url)) return emptyCursorPage;
   if (url.includes("traffic?")) return traffic;
   if (url.includes("topics/") && url.includes("/history")) return topicHistory;
   if (url.includes("topics/") && url.includes("/results")) return topicResults;
@@ -79,7 +81,7 @@ describe("batch 178–182", () => {
   it("separates zero-query, empty selection and no-history Search states", async () => {
     let queries: (typeof searchHistory)[] = [];
     api.mockImplementation((url: string) =>
-      Promise.resolve(String(url).includes("search-visibility") ? queries : respond(String(url))),
+      Promise.resolve(String(url).includes("search-queries") ? queries : respond(String(url))),
     );
     const view = render(
       <MemoryRouter initialEntries={["/admin/repositories/13?tab=search"]}>
@@ -622,11 +624,12 @@ describe("batch 178–182", () => {
     const user = userEvent.setup();
     let finishPaths: (value: unknown) => void = () => {};
     api.mockImplementation((url: string) => {
-      if (url.includes("traffic-history") && url.includes("kind=paths"))
+      if (url.includes("path-history"))
         return new Promise((resolve) => {
           finishPaths = resolve;
         });
-      if (url.includes("traffic-history")) return Promise.resolve(snapshotHistory);
+      if (url.includes("traffic-history") || url.includes("referrer-history"))
+        return Promise.resolve(snapshotHistory);
       return Promise.resolve(respond(String(url)));
     });
     render(

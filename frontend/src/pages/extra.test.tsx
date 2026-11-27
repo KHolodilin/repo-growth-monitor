@@ -171,7 +171,11 @@ describe("extra coverage", () => {
           run: { ...searchResults.run, enrichmentStatus: "PARTIAL" },
         });
       }
-      if (url.includes("traffic-history")) {
+      if (
+        url.includes("traffic-history") ||
+        url.includes("referrer-history") ||
+        url.includes("path-history")
+      ) {
         return Promise.resolve(snapshotHistory);
       }
       return Promise.resolve([]);
@@ -215,7 +219,7 @@ describe("extra coverage", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string, init?: RequestInit) => {
       const url = String(path);
-      if (url.includes("/collect")) {
+      if (url.includes("/collections") || /\/collect(?:\?|$)/.test(url)) {
         return Promise.reject(new Error("collect failed"));
       }
       if (
@@ -262,10 +266,10 @@ describe("extra coverage", () => {
           },
         });
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve([searchHistory]);
       }
-      if (url.includes("topics-visibility")) {
+      if (url.includes("topic-watches")) {
         return Promise.resolve([topicHistory]);
       }
       if (url.includes("growth-events") && !url.includes("settings")) {
@@ -314,7 +318,7 @@ describe("extra coverage", () => {
     topicErrors.unmount();
 
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.reject(new Error("collect failed"));
       }
       if (String(path).endsWith("/admin/repositories/13")) {
@@ -346,10 +350,10 @@ describe("extra coverage", () => {
           },
         });
       }
-      if (url.includes("topics-visibility")) {
+      if (url.includes("topic-watches")) {
         return Promise.resolve([topicHistory]);
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve([{ ...searchHistory, searchStatus: "READY" }]);
       }
       return Promise.resolve([]);
@@ -576,7 +580,7 @@ describe("extra coverage", () => {
       if (url.includes("/traffic?")) {
         return Promise.resolve(traffic);
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve([
           searchHistory,
           {
@@ -585,7 +589,7 @@ describe("extra coverage", () => {
           },
         ]);
       }
-      if (url.includes("topics-visibility")) {
+      if (url.includes("topic-watches")) {
         return Promise.resolve([
           topicHistory,
           { ...topicHistory, watch: { ...topicHistory.watch, id: 8, topic: "kafka" } },

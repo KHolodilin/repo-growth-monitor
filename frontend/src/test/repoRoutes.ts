@@ -15,3 +15,10 @@ export function publicResolveResponse(repositoryId: string | number = repository
 export function isPublicResolve(url: string) {
   return String(url).includes("/api/v1/public/resolve");
 }
+
+/** Empty catalog page — resolve falls through to public /resolve or admin list. */
+export const emptyCursorPage = { items: [] as never[], nextCursor: null as string | null };
+
+export function isOwnersCatalog(url: string) {
+  return String(url).includes("/api/v1/owners");
+}

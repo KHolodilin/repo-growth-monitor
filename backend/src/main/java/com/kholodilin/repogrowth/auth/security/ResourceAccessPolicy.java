@@ -6,6 +6,7 @@ import com.kholodilin.repogrowth.publication.PublicationService;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 
 /**
@@ -101,7 +102,7 @@ public class ResourceAccessPolicy {
       return List.of();
     }
     if (currentUserAccess.canSeePrivateRepositories()) {
-      return List.copyOf(repositoryIds);
+      return repositoryIds.stream().filter(Objects::nonNull).toList();
     }
     List<Long> visible = new ArrayList<>();
     for (Long id : repositoryIds) {

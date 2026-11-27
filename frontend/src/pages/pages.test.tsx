@@ -16,7 +16,12 @@ import {
   topicResults,
   traffic,
 } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
+import {
+  isPublicResolve,
+  publicResolveResponse,
+  emptyCursorPage,
+  isOwnersCatalog,
+} from "../test/repoRoutes";
 import { DashboardPage } from "./DashboardPage";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { RepositoriesPage } from "./RepositoriesPage";
@@ -71,7 +76,10 @@ describe("pages", () => {
   it("renders dashboard ready state and sorts repositories", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/admin/dashboard")) {
+      if (
+        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/collection-status")
+      ) {
         return Promise.resolve(json(dashboardReady));
       }
       if (String(path).includes("growth-events")) {
@@ -99,7 +107,7 @@ describe("pages", () => {
     await user.click(screen.getByRole("menuitem", { name: "Collect 1 repository" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith(
-        "/api/v1/admin/repositories/13/collections",
+        "/api/v1/repositories/13/collections",
         expect.objectContaining({ method: "POST" }),
       ),
     );
@@ -117,7 +125,10 @@ describe("pages", () => {
           }),
         );
       }
-      if (String(path).includes("/admin/dashboard")) {
+      if (
+        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/collection-status")
+      ) {
         return Promise.resolve(
           json({ ...dashboardReady, state: "NO_REPOSITORIES", repositories: [], traffic: [] }),
         );
@@ -183,6 +194,7 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string, init?: RequestInit) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) {
         return Promise.resolve(json(publicResolveResponse()));
       }
@@ -192,10 +204,10 @@ describe("pages", () => {
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory]));
       }
-      if (url.includes("topics-visibility")) {
+      if (url.includes("topic-watches")) {
         const kafka = {
           ...topicHistory,
           watch: { ...topicHistory.watch, id: 8, topic: "kafka" },
@@ -241,7 +253,12 @@ describe("pages", () => {
           ]),
         );
       }
-      if (url.includes("/collect") || url.includes("/run") || url.includes("search-queries")) {
+      if (
+        url.includes("/collections") ||
+        /\/collect(?:\?|$)/.test(url) ||
+        url.includes("/run") ||
+        url.includes("search-queries")
+      ) {
         return Promise.resolve(json({}));
       }
       return Promise.resolve(json([]));
@@ -454,13 +471,14 @@ describe("pages", () => {
     const pending: { resolve: (value: unknown) => void; reject: (error: Error) => void }[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("topics-visibility")) {
+      if (url.includes("topic-watches")) {
         return Promise.resolve(json([topicHistory]));
       }
       if (url.includes("growth-events") && !url.includes("settings")) {
@@ -489,6 +507,7 @@ describe("pages", () => {
   it("shows dashes when overview fields and topics were never stored", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(
           json({
@@ -532,6 +551,7 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(
           json({
@@ -589,10 +609,11 @@ describe("pages", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13") || url.includes("/admin/repositories?refresh")) {
         return Promise.resolve(json(url.includes("refresh") ? [repository] : repository));
       }
-      if (url.includes("/admin/dashboard")) {
+      if (url.includes("/api/v1/admin/dashboard") || url.includes("/api/v1/collection-status")) {
         return Promise.resolve(json(dashboardReady));
       }
       if (url.includes("/topics/") && url.includes("history")) {
@@ -614,7 +635,11 @@ describe("pages", () => {
       if (url.includes("/admin/search-runs/")) {
         return Promise.resolve(json(searchResults));
       }
-      if (url.includes("traffic-history")) {
+      if (
+        url.includes("traffic-history") ||
+        url.includes("referrer-history") ||
+        url.includes("path-history")
+      ) {
         return Promise.resolve(json(snapshotHistory));
       }
       if (url.includes("/run")) {
@@ -659,13 +684,14 @@ describe("pages", () => {
   it("keeps the rank chart when event markers fail or arrive late", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory]));
       }
       if (url.includes("growth-events") && url.includes("period=all")) {
@@ -682,13 +708,14 @@ describe("pages", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory]));
       }
       if (url.includes("growth-events") && url.includes("period=all")) {
@@ -703,13 +730,14 @@ describe("pages", () => {
     const pending: ((value: unknown) => void)[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory]));
       }
       if (url.includes("growth-events") && url.includes("period=all")) {
@@ -728,13 +756,14 @@ describe("pages", () => {
     const failing: ((reason?: unknown) => void)[] = [];
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory]));
       }
       if (url.includes("growth-events") && url.includes("period=all")) {
@@ -765,13 +794,14 @@ describe("pages", () => {
     };
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));
       }
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
-      if (url.includes("search-visibility")) {
+      if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory, second]));
       }
       return Promise.resolve(json([]));

@@ -377,8 +377,9 @@ class PublicApiIT extends AbstractPostgresTest {
     mvc.perform(get("/api/v1/admin/search-queries/" + query)).andExpect(status().isOk());
     mvc.perform(get("/api/v1/admin/search-queries/" + query).with(as("user")))
         .andExpect(status().isOk());
+    // Resource Search API is live; admin may read the query card through /api/v1.
     mvc.perform(get("/api/v1/search-queries/" + query).with(as("admin")))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isOk());
     mvc.perform(get("/api/v1/admin/repositories/" + a)).andExpect(status().isOk());
     mvc.perform(get("/api/v1/admin/repositories/" + hidden)).andExpect(status().isNotFound());
     String publication = "/api/v1/admin/repositories/" + a + "/publication";

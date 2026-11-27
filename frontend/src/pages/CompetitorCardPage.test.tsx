@@ -3,7 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { repository, searchHistory } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse, repoBase } from "../test/repoRoutes";
+import {
+  isPublicResolve,
+  publicResolveResponse,
+  repoBase,
+  emptyCursorPage,
+  isOwnersCatalog,
+} from "../test/repoRoutes";
 import { CompetitorCardPage } from "./CompetitorCardPage";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
@@ -48,6 +54,7 @@ describe("competitor card", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
@@ -80,6 +87,7 @@ describe("competitor card", () => {
   it("shows empty copy when the profile has no description, topics, or days", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
@@ -106,6 +114,7 @@ describe("competitor card", () => {
   it("shows the load error and ignores a cancelled request", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
@@ -117,6 +126,7 @@ describe("competitor card", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
@@ -129,6 +139,7 @@ describe("competitor card", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       return new Promise(() => undefined);

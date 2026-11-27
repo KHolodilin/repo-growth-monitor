@@ -66,13 +66,14 @@ beforeEach(() => {
   run = () => Promise.resolve({});
   api.mockImplementation((path: string, options?: { method?: string }) => {
     if (options?.method === "POST") return Promise.resolve(run());
-    if (path.startsWith("/api/v1/admin/dashboard")) return Promise.resolve(dashboardReady);
+    if (path.startsWith("/api/v1/admin/dashboard") || path.startsWith("/api/v1/collection-status"))
+      return Promise.resolve(dashboardReady);
     if (/\/repositories\/\d+$/.test(path))
       return Promise.resolve({ ...repository, id: path.endsWith("/8") ? 8 : 13 });
     if (path.includes("/traffic?")) return Promise.resolve(traffic);
-    if (path.includes("/search-visibility"))
+    if (path.includes("/search-queries"))
       return Promise.resolve(empty ? [] : [{ ...searchHistory, searchStatus: status }]);
-    if (path.includes("/topics-visibility"))
+    if (path.includes("/topic-watches"))
       return Promise.resolve(empty ? [] : [{ ...topicHistory, searchStatus: status }]);
     return Promise.resolve([]);
   });

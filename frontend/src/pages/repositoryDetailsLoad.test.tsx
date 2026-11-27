@@ -32,8 +32,8 @@ function mockDetailsApi(handlers: { repository?: () => Promise<unknown> }) {
       return Promise.resolve([repository]);
     }
     if (url.includes("/traffic?")) return Promise.resolve(traffic);
-    if (url.includes("search-visibility")) return Promise.resolve([searchHistory]);
-    if (url.includes("topics-visibility")) return Promise.resolve([]);
+    if (url.includes("search-queries")) return Promise.resolve([searchHistory]);
+    if (url.includes("topic-watches")) return Promise.resolve([]);
     if (url.includes("growth-events")) return Promise.resolve([]);
     if (url.includes("growth-event-settings")) return Promise.resolve([]);
     return Promise.resolve([]);
@@ -55,8 +55,8 @@ describe("RepositoryDetailsPage load races", () => {
         return Promise.resolve([repository]);
       }
       if (url.includes("/traffic?")) return Promise.resolve(traffic);
-      if (url.includes("search-visibility")) return Promise.resolve([searchHistory]);
-      if (url.includes("topics-visibility")) return Promise.resolve([]);
+      if (url.includes("search-queries")) return Promise.resolve([searchHistory]);
+      if (url.includes("topic-watches")) return Promise.resolve([]);
       if (url.includes("growth-events")) return Promise.resolve([]);
       return Promise.resolve([]);
     });
@@ -131,8 +131,8 @@ describe("RepositoryDetailsPage load races", () => {
         return Promise.resolve([repository]);
       }
       if (url.includes("/traffic?")) return Promise.resolve(traffic);
-      if (url.includes("search-visibility")) return Promise.resolve([searchHistory]);
-      if (url.includes("topics-visibility")) return Promise.resolve([]);
+      if (url.includes("search-queries")) return Promise.resolve([searchHistory]);
+      if (url.includes("topic-watches")) return Promise.resolve([]);
       if (url.includes("growth-events")) return Promise.resolve([]);
       return Promise.resolve([]);
     });
@@ -160,8 +160,8 @@ describe("RepositoryDetailsPage load races", () => {
         return Promise.resolve([repository]);
       }
       if (url.includes("/traffic?")) return Promise.resolve(traffic);
-      if (url.includes("search-visibility")) return Promise.resolve([searchHistory]);
-      if (url.includes("topics-visibility")) return Promise.resolve([]);
+      if (url.includes("search-queries")) return Promise.resolve([searchHistory]);
+      if (url.includes("topic-watches")) return Promise.resolve([]);
       if (url.includes("growth-events") && !url.includes("settings")) {
         return Promise.reject(new Error("events offline"));
       }
@@ -200,8 +200,8 @@ describe("RepositoryDetailsPage load races", () => {
         return Promise.resolve([repository]);
       }
       if (url.includes("/traffic?")) return Promise.resolve(traffic);
-      if (url.includes("search-visibility")) return Promise.resolve([searchHistory]);
-      if (url.includes("topics-visibility")) return Promise.resolve([]);
+      if (url.includes("search-queries")) return Promise.resolve([searchHistory]);
+      if (url.includes("topic-watches")) return Promise.resolve([]);
       if (url.includes("growth-events") && !url.includes("settings")) {
         eventCalls += 1;
         if (eventCalls === 1) {

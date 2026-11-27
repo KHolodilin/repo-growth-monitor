@@ -21,7 +21,10 @@ describe("missing traffic", () => {
   it("opens the portfolio list and keeps the warning off the repository name", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (!String(path).includes("/admin/dashboard")) {
+      if (!(
+        String(path).includes("/api/v1/admin/dashboard") ||
+        String(path).includes("/api/v1/collection-status")
+      )) {
         return Promise.resolve({});
       }
       return Promise.resolve({

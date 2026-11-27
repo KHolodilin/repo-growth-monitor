@@ -3,7 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, topicHistory, topicResults } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
+import {
+  isPublicResolve,
+  publicResolveResponse,
+  emptyCursorPage,
+  isOwnersCatalog,
+} from "../test/repoRoutes";
 import { TopicCompetitorCardPage } from "./TopicCompetitorCardPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
 
@@ -67,6 +72,7 @@ function renderTopics(path: string) {
 function mockTopicApi(competitor: unknown = card) {
   api.mockImplementation((path: string) => {
     const url = String(path);
+    if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
     if (isPublicResolve(url)) {
       const id = url.toLowerCase().includes("other") ? other.id : repository.id;
       return Promise.resolve(publicResolveResponse(id));
@@ -174,6 +180,7 @@ describe("topic competitor card", () => {
   it("shows a missing repository and ignores a cancelled request", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/"))
@@ -188,6 +195,7 @@ describe("topic competitor card", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
@@ -206,6 +214,7 @@ describe("topic competitor card", () => {
     api.mockReset();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
@@ -234,6 +243,7 @@ describe("topic competitor card", () => {
     };
     api.mockImplementation((path: string) => {
       const url = String(path);
+      if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/2"))

@@ -48,7 +48,7 @@ beforeEach(() => {
     if (url.endsWith("/admin/repositories/13"))
       return Promise.resolve({ ...repository, language: "Java" });
     if (url.includes("/traffic?")) return Promise.resolve(traffic);
-    if (url.includes("/search-visibility"))
+    if (url.includes("/search-queries"))
       return Promise.resolve([
         { ...searchHistory, searchStatus: state.busy ? "RUNNING" : undefined },
         {
@@ -57,7 +57,7 @@ beforeEach(() => {
           currentRank: 8,
         },
       ]);
-    if (url.includes("/topics-visibility"))
+    if (url.includes("/topic-watches"))
       return Promise.resolve(
         url.includes("scope=language")
           ? [

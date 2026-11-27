@@ -22,7 +22,12 @@ import { chartCsv } from "../lib/chartExport";
 import { withCollectionWarning } from "../lib/chartPresentation";
 import type { SnapshotHistory } from "../lib/api";
 import { repository, searchHistory, traffic } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
+import {
+  isPublicResolve,
+  publicResolveResponse,
+  emptyCursorPage,
+  isOwnersCatalog,
+} from "../test/repoRoutes";
 const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
 vi.mock("../lib/api", async (original) => ({
   ...(await original<typeof import("../lib/api")>()),
@@ -83,14 +88,15 @@ function respondPublic(path: string) {
 }
 function respond(path: string) {
   const url = String(path);
+  if (isOwnersCatalog(url)) return emptyCursorPage;
   if (isPublicResolve(url)) return publicResolveResponse(publishedRepo.id);
   if (url.startsWith("/api/v1/public/")) return respondPublic(url);
   if (url.endsWith("/admin/repositories/13")) return publishedRepo;
   if (url.includes("/admin/repositories?") || url.includes("/admin/repositories?refresh"))
     return [publishedRepo];
   if (url.includes("/traffic?")) return { ...traffic, repository: publishedRepo };
-  if (url.includes("search-visibility")) return [{ ...searchHistory, repositoryId: 13 }];
-  if (url.includes("topics-visibility")) return [];
+  if (url.includes("search-queries")) return [{ ...searchHistory, repositoryId: 13 }];
+  if (url.includes("topic-watches")) return [];
   if (
     url.includes("growth-events") ||
     url.includes("growth-event-settings") ||

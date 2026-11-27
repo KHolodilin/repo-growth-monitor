@@ -4,6 +4,7 @@ import com.kholodilin.repogrowth.analytics.application.GrowthMath;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
@@ -41,16 +42,18 @@ public final class BandKpiMath {
       series.add(countOnDay(active, band, day, mode));
     }
     Integer value = currentCount(active, band, mode);
+    // Incomplete days stay as null entries — List.copyOf rejects nulls.
+    List<Integer> frozen = Collections.unmodifiableList(series);
     if (value == null || window.previousTo() == null) {
-      return new BandKpi(value, null, null, List.copyOf(series));
+      return new BandKpi(value, null, null, frozen);
     }
     Integer previous = countAsOf(active, band, window.previousTo(), mode);
     if (previous == null) {
-      return new BandKpi(value, null, null, List.copyOf(series));
+      return new BandKpi(value, null, null, frozen);
     }
     int absoluteChange = value - previous;
     return new BandKpi(
-        value, absoluteChange, GrowthMath.percent(value, previous), List.copyOf(series));
+        value, absoluteChange, GrowthMath.percent(value, previous), frozen);
   }
 
   public record Usage(int used, int limit, int available, double progress) {}

@@ -34,7 +34,7 @@ vi.mock("../lib/api", async (importOriginal) => {
 
 function expectCollectionPost(apiMock: typeof api, repositoryId: number) {
   const call = apiMock.mock.calls.find(
-    ([url]) => String(url) === `/api/v1/admin/repositories/${repositoryId}/collections`,
+    ([url]) => String(url) === `/api/v1/repositories/${repositoryId}/collections`,
   );
   expect(call).toBeDefined();
   const init = call?.[1] as RequestInit | undefined;
@@ -72,7 +72,7 @@ describe("components", () => {
   it("collects from the header and reports sync failures", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve({});
       }
       return Promise.resolve(dashboardReady);
@@ -105,7 +105,7 @@ describe("components", () => {
     let hold = true;
     const waiters: Array<(value: unknown) => void> = [];
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return new Promise((resolve) => {
           if (!hold) {
             resolve({});
@@ -156,7 +156,7 @@ describe("components", () => {
     pending.unmount();
 
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.reject(new Error("busy"));
       }
       return Promise.resolve(dashboardReady);
@@ -176,7 +176,7 @@ describe("components", () => {
     failed.unmount();
 
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.reject(new Error("nope"));
       }
       return Promise.resolve({ lastSyncAt: null });
@@ -198,7 +198,7 @@ describe("components", () => {
     empty.unmount();
 
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
         return Promise.reject({ reason: "nope" });
       }
@@ -256,7 +256,7 @@ describe("components", () => {
       ],
     };
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve({});
       }
       return Promise.resolve(portfolio);
@@ -273,15 +273,12 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() => expectCollectionPost(api, 13));
-    expect(api).not.toHaveBeenCalledWith(
-      "/api/v1/admin/repositories/8/collections",
-      expect.anything(),
-    );
+    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories/8/collections", expect.anything());
     repo.unmount();
 
     api.mockClear();
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve({});
       }
       return Promise.resolve(portfolio);
@@ -299,7 +296,7 @@ describe("components", () => {
     await user.click(screen.getByRole("menuitem", { name: "Collect 2 repositories" }));
     await waitFor(() =>
       expect(api).toHaveBeenCalledWith(
-        "/api/v1/admin/repositories/8/collections",
+        "/api/v1/repositories/8/collections",
         expect.objectContaining({ method: "POST" }),
       ),
     );
@@ -323,7 +320,7 @@ describe("components", () => {
       if (failPoll) {
         return Promise.reject(new Error("poll failed"));
       }
-      if (bare || String(path).includes("/collect")) {
+      if (bare || String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve(bare ? { lastSyncAt: null } : {});
       }
       const running = phase === "running";
@@ -403,7 +400,7 @@ describe("components", () => {
       ],
     };
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve({});
       }
       return Promise.resolve(portfolio);
@@ -429,7 +426,7 @@ describe("components", () => {
   it("collects a named HTML repository path using loaded rows", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve({});
       }
       return Promise.resolve(dashboardReady);
@@ -450,10 +447,7 @@ describe("components", () => {
     await user.click(await screen.findByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("menuitem", { name: "Collect this repository" }));
     await waitFor(() => expectCollectionPost(api, 13));
-    expect(api).not.toHaveBeenCalledWith(
-      "/api/v1/admin/repositories/8/collections",
-      expect.anything(),
-    );
+    expect(api).not.toHaveBeenCalledWith("/api/v1/repositories/8/collections", expect.anything());
   });
 
   it("does not collect when no repository is tracked", async () => {
@@ -461,7 +455,7 @@ describe("components", () => {
     let release: (value: unknown) => void = () => undefined;
     let calls = 0;
     api.mockImplementation((path: string) => {
-      if (String(path).includes("/collect")) {
+      if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.resolve({});
       }
       calls += 1;
@@ -647,7 +641,7 @@ describe("components", () => {
           ],
         });
       }
-      if (path.includes("search-visibility")) {
+      if (path.includes("search-queries")) {
         return Promise.resolve([
           {
             query: { name: "outbox" },
@@ -753,7 +747,7 @@ describe("components", () => {
     cleanup();
 
     api.mockImplementation((url: string) => {
-      if (String(url).includes("search-visibility")) {
+      if (String(url).includes("search-queries")) {
         return Promise.resolve([
           { query: { name: "outbox" } },
           { query: { name: "outbox" }, points: [{ date: "2026-01-01", position: 3 }] },

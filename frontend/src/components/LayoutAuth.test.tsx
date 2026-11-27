@@ -119,7 +119,10 @@ describe("Layout auth chrome", () => {
   it("shows session expired when collect returns 401", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string, init?: RequestInit) => {
-      if (init?.method === "POST" && String(path).includes("/collect")) {
+      if (
+        init?.method === "POST" &&
+        (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path)))
+      ) {
         return Promise.reject(new ApiError(401, "Authentication required"));
       }
       return Promise.resolve(dashboardReady);

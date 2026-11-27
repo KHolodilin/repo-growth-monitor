@@ -63,7 +63,9 @@ describe("owner portfolio route", () => {
     expect(
       api.mock.calls.some(
         ([path]) =>
-          String(path).includes("/admin/dashboard?") && String(path).includes("owner=KHolodilin"),
+          (String(path).includes("/api/v1/admin/dashboard?") ||
+            String(path).includes("/api/v1/collection-status?")) &&
+          String(path).includes("owner=KHolodilin"),
       ),
     ).toBe(true);
   });
