@@ -52,7 +52,8 @@ class SearchKpiServiceTest {
     var kpi = service.repositoryKpi(13L, "7d");
     assertThat(kpi.scope()).isEqualTo(KpiScope.REPOSITORY);
     assertThat(kpi.usage().used()).isEqualTo(1);
-    assertThat(kpi.metrics().top3().value()).isNotNull();
+    assertThat(kpi.metrics().top3().kpi().value()).isNotNull();
+    assertThat(kpi.metrics().top3().series()).isNotEmpty();
   }
 
   @Test

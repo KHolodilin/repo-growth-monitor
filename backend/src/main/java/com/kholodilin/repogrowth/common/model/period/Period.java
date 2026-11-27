@@ -1,5 +1,7 @@
 package com.kholodilin.repogrowth.common.model.period;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -20,8 +22,14 @@ public enum Period {
     this.wire = wire;
   }
 
+  @JsonValue
   public String wire() {
     return wire;
+  }
+
+  @JsonCreator
+  public static Period fromWire(String raw) {
+    return tryParse(raw).orElseThrow(() -> new IllegalArgumentException("Unsupported period: " + raw));
   }
 
   public boolean allTime() {

@@ -98,7 +98,11 @@ public class TopicsKpiService {
         range,
         comparison,
         topicScope,
-        new TopicsKpiResponse.Metrics(toKpi(top3), toKpi(top10), toKpi(top20)));
+        new TopicsKpiResponse.Metrics(toBand(top3), toBand(top10), toBand(top20)));
+  }
+
+  private static TopicsKpiResponse.BandMetric toBand(BandKpi band) {
+    return new TopicsKpiResponse.BandMetric(toKpi(band), band.series());
   }
 
   private static KpiValue toKpi(BandKpi band) {

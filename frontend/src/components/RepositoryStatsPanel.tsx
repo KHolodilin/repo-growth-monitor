@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type RepositoryStatsHistory } from "../lib/api";
+import { repositoryStatsKpi, type StatsKpiResponse } from "../lib/kpiApi";
 import { repoStatsChartId, STATS_SERIES } from "../lib/chartLegend";
 import { statsChartOption } from "../lib/statsChart";
 import { type Period } from "./PeriodSelector";
@@ -9,11 +10,11 @@ import { TrafficKpiCard } from "./TrafficKpiCard";
 import { Card } from "./ui";
 
 const STATS_CARDS = [
-  { key: "stars", label: "Stars" },
-  { key: "forks", label: "Forks" },
-  { key: "watchers", label: "Watchers" },
-  { key: "contributors", label: "Contributors" },
-] as const;
+  { key: "stars" as const, label: "Stars" },
+  { key: "forks" as const, label: "Forks" },
+  { key: "watchers" as const, label: "Watchers" },
+  { key: "contributors" as const, label: "Contributors" },
+];
 
 export function RepositoryStatsPanel({
   repositoryId,
@@ -29,22 +30,28 @@ export function RepositoryStatsPanel({
   const loadKey = `${repositoryId}:${period}`;
   const [seenKey, setSeenKey] = useState(loadKey);
   const [history, setHistory] = useState<RepositoryStatsHistory | null>(null);
+  const [kpi, setKpi] = useState<StatsKpiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (loadKey !== seenKey) {
     setSeenKey(loadKey);
     setError(null);
     setHistory(null);
+    setKpi(null);
   }
 
   useEffect(() => {
     let cancelled = false;
-    api<RepositoryStatsHistory>(
-      `/api/v1/repositories/${repositoryId}/stats-history?period=${period}`,
-    )
-      .then((data) => {
+    Promise.all([
+      repositoryStatsKpi(repositoryId, period),
+      api<RepositoryStatsHistory>(
+        `/api/v1/repositories/${repositoryId}/stats-history?period=${period}`,
+      ),
+    ])
+      .then(([kpiData, historyData]) => {
         if (!cancelled) {
-          setHistory(data);
+          setKpi(kpiData);
+          setHistory(historyData);
         }
       })
       .catch((err: Error) => {
@@ -62,7 +69,7 @@ export function RepositoryStatsPanel({
   if (error) {
     return <p className="text-red-600">{error}</p>;
   }
-  if (!history) {
+  if (!history || !kpi) {
     return (
       <div className="space-y-4">
         <Card>
@@ -76,14 +83,19 @@ export function RepositoryStatsPanel({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {STATS_CARDS.map((card) => {
-          const total = history.totals[card.key];
+          const metric = kpi.metrics[card.key];
+          const value = metric.value == null ? null : Number(metric.value);
+          const absoluteChange =
+            metric.change?.absolute == null ? null : Number(metric.change.absolute);
+          const growthPercent =
+            metric.change?.percent == null ? null : Number(metric.change.percent);
           return (
             <TrafficKpiCard
               key={card.key}
               label={card.label}
-              value={total.value}
-              growthPercent={total.growthPercent}
-              absoluteChange={total.absoluteChange}
+              value={value}
+              growthPercent={growthPercent}
+              absoluteChange={absoluteChange}
               period={period}
               series={history.points.map((point) => point[card.key])}
             />

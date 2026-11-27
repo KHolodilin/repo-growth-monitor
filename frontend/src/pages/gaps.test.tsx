@@ -22,6 +22,7 @@ import { SearchResultsPage } from "./SearchResultsPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
 import { TrafficHistoryPage } from "./TrafficHistoryPage";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
+import { respondKpi } from "../test/kpiFixtures";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock("../lib/api", async (importOriginal) => {
@@ -452,6 +453,9 @@ describe("coverage gaps", () => {
           pathSnapshotAt: undefined,
           referrerSnapshotAt: undefined,
         });
+      }
+      if (url.includes("/search/kpi") || url.includes("/topics/kpi") || url.includes("/stats/kpi")) {
+        return Promise.resolve(respondKpi(url));
       }
       if (
         url.includes("visibility") ||

@@ -1481,7 +1481,12 @@ function TopicsPanel({
 
   return (
     <div className="space-y-4">
-      <TopicVisibilityKpis topics={visibility} period={period} />
+      <TopicVisibilityKpis
+        repositoryId={repositoryId}
+        period={period}
+        scope={scope}
+        topicCount={visibility.length}
+      />
       <CombinedTopicRankChart
         repositoryId={repositoryId}
         scope={scope}
@@ -1933,7 +1938,7 @@ function SearchPanel({
 
   return (
     <div className="space-y-4">
-      <SearchVisibilityKpis queries={visibility} period={period} />
+      <SearchVisibilityKpis repositoryId={repositoryId} period={period} />
       <CombinedRankChart
         repositoryId={repositoryId}
         period={period}

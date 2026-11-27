@@ -50,7 +50,8 @@ class TopicsKpiServiceTest {
                         new RankPoint(TODAY.minusDays(1), 5, 2L)))));
     var kpi = service.repositoryKpi(13L, "7d", "all");
     assertThat(kpi.scope()).isEqualTo(KpiScope.REPOSITORY);
-    assertThat(kpi.metrics().top10().value()).isNotNull();
+    assertThat(kpi.metrics().top10().kpi().value()).isNotNull();
+    assertThat(kpi.metrics().top10().series()).isNotEmpty();
   }
 
   @Test
@@ -73,7 +74,7 @@ class TopicsKpiServiceTest {
   void missingRanksSurfaceMissingKpiValues() {
     when(topics.visibility(13L, "all")).thenReturn(List.of(history(List.of())));
     var kpi = service.repositoryKpi(13L, "7d", null);
-    assertThat(kpi.metrics().top3().value()).isNull();
+    assertThat(kpi.metrics().top3().kpi().value()).isNull();
   }
 
   private TopicHistory history(List<RankPoint> points) {

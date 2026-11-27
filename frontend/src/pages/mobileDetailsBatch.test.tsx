@@ -37,8 +37,38 @@ vi.mock("../lib/api", async (original) => ({
 vi.mock("../lib/AuthContext", () => ({ useAuth: () => auth }));
 let mobile = true;
 let listeners: (() => void)[] = [];
+function emptySearchKpi() {
+  const band = { kpi: { value: null, unit: "COUNT", dataStatus: "MISSING", change: null, coverage: null, asOf: null }, series: [] };
+  return {
+    scope: "REPOSITORY",
+    scopeId: "13",
+    period: "7d",
+    metrics: { top3: band, top10: band, top20: band },
+    usage: { used: 0, limit: 50, available: 50, progress: 0 },
+  };
+}
 function respond(url: string) {
   if (isOwnersCatalog(url)) return emptyCursorPage;
+  if (url.includes("/search/kpi")) return emptySearchKpi();
+  if (url.includes("/topics/kpi")) {
+    const band = emptySearchKpi().metrics.top3;
+    return {
+      scope: "REPOSITORY",
+      scopeId: "13",
+      period: "7d",
+      topicScope: "all",
+      metrics: { top3: band, top10: band, top20: band },
+    };
+  }
+  if (url.includes("/stats/kpi")) {
+    const metric = { value: null, unit: "COUNT", dataStatus: "MISSING", change: null, coverage: null, asOf: null };
+    return {
+      scope: "REPOSITORY",
+      scopeId: "13",
+      period: "7d",
+      metrics: { stars: metric, forks: metric, watchers: metric, contributors: metric },
+    };
+  }
   if (url.includes("traffic?")) return traffic;
   if (url.includes("topics/") && url.includes("/history")) return topicHistory;
   if (url.includes("topics/") && url.includes("/results")) return topicResults;
@@ -310,15 +340,20 @@ describe("batch 178–182", () => {
     "shows read-only event configuration for authenticated=%s",
     async (authenticated) => {
       auth.me = { ...anonymousMe, authenticated, actions: [] };
-      api.mockResolvedValue([
-        { eventType: "STAR_MILESTONE", enabled: true },
-        { eventType: "FORK_MILESTONE", enabled: false },
-      ]);
+      api.mockImplementation((url: string) => {
+        if (String(url).includes("growth-event-settings")) {
+          return Promise.resolve([
+            { eventType: "STAR_MILESTONE", enabled: true },
+            { eventType: "FORK_MILESTONE", enabled: false },
+          ]);
+        }
+        return Promise.resolve(respond(String(url)));
+      });
       router(
         <>
           <GrowthEventSettingsCard repositoryId={13} />
           <GrowthEventsPanel repositoryId={13} events={[]} onChanged={vi.fn()} />
-          <SearchVisibilityKpis queries={[]} period="7d" />
+          <SearchVisibilityKpis repositoryId={13} period="7d" />
         </>,
       );
       expect(await screen.findByText(/Current configuration \(1 enabled\)/)).toBeInTheDocument();

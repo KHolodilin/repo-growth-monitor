@@ -28,6 +28,7 @@ import {
   emptyCursorPage,
   isOwnersCatalog,
 } from "../test/repoRoutes";
+import { respondKpi } from "../test/kpiFixtures";
 const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
 vi.mock("../lib/api", async (original) => ({
   ...(await original<typeof import("../lib/api")>()),
@@ -103,6 +104,10 @@ function respond(path: string) {
     url.includes("stats-history")
   )
     return [];
+  const kpi = respondKpi(url);
+  if (kpi !== undefined) {
+    return kpi;
+  }
   throw Error("Unexpected request: " + url);
 }
 function page(path = "/Alpha") {

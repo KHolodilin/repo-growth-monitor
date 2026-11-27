@@ -19,6 +19,7 @@ import {
   topicHistory,
   traffic,
 } from "../test/fixtures";
+import { respondKpi } from "../test/kpiFixtures";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { RepositoriesPage } from "./RepositoriesPage";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
@@ -55,6 +56,48 @@ function renderAt(path: string, ui: ReactNode) {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+
+function statsKpiFromHistory(history: {
+  repositoryId: number;
+  period: string;
+  totals: Record<string, { value: number | null; absoluteChange: number | null; growthPercent: number | null }>;
+}) {
+  const metric = (total: { value: number | null; absoluteChange: number | null; growthPercent: number | null }) => ({
+    value: total.value,
+    unit: "COUNT",
+    dataStatus: total.value == null ? "MISSING" : "COMPLETE",
+    change:
+      total.absoluteChange == null && total.growthPercent == null
+        ? null
+        : { absolute: total.absoluteChange, percent: total.growthPercent },
+    coverage: null,
+    asOf: null,
+  });
+  return {
+    scope: "REPOSITORY",
+    scopeId: String(history.repositoryId),
+    period: history.period,
+    metrics: {
+      stars: metric(history.totals.stars),
+      forks: metric(history.totals.forks),
+      watchers: metric(history.totals.watchers),
+      contributors: metric(history.totals.contributors),
+    },
+  };
+}
+
+function mockStatsPanel(history: Parameters<typeof statsKpiFromHistory>[0] & { points: unknown[] }) {
+  api.mockImplementation((url: string) => {
+    if (String(url).includes("/stats/kpi")) {
+      return Promise.resolve(statsKpiFromHistory(history));
+    }
+    if (String(url).includes("stats-history")) {
+      return Promise.resolve(history);
+    }
+    return Promise.resolve([]);
+  });
 }
 
 describe("extra coverage", () => {
@@ -165,7 +208,7 @@ describe("extra coverage", () => {
       if (url.includes("/search-queries/") && url.includes("results")) {
         return Promise.reject(new Error("no search snapshot"));
       }
-      if (url.includes("/admin/search-runs/")) {
+      if (url.includes("/search-runs/")) {
         return Promise.resolve({
           ...searchResults,
           run: { ...searchResults.run, enrichmentStatus: "PARTIAL" },
@@ -177,6 +220,10 @@ describe("extra coverage", () => {
         url.includes("path-history")
       ) {
         return Promise.resolve(snapshotHistory);
+      }
+      const kpi = respondKpi(url);
+      if (kpi !== undefined) {
+        return Promise.resolve(kpi);
       }
       return Promise.resolve([]);
     });
@@ -278,8 +325,28 @@ describe("extra coverage", () => {
       if (url.includes("growth-event-settings")) {
         return Promise.resolve([{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }]);
       }
-      if (url.includes("stats-history")) {
+      if (url.includes("stats-history") || url.includes("/stats/kpi")) {
         return Promise.reject(new Error("stats down"));
+      }
+      if (url.includes("/search/kpi")) {
+        const band = { kpi: { value: null, unit: "COUNT", dataStatus: "MISSING", change: null, coverage: null, asOf: null }, series: [] };
+        return Promise.resolve({
+          scope: "REPOSITORY",
+          scopeId: "13",
+          period: "7d",
+          metrics: { top3: band, top10: band, top20: band },
+          usage: { used: 0, limit: 50, available: 50, progress: 0 },
+        });
+      }
+      if (url.includes("/topics/kpi")) {
+        const band = { kpi: { value: null, unit: "COUNT", dataStatus: "MISSING", change: null, coverage: null, asOf: null }, series: [] };
+        return Promise.resolve({
+          scope: "REPOSITORY",
+          scopeId: "13",
+          period: "7d",
+          topicScope: "all",
+          metrics: { top3: band, top10: band, top20: band },
+        });
       }
       return Promise.resolve([]);
     });
@@ -379,7 +446,7 @@ describe("extra coverage", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("event save failed")).toBeInTheDocument();
 
-    api.mockResolvedValueOnce({
+    mockStatsPanel({
       repositoryId: 13,
       period: "30d",
       totals: {
@@ -404,7 +471,7 @@ describe("extra coverage", () => {
   });
 
   it("shows stats kpi cards from the history totals", async () => {
-    api.mockResolvedValueOnce({
+    mockStatsPanel({
       repositoryId: 13,
       period: "30d",
       totals: {
@@ -435,7 +502,7 @@ describe("extra coverage", () => {
     ).toEqual(statsChartOption([]).series.map((line) => line.itemStyle.color));
     stats.unmount();
 
-    api.mockResolvedValueOnce({
+    mockStatsPanel({
       repositoryId: 13,
       period: "all",
       totals: {
@@ -477,13 +544,15 @@ describe("extra coverage", () => {
         { date: "2026-09-23", stars: 27, forks: 19, watchers: 0, contributors: 10 },
       ],
     };
-    api.mockImplementation((url: string) =>
-      Promise.resolve(
-        String(url).includes("period=7d")
-          ? { ...history30, period: "7d", points: [history30.points[1]] }
-          : history30,
-      ),
-    );
+    api.mockImplementation((url: string) => {
+      const history = String(url).includes("period=7d")
+        ? { ...history30, period: "7d", points: [history30.points[1]] }
+        : history30;
+      if (String(url).includes("/stats/kpi")) {
+        return Promise.resolve(statsKpiFromHistory(history));
+      }
+      return Promise.resolve(history);
+    });
     const { rerender } = render(
       <MemoryRouter>
         <RepositoryStatsPanel repositoryId={13} period="30d" />
@@ -501,7 +570,7 @@ describe("extra coverage", () => {
 
   it("ignores late stats responses after unmount and surfaces load errors", async () => {
     let finish: (value: unknown) => void = () => undefined;
-    api.mockImplementationOnce(
+    api.mockImplementation(
       () =>
         new Promise((resolve) => {
           finish = resolve;
@@ -513,7 +582,7 @@ describe("extra coverage", () => {
       </MemoryRouter>,
     );
     pending.unmount();
-    finish({
+    const lateHistory = {
       repositoryId: 13,
       period: "30d",
       totals: {
@@ -523,11 +592,12 @@ describe("extra coverage", () => {
         contributors: { value: 0, absoluteChange: 0, growthPercent: 0 },
       },
       points: [],
-    });
+    };
+    finish(lateHistory);
     await Promise.resolve();
 
     let fail: (reason: unknown) => void = () => undefined;
-    api.mockImplementationOnce(
+    api.mockImplementation(
       () =>
         new Promise((_, reject) => {
           fail = reject;
@@ -542,7 +612,7 @@ describe("extra coverage", () => {
     fail(new Error("gone"));
     await Promise.resolve();
 
-    api.mockRejectedValueOnce(new Error("stats offline"));
+    api.mockRejectedValue(new Error("stats offline"));
     render(
       <MemoryRouter>
         <RepositoryStatsPanel repositoryId={13} period="30d" />
@@ -574,6 +644,10 @@ describe("extra coverage", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const kpi = respondKpi(url);
+      if (kpi !== undefined) {
+        return Promise.resolve(kpi);
+      }
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }

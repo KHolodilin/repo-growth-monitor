@@ -1,5 +1,5 @@
 import type { Period } from "./period";
-import { periodDates } from "./searchVisibilityKpi";
+import { periodDates } from "./period";
 import { lineStyle, prepareSeriesStyles, seriesMarkerHtml } from "./seriesStyle";
 import type { GrowthEvent, SearchSeries } from "./api";
 import { eventUtcDate } from "./growthEvents";

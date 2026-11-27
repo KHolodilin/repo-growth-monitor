@@ -17,9 +17,10 @@ public record SearchKpiResponse(
     Metrics metrics,
     Usage usage) {
 
-  public record Metrics(KpiValue top3, KpiValue top10, KpiValue top20) {}
+  /** Band metric with sparkline series aligned to {@link #range()} days. */
+  public record BandMetric(KpiValue kpi, List<Integer> series) {}
+
+  public record Metrics(BandMetric top3, BandMetric top10, BandMetric top20) {}
 
   public record Usage(int used, int limit, int available, double progress) {}
-
-  public record BandSeries(String band, List<Integer> series) {}
 }

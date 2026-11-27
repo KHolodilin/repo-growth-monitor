@@ -1,4 +1,4 @@
-import { periodDates } from "./searchVisibilityKpi";
+import { periodDates } from "./period";
 import type { Period } from "./period";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";

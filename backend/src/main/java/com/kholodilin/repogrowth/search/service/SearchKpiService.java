@@ -100,9 +100,13 @@ public class SearchKpiService {
         period,
         range,
         comparison,
-        new SearchKpiResponse.Metrics(toKpi(top3), toKpi(top10), toKpi(top20)),
+        new SearchKpiResponse.Metrics(toBand(top3), toBand(top10), toBand(top20)),
         new SearchKpiResponse.Usage(
             usage.used(), usage.limit(), usage.available(), usage.progress()));
+  }
+
+  private static SearchKpiResponse.BandMetric toBand(BandKpi band) {
+    return new SearchKpiResponse.BandMetric(toKpi(band), band.series());
   }
 
   private static KpiValue toKpi(BandKpi band) {

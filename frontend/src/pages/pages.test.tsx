@@ -22,6 +22,7 @@ import {
   emptyCursorPage,
   isOwnersCatalog,
 } from "../test/repoRoutes";
+import { emptySearchKpi, respondKpi, statsKpiFromTotals } from "../test/kpiFixtures";
 import { DashboardPage } from "./DashboardPage";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { RepositoriesPage } from "./RepositoriesPage";
@@ -224,19 +225,30 @@ describe("pages", () => {
           json([{ repositoryId: 13, eventType: "STAR_MILESTONE", enabled: true }]),
         );
       }
-      if (url.includes("stats-history")) {
+      if (url.includes("/search/kpi")) {
+        return Promise.resolve(json(emptySearchKpi(13, "7d", 1)));
+      }
+      if (url.includes("/topics/kpi")) {
+        return Promise.resolve(json(respondKpi(url)));
+      }
+      if (url.includes("/stats/kpi") || url.includes("stats-history")) {
+        const history = {
+          repositoryId: 13,
+          period: "30d",
+          totals: {
+            stars: { value: 21, absoluteChange: null, growthPercent: null },
+            forks: { value: 16, absoluteChange: null, growthPercent: null },
+            watchers: { value: 0, absoluteChange: null, growthPercent: null },
+            contributors: { value: 7, absoluteChange: null, growthPercent: null },
+          },
+          points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 }],
+        };
         return Promise.resolve(
-          json({
-            repositoryId: 13,
-            period: "30d",
-            totals: {
-              stars: { value: 21, absoluteChange: null, growthPercent: null },
-              forks: { value: 16, absoluteChange: null, growthPercent: null },
-              watchers: { value: 0, absoluteChange: null, growthPercent: null },
-              contributors: { value: 7, absoluteChange: null, growthPercent: null },
-            },
-            points: [{ date: "2026-09-23", stars: 21, forks: 16, watchers: 0, contributors: 7 }],
-          }),
+          json(
+            url.includes("/stats/kpi")
+              ? statsKpiFromTotals(13, "30d", history.totals)
+              : history,
+          ),
         );
       }
       if (url.includes("/admin/repositories?refresh=false")) {
@@ -486,6 +498,10 @@ describe("pages", () => {
           pending.push({ resolve, reject });
         });
       }
+      const kpi = respondKpi(url);
+      if (kpi !== undefined) {
+        return Promise.resolve(json(kpi));
+      }
       return Promise.resolve(json([]));
     });
     renderPath("/admin/repositories/13?tab=topics", <RepositoryDetailsPage />);
@@ -632,7 +648,7 @@ describe("pages", () => {
       if (url.includes("/search-queries/") && url.includes("results")) {
         return Promise.resolve(json(searchResults));
       }
-      if (url.includes("/admin/search-runs/")) {
+      if (url.includes("/search-runs/")) {
         return Promise.resolve(json(searchResults));
       }
       if (
@@ -801,8 +817,15 @@ describe("pages", () => {
       if (url.includes("/traffic?")) {
         return Promise.resolve(json(traffic));
       }
+      if (url.includes("/search/kpi")) {
+        return Promise.resolve(json(emptySearchKpi(13, "7d", 2)));
+      }
       if (url.includes("search-queries")) {
         return Promise.resolve(json([searchHistory, second]));
+      }
+      const kpi = respondKpi(url);
+      if (kpi !== undefined) {
+        return Promise.resolve(json(kpi));
       }
       return Promise.resolve(json([]));
     });

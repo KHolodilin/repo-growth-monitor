@@ -3,7 +3,7 @@ import type { Period } from "./period";
 import type { GrowthEvent } from "./api";
 import { eventMarkOverlays } from "./trafficChart";
 import { eventUtcDate } from "./growthEvents";
-import { periodDates } from "./searchVisibilityKpi";
+import { periodDates } from "./period";
 import { calendarDates, formatChartAxisDate } from "./utils";
 
 export type RankHistoryPoint = { date: string; position: number | null };

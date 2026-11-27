@@ -11,7 +11,7 @@ import {
   isOwnersCatalog,
 } from "../test/repoRoutes";
 import { writeStoredRepoPeriod, PERIODS } from "../components/PeriodSelector";
-import { periodDates } from "../lib/searchVisibilityKpi";
+import { periodDates } from "../lib/period";
 import * as downloads from "../lib/chartExport";
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock("../lib/api", async (original) => ({
