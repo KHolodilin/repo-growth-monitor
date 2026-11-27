@@ -2,9 +2,9 @@ package com.kholodilin.repogrowth.analytics.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.PromotionCount;
-import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.RankPoint;
 import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.VisitorRow;
+import com.kholodilin.repogrowth.event.domain.PromotionCount;
+import com.kholodilin.repogrowth.search.domain.SuccessfulRank;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -17,14 +17,14 @@ class PortfolioHighlightMathTest {
   void picksTheStrongestRiseAndTheWorstDrop() {
     List<RankPoint> points =
         List.of(
-            new RankPoint(1, "acme/outbox", "outbox", LocalDate.of(2026, 9, 20), 22),
-            new RankPoint(1, "acme/outbox", "outbox", LocalDate.of(2026, 10, 8), 14),
-            new RankPoint(2, "acme/kafka", "kafka", LocalDate.of(2026, 9, 20), 4),
-            new RankPoint(2, "acme/kafka", "kafka", LocalDate.of(2026, 10, 8), 11),
-            new RankPoint(1, "acme/outbox", "flat", LocalDate.of(2026, 9, 20), 5),
-            new RankPoint(1, "acme/outbox", "flat", LocalDate.of(2026, 10, 8), 5),
-            new RankPoint(3, "acme/other", "small", LocalDate.of(2026, 10, 2), 10),
-            new RankPoint(3, "acme/other", "small", LocalDate.of(2026, 10, 8), 9));
+            new SuccessfulRank(1, "acme/outbox", "outbox", LocalDate.of(2026, 9, 20), 22),
+            new SuccessfulRank(1, "acme/outbox", "outbox", LocalDate.of(2026, 10, 8), 14),
+            new SuccessfulRank(2, "acme/kafka", "kafka", LocalDate.of(2026, 9, 20), 4),
+            new SuccessfulRank(2, "acme/kafka", "kafka", LocalDate.of(2026, 10, 8), 11),
+            new SuccessfulRank(1, "acme/outbox", "flat", LocalDate.of(2026, 9, 20), 5),
+            new SuccessfulRank(1, "acme/outbox", "flat", LocalDate.of(2026, 10, 8), 5),
+            new SuccessfulRank(3, "acme/other", "small", LocalDate.of(2026, 10, 2), 10),
+            new SuccessfulRank(3, "acme/other", "small", LocalDate.of(2026, 10, 8), 9));
 
     assertThat(PortfolioHighlightMath.strongestRise(points, FROM))
         .satisfies(rise -> {
@@ -42,18 +42,18 @@ class PortfolioHighlightMathTest {
   void breaksEqualMovesByTheFinishAndTheQueryName() {
     List<RankPoint> points =
         List.of(
-            new RankPoint(1, "acme/a", "zeta", FROM.plusDays(1), 30),
-            new RankPoint(1, "acme/a", "zeta", FROM.plusDays(2), 22),
-            new RankPoint(2, "acme/b", "alpha", FROM.plusDays(1), 22),
-            new RankPoint(2, "acme/b", "alpha", FROM.plusDays(2), 14),
-            new RankPoint(3, "acme/c", "mid", FROM.plusDays(1), 22),
-            new RankPoint(3, "acme/c", "mid", FROM.plusDays(2), 14),
-            new RankPoint(4, "acme/d", "down-z", FROM.plusDays(1), 2),
-            new RankPoint(4, "acme/d", "down-z", FROM.plusDays(2), 9),
-            new RankPoint(5, "acme/e", "down-a", FROM.plusDays(1), 4),
-            new RankPoint(5, "acme/e", "down-a", FROM.plusDays(2), 11),
-            new RankPoint(6, "acme/f", "down-b", FROM.plusDays(1), 4),
-            new RankPoint(6, "acme/f", "down-b", FROM.plusDays(2), 11));
+            new SuccessfulRank(1, "acme/a", "zeta", FROM.plusDays(1), 30),
+            new SuccessfulRank(1, "acme/a", "zeta", FROM.plusDays(2), 22),
+            new SuccessfulRank(2, "acme/b", "alpha", FROM.plusDays(1), 22),
+            new SuccessfulRank(2, "acme/b", "alpha", FROM.plusDays(2), 14),
+            new SuccessfulRank(3, "acme/c", "mid", FROM.plusDays(1), 22),
+            new SuccessfulRank(3, "acme/c", "mid", FROM.plusDays(2), 14),
+            new SuccessfulRank(4, "acme/d", "down-z", FROM.plusDays(1), 2),
+            new SuccessfulRank(4, "acme/d", "down-z", FROM.plusDays(2), 9),
+            new SuccessfulRank(5, "acme/e", "down-a", FROM.plusDays(1), 4),
+            new SuccessfulRank(5, "acme/e", "down-a", FROM.plusDays(2), 11),
+            new SuccessfulRank(6, "acme/f", "down-b", FROM.plusDays(1), 4),
+            new SuccessfulRank(6, "acme/f", "down-b", FROM.plusDays(2), 11));
     assertThat(PortfolioHighlightMath.strongestRise(points, FROM).queryName()).isEqualTo("alpha");
     assertThat(PortfolioHighlightMath.worstDrop(points, FROM).queryName()).isEqualTo("down-a");
   }
@@ -61,7 +61,7 @@ class PortfolioHighlightMathTest {
   @Test
   void ignoresAQueryThatNeverMovesInsideTheWindow() {
     List<RankPoint> points =
-        List.of(new RankPoint(1, "acme/outbox", "outbox", LocalDate.of(2026, 10, 8), 14));
+        List.of(new SuccessfulRank(1, "acme/outbox", "outbox", LocalDate.of(2026, 10, 8), 14));
     assertThat(PortfolioHighlightMath.strongestRise(points, FROM)).isNull();
     assertThat(PortfolioHighlightMath.worstDrop(List.of(), FROM)).isNull();
   }
@@ -117,27 +117,27 @@ class PortfolioHighlightMathTest {
 
     List<RankPoint> points =
         List.of(
-            new RankPoint(9, "acme/old", "old", FROM.minusDays(2), 3),
-            new RankPoint(1, "acme/first", "first-rise", FROM.plusDays(1), 20),
-            new RankPoint(1, "acme/first", "first-rise", FROM.plusDays(2), 12),
-            new RankPoint(2, "acme/big", "bigger", FROM.plusDays(1), 30),
-            new RankPoint(2, "acme/big", "bigger", FROM.plusDays(2), 10),
-            new RankPoint(3, "acme/worse", "worse-finish", FROM.plusDays(1), 40),
-            new RankPoint(3, "acme/worse", "worse-finish", FROM.plusDays(2), 20),
-            new RankPoint(4, "acme/z", "z-same", FROM.plusDays(1), 30),
-            new RankPoint(4, "acme/z", "z-same", FROM.plusDays(2), 10),
-            new RankPoint(5, "acme/a", "a-same", FROM.plusDays(1), 30),
-            new RankPoint(5, "acme/a", "a-same", FROM.plusDays(2), 10),
-            new RankPoint(6, "acme/drop", "first-drop", FROM.plusDays(1), 10),
-            new RankPoint(6, "acme/drop", "first-drop", FROM.plusDays(2), 15),
-            new RankPoint(7, "acme/drop", "deeper", FROM.plusDays(1), 10),
-            new RankPoint(7, "acme/drop", "deeper", FROM.plusDays(2), 20),
-            new RankPoint(8, "acme/drop", "shallower", FROM.plusDays(1), 5),
-            new RankPoint(8, "acme/drop", "shallower", FROM.plusDays(2), 15),
-            new RankPoint(10, "acme/drop", "z-drop", FROM.plusDays(1), 10),
-            new RankPoint(10, "acme/drop", "z-drop", FROM.plusDays(2), 20),
-            new RankPoint(11, "acme/drop", "a-drop", FROM.plusDays(1), 10),
-            new RankPoint(11, "acme/drop", "a-drop", FROM.plusDays(2), 20));
+            new SuccessfulRank(9, "acme/old", "old", FROM.minusDays(2), 3),
+            new SuccessfulRank(1, "acme/first", "first-rise", FROM.plusDays(1), 20),
+            new SuccessfulRank(1, "acme/first", "first-rise", FROM.plusDays(2), 12),
+            new SuccessfulRank(2, "acme/big", "bigger", FROM.plusDays(1), 30),
+            new SuccessfulRank(2, "acme/big", "bigger", FROM.plusDays(2), 10),
+            new SuccessfulRank(3, "acme/worse", "worse-finish", FROM.plusDays(1), 40),
+            new SuccessfulRank(3, "acme/worse", "worse-finish", FROM.plusDays(2), 20),
+            new SuccessfulRank(4, "acme/z", "z-same", FROM.plusDays(1), 30),
+            new SuccessfulRank(4, "acme/z", "z-same", FROM.plusDays(2), 10),
+            new SuccessfulRank(5, "acme/a", "a-same", FROM.plusDays(1), 30),
+            new SuccessfulRank(5, "acme/a", "a-same", FROM.plusDays(2), 10),
+            new SuccessfulRank(6, "acme/drop", "first-drop", FROM.plusDays(1), 10),
+            new SuccessfulRank(6, "acme/drop", "first-drop", FROM.plusDays(2), 15),
+            new SuccessfulRank(7, "acme/drop", "deeper", FROM.plusDays(1), 10),
+            new SuccessfulRank(7, "acme/drop", "deeper", FROM.plusDays(2), 20),
+            new SuccessfulRank(8, "acme/drop", "shallower", FROM.plusDays(1), 5),
+            new SuccessfulRank(8, "acme/drop", "shallower", FROM.plusDays(2), 15),
+            new SuccessfulRank(10, "acme/drop", "z-drop", FROM.plusDays(1), 10),
+            new SuccessfulRank(10, "acme/drop", "z-drop", FROM.plusDays(2), 20),
+            new SuccessfulRank(11, "acme/drop", "a-drop", FROM.plusDays(1), 10),
+            new SuccessfulRank(11, "acme/drop", "a-drop", FROM.plusDays(2), 20));
     assertThat(PortfolioHighlightMath.strongestRise(points, FROM).queryName()).isEqualTo("a-same");
     assertThat(PortfolioHighlightMath.worstDrop(points, FROM).queryName()).isEqualTo("a-drop");
 

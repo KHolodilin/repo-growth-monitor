@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.search.persistence;
 
-import com.kholodilin.repogrowth.analytics.application.PortfolioHighlightMath.RankPoint;
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
 import com.kholodilin.repogrowth.search.domain.SearchRun;
 import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
+import com.kholodilin.repogrowth.search.domain.SuccessfulRank;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -368,7 +368,7 @@ public class SearchRunJdbcRepository {
         .list();
   }
 
-  public List<RankPoint> successfulPositions(LocalDate to) {
+  public List<SuccessfulRank> successfulPositions(LocalDate to) {
     return jdbcClient
         .sql(
             """
@@ -388,7 +388,7 @@ public class SearchRunJdbcRepository {
             """)
         .param("to", to)
         .query((rs, rowNum) ->
-            new RankPoint(
+            new SuccessfulRank(
                 rs.getLong("repository_id"),
                 rs.getString("full_name"),
                 rs.getString("query_name"),

@@ -21,8 +21,7 @@ public class PortfolioHighlightsService {
   }
 
   public Highlights build(DashboardPeriod period, List<RepositoryRow> rows) {
-    List<PortfolioHighlightMath.RankPoint> ranks =
-        searchRunRepository.successfulPositions(period.to());
+    var ranks = searchRunRepository.successfulPositions(period.to());
     return new Highlights(
         PortfolioHighlightMath.strongestRise(ranks, period.from()),
         PortfolioHighlightMath.worstDrop(ranks, period.from()),

@@ -3,6 +3,8 @@ package com.kholodilin.repogrowth.analytics.application;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.EventHighlight;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.RankHighlight;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.VisitorHighlight;
+import com.kholodilin.repogrowth.event.domain.PromotionCount;
+import com.kholodilin.repogrowth.search.domain.SuccessfulRank;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,19 +16,14 @@ public final class PortfolioHighlightMath {
 
   private PortfolioHighlightMath() {}
 
-  public record RankPoint(
-      long repositoryId, String fullName, String queryName, LocalDate date, int position) {}
-
-  public record PromotionCount(long repositoryId, String fullName, int count) {}
-
   public record VisitorRow(
       long repositoryId, String fullName, Long visitors, Double growthPercent) {}
 
-  public static RankHighlight strongestRise(List<RankPoint> points, LocalDate from) {
+  public static RankHighlight strongestRise(List<SuccessfulRank> points, LocalDate from) {
     return choose(points, from, true);
   }
 
-  public static RankHighlight worstDrop(List<RankPoint> points, LocalDate from) {
+  public static RankHighlight worstDrop(List<SuccessfulRank> points, LocalDate from) {
     return choose(points, from, false);
   }
 
@@ -73,9 +70,9 @@ public final class PortfolioHighlightMath {
     return best;
   }
 
-  private static RankHighlight choose(List<RankPoint> points, LocalDate from, boolean rise) {
-    Map<String, List<RankPoint>> groups = new LinkedHashMap<>();
-    for (RankPoint point : points) {
+  private static RankHighlight choose(List<SuccessfulRank> points, LocalDate from, boolean rise) {
+    Map<String, List<SuccessfulRank>> groups = new LinkedHashMap<>();
+    for (SuccessfulRank point : points) {
       groups
           .computeIfAbsent(
               point.repositoryId() + "\0" + point.queryName(), key -> new ArrayList<>())
@@ -83,12 +80,12 @@ public final class PortfolioHighlightMath {
     }
     RankHighlight chosen = null;
     int chosenDelta = 0;
-    for (List<RankPoint> group : groups.values()) {
-      group.sort(Comparator.comparing(RankPoint::date));
-      RankPoint baseline = null;
-      RankPoint firstInWindow = null;
-      RankPoint end = null;
-      for (RankPoint point : group) {
+    for (List<SuccessfulRank> group : groups.values()) {
+      group.sort(Comparator.comparing(SuccessfulRank::date));
+      SuccessfulRank baseline = null;
+      SuccessfulRank firstInWindow = null;
+      SuccessfulRank end = null;
+      for (SuccessfulRank point : group) {
         if (point.date().isBefore(from)) {
           baseline = point;
           continue;
@@ -101,7 +98,7 @@ public final class PortfolioHighlightMath {
       if (end == null) {
         continue;
       }
-      RankPoint start = baseline != null ? baseline : firstInWindow;
+      SuccessfulRank start = baseline != null ? baseline : firstInWindow;
       if (start.date().equals(end.date())) {
         continue;
       }
@@ -131,7 +128,7 @@ public final class PortfolioHighlightMath {
     return chosen;
   }
 
-  private static boolean prefer(RankPoint end, RankHighlight chosen, boolean rise) {
+  private static boolean prefer(SuccessfulRank end, RankHighlight chosen, boolean rise) {
     if (rise && end.position() != chosen.toRank()) {
       return end.position() < chosen.toRank();
     }
