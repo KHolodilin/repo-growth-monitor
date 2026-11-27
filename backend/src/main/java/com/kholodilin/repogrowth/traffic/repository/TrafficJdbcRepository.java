@@ -1,8 +1,8 @@
 package com.kholodilin.repogrowth.traffic.repository;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
 import java.sql.Array;
 import java.sql.Timestamp;
 import java.time.Instant;

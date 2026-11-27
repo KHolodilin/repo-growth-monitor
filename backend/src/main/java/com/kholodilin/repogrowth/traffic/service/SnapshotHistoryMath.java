@@ -1,4 +1,4 @@
-package com.kholodilin.repogrowth.traffic;
+package com.kholodilin.repogrowth.traffic.service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;

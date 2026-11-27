@@ -37,9 +37,7 @@ import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcReposito
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
-import com.kholodilin.repogrowth.traffic.SnapshotKind;
+import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
@@ -48,6 +46,8 @@ import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.Reposi
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryStatDay;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

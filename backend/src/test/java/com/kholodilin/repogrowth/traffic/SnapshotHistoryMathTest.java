@@ -2,10 +2,10 @@ package com.kholodilin.repogrowth.traffic;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Cell;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Result;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Row;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Cell;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Result;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Row;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;

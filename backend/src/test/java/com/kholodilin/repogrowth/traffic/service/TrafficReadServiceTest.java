@@ -18,7 +18,6 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.model.kpi.DataStatus;
 import com.kholodilin.repogrowth.common.model.kpi.KpiScope;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
-import com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.Observation;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathRow;
@@ -26,6 +25,7 @@ import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSn
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerRow;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerSnapshot;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
+import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;

@@ -1,4 +1,4 @@
-package com.kholodilin.repogrowth.traffic;
+package com.kholodilin.repogrowth.traffic.service;
 
 import com.kholodilin.repogrowth.common.config.TrafficProperties;
 import java.util.Locale;

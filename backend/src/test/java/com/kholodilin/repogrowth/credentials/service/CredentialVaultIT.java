@@ -945,7 +945,7 @@ class CredentialVaultIT extends AbstractPostgresTest {
     assertThat(trafficRepository.latestReferrerSnapshot(repositoryId).snapshotAt()).isNotNull();
     LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
     var pivot =
-        com.kholodilin.repogrowth.traffic.SnapshotHistoryMath.pivot(
+        com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.pivot(
             trafficRepository.referrerSnapshotsForDelta(repositoryId, today.minusDays(1), today),
             today.minusDays(1),
             today);
