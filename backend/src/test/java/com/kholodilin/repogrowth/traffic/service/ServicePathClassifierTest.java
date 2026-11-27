@@ -1,4 +1,4 @@
-package com.kholodilin.repogrowth.traffic;
+package com.kholodilin.repogrowth.traffic.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
