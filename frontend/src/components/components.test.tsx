@@ -623,12 +623,12 @@ describe("components", () => {
   it("shows one before and after table for the day's events", async () => {
     api.mockImplementation((url: string) => {
       const path = String(url);
-      if (path.includes("traffic")) {
+      if (path.includes("traffic-history") || path.includes("traffic")) {
         return Promise.resolve({
-          traffic: [
-            { date: "2026-09-30", uniqueVisitors: 100, clones: 18 },
-            { date: "2026-10-04", uniqueVisitors: 20, clones: null },
-            { date: "2026-10-05", uniqueVisitors: 340, clones: 40 },
+          points: [
+            { date: "2026-09-30", views: null, visitors: 100, clones: 18, uniqueCloners: null },
+            { date: "2026-10-04", views: null, visitors: 20, clones: null, uniqueCloners: null },
+            { date: "2026-10-05", views: null, visitors: 340, clones: 40, uniqueCloners: null },
           ],
         });
       }
@@ -768,6 +768,19 @@ describe("components", () => {
     expect(await screen.findByText("A match in time does not prove a cause.")).toBeInTheDocument();
     expect(screen.queryByText("outbox 3 to 3")).not.toBeInTheDocument();
     expect(screen.queryByText("No queries")).not.toBeInTheDocument();
+  });
+
+  it("shows a generic save failure when the create call rejects a non-Error", async () => {
+    const user = userEvent.setup();
+    api.mockResolvedValue([]);
+    render(
+      <GrowthEventsPanel repositoryId={13} events={[growthEvent]} onChanged={vi.fn()} />,
+    );
+    await user.click(screen.getByRole("button", { name: "+ Add event" }));
+    await user.type(screen.getByLabelText(/Title/i), "Launch");
+    api.mockRejectedValueOnce("boom");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Failed to save event")).toBeInTheDocument();
   });
 
   it("still shows the comparison when the series cannot be loaded", async () => {

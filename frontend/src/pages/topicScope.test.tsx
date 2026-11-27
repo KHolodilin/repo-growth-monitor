@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useSearchParams } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, topicHistory, traffic } from "../test/fixtures";
-import { emptyCursorPage, isOwnersCatalog, respondCatalogResolve } from "../test/repoRoutes";
+import { respondTrafficResources } from "../test/trafficResources";
+import {  emptyCursorPage, isOwnersCatalog, respondCatalogResolve, respondCatalogSwitcher } from "../test/repoRoutes";
 import { readTopicScope, topicScopeCookie, writeTopicScope } from "../lib/topicScope";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
@@ -57,9 +58,11 @@ describe("topics visibility scope cookie", () => {
       const url = String(path);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
+      const switcher = respondCatalogSwitcher(url, [repository, { ...repository, id: 8, name: "other", fullName: "KHolodilin/other" }]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.endsWith("/admin/repositories/13") || url.endsWith("/admin/repositories/8")) {
-        const id = url.endsWith("/admin/repositories/8") ? 8 : 13;
+      if (url.endsWith("/repositories/13") || url.endsWith("/repositories/8")) {
+        const id = url.endsWith("/repositories/8") ? 8 : 13;
         return Promise.resolve({
           ...repository,
           id,
@@ -68,14 +71,9 @@ describe("topics visibility scope cookie", () => {
           language: "Java",
         });
       }
-      if (url.includes("/admin/repositories?")) {
-        return Promise.resolve([
-          repository,
-          { ...repository, id: 8, name: "other", fullName: "KHolodilin/other" },
-        ]);
-      }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("/topics/") && url.includes("history")) {
         return Promise.resolve(topicHistory);
@@ -166,15 +164,15 @@ describe("topics visibility scope cookie", () => {
       const url = String(path);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
+      const switcher = respondCatalogSwitcher(url, [repository, { ...repository, id: 8, name: "other", fullName: "KHolodilin/other" }]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.includes("/admin/repositories?")) {
-        return Promise.resolve([bare]);
-      }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(bare);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("topic-watches")) {
         return Promise.resolve([topicHistory]);
@@ -195,15 +193,15 @@ describe("topics visibility scope cookie", () => {
       const url = String(path);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
+      const switcher = respondCatalogSwitcher(url, [repository, { ...repository, id: 8, name: "other", fullName: "KHolodilin/other" }]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.includes("/admin/repositories?")) {
-        return Promise.resolve([bare]);
-      }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(bare);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("topic-watches")) {
         return Promise.resolve([topicHistory]);
@@ -272,11 +270,10 @@ describe("topics visibility scope cookie", () => {
       const url = String(path);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
+      const switcher = respondCatalogSwitcher(url, [repository, { ...repository, id: 8, name: "other", fullName: "KHolodilin/other" }]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.includes("/admin/repositories?")) {
-        return Promise.resolve([bare]);
-      }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(bare);
       }
       if (url.includes("history")) {

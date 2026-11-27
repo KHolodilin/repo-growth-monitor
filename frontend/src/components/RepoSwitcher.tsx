@@ -10,7 +10,8 @@ import {
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Book, Check, ChevronDown, Lock, Search } from "lucide-react";
-import { api, type Repository } from "../lib/api";
+import type { Repository } from "../lib/api";
+import { listCatalogRepositoriesForSwitcher } from "../lib/catalogApi";
 import { cn } from "../lib/utils";
 
 type RepoSwitcherProps = {
@@ -123,7 +124,7 @@ export function RepoSwitcher({ currentId, currentLabel, hrefFor, description }: 
       return;
     }
     try {
-      setRepos(await api<Repository[]>("/api/v1/admin/repositories?refresh=false"));
+      setRepos(await listCatalogRepositoriesForSwitcher());
     } catch (err) {
       setError((err as Error).message);
     }

@@ -25,6 +25,7 @@ import {
   topicResults,
 } from "../test/fixtures";
 import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
+import { respondTrafficResources } from "../test/trafficResources";
 import { anonymousMe } from "../lib/auth";
 const { api, auth } = vi.hoisted(() => ({
   api: vi.fn(),
@@ -69,7 +70,8 @@ function respond(url: string) {
       metrics: { stars: metric, forks: metric, watchers: metric, contributors: metric },
     };
   }
-  if (url.includes("traffic?")) return traffic;
+  const trafficBundle = respondTrafficResources(url, traffic);
+  if (trafficBundle !== undefined) return trafficBundle;
   if (url.includes("topics/") && url.includes("/history")) return topicHistory;
   if (url.includes("topics/") && url.includes("/results")) return topicResults;
   if (url.includes("topics/") && url.includes("/series"))
@@ -80,7 +82,10 @@ function respond(url: string) {
         points: [{ date: "2026-09-23", position: 1 }],
       },
     ];
-  if (url.includes("/admin/repositories/13") && !url.slice(url.indexOf("/13") + 3).startsWith("/"))
+  if (
+    (url.includes("/repositories/13") || url.includes("/admin/repositories/13")) &&
+    !url.slice(url.indexOf("/13") + 3).startsWith("/")
+  )
     return repository;
   return [];
 }

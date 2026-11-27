@@ -95,7 +95,7 @@ beforeEach(() => {
   writeStoredRepoPeriod("13", "all");
   api.mockReset();
   api.mockImplementation((url: string) => {
-    if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+    if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
     if (url.includes("/competitors/")) return Promise.resolve(card);
     if (url.includes("/history")) return Promise.resolve(url.includes("/topics/") ? topic : query);
     if (url.includes("/results"))

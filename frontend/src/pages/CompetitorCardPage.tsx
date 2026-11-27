@@ -42,7 +42,7 @@ export function CompetitorCardPage() {
     if (!repositoryId || !queryId || !githubRepositoryId) return;
     let cancelled = false;
     Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<Repository>(`/api/v1/repositories/${repositoryId}`),
       api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
       api<CompetitorCard>(
         `/api/v1/search-queries/${queryId}/competitors/${githubRepositoryId}`,

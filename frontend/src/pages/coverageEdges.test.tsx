@@ -26,6 +26,8 @@ import {
   topicResults,
   traffic,
 } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
+import { respondCatalogSwitcher } from "../test/repoRoutes";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock("../lib/api", async (importOriginal) => {
@@ -227,7 +229,7 @@ describe("remaining coverage edges", () => {
     });
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/topics/") && url.includes("/history")) {
@@ -315,7 +317,11 @@ describe("remaining coverage edges", () => {
     );
     expect(screen.getByText("repos")).toBeInTheDocument();
 
-    api.mockResolvedValue([repository]);
+    api.mockImplementation((path: string) => {
+      const switcher = respondCatalogSwitcher(String(path), [repository]);
+      if (switcher) return Promise.resolve(switcher);
+      return Promise.resolve([]);
+    });
     render(
       <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
@@ -361,7 +367,11 @@ describe("remaining coverage edges", () => {
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(onEdit).toHaveBeenCalled();
 
-    api.mockResolvedValue([]);
+    api.mockImplementation((path: string) => {
+      const switcher = respondCatalogSwitcher(String(path), []);
+      if (switcher) return Promise.resolve(switcher);
+      return Promise.resolve({ items: [], nextCursor: null });
+    });
     render(
       <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
@@ -408,11 +418,10 @@ describe("remaining coverage edges", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve({ ...repository, description: undefined, health: undefined });
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({
+      const trafficBundle = respondTrafficResources(url, {
           ...traffic,
           lastCollection: {
             ...traffic.lastCollection,
@@ -426,6 +435,8 @@ describe("remaining coverage edges", () => {
             ],
           },
         });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("growth-events") && !url.includes("settings")) {
         return Promise.reject(new Error("events down"));

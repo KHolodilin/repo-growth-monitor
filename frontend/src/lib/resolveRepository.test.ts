@@ -139,7 +139,7 @@ describe("resolveRepository", () => {
           nextCursor: null,
         });
       }
-      if (url === "/api/v1/admin/repositories/13") return Promise.resolve(repository);
+      if (url === "/api/v1/repositories/13") return Promise.resolve(repository);
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 

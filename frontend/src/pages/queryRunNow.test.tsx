@@ -21,7 +21,7 @@ describe("QueryDetailsPage run now", () => {
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/search-queries/") && url.includes("history")) {

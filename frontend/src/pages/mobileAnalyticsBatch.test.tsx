@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 import { DashboardPage } from "./DashboardPage";
 import { dashboardReady, repository, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
+import { respondCatalogSwitcher } from "../test/repoRoutes";
 import { NavigationButton } from "../components/NavigationButton";
 import { RepositoryWarningSheet } from "../components/RepositoryWarningSheet";
 import { TrafficKpiCard } from "../components/TrafficKpiCard";
@@ -104,15 +106,12 @@ describe("mobile analytics batch", () => {
     let points: typeof traffic.traffic = [
       { date: "2026-11-02", views: null, uniqueVisitors: null, clones: null, uniqueCloners: null },
     ];
-    api.mockImplementation((path: string) =>
-      Promise.resolve(
-        path.includes("/traffic?")
-          ? { ...traffic, traffic: points }
-          : path.endsWith("/admin/repositories/13")
-            ? repository
-            : [],
-      ),
-    );
+    api.mockImplementation((path: string) => {
+      if (path.endsWith("/repositories/13") || path.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      const trafficBundle = respondTrafficResources(path, { ...traffic, traffic: points });
+      if (trafficBundle !== undefined) return Promise.resolve(trafficBundle);
+      return Promise.resolve([]);
+    });
     render(
       <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
@@ -138,7 +137,11 @@ describe("mobile analytics batch", () => {
   });
   it("keeps the mobile repository menu usable during viewport and page changes", async () => {
     const user = userEvent.setup();
-    api.mockResolvedValue([repository]);
+    api.mockImplementation((path: string) => {
+      const switcher = respondCatalogSwitcher(String(path), [repository]);
+      if (switcher) return Promise.resolve(switcher);
+      return Promise.resolve([]);
+    });
     render(
       <MemoryRouter>
         <PageBreadcrumb

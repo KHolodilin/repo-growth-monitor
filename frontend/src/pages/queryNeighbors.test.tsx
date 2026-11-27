@@ -23,7 +23,7 @@ describe("query neighbor chart", () => {
       if (catalog) {
         return Promise.resolve(catalog);
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/history")) {
@@ -142,7 +142,7 @@ describe("query neighbor chart", () => {
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
       if (url.includes("/search-queries/5/")) return Promise.reject(new Error("query-5-down"));
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/search-queries/7/history")) {
         return new Promise((resolve) => {
           finishB = resolve;

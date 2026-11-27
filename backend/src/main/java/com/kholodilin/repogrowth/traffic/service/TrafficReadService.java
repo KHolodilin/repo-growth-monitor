@@ -1,6 +1,13 @@
 package com.kholodilin.repogrowth.traffic.service;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficNotice;
+import com.kholodilin.repogrowth.collection.model.CollectionJob;
+import com.kholodilin.repogrowth.collection.model.CollectionJobType;
+import com.kholodilin.repogrowth.collection.model.CollectionRun;
+import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
+import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
+import com.kholodilin.repogrowth.collection.service.CollectionTrafficProbe;
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.common.model.GrowthMath;
 import com.kholodilin.repogrowth.common.api.ApiException;
@@ -51,10 +58,21 @@ public class TrafficReadService {
   private static final int MAX_HISTORY_DAYS = 14;
 
   private final TrafficJdbcRepository traffic;
+  private final CollectionTrafficProbe collections;
+  private final CollectionRunMapper collectionRunMapper;
+  private final PlanningWindow planningWindow;
   private final Clock clock;
 
-  public TrafficReadService(TrafficJdbcRepository traffic, Clock clock) {
+  public TrafficReadService(
+      TrafficJdbcRepository traffic,
+      CollectionTrafficProbe collections,
+      CollectionRunMapper collectionRunMapper,
+      PlanningWindow planningWindow,
+      Clock clock) {
     this.traffic = traffic;
+    this.collections = collections;
+    this.collectionRunMapper = collectionRunMapper;
+    this.planningWindow = planningWindow;
     this.clock = clock;
   }
 
@@ -83,12 +101,17 @@ public class TrafficReadService {
                     (long) day.clones(),
                     (long) day.uniqueCloners()))
             .toList();
+    CollectionRun latestRun = collections.latestForRepository(repositoryId).orElse(null);
     return new DailyHistoryResponse(
         KpiScope.REPOSITORY,
         Long.toString(repositoryId),
         PeriodParser.parse(period.value()),
         new DateRange(period.from(), period.to()),
-        points);
+        points,
+        latestRun == null
+            ? null
+            : collectionRunMapper.toResponse(collectionRunMapper.toView(latestRun)),
+        trafficGap(repositoryId));
   }
 
   public DailyHistoryResponse ownerDailyHistory(
@@ -131,7 +154,9 @@ public class TrafficReadService {
         Long.toString(ownerId),
         PeriodParser.parse(period.value()),
         new DateRange(period.from(), period.to()),
-        points);
+        points,
+        null,
+        null);
   }
 
   public SnapshotResponse latestReferrers(long repositoryId) {
@@ -141,7 +166,7 @@ public class TrafficReadService {
         SnapshotKind.REFERRERS.name(),
         snapshot.snapshotAt(),
         snapshot.rows().stream()
-            .map(row -> new SnapshotRow(row.referrer(), null, row.views(), row.uniqueVisitors()))
+            .map(row -> new SnapshotRow(row.referrer(), null, row.views(), row.uniqueVisitors(), null))
             .toList());
   }
 
@@ -152,7 +177,14 @@ public class TrafficReadService {
         SnapshotKind.PATHS.name(),
         snapshot.snapshotAt(),
         snapshot.rows().stream()
-            .map(row -> new SnapshotRow(row.path(), row.title(), row.views(), row.uniqueVisitors()))
+            .map(
+                row ->
+                    new SnapshotRow(
+                        row.path(),
+                        row.title(),
+                        row.views(),
+                        row.uniqueVisitors(),
+                        row.servicePath()))
             .toList());
   }
 
@@ -456,8 +488,43 @@ public class TrafficReadService {
     return Math.min(MAX_HISTORY_DAYS, Math.max(1, days));
   }
 
+  private TrafficNotice trafficGap(long repositoryId) {
+    LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
+    CollectionRun todayRun = collections.find(repositoryId, today).orElse(null);
+    CollectionJob trafficJob = null;
+    if (todayRun != null) {
+      for (CollectionJob job : collections.findByRun(todayRun.id())) {
+        if (job.jobType() == CollectionJobType.TRAFFIC) {
+          trafficJob = job;
+        }
+      }
+    }
+    boolean yesterdayStored =
+        traffic
+            .latestDate(repositoryId)
+            .filter(date -> !date.isBefore(today.minusDays(1)))
+            .isPresent();
+    TrafficCompleteness.Notice notice =
+        TrafficCompleteness.status(
+            today,
+            planningWindow.isOpen(),
+            yesterdayStored,
+            TrafficCompleteness.jobState(trafficJob));
+    if (notice == null) {
+      return null;
+    }
+    return new TrafficNotice(notice.reason().name(), notice.date(), notice.lastTrafficDate());
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   public record DailyHistoryResponse(
-      KpiScope scope, String scopeId, Period period, DateRange range, List<DailyPoint> points) {}
+      KpiScope scope,
+      String scopeId,
+      Period period,
+      DateRange range,
+      List<DailyPoint> points,
+      CollectionRunMapper.CollectionRunResponse lastCollection,
+      TrafficNotice trafficGap) {}
 
   @JsonInclude(JsonInclude.Include.ALWAYS)
   public record DailyPoint(
@@ -466,7 +533,9 @@ public class TrafficReadService {
   public record SnapshotResponse(
       String repositoryId, String kind, Instant snapshotAt, List<SnapshotRow> rows) {}
 
-  public record SnapshotRow(String key, String title, int views, int uniqueVisitors) {}
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public record SnapshotRow(
+      String key, String title, int views, int uniqueVisitors, Boolean servicePath) {}
 
   public record SnapshotHistoryResponse(
       String repositoryId,

@@ -14,7 +14,7 @@ export async function resolveRepository(owner: string, repository: string): Prom
     if (ownerCard) {
       const repoCard = await findRepositoryByName(ownerCard.ownerId, repository);
       if (repoCard) {
-        return api<Repository>(`/api/v1/admin/repositories/${repoCard.repositoryId}`);
+        return api<Repository>(`/api/v1/repositories/${repoCard.repositoryId}`);
       }
     }
   } catch (err) {

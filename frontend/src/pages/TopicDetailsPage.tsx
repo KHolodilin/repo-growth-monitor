@@ -60,7 +60,7 @@ export function TopicDetailsPage() {
     }
     const version = generation.current;
     const [repository, topicHistory] = await Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<Repository>(`/api/v1/repositories/${repositoryId}`),
       api<TopicHistory>(
         `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
       ),
@@ -88,7 +88,7 @@ export function TopicDetailsPage() {
     const version = ++generation.current;
     let cancelled = false;
     Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<Repository>(`/api/v1/repositories/${repositoryId}`),
       api<TopicHistory>(
         `/api/v1/repositories/${repositoryId}/topics/${encodeURIComponent(topicName)}/history?scope=${scope}`,
       ),

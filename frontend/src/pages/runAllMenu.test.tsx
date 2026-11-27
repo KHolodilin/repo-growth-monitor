@@ -6,6 +6,7 @@ import { Layout } from "../components/Layout";
 import { AuthProvider } from "../lib/AuthContext";
 import { anonymousMe } from "../lib/auth";
 import { dashboardReady, repository, searchHistory, topicHistory, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 
 const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
@@ -70,7 +71,8 @@ beforeEach(() => {
       return Promise.resolve(dashboardReady);
     if (/\/repositories\/\d+$/.test(path))
       return Promise.resolve({ ...repository, id: path.endsWith("/8") ? 8 : 13 });
-    if (path.includes("/traffic?")) return Promise.resolve(traffic);
+    const trafficBundle = respondTrafficResources(path, traffic);
+    if (trafficBundle !== undefined) return Promise.resolve(trafficBundle);
     if (path.includes("/search-queries"))
       return Promise.resolve(empty ? [] : [{ ...searchHistory, searchStatus: status }]);
     if (path.includes("/topic-watches"))

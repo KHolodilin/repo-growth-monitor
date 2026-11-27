@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { dashboardReady, repository, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { emptyCursorPage, isOwnersCatalog, respondCatalogResolve } from "../test/repoRoutes";
 import { DashboardPage } from "./DashboardPage";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
@@ -169,11 +170,12 @@ describe("portfolio highlights", () => {
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("growth-events")) {
         return Promise.resolve([
@@ -211,11 +213,12 @@ describe("portfolio highlights", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });

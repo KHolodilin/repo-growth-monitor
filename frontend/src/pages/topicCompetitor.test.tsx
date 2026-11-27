@@ -3,11 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, topicHistory, topicResults } from "../test/fixtures";
-import {
+import { 
   respondCatalogResolve,
   emptyCursorPage,
-  isOwnersCatalog,
-} from "../test/repoRoutes";
+  isOwnersCatalog, respondCatalogSwitcher } from "../test/repoRoutes";
 import { TopicCompetitorCardPage } from "./TopicCompetitorCardPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
 
@@ -76,16 +75,11 @@ function mockTopicApi(competitor: unknown = card) {
       url.toLowerCase().includes("other") ? other.id : repository.id,
     );
     if (catalog) return Promise.resolve(catalog);
+    const switcher = respondCatalogSwitcher(url, [repository, other]);
+    if (switcher) return Promise.resolve(switcher);
     if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-    if (
-      url.includes("/admin/repositories?refresh") ||
-      url.includes("/admin/repositories?refresh=false")
-    ) {
-      return Promise.resolve([repository, other]);
-    }
-    if (url.includes("/admin/repositories?")) return Promise.resolve([repository, other]);
-    if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
-    if (url.endsWith("/admin/repositories/8")) return Promise.resolve(other);
+    if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
+    if (url.endsWith("/repositories/8")) return Promise.resolve(other);
     if (url.includes("/topics/") && url.includes("/history")) return Promise.resolve(topicHistory);
     if (url.includes("/topics/") && url.includes("/results")) return Promise.resolve(topicResults);
     if (url.includes("/competitors/")) return Promise.resolve(competitor);
@@ -180,13 +174,15 @@ describe("topic competitor card", () => {
   it("shows a missing repository and ignores a cancelled request", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const switcher = respondCatalogSwitcher(url, [repository, other]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/"))
         return Promise.reject(new Error("Repository was not found in this topic"));
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
       return Promise.resolve([]);
     });
@@ -196,11 +192,13 @@ describe("topic competitor card", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const switcher = respondCatalogSwitcher(url, [repository, other]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
       return Promise.reject({ reason: "nope" });
@@ -216,11 +214,13 @@ describe("topic competitor card", () => {
     api.mockReset();
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const switcher = respondCatalogSwitcher(url, [repository, other]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
       return Promise.resolve(card);
     });
@@ -246,6 +246,8 @@ describe("topic competitor card", () => {
     };
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const switcher = respondCatalogSwitcher(url, [repository, other]);
+      if (switcher) return Promise.resolve(switcher);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       const catalog = respondCatalogResolve(url);
       if (catalog) return Promise.resolve(catalog);
@@ -258,7 +260,7 @@ describe("topic competitor card", () => {
         return new Promise<unknown>((_, reject) => {
           late.fail = reject;
         });
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
       return Promise.resolve([]);
     });

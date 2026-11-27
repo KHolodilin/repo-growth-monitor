@@ -19,6 +19,8 @@ import {
   topicHistory,
   traffic,
 } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
+import { respondCatalogSwitcher } from "../test/repoRoutes";
 import { respondKpi } from "../test/kpiFixtures";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 import { RepositoriesPage } from "./RepositoriesPage";
@@ -118,7 +120,7 @@ describe("extra coverage", () => {
 
   it("covers repo switcher search keyboard and errors", async () => {
     const user = userEvent.setup();
-    api.mockResolvedValue([
+    const switcherRepos = [
       repository,
       {
         ...repository,
@@ -129,7 +131,12 @@ describe("extra coverage", () => {
         visibility: "PRIVATE",
       },
       { ...repository, id: 9, name: "extra", fullName: "KHolodilin/extra", trackingEnabled: true },
-    ]);
+    ];
+    api.mockImplementation((path: string) => {
+      const switcher = respondCatalogSwitcher(String(path), switcherRepos);
+      if (switcher) return Promise.resolve(switcher);
+      return Promise.reject(new Error(`unexpected ${path}`));
+    });
     const view = render(
       <MemoryRouter initialEntries={["/admin/repositories/13"]}>
         <Routes>
@@ -161,6 +168,7 @@ describe("extra coverage", () => {
     fireEvent.keyDown(search, { key: "Enter" });
     view.unmount();
 
+    api.mockReset();
     api.mockRejectedValueOnce(new Error("switcher down"));
     render(
       <MemoryRouter>
@@ -184,7 +192,7 @@ describe("extra coverage", () => {
       if (url.includes("/run")) {
         return Promise.reject(new Error("run failed"));
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
       if (url.includes("/topics/") && url.includes("history")) {
@@ -285,7 +293,7 @@ describe("extra coverage", () => {
       if (url.includes("/topic-watches/run")) {
         return Promise.reject(new Error("topics failed"));
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve({
           ...repository,
           githubUrl: undefined,
@@ -293,8 +301,7 @@ describe("extra coverage", () => {
           lastCommitAt: undefined,
         });
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({
+      const trafficBundle = respondTrafficResources(url, {
           ...traffic,
           lastCollection: {
             ...traffic.lastCollection,
@@ -312,6 +319,8 @@ describe("extra coverage", () => {
             ],
           },
         });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("search-queries")) {
         return Promise.resolve([searchHistory]);
@@ -388,11 +397,12 @@ describe("extra coverage", () => {
       if (String(path).includes("/collections") || /\/collect(?:\?|$)/.test(String(path))) {
         return Promise.reject(new Error("collect failed"));
       }
-      if (String(path).endsWith("/admin/repositories/13")) {
+      if (String(path).endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (String(path).includes("/traffic?")) {
-        return Promise.resolve({ ...traffic, lastCollection: undefined });
+      const trafficBundle = respondTrafficResources(String(path), { ...traffic, lastCollection: undefined });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });
@@ -404,11 +414,10 @@ describe("extra coverage", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({
+      const trafficBundle = respondTrafficResources(url, {
           ...traffic,
           lastCollection: {
             ...traffic.lastCollection,
@@ -416,6 +425,8 @@ describe("extra coverage", () => {
             jobs: [{ jobType: "TRAFFIC", status: "RUNNING" }],
           },
         });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("topic-watches")) {
         return Promise.resolve([topicHistory]);
@@ -648,11 +659,12 @@ describe("extra coverage", () => {
       if (kpi !== undefined) {
         return Promise.resolve(kpi);
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("search-queries")) {
         return Promise.resolve([

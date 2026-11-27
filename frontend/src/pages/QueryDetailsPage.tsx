@@ -60,7 +60,7 @@ export function QueryDetailsPage() {
       return;
     }
     const [repository, queryHistory] = await Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<Repository>(`/api/v1/repositories/${repositoryId}`),
       api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`),
     ]);
     setRepo(repository);
@@ -86,7 +86,7 @@ export function QueryDetailsPage() {
     const abort = new AbortController();
     let cancelled = false;
     Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`, { signal: abort.signal }),
+      api<Repository>(`/api/v1/repositories/${repositoryId}`, { signal: abort.signal }),
       api<SearchHistory>(`/api/v1/search-queries/${queryId}/history`, {
         signal: abort.signal,
       }),

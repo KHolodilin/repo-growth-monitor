@@ -22,6 +22,7 @@ import { chartCsv } from "../lib/chartExport";
 import { withCollectionWarning } from "../lib/chartPresentation";
 import type { SnapshotHistory } from "../lib/api";
 import { dashboardReady, repository, searchHistory, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
 import { respondKpi } from "../test/kpiFixtures";
 
@@ -122,10 +123,11 @@ function respond(path: string) {
     return [];
   }
   if (isOwnersCatalog(url)) return emptyCursorPage;
-  if (url.endsWith("/admin/repositories/13")) return publishedRepo;
+  if (url.endsWith("/repositories/13")) return publishedRepo;
   if (url.includes("/admin/repositories?") || url.includes("/admin/repositories?refresh"))
     return [publishedRepo];
-  if (url.includes("/traffic?")) return { ...traffic, repository: publishedRepo };
+  const trafficBundle = respondTrafficResources(url, { ...traffic, repository: publishedRepo });
+  if (trafficBundle !== undefined) return trafficBundle;
   if (url.includes("search-queries")) return [{ ...searchHistory, repositoryId: 13 }];
   if (url.includes("topic-watches")) return [];
   if (

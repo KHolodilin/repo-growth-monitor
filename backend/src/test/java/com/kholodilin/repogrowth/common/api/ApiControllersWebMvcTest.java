@@ -406,7 +406,6 @@ class ApiControllersWebMvcTest {
                     new CompetitorCardService.CompetitorPoint(LocalDate.of(2026, 9, 23), 10, 2))));
     when(analyticsService.dashboard(anyString(), any(), anyBoolean())).thenReturn(null);
     when(analyticsService.portfolio(anyString(), anyBoolean())).thenReturn(null);
-    when(adminTrafficService.traffic(eq(13L), anyString(), anyBoolean())).thenReturn(null);
     when(adminTrafficService.snapshotHistory(eq(13L), any(), any(), any(), anyBoolean()))
         .thenReturn(null);
     when(adminStatsHistoryService.statsHistory(eq(13L), anyString())).thenReturn(null);
@@ -513,7 +512,6 @@ class ApiControllersWebMvcTest {
     mockMvc.perform(get("/api/v1/topic-runs/3/results")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/dashboard")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/portfolio")).andExpect(status().isOk());
-    mockMvc.perform(get("/api/v1/repositories/13/traffic")).andExpect(status().isOk());
     mockMvc
         .perform(get("/api/v1/repositories/13/traffic/snapshot-history"))
         .andExpect(status().isOk());

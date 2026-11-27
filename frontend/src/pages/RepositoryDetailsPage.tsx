@@ -98,6 +98,7 @@ import {
 } from "../lib/topicScope";
 import { trafficChartOption } from "../lib/trafficChart";
 import { repositoryGapText, trafficJobWarning } from "../lib/trafficGap";
+import { fetchRepositoryTrafficResources } from "../lib/repositoryTrafficBundle";
 import { useServicePaths } from "../lib/servicePathPrefs";
 import { QUERY_SORT_KEYS, compareQueryRows, sortTopicHistories } from "../lib/querySort";
 import { useTableSort } from "../lib/tableSortPrefs";
@@ -146,11 +147,8 @@ function fetchRepositoryDetailsBundle(
   signal: AbortSignal,
 ): Promise<RepositoryDetailsBundle> {
   return Promise.all([
-    api<Repository>(`/api/v1/admin/repositories/${id}`, { signal }),
-    api<RepositoryTraffic>(
-      `/api/v1/repositories/${id}/traffic?period=${period}&includeServicePaths=${showServicePaths}`,
-      { signal },
-    ),
+    api<Repository>(`/api/v1/repositories/${id}`, { signal }),
+    fetchRepositoryTrafficResources(id, period, showServicePaths, signal),
     api<SearchHistory[]>(`/api/v1/repositories/${id}/search-queries?include=history`, { signal }),
     api<TopicHistory[]>(`/api/v1/repositories/${id}/topic-watches?scope=all&include=history`, {
       signal,

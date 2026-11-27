@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Layout } from "../components/Layout";
 import { TOKEN_MISSING, TOKEN_REJECTED, TRAFFIC_PERMISSION } from "../lib/githubAccess";
 import { dashboardReady, repository, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { DashboardPage } from "./DashboardPage";
 import { RepositoriesPage } from "./RepositoriesPage";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
@@ -299,15 +300,16 @@ describe("repository filters", () => {
       if (url.includes("/system/status")) {
         return Promise.resolve({ tokenState: "OK", rateLimitReset: "2026-10-16T18:00:00Z" });
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve({
           ...repository,
           accessible: false,
           trafficPermissionMissing: true,
         });
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve(traffic);
+      const trafficBundle = respondTrafficResources(url, traffic);
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });
@@ -447,11 +449,12 @@ describe("repository filters", () => {
       if (url.includes("/system/status")) {
         return Promise.resolve({ tokenState: "REJECTED", rateLimitReset: null });
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({ ...traffic, lastCollection: undefined });
+      const trafficBundle = respondTrafficResources(url, { ...traffic, lastCollection: undefined });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });
@@ -476,11 +479,12 @@ describe("repository filters", () => {
           releaseDetails = resolve;
         });
       }
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve({ ...repository, accessible: true, trafficPermissionMissing: true });
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({ ...traffic, lastCollection: undefined });
+      const trafficBundle = respondTrafficResources(url, { ...traffic, lastCollection: undefined });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });

@@ -105,19 +105,6 @@ public class TrafficController {
   }
 
   /**
-   * Legacy composite traffic card used by Repository Details. Prefer KPI/referrers/paths once FE
-   * consumes those shapes; no {@code /admin} prefix.
-   */
-  @GetMapping("/repositories/{repositoryId}/traffic")
-  public AdminTrafficService.RepositoryTrafficSnapshot repositoryTraffic(
-      @PathVariable long repositoryId,
-      @RequestParam(defaultValue = "7d") String period,
-      @RequestParam(defaultValue = "false") boolean includeServicePaths) {
-    access.requireReadable(repositoryId, PublicationService.Module.TRAFFIC);
-    return adminTraffic.traffic(repositoryId, period, includeServicePaths);
-  }
-
-  /**
    * Legacy combined referrer/path history ({@code ?kind=}). Prefer referrer-history / path-history.
    */
   @GetMapping("/repositories/{repositoryId}/traffic/snapshot-history")

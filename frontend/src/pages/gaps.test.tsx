@@ -10,6 +10,7 @@ import {
   topicResults,
   traffic,
 } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { GrowthEventSettingsCard } from "../components/GrowthEventSettingsCard";
 import { Layout } from "../components/Layout";
 import { PersistentECharts } from "../components/PersistentECharts";
@@ -435,7 +436,7 @@ describe("coverage gaps", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve({
           ...repository,
           language: "Java",
@@ -446,13 +447,14 @@ describe("coverage gaps", () => {
           },
         });
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({
+      const trafficBundle = respondTrafficResources(url, {
           ...traffic,
           lastCollection: undefined,
           pathSnapshotAt: undefined,
           referrerSnapshotAt: undefined,
         });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       if (url.includes("/search/kpi") || url.includes("/topics/kpi") || url.includes("/stats/kpi")) {
         return Promise.resolve(respondKpi(url));
@@ -497,12 +499,12 @@ describe("coverage gaps", () => {
     expect(screen.queryByRole("button", { name: "Collect now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
     const loadsBefore = api.mock.calls.filter((call) =>
-      String(call[0]).endsWith("/admin/repositories/13"),
+      String(call[0]).endsWith("/repositories/13"),
     ).length;
     window.dispatchEvent(new Event("repos-collected"));
     await waitFor(() => {
       const loadsAfter = api.mock.calls.filter((call) =>
-        String(call[0]).endsWith("/admin/repositories/13"),
+        String(call[0]).endsWith("/repositories/13"),
       ).length;
       expect(loadsAfter).toBeGreaterThan(loadsBefore);
     });

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, searchHistory, topicHistory, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { repoBase } from "../test/repoRoutes";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 const state = vi.hoisted(() => ({ api: vi.fn(), admin: false, busy: false }));
@@ -45,9 +46,10 @@ beforeEach(() => {
     vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
   );
   state.api.mockImplementation((url: string) => {
-    if (url.endsWith("/admin/repositories/13"))
+    if (url.endsWith("/repositories/13"))
       return Promise.resolve({ ...repository, language: "Java" });
-    if (url.includes("/traffic?")) return Promise.resolve(traffic);
+    const trafficBundle = respondTrafficResources(url, traffic);
+    if (trafficBundle !== undefined) return Promise.resolve(trafficBundle);
     if (url.includes("/search-queries"))
       return Promise.resolve([
         { ...searchHistory, searchStatus: state.busy ? "RUNNING" : undefined },

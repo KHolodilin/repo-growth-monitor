@@ -50,7 +50,7 @@ export function TopicCompetitorCardPage() {
     let cancelled = false;
     const topicPath = encodeURIComponent(topicName);
     Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${repositoryId}`),
+      api<Repository>(`/api/v1/repositories/${repositoryId}`),
       api<TopicHistory>(
         `/api/v1/repositories/${repositoryId}/topics/${topicPath}/history?scope=${scope}`,
       ),

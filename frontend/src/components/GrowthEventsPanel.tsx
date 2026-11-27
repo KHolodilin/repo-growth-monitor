@@ -4,9 +4,9 @@ import {
   type GrowthEvent,
   type ManualGrowthEventRequest,
   type RepositoryStatsHistory,
-  type RepositoryTraffic,
   type SearchHistory,
 } from "../lib/api";
+import { dailyPointsToTraffic } from "../lib/repositoryTrafficBundle";
 import {
   eventWindowComparison,
   signedCount,
@@ -323,19 +323,27 @@ export function EventDetailsDialog({
     let cancelled = false;
     const day = today ?? new Date().toISOString().slice(0, 10);
     Promise.all([
-      api<RepositoryTraffic>(`/api/v1/repositories/${repositoryId}/traffic?period=all`),
+      api<{
+        points?: {
+          date: string;
+          views: number | null;
+          visitors: number | null;
+          clones: number | null;
+          uniqueCloners: number | null;
+        }[];
+      }>(`/api/v1/repositories/${repositoryId}/traffic-history?period=all`),
       api<RepositoryStatsHistory>(
         `/api/v1/repositories/${repositoryId}/stats-history?period=all`,
       ),
       api<SearchHistory[]>(`/api/v1/repositories/${repositoryId}/search-queries?include=history`),
     ])
-      .then(([traffic, stats, queries]) => {
+      .then(([history, stats, queries]) => {
         if (cancelled) {
           return;
         }
         const trafficDays =
-          traffic && typeof traffic === "object" && Array.isArray(traffic.traffic)
-            ? traffic.traffic
+          history && typeof history === "object" && Array.isArray(history.points)
+            ? dailyPointsToTraffic(history.points)
             : [];
         const starDays =
           stats && typeof stats === "object" && Array.isArray(stats.points) ? stats.points : [];

@@ -77,7 +77,7 @@ export function TrafficHistoryPage() {
     }
     let cancelled = false;
     Promise.all([
-      api<Repository>(`/api/v1/admin/repositories/${id}`),
+      api<Repository>(`/api/v1/repositories/${id}`),
       api<SnapshotHistory>(
         kind === "paths"
           ? `/api/v1/repositories/${id}/path-history?period=${period}&includeServicePaths=${includeService}`

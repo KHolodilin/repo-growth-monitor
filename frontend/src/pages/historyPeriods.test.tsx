@@ -4,11 +4,10 @@ import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrafficHistoryPage } from "./TrafficHistoryPage";
 import { repository, snapshotHistory } from "../test/fixtures";
-import {
+import { 
   respondCatalogResolve,
   emptyCursorPage,
-  isOwnersCatalog,
-} from "../test/repoRoutes";
+  isOwnersCatalog, respondCatalogSwitcher } from "../test/repoRoutes";
 import { writeStoredRepoPeriod, PERIODS } from "../components/PeriodSelector";
 import { periodDates } from "../lib/period";
 import * as downloads from "../lib/chartExport";
@@ -96,6 +95,8 @@ beforeEach(() => {
   api.mockImplementation((url: string) => {
     const catalog = respondCatalogResolve(url);
     if (catalog) return Promise.resolve(catalog);
+    const switcher = respondCatalogSwitcher(url, [repository]);
+    if (switcher) return Promise.resolve(switcher);
     if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
     if (
       url.includes("traffic-history") ||
@@ -104,7 +105,7 @@ beforeEach(() => {
     ) {
       return Promise.resolve(data(url));
     }
-    if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+    if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
     return Promise.resolve([]);
   });
 });
@@ -196,6 +197,8 @@ it("uses the saved period for an empty archive and keeps the empty state honest"
   api.mockImplementation((url: string) => {
     const catalog = respondCatalogResolve(url);
     if (catalog) return Promise.resolve(catalog);
+    const switcher = respondCatalogSwitcher(url, [repository]);
+    if (switcher) return Promise.resolve(switcher);
     if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
     if (
       url.includes("traffic-history") ||
@@ -204,7 +207,7 @@ it("uses the saved period for an empty archive and keeps the empty state honest"
     ) {
       return Promise.resolve({ ...snapshotHistory, dates: [], rows: [] });
     }
-    if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+    if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
     return Promise.resolve([]);
   });
   mount();
@@ -249,7 +252,8 @@ it("does not apply a late response from an older period", async () => {
 it("keeps kind and selected period when switching repositories", async () => {
   const original = api.getMockImplementation()!;
   api.mockImplementation(async (url: string) => {
-    if (url.includes("/admin/repositories?")) return [repository];
+    const switcher = respondCatalogSwitcher(String(url), [repository]);
+    if (switcher) return switcher;
     return (await original(url)) as unknown;
   });
   const user = userEvent.setup();

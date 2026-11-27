@@ -16,6 +16,7 @@ import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.OwnerType;
 import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
 import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService.OwnerRow;
@@ -26,6 +27,7 @@ import com.kholodilin.repogrowth.common.api.GlobalExceptionHandler;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
@@ -131,6 +133,12 @@ class CatalogControllerTest {
 
     doNothing().when(access).requireReadable(13L, PublicationService.Module.DASHBOARD);
     when(repositories.get(13L)).thenReturn(repository);
+    when(repositories.owner(1L)).thenReturn(owner);
+    when(repositories.signalsFor(List.of(13L)))
+        .thenReturn(Map.of(13L, new RepositorySignals(true, false)));
+    when(repositories.topics(13L)).thenReturn(List.of("java", "outbox"));
+    when(health.forRepository(repository))
+        .thenReturn(new RepositoryHealthResponse(List.of(), List.of()));
     when(activity.classify(false, repository.activityAt())).thenReturn(ActivityStatus.ACTIVE);
     when(publication.allows(13L, PublicationService.Module.DASHBOARD)).thenReturn(true);
     when(publication.allows(13L, PublicationService.Module.TRAFFIC)).thenReturn(true);
@@ -141,7 +149,18 @@ class CatalogControllerTest {
     mockMvc
         .perform(get("/api/v1/repositories/13"))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(13))
+        .andExpect(jsonPath("$.githubId").value(99))
         .andExpect(jsonPath("$.fullName").value("acme/outbox"))
+        .andExpect(jsonPath("$.stars").value(21))
+        .andExpect(jsonPath("$.trackingEnabled").value(true))
+        .andExpect(jsonPath("$.accessible").value(true))
+        .andExpect(jsonPath("$.trafficPermissionMissing").value(false))
+        .andExpect(jsonPath("$.githubUrl").value("https://github.com/acme/outbox"))
+        .andExpect(jsonPath("$.activityStatus").value("ACTIVE"))
+        .andExpect(jsonPath("$.topics[0]").value("java"))
+        .andExpect(jsonPath("$.owner.id").value(1))
+        .andExpect(jsonPath("$.owner.login").value("acme"))
         .andExpect(jsonPath("$.modules.topics").value(true))
         .andExpect(jsonPath("$.modules.referrers").value(false));
   }

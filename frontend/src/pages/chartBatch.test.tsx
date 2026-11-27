@@ -16,6 +16,7 @@ import {
   topicResults,
   traffic,
 } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
 vi.mock("../lib/api", async (original) => ({
   ...(await original<typeof import("../lib/api")>()),
@@ -45,26 +46,30 @@ describe("chart batch integration", () => {
     const user = userEvent.setup();
     let finishOld: (value: unknown) => void = () => {};
     api.mockImplementation((url: string) => {
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
-      if (url.includes("/traffic?")) {
-        if (url.includes("period=30d"))
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
+      if (url.includes("/traffic/kpi") || url.includes("/traffic-history") || url.includes("/referrers") || (/\/paths(?:\?|$)/.test(url))) {
+        const fixture = url.includes("period=1d")
+          ? {
+              ...traffic,
+              traffic: [
+                {
+                  date: "2026-11-02",
+                  views: null,
+                  uniqueVisitors: null,
+                  clones: 8,
+                  uniqueCloners: null,
+                },
+              ],
+            }
+          : traffic;
+        if (url.includes("period=30d") && (url.includes("/traffic/kpi") || url.includes("/traffic-history"))) {
           return new Promise((resolve) => {
-            finishOld = resolve;
+            finishOld = (value) =>
+              resolve(respondTrafficResources(url, value as typeof traffic) ?? value);
           });
-        if (url.includes("period=1d"))
-          return Promise.resolve({
-            ...traffic,
-            traffic: [
-              {
-                date: "2026-11-02",
-                views: null,
-                uniqueVisitors: null,
-                clones: 8,
-                uniqueCloners: null,
-              },
-            ],
-          });
-        return Promise.resolve(traffic);
+        }
+        const trafficBundle = respondTrafficResources(url, fixture);
+        if (trafficBundle !== undefined) return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });
@@ -87,7 +92,7 @@ describe("chart batch integration", () => {
   it("uses the compact mobile summary in both detail pages and updates it when Topic scope changes", async () => {
     const user = userEvent.setup();
     api.mockImplementation((url: string) => {
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history"))
         return Promise.resolve(
           url.includes("/topics/")
@@ -140,7 +145,7 @@ describe("query metric labels", () => {
   it("keeps selected competitors while cycling metric headings and restores the metric from its URL", async () => {
     const user = userEvent.setup();
     api.mockImplementation((url: string) => {
-      if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+      if (url.endsWith("/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(searchHistory);
       if (url.includes("/results")) return Promise.resolve(searchResults);
       return Promise.resolve([]);

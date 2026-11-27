@@ -3,14 +3,17 @@ package com.kholodilin.repogrowth.catalog.controller;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
+import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.service.OwnerDirectoryService;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
+import com.kholodilin.repogrowth.catalog.service.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.common.model.page.CursorPage;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,6 +44,43 @@ public class CatalogController {
       boolean fork,
       String activityStatus,
       Modules modules) {}
+
+  /**
+   * Rich repository About for detail pages. Numeric {@code id}/{@code owner.id} match the FE {@code
+   * Repository} contract so ordinary dashboard reads can leave admin GET.
+   */
+  public record RepositoryAbout(
+      long id,
+      long githubId,
+      String name,
+      String fullName,
+      String description,
+      String visibility,
+      String defaultBranch,
+      String language,
+      boolean fork,
+      boolean archived,
+      int stars,
+      int watchers,
+      int forks,
+      int contributors,
+      int openIssues,
+      boolean trackingEnabled,
+      boolean accessible,
+      boolean trafficPermissionMissing,
+      Instant githubCreatedAt,
+      Instant githubUpdatedAt,
+      Instant lastCommitAt,
+      String githubUrl,
+      String activityStatus,
+      Instant lastActivityAt,
+      List<String> topics,
+      RepositoryHealthResponse health,
+      OwnerDetail owner,
+      Modules modules) {}
+
+  public record OwnerDetail(
+      long id, long githubId, String login, String ownerType, String avatarUrl, String htmlUrl) {}
 
   public record Modules(
       boolean dashboard, boolean traffic, boolean referrers, boolean paths, boolean topics) {}
@@ -111,10 +151,12 @@ public class CatalogController {
   }
 
   @GetMapping("/repositories/{repositoryId}")
-  public RepositoryCard repository(@PathVariable String repositoryId) {
+  public RepositoryAbout repository(@PathVariable String repositoryId) {
     long id = parseId(repositoryId, "repositoryId");
     access.requireReadable(id, PublicationService.Module.DASHBOARD);
-    return toCard(repositories.get(id));
+    Repository repository = repositories.get(id);
+    RepositorySignals signals = repositories.signalsFor(List.of(id)).get(id);
+    return toAbout(repository, signals);
   }
 
   @GetMapping("/repositories/{repositoryId}/health")
@@ -138,16 +180,46 @@ public class CatalogController {
     }
   }
 
+  private RepositoryAbout toAbout(Repository repository, RepositorySignals signals) {
+    GitHubOwner owner = repositories.owner(repository.ownerId());
+    return new RepositoryAbout(
+        repository.id(),
+        repository.githubId(),
+        repository.name(),
+        repository.fullName(),
+        repository.description(),
+        repository.visibility(),
+        repository.defaultBranch(),
+        repository.language(),
+        repository.fork(),
+        repository.archived(),
+        repository.stars(),
+        repository.watchers(),
+        repository.forks(),
+        repository.contributors(),
+        repository.openIssues(),
+        repository.trackingEnabled(),
+        signals == null || signals.accessible(),
+        signals != null && signals.trafficPermissionMissing(),
+        repository.githubCreatedAt(),
+        repository.githubUpdatedAt(),
+        repository.lastCommitAt(),
+        "https://github.com/" + repository.fullName(),
+        activity.classify(repository.archived(), repository.activityAt()).name(),
+        repository.activityAt(),
+        repositories.topics(repository.id()),
+        health.forRepository(repository),
+        new OwnerDetail(
+            owner.id(),
+            owner.githubId(),
+            owner.login(),
+            owner.ownerType() == null ? null : owner.ownerType().name(),
+            owner.avatarUrl(),
+            owner.htmlUrl()),
+        modulesFor(repository.id()));
+  }
+
   private RepositoryCard toCard(Repository repository) {
-    String activityStatus =
-        activity.classify(repository.archived(), repository.activityAt()).name();
-    Modules modules =
-        new Modules(
-            publication.allows(repository.id(), PublicationService.Module.DASHBOARD),
-            publication.allows(repository.id(), PublicationService.Module.TRAFFIC),
-            publication.allows(repository.id(), PublicationService.Module.REFERRERS),
-            publication.allows(repository.id(), PublicationService.Module.PATHS),
-            publication.allows(repository.id(), PublicationService.Module.TOPICS));
     return new RepositoryCard(
         Long.toString(repository.id()),
         Long.toString(repository.ownerId()),
@@ -157,8 +229,17 @@ public class CatalogController {
         repository.language(),
         repository.archived(),
         repository.fork(),
-        activityStatus,
-        modules);
+        activity.classify(repository.archived(), repository.activityAt()).name(),
+        modulesFor(repository.id()));
+  }
+
+  private Modules modulesFor(long repositoryId) {
+    return new Modules(
+        publication.allows(repositoryId, PublicationService.Module.DASHBOARD),
+        publication.allows(repositoryId, PublicationService.Module.TRAFFIC),
+        publication.allows(repositoryId, PublicationService.Module.REFERRERS),
+        publication.allows(repositoryId, PublicationService.Module.PATHS),
+        publication.allows(repositoryId, PublicationService.Module.TOPICS));
   }
 
   private static CursorPage<RepositoryCard> page(

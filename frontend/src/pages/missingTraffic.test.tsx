@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { dashboardReady, repository, traffic } from "../test/fixtures";
+import { respondTrafficResources } from "../test/trafficResources";
 import { DashboardPage } from "./DashboardPage";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 
@@ -94,11 +95,10 @@ describe("missing traffic", () => {
   it("explains a missing yesterday on the repository page without drawing it as zero", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({
+      const trafficBundle = respondTrafficResources(url, {
           ...traffic,
           traffic: [
             { date: "2026-10-17", views: 4, uniqueVisitors: 2, clones: 1, uniqueCloners: 1 },
@@ -118,6 +118,8 @@ describe("missing traffic", () => {
             ],
           },
         });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });
@@ -139,11 +141,10 @@ describe("missing traffic", () => {
   it("says the collection never started after the window closed", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.endsWith("/admin/repositories/13")) {
+      if (url.endsWith("/repositories/13")) {
         return Promise.resolve(repository);
       }
-      if (url.includes("/traffic?")) {
-        return Promise.resolve({
+      const trafficBundle = respondTrafficResources(url, {
           ...traffic,
           trafficGap: {
             reason: "COLLECTION_NOT_EXECUTED",
@@ -151,6 +152,8 @@ describe("missing traffic", () => {
             lastTrafficDate: null,
           },
         });
+      if (trafficBundle !== undefined) {
+        return Promise.resolve(trafficBundle);
       }
       return Promise.resolve([]);
     });

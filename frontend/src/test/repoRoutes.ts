@@ -1,3 +1,4 @@
+import type { Repository } from "../lib/api";
 import { repository } from "./fixtures";
 
 /** Canonical in-app base for the shared fixture repository. */
@@ -12,7 +13,72 @@ export function isOwnersCatalog(url: string) {
   if (path.includes("login=") || path.includes("name=")) {
     return false;
   }
+  // RepoSwitcher directory pages are handled by respondCatalogSwitcher.
+  if (isCatalogSwitcherUrl(path)) {
+    return false;
+  }
   return path.includes("/api/v1/owners");
+}
+
+function isCatalogSwitcherUrl(path: string) {
+  if (path.includes("login=") || path.includes("name=")) {
+    return false;
+  }
+  if (/\/api\/v1\/owners\?/.test(path) && path.includes("limit=")) {
+    return true;
+  }
+  return /\/api\/v1\/owners\/[^/]+\/repositories\?/.test(path) && path.includes("limit=");
+}
+
+function toSwitcherCard(repo: Repository) {
+  return {
+    repositoryId: String(repo.id),
+    ownerId: String(repo.owner.id),
+    name: repo.name,
+    fullName: repo.fullName,
+    description: repo.description ?? null,
+    language: repo.language ?? null,
+    archived: repo.archived,
+    fork: repo.fork,
+    activityStatus: repo.activityStatus ?? "ACTIVE",
+    modules: {
+      dashboard: true,
+      traffic: true,
+      referrers: true,
+      paths: true,
+      topics: true,
+    },
+  };
+}
+
+/**
+ * Catalog owners/repos pages used by RepoSwitcher after leaving admin list GET.
+ * Pass extra repositories (e.g. id 8 "other") when the test switches between them.
+ */
+export function respondCatalogSwitcher(url: string, repos: Repository[] = [repository]) {
+  const path = String(url);
+  if (!isCatalogSwitcherUrl(path)) {
+    return null;
+  }
+  if (/\/api\/v1\/owners\?/.test(path) && !path.includes("/repositories")) {
+    const owners = new Map<string, { ownerId: string; login: string }>();
+    for (const repo of repos) {
+      owners.set(String(repo.owner.id), {
+        ownerId: String(repo.owner.id),
+        login: repo.owner.login,
+      });
+    }
+    return { items: [...owners.values()], nextCursor: null };
+  }
+  const ownerMatch = path.match(/\/api\/v1\/owners\/([^/]+)\/repositories\?/);
+  if (ownerMatch) {
+    const ownerId = ownerMatch[1];
+    return {
+      items: repos.filter((repo) => String(repo.owner.id) === ownerId).map(toSwitcherCard),
+      nextCursor: null,
+    };
+  }
+  return null;
 }
 
 /** Catalog login/name lookup used by resolveRepository after /public/resolve removal. */
