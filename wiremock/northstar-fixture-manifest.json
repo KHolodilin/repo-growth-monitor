@@ -80,9 +80,19 @@
     "collect",
     "chart-period-switch",
     "referrers-paths",
+    "search-topics-events",
     "owner-directory"
   ],
   "determinism": "values from stable formulas; timestamps use WireMock now-relative offsets so same calendar day repeats",
   "referrers": true,
-  "paths": true
+  "paths": true,
+  "search": true,
+  "topics": true,
+  "events": true,
+  "directoryOwners": {
+    "count": 30,
+    "loginPattern": "atlas-01..atlas-30",
+    "reposPerOwner": "1 or 2",
+    "seededBy": "NorthstarMockSeed"
+  }
 }
