@@ -78,7 +78,11 @@
   "scenarios": [
     "onboarding",
     "collect",
-    "chart-period-switch"
+    "chart-period-switch",
+    "referrers-paths",
+    "owner-directory"
   ],
-  "determinism": "values from stable formulas; timestamps use WireMock now-relative offsets so same calendar day repeats"
+  "determinism": "values from stable formulas; timestamps use WireMock now-relative offsets so same calendar day repeats",
+  "referrers": true,
+  "paths": true
 }

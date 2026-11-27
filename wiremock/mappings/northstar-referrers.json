@@ -1,0 +1,404 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/pulse-board/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 40,
+            "uniques": 20
+          },
+          {
+            "referrer": "google.com",
+            "count": 25,
+            "uniques": 12
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 10,
+            "uniques": 6
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 5,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 8,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/signal-router/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 43,
+            "uniques": 21
+          },
+          {
+            "referrer": "google.com",
+            "count": 27,
+            "uniques": 13
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 11,
+            "uniques": 7
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 6,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 9,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/lake-ingest/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 46,
+            "uniques": 22
+          },
+          {
+            "referrer": "google.com",
+            "count": 29,
+            "uniques": 14
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 12,
+            "uniques": 8
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 7,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 10,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/edge-cache/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 49,
+            "uniques": 23
+          },
+          {
+            "referrer": "google.com",
+            "count": 31,
+            "uniques": 15
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 13,
+            "uniques": 9
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 8,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 11,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/trust-vault/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 52,
+            "uniques": 24
+          },
+          {
+            "referrer": "google.com",
+            "count": 33,
+            "uniques": 16
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 14,
+            "uniques": 6
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 9,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 12,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/schema-forge/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 55,
+            "uniques": 25
+          },
+          {
+            "referrer": "google.com",
+            "count": 35,
+            "uniques": 17
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 15,
+            "uniques": 7
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 5,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 13,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/fleet-agent/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 58,
+            "uniques": 26
+          },
+          {
+            "referrer": "google.com",
+            "count": 37,
+            "uniques": 18
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 16,
+            "uniques": 8
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 6,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 14,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/chart-kit/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 61,
+            "uniques": 27
+          },
+          {
+            "referrer": "google.com",
+            "count": 39,
+            "uniques": 19
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 17,
+            "uniques": 9
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 7,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 15,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/rank-engine/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 64,
+            "uniques": 28
+          },
+          {
+            "referrer": "google.com",
+            "count": 41,
+            "uniques": 20
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 18,
+            "uniques": 6
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 8,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 16,
+            "uniques": 4
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/audit-ledger/traffic/popular/referrers"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "referrer": "github.com",
+            "count": 67,
+            "uniques": 29
+          },
+          {
+            "referrer": "google.com",
+            "count": 43,
+            "uniques": 21
+          },
+          {
+            "referrer": "chatgpt.com",
+            "count": 19,
+            "uniques": 7
+          },
+          {
+            "referrer": "reddit.com",
+            "count": 9,
+            "uniques": 3
+          },
+          {
+            "referrer": "Other",
+            "count": 17,
+            "uniques": 4
+          }
+        ]
+      }
+    }
+  ]
+}

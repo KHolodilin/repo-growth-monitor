@@ -9,8 +9,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Guards the deterministic northstar mock owner fixture used by docker-compose.mock.yml /
- * WireMock regression (onboarding, collect, chart period switch).
+ * Guards the deterministic northstar mock owner fixture used by docker-compose.mock.yml / WireMock
+ * regression (onboarding, collect, chart period switch).
  */
 class NorthstarWireMockFixtureTest {
 
@@ -35,7 +35,8 @@ class NorthstarWireMockFixtureTest {
 
   @Test
   void northstarTrafficMappingsExposeThirtyDailyPoints() throws Exception {
-    JsonNode views = json.readTree(Files.readString(locate("mappings/northstar-traffic-views.json")));
+    JsonNode views =
+        json.readTree(Files.readString(locate("mappings/northstar-traffic-views.json")));
     assertThat(views.get("mappings")).hasSize(10);
     JsonNode firstViews = views.get("mappings").get(0).at("/response/jsonBody/views");
     assertThat(firstViews).hasSize(30);

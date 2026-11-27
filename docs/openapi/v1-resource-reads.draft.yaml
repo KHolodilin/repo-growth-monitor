@@ -1,0 +1,239 @@
+openapi: 3.1.0
+info:
+  title: Repo Growth Monitor — Resource API (draft)
+  version: 0.0.0-phase1
+  description: |
+    Draft contract for unified `/api/v1` resource reads (anonymous / user / admin).
+    Ops diagnostics remain `/api/v1/admin/*` (ApiSurface.OPS).
+    Collector protocol remains `/internal/v1/*` (ApiSurface.INTERNAL).
+    Not a compatibility layer for legacy `/api/v1/public/**` or admin dashboard GETs.
+servers:
+  - url: /api/v1
+tags:
+  - name: Catalog
+  - name: Traffic
+  - name: Stats
+  - name: Search
+  - name: Topics
+  - name: Events
+  - name: Collection
+  - name: Identity
+paths:
+  /owners:
+    get:
+      tags: [Catalog]
+      summary: Paginated owners directory
+      parameters:
+        - $ref: "#/components/parameters/ExactLogin"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Cursor page of owner cards (hidden owners omitted before paging)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnerCursorPage"
+  /owners/{ownerId}:
+    get:
+      tags: [Catalog]
+      summary: Owner about + available sections
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+      responses:
+        "200":
+          description: Owner card
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /owners/{ownerId}/repositories:
+    get:
+      tags: [Catalog]
+      summary: Owner repositories (exact name filter optional)
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - name: name
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Cursor page of repository cards
+  /repositories/{repositoryId}:
+    get:
+      tags: [Catalog]
+      summary: Repository about
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+      responses:
+        "200":
+          description: Repository card
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /repositories/{repositoryId}/traffic/kpi:
+    get:
+      tags: [Traffic]
+      summary: Repository Traffic KPI set (typed metrics)
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Typed Traffic KPI payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficKpiResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /repositories/{repositoryId}/traffic-history:
+    get:
+      tags: [Traffic]
+      summary: Daily traffic series
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Daily points
+  /repositories/{repositoryId}/stats/kpi:
+    get:
+      tags: [Stats]
+      summary: Repository Stats KPI set
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Typed Stats KPI payload
+  /me:
+    get:
+      tags: [Identity]
+      summary: Current principal and capabilities
+      responses:
+        "200":
+          description: Me payload
+components:
+  parameters:
+    OwnerId:
+      name: ownerId
+      in: path
+      required: true
+      schema: { type: string }
+    RepositoryId:
+      name: repositoryId
+      in: path
+      required: true
+      schema: { type: string }
+    ExactLogin:
+      name: login
+      in: query
+      description: Exact owner login filter
+      schema: { type: string }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from a previous page
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Period:
+      name: period
+      in: query
+      schema:
+        $ref: "#/components/schemas/Period"
+      description: Default 7d; invalid values are 400 validation errors
+  responses:
+    NotFound:
+      description: Missing or hidden resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    Period:
+      type: string
+      enum: [1d, 7d, 30d, 90d, 1y, all]
+      default: 7d
+    ApiError:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        timestamp: { type: string, format: date-time }
+        traceId: { type: string }
+    DateRange:
+      type: object
+      required: [from, to]
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+    ComparisonRange:
+      type: object
+      properties:
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+    DataStatus:
+      type: string
+      enum: [COMPLETE, PARTIAL, MISSING, NOT_APPLICABLE]
+    Unit:
+      type: string
+      enum: [COUNT, PERCENT, POSITION]
+    KpiChange:
+      type: object
+      properties:
+        absolute: { type: string, description: Decimal string / number }
+        percent: { type: string, nullable: true }
+    Coverage:
+      type: object
+      required: [observed, expected, unit]
+      properties:
+        observed: { type: integer }
+        expected: { type: integer }
+        unit: { type: string }
+    KpiValue:
+      type: object
+      required: [unit, dataStatus]
+      properties:
+        value: { type: string, nullable: true }
+        unit: { $ref: "#/components/schemas/Unit" }
+        dataStatus: { $ref: "#/components/schemas/DataStatus" }
+        change: { $ref: "#/components/schemas/KpiChange" }
+        coverage: { $ref: "#/components/schemas/Coverage" }
+        asOf: { type: string, format: date-time, nullable: true }
+    TrafficMetrics:
+      type: object
+      required: [views, visitors, clones, uniqueCloners]
+      properties:
+        views: { $ref: "#/components/schemas/KpiValue" }
+        visitors: { $ref: "#/components/schemas/KpiValue" }
+        clones: { $ref: "#/components/schemas/KpiValue" }
+        uniqueCloners: { $ref: "#/components/schemas/KpiValue" }
+    TrafficKpiResponse:
+      type: object
+      required: [scope, scopeId, period, range, metrics]
+      properties:
+        scope: { type: string, enum: [OWNER, REPOSITORY] }
+        scopeId: { type: string }
+        period: { $ref: "#/components/schemas/Period" }
+        range: { $ref: "#/components/schemas/DateRange" }
+        comparison: { $ref: "#/components/schemas/ComparisonRange" }
+        metrics: { $ref: "#/components/schemas/TrafficMetrics" }
+    OwnerCard:
+      type: object
+      required: [ownerId, login]
+      properties:
+        ownerId: { type: string }
+        login: { type: string }
+    OwnerCursorPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OwnerCard" }
+        nextCursor: { type: string, nullable: true }

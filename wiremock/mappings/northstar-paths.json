@@ -1,0 +1,394 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/pulse-board/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/pulse-board",
+            "title": "pulse-board",
+            "count": 50,
+            "uniques": 22
+          },
+          {
+            "path": "/northstar/pulse-board/blob/main/README.md",
+            "title": "README",
+            "count": 18,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/pulse-board/issues",
+            "title": "Issues",
+            "count": 7,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/pulse-board/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/signal-router/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/signal-router",
+            "title": "signal-router",
+            "count": 54,
+            "uniques": 23
+          },
+          {
+            "path": "/northstar/signal-router/blob/main/README.md",
+            "title": "README",
+            "count": 19,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/signal-router/issues",
+            "title": "Issues",
+            "count": 8,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/signal-router/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/lake-ingest/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/lake-ingest",
+            "title": "lake-ingest",
+            "count": 58,
+            "uniques": 24
+          },
+          {
+            "path": "/northstar/lake-ingest/blob/main/README.md",
+            "title": "README",
+            "count": 20,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/lake-ingest/issues",
+            "title": "Issues",
+            "count": 9,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/lake-ingest/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/edge-cache/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/edge-cache",
+            "title": "edge-cache",
+            "count": 62,
+            "uniques": 25
+          },
+          {
+            "path": "/northstar/edge-cache/blob/main/README.md",
+            "title": "README",
+            "count": 21,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/edge-cache/issues",
+            "title": "Issues",
+            "count": 10,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/edge-cache/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/trust-vault/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/trust-vault",
+            "title": "trust-vault",
+            "count": 66,
+            "uniques": 26
+          },
+          {
+            "path": "/northstar/trust-vault/blob/main/README.md",
+            "title": "README",
+            "count": 22,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/trust-vault/issues",
+            "title": "Issues",
+            "count": 11,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/trust-vault/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/schema-forge/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/schema-forge",
+            "title": "schema-forge",
+            "count": 70,
+            "uniques": 27
+          },
+          {
+            "path": "/northstar/schema-forge/blob/main/README.md",
+            "title": "README",
+            "count": 23,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/schema-forge/issues",
+            "title": "Issues",
+            "count": 12,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/schema-forge/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/fleet-agent/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/fleet-agent",
+            "title": "fleet-agent",
+            "count": 74,
+            "uniques": 28
+          },
+          {
+            "path": "/northstar/fleet-agent/blob/main/README.md",
+            "title": "README",
+            "count": 24,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/fleet-agent/issues",
+            "title": "Issues",
+            "count": 13,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/fleet-agent/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/chart-kit/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/chart-kit",
+            "title": "chart-kit",
+            "count": 78,
+            "uniques": 29
+          },
+          {
+            "path": "/northstar/chart-kit/blob/main/README.md",
+            "title": "README",
+            "count": 25,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/chart-kit/issues",
+            "title": "Issues",
+            "count": 14,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/chart-kit/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/rank-engine/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/rank-engine",
+            "title": "rank-engine",
+            "count": 82,
+            "uniques": 30
+          },
+          {
+            "path": "/northstar/rank-engine/blob/main/README.md",
+            "title": "README",
+            "count": 26,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/rank-engine/issues",
+            "title": "Issues",
+            "count": 15,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/rank-engine/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/audit-ledger/traffic/popular/paths"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": [
+          {
+            "path": "/northstar/audit-ledger",
+            "title": "audit-ledger",
+            "count": 86,
+            "uniques": 31
+          },
+          {
+            "path": "/northstar/audit-ledger/blob/main/README.md",
+            "title": "README",
+            "count": 27,
+            "uniques": 10
+          },
+          {
+            "path": "/northstar/audit-ledger/issues",
+            "title": "Issues",
+            "count": 16,
+            "uniques": 5
+          },
+          {
+            "path": "/northstar/audit-ledger/graphs/traffic",
+            "title": "Traffic",
+            "count": 3,
+            "uniques": 2
+          }
+        ]
+      }
+    }
+  ]
+}
