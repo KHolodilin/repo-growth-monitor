@@ -16,19 +16,22 @@ describe("resolveRepository", () => {
     api.mockReset();
   });
 
-  it("falls back to the admin list when catalog misses", async () => {
+  it("returns not found when catalog misses the owner", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (url.includes("/api/v1/owners")) return Promise.resolve(emptyCursorPage);
-      if (url.includes("/api/v1/admin/repositories?refresh=false"))
-        return Promise.resolve([repository]);
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
     await expect(
       resolveRepository("KHolodilin", "spring-transactional-outbox-kafka"),
-    ).resolves.toEqual(repository);
-    expect(api).toHaveBeenCalledWith("/api/v1/admin/repositories?refresh=false");
+    ).rejects.toMatchObject({
+      status: 404,
+      message: "Repository not found",
+    });
+    expect(
+      api.mock.calls.map(([path]) => String(path)).some((path) => path.includes("/admin/")),
+    ).toBe(false);
   });
 
   it("returns not found when catalog finds the owner but not the repository", async () => {
@@ -43,9 +46,6 @@ describe("resolveRepository", () => {
       if (url.includes("/repositories?name=")) {
         return Promise.resolve({ items: [], nextCursor: null });
       }
-      if (url.includes("/api/v1/admin/repositories?refresh=false")) {
-        return Promise.resolve([]);
-      }
       return Promise.reject(new Error(`unexpected ${url}`));
     });
     await expect(resolveRepository("Alpha", "missing")).rejects.toMatchObject({
@@ -54,12 +54,12 @@ describe("resolveRepository", () => {
     });
   });
 
-  it("returns not found when catalog misses and the admin list is closed", async () => {
+  it("returns not found after catalog 401 without admin fallback", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.includes("/api/v1/owners")) return Promise.resolve(emptyCursorPage);
-      if (url.includes("/api/v1/admin/repositories?refresh=false"))
+      if (url.includes("/api/v1/owners?login=")) {
         return Promise.reject(new ApiError(401, "Authentication required"));
+      }
       return Promise.reject(new Error(`unexpected ${url}`));
     });
 
@@ -80,29 +80,6 @@ describe("resolveRepository", () => {
     await expect(
       resolveRepository("KHolodilin", "spring-transactional-outbox-kafka"),
     ).rejects.toMatchObject({ status: 500, message: "catalog down" });
-  });
-
-  it("continues after catalog 401 and matches admin list by owner/name", async () => {
-    api.mockImplementation((path: string) => {
-      const url = String(path);
-      if (url.includes("/api/v1/owners?login=")) {
-        return Promise.reject(new ApiError(401, "Authentication required"));
-      }
-      if (url.includes("/api/v1/admin/repositories?refresh=false")) {
-        return Promise.resolve([
-          {
-            ...repository,
-            fullName: "Other/name",
-            owner: { ...repository.owner, login: "KHolodilin" },
-            name: "spring-transactional-outbox-kafka",
-          },
-        ]);
-      }
-      return Promise.reject(new Error(`unexpected ${url}`));
-    });
-    await expect(
-      resolveRepository("KHolodilin", "spring-transactional-outbox-kafka"),
-    ).resolves.toMatchObject({ name: "spring-transactional-outbox-kafka" });
   });
 
   it("prefers catalog owner and repository filters", async () => {
@@ -147,7 +124,7 @@ describe("resolveRepository", () => {
       resolveRepository("KHolodilin", "spring-transactional-outbox-kafka"),
     ).resolves.toEqual(repository);
     expect(
-      api.mock.calls.map(([path]) => String(path)).some((path) => path.includes("/public/")),
+      api.mock.calls.map(([path]) => String(path)).some((path) => path.includes("/admin/")),
     ).toBe(false);
   });
 });
