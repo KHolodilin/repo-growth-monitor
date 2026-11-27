@@ -20,6 +20,7 @@ import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficNotice;
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
+import com.kholodilin.repogrowth.collection.application.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
@@ -80,7 +81,7 @@ public class AnalyticsService {
   private final TrafficJdbcRepository trafficJdbcRepository;
   private final CollectionRunJdbcRepository runRepository;
   private final CollectionJobJdbcRepository jobRepository;
-  private final CollectionController collectionController;
+  private final CollectionRunMapper collectionRunMapper;
   private final ActivityClassifier activityClassifier;
   private final RepositoryHealthService healthService;
   private final PortfolioHighlightsService highlightsService;
@@ -93,7 +94,7 @@ public class AnalyticsService {
       TrafficJdbcRepository trafficJdbcRepository,
       CollectionRunJdbcRepository runRepository,
       CollectionJobJdbcRepository jobRepository,
-      CollectionController collectionController,
+      CollectionRunMapper collectionRunMapper,
       ActivityClassifier activityClassifier,
       RepositoryHealthService healthService,
       PortfolioHighlightsService highlightsService,
@@ -104,7 +105,7 @@ public class AnalyticsService {
     this.trafficJdbcRepository = trafficJdbcRepository;
     this.runRepository = runRepository;
     this.jobRepository = jobRepository;
-    this.collectionController = collectionController;
+    this.collectionRunMapper = collectionRunMapper;
     this.activityClassifier = activityClassifier;
     this.healthService = healthService;
     this.highlightsService = highlightsService;
@@ -221,7 +222,9 @@ public class AnalyticsService {
         referrers.snapshotAt(),
         paths.rows(),
         paths.snapshotAt(),
-        latestRun == null ? null : collectionController.toResponse(latestRun),
+        latestRun == null
+            ? null
+            : CollectionController.toResponse(collectionRunMapper.toView(latestRun)),
         trafficGap(repositoryId));
   }
 

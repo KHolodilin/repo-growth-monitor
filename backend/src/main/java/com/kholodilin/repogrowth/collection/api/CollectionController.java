@@ -1,8 +1,9 @@
 package com.kholodilin.repogrowth.collection.api;
 
-import com.kholodilin.repogrowth.collection.domain.CollectionJob;
+import com.kholodilin.repogrowth.collection.application.CollectionRunMapper;
+import com.kholodilin.repogrowth.collection.application.CollectionRunMapper.CollectionJobView;
+import com.kholodilin.repogrowth.collection.application.CollectionRunMapper.CollectionRunView;
 import com.kholodilin.repogrowth.collection.domain.CollectionRun;
-import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.planner.DailyPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
@@ -24,17 +25,17 @@ public class CollectionController {
   private final PlanningWindow planningWindow;
   private final DailyPlanner dailyPlanner;
   private final CollectionRunJdbcRepository runRepository;
-  private final CollectionJobJdbcRepository jobRepository;
+  private final CollectionRunMapper runMapper;
 
   public CollectionController(
       PlanningWindow planningWindow,
       DailyPlanner dailyPlanner,
       CollectionRunJdbcRepository runRepository,
-      CollectionJobJdbcRepository jobRepository) {
+      CollectionRunMapper runMapper) {
     this.planningWindow = planningWindow;
     this.dailyPlanner = dailyPlanner;
     this.runRepository = runRepository;
-    this.jobRepository = jobRepository;
+    this.runMapper = runMapper;
   }
 
   @org.springframework.web.bind.annotation.ResponseStatus(
@@ -60,33 +61,34 @@ public class CollectionController {
         runRepository
             .findById(id)
             .orElseThrow(() -> ApiException.notFound("Collection run not found"));
-    return toResponse(run);
+    return toResponse(runMapper.toView(run));
   }
 
-  public CollectionRunResponse toResponse(CollectionRun run) {
-    List<CollectionJob> jobs = jobRepository.findByRun(run.id());
+  /** Wire-compatible admin DTO; mapping logic lives in {@link CollectionRunMapper}. */
+  public static CollectionRunResponse toResponse(CollectionRunView view) {
     return new CollectionRunResponse(
-        run.id(),
-        run.repositoryId(),
-        run.businessDate().toString(),
-        run.status().name(),
-        run.plannedJobs(),
-        run.successfulJobs(),
-        run.failedJobs(),
-        run.createdAt(),
-        run.completedAt(),
-        jobs.stream()
-            .map(job ->
-                new CollectionJobResponse(
-                    job.id(),
-                    job.jobType().name(),
-                    job.status().name(),
-                    job.attempt(),
-                    job.errorCode(),
-                    job.errorMessage(),
-                    job.startedAt(),
-                    job.completedAt()))
-            .toList());
+        view.id(),
+        view.repositoryId(),
+        view.businessDate(),
+        view.status(),
+        view.plannedJobs(),
+        view.successfulJobs(),
+        view.failedJobs(),
+        view.createdAt(),
+        view.completedAt(),
+        view.jobs().stream().map(CollectionController::toJobResponse).toList());
+  }
+
+  private static CollectionJobResponse toJobResponse(CollectionJobView job) {
+    return new CollectionJobResponse(
+        job.id(),
+        job.jobType(),
+        job.status(),
+        job.attempt(),
+        job.errorCode(),
+        job.errorMessage(),
+        job.startedAt(),
+        job.completedAt());
   }
 
   public record CollectionRunResponse(

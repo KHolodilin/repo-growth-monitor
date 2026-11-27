@@ -1,0 +1,46 @@
+package com.kholodilin.repogrowth.stats.api;
+
+import com.kholodilin.repogrowth.common.api.ApiSurface;
+import com.kholodilin.repogrowth.stats.application.StatsReadService;
+import com.kholodilin.repogrowth.stats.application.StatsReadService.StatsHistoryResponse;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/** Unified Stats resource reads ({@link ApiSurface#RESOURCE}). */
+@RestController
+@RequestMapping("/api/v1")
+public class StatsController {
+
+  private final StatsReadService stats;
+
+  public StatsController(StatsReadService stats) {
+    this.stats = stats;
+  }
+
+  @GetMapping("/owners/{ownerId}/stats/kpi")
+  public StatsKpiResponse ownerStatsKpi(
+      @PathVariable long ownerId, @RequestParam(defaultValue = "7d") String period) {
+    return stats.ownerKpi(ownerId, period);
+  }
+
+  @GetMapping("/repositories/{repositoryId}/stats/kpi")
+  public StatsKpiResponse repositoryStatsKpi(
+      @PathVariable long repositoryId, @RequestParam(defaultValue = "7d") String period) {
+    return stats.repositoryKpi(repositoryId, period);
+  }
+
+  @GetMapping("/owners/{ownerId}/stats-history")
+  public StatsHistoryResponse ownerStatsHistory(
+      @PathVariable long ownerId, @RequestParam(defaultValue = "7d") String period) {
+    return stats.ownerHistoryResponse(ownerId, period);
+  }
+
+  @GetMapping("/repositories/{repositoryId}/stats-history")
+  public StatsHistoryResponse repositoryStatsHistory(
+      @PathVariable long repositoryId, @RequestParam(defaultValue = "7d") String period) {
+    return stats.repositoryHistoryResponse(repositoryId, period);
+  }
+}

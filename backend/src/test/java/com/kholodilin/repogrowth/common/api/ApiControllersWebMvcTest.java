@@ -21,6 +21,7 @@ import com.kholodilin.repogrowth.analytics.api.AnalyticsController;
 import com.kholodilin.repogrowth.analytics.application.AnalyticsService;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.collection.api.CollectionController;
+import com.kholodilin.repogrowth.collection.application.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
@@ -97,6 +98,7 @@ class ApiControllersWebMvcTest {
 
   @Autowired MockMvc mockMvc;
   @Autowired CollectionController collectionController;
+  @MockitoBean CollectionRunMapper collectionRunMapper;
   @Autowired SearchQueryController searchQueryController;
   @Autowired TopicVisibilityController topicVisibilityController;
 

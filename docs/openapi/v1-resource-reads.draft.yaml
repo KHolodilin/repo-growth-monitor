@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Repo Growth Monitor — Resource API (draft)
-  version: 0.0.0-phase1
+  version: 0.0.0-phase3
   description: |
     Draft contract for unified `/api/v1` resource reads (anonymous / user / admin).
     Ops diagnostics remain `/api/v1/admin/*` (ApiSurface.OPS).
@@ -71,6 +71,20 @@ paths:
           description: Repository card
         "404":
           $ref: "#/components/responses/NotFound"
+  /owners/{ownerId}/traffic/kpi:
+    get:
+      tags: [Traffic]
+      summary: Owner Traffic KPI (readable repositories only)
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Typed Traffic KPI payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficKpiResponse"
   /repositories/{repositoryId}/traffic/kpi:
     get:
       tags: [Traffic]
@@ -87,16 +101,84 @@ paths:
                 $ref: "#/components/schemas/TrafficKpiResponse"
         "404":
           $ref: "#/components/responses/NotFound"
+  /owners/{ownerId}/traffic-history:
+    get:
+      tags: [Traffic]
+      summary: Owner daily traffic series
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Daily points aggregated over readable repositories
   /repositories/{repositoryId}/traffic-history:
     get:
       tags: [Traffic]
-      summary: Daily traffic series
+      summary: Daily traffic series (not rolling referrer/path snapshots)
       parameters:
         - $ref: "#/components/parameters/RepositoryId"
         - $ref: "#/components/parameters/Period"
       responses:
         "200":
           description: Daily points
+  /repositories/{repositoryId}/referrers:
+    get:
+      tags: [Traffic]
+      summary: Latest referrer snapshot
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+      responses:
+        "200":
+          description: Latest rolling-window referrer snapshot
+  /repositories/{repositoryId}/referrer-history:
+    get:
+      tags: [Traffic]
+      summary: Referrer rolling-window snapshot history
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Pivot history with signed deltas; not summed as independent days
+  /repositories/{repositoryId}/paths:
+    get:
+      tags: [Traffic]
+      summary: Latest path snapshot
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - name: includeServicePaths
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Latest rolling-window path snapshot
+  /repositories/{repositoryId}/path-history:
+    get:
+      tags: [Traffic]
+      summary: Path rolling-window snapshot history
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+        - name: includeServicePaths
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Pivot history with signed deltas
+  /owners/{ownerId}/stats/kpi:
+    get:
+      tags: [Stats]
+      summary: Owner Stats KPI (readable repositories only)
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Typed Stats KPI payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsKpiResponse"
   /repositories/{repositoryId}/stats/kpi:
     get:
       tags: [Stats]
@@ -107,6 +189,30 @@ paths:
       responses:
         "200":
           description: Typed Stats KPI payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsKpiResponse"
+  /owners/{ownerId}/stats-history:
+    get:
+      tags: [Stats]
+      summary: Owner stats history
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Tip-level series over readable repositories
+  /repositories/{repositoryId}/stats-history:
+    get:
+      tags: [Stats]
+      summary: Repository stats history
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Tip-level series
   /me:
     get:
       tags: [Identity]
@@ -223,6 +329,24 @@ components:
         range: { $ref: "#/components/schemas/DateRange" }
         comparison: { $ref: "#/components/schemas/ComparisonRange" }
         metrics: { $ref: "#/components/schemas/TrafficMetrics" }
+    StatsMetrics:
+      type: object
+      required: [stars, forks, watchers, contributors]
+      properties:
+        stars: { $ref: "#/components/schemas/KpiValue" }
+        forks: { $ref: "#/components/schemas/KpiValue" }
+        watchers: { $ref: "#/components/schemas/KpiValue" }
+        contributors: { $ref: "#/components/schemas/KpiValue" }
+    StatsKpiResponse:
+      type: object
+      required: [scope, scopeId, period, range, metrics]
+      properties:
+        scope: { type: string, enum: [OWNER, REPOSITORY] }
+        scopeId: { type: string }
+        period: { $ref: "#/components/schemas/Period" }
+        range: { $ref: "#/components/schemas/DateRange" }
+        comparison: { $ref: "#/components/schemas/ComparisonRange" }
+        metrics: { $ref: "#/components/schemas/StatsMetrics" }
     OwnerCard:
       type: object
       required: [ownerId, login]

@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.analytics.api.DashboardResponse.Highlights;
 import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
-import com.kholodilin.repogrowth.collection.api.CollectionController;
+import com.kholodilin.repogrowth.collection.application.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.domain.CollectionJob;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.domain.CollectionJobType;
@@ -162,7 +162,7 @@ class AnalyticsTrafficNoticeTest {
             traffic,
             runs,
             jobs,
-            mock(CollectionController.class),
+            mock(CollectionRunMapper.class),
             activity,
             health,
             highlights,
@@ -198,7 +198,7 @@ class AnalyticsTrafficNoticeTest {
         traffic,
         runs,
         jobs,
-        mock(CollectionController.class),
+        mock(CollectionRunMapper.class),
         mock(ActivityClassifier.class),
         mock(RepositoryHealthService.class),
         mock(PortfolioHighlightsService.class),
