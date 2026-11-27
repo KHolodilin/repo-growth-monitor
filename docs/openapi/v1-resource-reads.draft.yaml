@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Repo Growth Monitor — Resource API (draft)
-  version: 0.0.0-phase3
+  version: 0.0.0-phase6
   description: |
     Draft contract for unified `/api/v1` resource reads (anonymous / user / admin).
     Ops diagnostics remain `/api/v1/admin/*` (ApiSurface.OPS).
@@ -213,6 +213,146 @@ paths:
       responses:
         "200":
           description: Tip-level series
+  /owners/{ownerId}/search/kpi:
+    get:
+      tags: [Search]
+      summary: Owner Search KPI (Top 3/10/20 + usage)
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Typed Search KPI
+  /repositories/{repositoryId}/search/kpi:
+    get:
+      tags: [Search]
+      summary: Repository Search KPI
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Typed Search KPI
+  /repositories/{repositoryId}/search-queries:
+    get:
+      tags: [Search]
+      summary: List queries; include=history for batch charts
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - name: include
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Query cards / histories
+  /owners/{ownerId}/topics/kpi:
+    get:
+      tags: [Topics]
+      summary: Owner Topics KPI
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+        - name: scope
+          in: query
+          schema: { type: string, enum: [all, language], default: all }
+      responses:
+        "200":
+          description: Typed Topics KPI
+  /repositories/{repositoryId}/topics/kpi:
+    get:
+      tags: [Topics]
+      summary: Repository Topics KPI
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+        - name: scope
+          in: query
+          schema: { type: string, enum: [all, language], default: all }
+      responses:
+        "200":
+          description: Typed Topics KPI
+  /repositories/{repositoryId}/topic-watches:
+    get:
+      tags: [Topics]
+      summary: List watches; include=history for batch charts
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - name: scope
+          in: query
+          schema: { type: string, enum: [all, language], default: all }
+        - name: include
+          in: query
+          schema: { type: string }
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Watch cards / histories
+  /owners/{ownerId}/growth-events:
+    get:
+      tags: [Events]
+      summary: Owner growth events (readable repositories)
+      parameters:
+        - $ref: "#/components/parameters/OwnerId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Event list
+  /repositories/{repositoryId}/growth-events:
+    get:
+      tags: [Events]
+      summary: Repository growth events
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Event list
+    post:
+      tags: [Events]
+      summary: Create manual growth event
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+      responses:
+        "200":
+          description: Created event
+  /repositories/{repositoryId}/growth-event-settings:
+    get:
+      tags: [Events]
+      summary: Detection settings (operator-only; never public by default)
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+      responses:
+        "200":
+          description: Settings
+        "401":
+          description: Unauthenticated
+        "403":
+          description: Forbidden for non-operators
+  /collection-status:
+    get:
+      tags: [Collection]
+      summary: Compact header collection status
+      parameters:
+        - name: owner
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: lastSyncAt + repository collection rows
+  /repositories/{repositoryId}/collections:
+    post:
+      tags: [Collection]
+      summary: Idempotent collection request
+      parameters:
+        - $ref: "#/components/parameters/RepositoryId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        "201":
+          description: Created collection request
   /me:
     get:
       tags: [Identity]
