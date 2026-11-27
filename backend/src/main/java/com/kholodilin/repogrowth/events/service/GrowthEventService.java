@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.events.model.GrowthEvent;
 import com.kholodilin.repogrowth.events.model.GrowthEventCatalog;
 import com.kholodilin.repogrowth.events.model.GrowthEventSetting;
+import com.kholodilin.repogrowth.events.model.PromotionCount;
 import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
 import com.kholodilin.repogrowth.events.repository.GrowthEventSettingJdbcRepository;
 import java.time.Instant;
@@ -129,6 +130,11 @@ public class GrowthEventService {
       enabledByType.put(update.eventType(), update.enabled());
     }
     return settingRepository.replace(repositoryId, enabledByType);
+  }
+
+  /** Promotion-event counts for tracked repositories in {@code [from, to]} (portfolio highlights). */
+  public List<PromotionCount> promotionCounts(LocalDate from, LocalDate to) {
+    return eventRepository.promotionCounts(from, to);
   }
 
   private static String blankToNull(String value) {

@@ -22,7 +22,6 @@ import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficLeader
 import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficNotice;
 import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficPoint;
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
-import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
 import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
@@ -31,22 +30,15 @@ import com.kholodilin.repogrowth.collection.model.CollectionJobType;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
 import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
-import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
-import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
+import com.kholodilin.repogrowth.collection.service.CollectionTrafficProbe;
 import com.kholodilin.repogrowth.stats.model.RepositoryStatDay;
-import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryDayTotals;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryPeriodTotals;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
-import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath;
-import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
+import com.kholodilin.repogrowth.stats.service.StatsReadService;
+import com.kholodilin.repogrowth.traffic.model.LatestTrafficDate;
+import com.kholodilin.repogrowth.traffic.model.RepositoryDayTotals;
+import com.kholodilin.repogrowth.traffic.model.RepositoryPeriodTotals;
+import com.kholodilin.repogrowth.traffic.model.StoredTrafficDay;
+import com.kholodilin.repogrowth.traffic.model.TrafficTotals;
+import com.kholodilin.repogrowth.traffic.service.TrafficReadService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -73,11 +65,9 @@ public class PortfolioDashboardService {
   private static final Logger log = LoggerFactory.getLogger(PortfolioDashboardService.class);
 
   private final RepositoryService repositoryService;
-  private final TrafficJdbcRepository trafficJdbcRepository;
-  private final StatsJdbcRepository statsJdbcRepository;
-  private final CollectionRunJdbcRepository runRepository;
-  private final CollectionJobJdbcRepository jobRepository;
-  private final CollectionRunMapper collectionRunMapper;
+  private final TrafficReadService trafficReads;
+  private final StatsReadService stats;
+  private final CollectionTrafficProbe collections;
   private final ActivityClassifier activityClassifier;
   private final RepositoryHealthService healthService;
   private final PortfolioHighlightsService highlightsService;
@@ -86,22 +76,18 @@ public class PortfolioDashboardService {
 
   public PortfolioDashboardService(
       RepositoryService repositoryService,
-      TrafficJdbcRepository trafficJdbcRepository,
-      StatsJdbcRepository statsJdbcRepository,
-      CollectionRunJdbcRepository runRepository,
-      CollectionJobJdbcRepository jobRepository,
-      CollectionRunMapper collectionRunMapper,
+      TrafficReadService trafficReads,
+      StatsReadService stats,
+      CollectionTrafficProbe collections,
       ActivityClassifier activityClassifier,
       RepositoryHealthService healthService,
       PortfolioHighlightsService highlightsService,
       PlanningWindow planningWindow,
       Clock clock) {
     this.repositoryService = repositoryService;
-    this.trafficJdbcRepository = trafficJdbcRepository;
-    this.statsJdbcRepository = statsJdbcRepository;
-    this.runRepository = runRepository;
-    this.jobRepository = jobRepository;
-    this.collectionRunMapper = collectionRunMapper;
+    this.trafficReads = trafficReads;
+    this.stats = stats;
+    this.collections = collections;
     this.activityClassifier = activityClassifier;
     this.healthService = healthService;
     this.highlightsService = highlightsService;
@@ -117,7 +103,7 @@ public class PortfolioDashboardService {
     LocalDate today = LocalDate.now(clock);
     DashboardPeriod period =
         DashboardPeriod.of(
-            periodParam, today, trafficJdbcRepository.earliestTrackedTrafficDate().orElse(null));
+            periodParam, today, trafficReads.earliestTrackedTrafficDate().orElse(null));
     List<Repository> tracked = visibleTracked(repositoryService.tracked(), includePrivate);
     if (ownerLogin != null && !ownerLogin.isBlank()) {
       String needle = ownerLogin.trim().toLowerCase(Locale.ROOT) + "/";
@@ -131,7 +117,7 @@ public class PortfolioDashboardService {
     if (tracked.isEmpty()) {
       return empty(period, DashboardState.NO_REPOSITORIES, 0, 0);
     }
-    if (!trafficJdbcRepository.hasTrackedTraffic()) {
+    if (!trafficReads.hasTrackedTraffic()) {
       return firstCollection(period, tracked);
     }
     return ready(period, tracked, includePrivate);
@@ -144,7 +130,7 @@ public class PortfolioDashboardService {
     List<RepositoryMetrics> rows =
         tracked.stream()
             .map(repository -> {
-              TrafficTotals repoTotals = trafficJdbcRepository.totals(repository.id(), from);
+              TrafficTotals repoTotals = trafficReads.totals(repository.id(), from);
               return new RepositoryMetrics(
                   repository.id(),
                   repository.fullName(),
@@ -160,7 +146,7 @@ public class PortfolioDashboardService {
     long uniqueCloners =
         tracked.stream()
             .mapToLong(
-                repository -> trafficJdbcRepository.totals(repository.id(), from).uniqueCloners())
+                repository -> trafficReads.totals(repository.id(), from).uniqueCloners())
             .sum();
     return new PortfolioSnapshot(
         tracked.size(), views, visitors, clones, uniqueCloners, stars, rows);
@@ -183,7 +169,7 @@ public class PortfolioDashboardService {
     long uniqueCloners = 0;
     for (Long repositoryId : repositoryIds) {
       TrafficTotals totals =
-          trafficJdbcRepository.totalsInRange(repositoryId, fromInclusive, toInclusive);
+          trafficReads.totalsInRange(repositoryId, fromInclusive, toInclusive);
       views += totals.views();
       uniqueVisitors += totals.uniqueVisitors();
       clones += totals.clones();
@@ -207,22 +193,22 @@ public class PortfolioDashboardService {
         period.allTime() ? null : coverage(visibleIds, previousFrom, period.previousTo());
     TrafficTotals current =
         fullPortfolio
-            ? trafficJdbcRepository.portfolioTotalsInRange(period.from(), end)
+            ? trafficReads.portfolioTotalsInRange(period.from(), end)
             : sumVisibleTotals(period.from(), end, visibleIds);
     TrafficTotals previous =
         period.allTime()
             ? new TrafficTotals(0, 0, 0, 0)
             : fullPortfolio
-                ? trafficJdbcRepository.portfolioTotalsInRange(previousFrom, period.previousTo())
+                ? trafficReads.portfolioTotalsInRange(previousFrom, period.previousTo())
                 : sumVisibleTotals(previousFrom, period.previousTo(), visibleIds);
     long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
     Long starsChange =
-        period.allTime() ? null : statsJdbcRepository.starsChangeSince(period.from());
+        period.allTime() ? null : stats.starsChangeSince(period.from());
     List<TrafficPoint> traffic = series(period, tracked);
     Map<Long, TrafficNotice> notices = trafficNotices(period, tracked);
     Map<Long, Long> previousVisitors = previousVisitorsByRepo(period);
     List<CollectionRun> latestRuns =
-        runRepository.latestPerTrackedRepository().stream()
+        collections.latestPerTrackedRepository().stream()
             .filter(run -> visibleIds.contains(run.repositoryId()))
             .toList();
     Map<Long, CollectionRun> runByRepo =
@@ -230,13 +216,13 @@ public class PortfolioDashboardService {
             .collect(
                 Collectors.toMap(CollectionRun::repositoryId, run -> run, (left, right) -> left));
     Map<Long, List<CollectionJob>> jobsByRun =
-        jobRepository.findByRunIds(latestRuns.stream().map(CollectionRun::id).toList()).stream()
+        collections.findByRunIds(latestRuns.stream().map(CollectionRun::id).toList()).stream()
             .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
     Map<Long, RepositoryHealthService.DiscoverabilityScore> discoverability = discoverabilityByRepo(tracked);
     Map<Long, RepositorySignals> signals =
         repositoryService.signalsFor(tracked.stream().map(Repository::id).toList());
     List<RepositoryRow> rows =
-        trafficJdbcRepository
+        trafficReads
             .totalsByTrackedRepository(period.from(), publishedEnd(period.to()))
             .stream()
             .filter(row -> visibleIds.contains(row.repositoryId()))
@@ -258,7 +244,7 @@ public class PortfolioDashboardService {
         period.value(),
         period.from(),
         period.to(),
-        runRepository.latestCompletedAtForTracked(),
+        collections.latestCompletedAtForTracked(),
         DashboardState.READY,
         null,
         collectionWarning(partialCount),
@@ -286,14 +272,14 @@ public class PortfolioDashboardService {
   }
 
   private DashboardResponse firstCollection(DashboardPeriod period, List<Repository> tracked) {
-    List<CollectionRun> latestRuns = runRepository.latestPerTrackedRepository();
+    List<CollectionRun> latestRuns = collections.latestPerTrackedRepository();
     Map<Long, CollectionRun> runByRepo =
         latestRuns.stream()
             .collect(
                 Collectors.toMap(
                     CollectionRun::repositoryId, Function.identity(), (left, right) -> left));
     Map<Long, List<CollectionJob>> jobsByRun =
-        jobRepository.findByRunIds(latestRuns.stream().map(CollectionRun::id).toList()).stream()
+        collections.findByRunIds(latestRuns.stream().map(CollectionRun::id).toList()).stream()
             .collect(Collectors.groupingBy(CollectionJob::collectionRunId));
     long starsTotal = tracked.stream().mapToLong(Repository::stars).sum();
     Map<Long, RepositoryHealthService.DiscoverabilityScore> discoverability = discoverabilityByRepo(tracked);
@@ -335,7 +321,7 @@ public class PortfolioDashboardService {
         period.value(),
         period.from(),
         period.to(),
-        runRepository.latestCompletedAtForTracked(),
+        collections.latestCompletedAtForTracked(),
         DashboardState.FIRST_COLLECTION,
         null,
         collectionWarning(
@@ -383,7 +369,7 @@ public class PortfolioDashboardService {
     if (period.allTime()) {
       return Map.of();
     }
-    return trafficJdbcRepository
+    return trafficReads
         .totalsByTrackedRepository(comparisonFrom(period), period.previousTo())
         .stream()
         .collect(
@@ -464,7 +450,7 @@ public class PortfolioDashboardService {
     Set<String> names = tracked.stream().map(Repository::fullName).collect(Collectors.toSet());
     Map<LocalDate, List<RepositoryDayTotals>> byDate = new TreeMap<>();
     for (RepositoryDayTotals row :
-        trafficJdbcRepository.dailyByRepository(period.from(), period.to())) {
+        trafficReads.dailyByRepository(period.from(), period.to())) {
       if (!names.contains(row.fullName())) continue;
       byDate.computeIfAbsent(row.date(), date -> new ArrayList<>()).add(row);
     }
@@ -541,7 +527,7 @@ public class PortfolioDashboardService {
     int trackedCount = tracked.size();
     Map<LocalDate, List<RepositoryStatDay>> byDate = new TreeMap<>();
     for (RepositoryStatDay row :
-        statsJdbcRepository.trackedDailyStats(period.from(), period.to())) {
+        stats.trackedDailyStats(period.from(), period.to())) {
       if (!visibleIds.contains(row.repositoryId())) {
         continue;
       }
@@ -553,7 +539,7 @@ public class PortfolioDashboardService {
     // Per-repo tip on or before the period end (same honesty as public owner Stats / 1d).
     // Absolute latest() would pull today's unfinished tip into a 1d window that ends yesterday.
     List<RepositoryStatDay> latest =
-        statsJdbcRepository.latestTrackedDailyStatsOnOrBefore(period.to()).stream()
+        stats.latestTrackedDailyStatsOnOrBefore(period.to()).stream()
             .filter(row -> visibleIds.contains(row.repositoryId()))
             .toList();
     return portfolioStats(latest, period.allTime(), trackedCount, points);
@@ -775,20 +761,20 @@ public class PortfolioDashboardService {
     LocalDate today = LocalDate.now(clock);
     boolean windowOpen = planningWindow.isOpen();
     Map<Long, Set<LocalDate>> stored = new HashMap<>();
-    for (TrafficJdbcRepository.StoredTrafficDay day :
-        trafficJdbcRepository.trackedTrafficDays(period.from(), period.to())) {
+    for (StoredTrafficDay day :
+        trafficReads.trackedTrafficDays(period.from(), period.to())) {
       stored.computeIfAbsent(day.repositoryId(), id -> new HashSet<>()).add(day.date());
     }
     Map<Long, LocalDate> latest = new HashMap<>();
-    for (TrafficJdbcRepository.LatestTrafficDate day :
-        trafficJdbcRepository.latestTrackedTrafficDates()) {
+    for (LatestTrafficDate day :
+        trafficReads.latestTrackedTrafficDates()) {
       if (day.date() != null) {
         latest.put(day.repositoryId(), day.date());
       }
     }
     Map<Long, CollectionJob> trafficJobs = new HashMap<>();
-    List<Long> runIds = runRepository.trackedOn(today).stream().map(CollectionRun::id).toList();
-    for (CollectionJob job : jobRepository.findByRunIds(runIds)) {
+    List<Long> runIds = collections.trackedOn(today).stream().map(CollectionRun::id).toList();
+    for (CollectionJob job : collections.findByRunIds(runIds)) {
       if (job.jobType() == CollectionJobType.TRAFFIC) {
         trafficJobs.put(job.repositoryId(), job);
       }
@@ -816,17 +802,17 @@ public class PortfolioDashboardService {
 
   private TrafficNotice trafficGap(long repositoryId) {
     LocalDate today = LocalDate.now(clock);
-    CollectionRun todayRun = runRepository.find(repositoryId, today).orElse(null);
+    CollectionRun todayRun = collections.find(repositoryId, today).orElse(null);
     CollectionJob trafficJob = null;
     if (todayRun != null) {
-      for (CollectionJob job : jobRepository.findByRun(todayRun.id())) {
+      for (CollectionJob job : collections.findByRun(todayRun.id())) {
         if (job.jobType() == CollectionJobType.TRAFFIC) {
           trafficJob = job;
         }
       }
     }
     boolean yesterdayStored =
-        trafficJdbcRepository
+        trafficReads
             .latestDate(repositoryId)
             .filter(date -> !date.isBefore(today.minusDays(1)))
             .isPresent();
@@ -876,7 +862,7 @@ public class PortfolioDashboardService {
     LocalDate end = publishedEnd(to);
     long days = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(from, end) + 1);
     return new TrafficCoverage(
-        trafficJdbcRepository.observedDays(ids, from, end), days * ids.size());
+        trafficReads.observedDays(ids, from, end), days * ids.size());
   }
 
   private LocalDate publishedEnd(LocalDate to) {
@@ -892,7 +878,7 @@ public class PortfolioDashboardService {
         || end.isBefore(period.from())) {
       return end;
     }
-    if (trafficJdbcRepository.observedDays(ids, end, end) < ids.size()) {
+    if (trafficReads.observedDays(ids, end, end) < ids.size()) {
       LocalDate prior = end.minusDays(1);
       return prior.isBefore(period.from()) ? end : prior;
     }

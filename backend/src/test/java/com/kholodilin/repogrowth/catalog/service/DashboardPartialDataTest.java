@@ -7,7 +7,7 @@ import com.kholodilin.repogrowth.catalog.service.DashboardResponse.PortfolioStat
 import com.kholodilin.repogrowth.catalog.service.DashboardResponse.StatsPoint;
 import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficLeader;
 import com.kholodilin.repogrowth.catalog.service.DashboardResponse.TrafficPoint;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryDayTotals;
+import com.kholodilin.repogrowth.traffic.model.RepositoryDayTotals;
 import com.kholodilin.repogrowth.stats.model.RepositoryStatDay;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;

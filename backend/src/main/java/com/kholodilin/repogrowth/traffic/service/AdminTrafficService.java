@@ -19,20 +19,18 @@ import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.model.CollectionJob;
 import com.kholodilin.repogrowth.collection.model.CollectionJobType;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
-import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
+import com.kholodilin.repogrowth.collection.service.CollectionTrafficProbe;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.traffic.model.PathSnapshot;
+import com.kholodilin.repogrowth.traffic.model.PathRow;
+import com.kholodilin.repogrowth.traffic.model.ReferrerRow;
+import com.kholodilin.repogrowth.traffic.model.ReferrerSnapshot;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
+import com.kholodilin.repogrowth.traffic.model.TrafficTotals;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryPeriodTotals;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
-import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -63,8 +61,7 @@ public class AdminTrafficService {
 
   private final RepositoryService repositoryService;
   private final TrafficJdbcRepository trafficJdbcRepository;
-  private final CollectionRunJdbcRepository runRepository;
-  private final CollectionJobJdbcRepository jobRepository;
+  private final CollectionTrafficProbe collections;
   private final CollectionRunMapper collectionRunMapper;
   private final PlanningWindow planningWindow;
   private final Clock clock;
@@ -72,15 +69,13 @@ public class AdminTrafficService {
   public AdminTrafficService(
       RepositoryService repositoryService,
       TrafficJdbcRepository trafficJdbcRepository,
-      CollectionRunJdbcRepository runRepository,
-      CollectionJobJdbcRepository jobRepository,
+      CollectionTrafficProbe collections,
       CollectionRunMapper collectionRunMapper,
       PlanningWindow planningWindow,
       Clock clock) {
     this.repositoryService = repositoryService;
     this.trafficJdbcRepository = trafficJdbcRepository;
-    this.runRepository = runRepository;
-    this.jobRepository = jobRepository;
+    this.collections = collections;
     this.collectionRunMapper = collectionRunMapper;
     this.planningWindow = planningWindow;
     this.clock = clock;
@@ -119,7 +114,7 @@ public class AdminTrafficService {
                 period,
                 coverage,
                 previousCoverage));
-    CollectionRun latestRun = runRepository.latestForRepository(repositoryId).orElse(null);
+    CollectionRun latestRun = collections.latestForRepository(repositoryId).orElse(null);
     ReferrerSnapshot referrers = trafficJdbcRepository.latestReferrerSnapshot(repositoryId);
     PathSnapshot paths =
         trafficJdbcRepository.latestPathSnapshot(repositoryId, includeServicePaths);
@@ -270,10 +265,10 @@ public class AdminTrafficService {
 
   private TrafficNotice trafficGap(long repositoryId) {
     LocalDate today = LocalDate.now(clock);
-    CollectionRun todayRun = runRepository.find(repositoryId, today).orElse(null);
+    CollectionRun todayRun = collections.find(repositoryId, today).orElse(null);
     CollectionJob trafficJob = null;
     if (todayRun != null) {
-      for (CollectionJob job : jobRepository.findByRun(todayRun.id())) {
+      for (CollectionJob job : collections.findByRun(todayRun.id())) {
         if (job.jobType() == CollectionJobType.TRAFFIC) {
           trafficJob = job;
         }
@@ -385,9 +380,9 @@ public class AdminTrafficService {
       String period,
       RepositoryTrafficTotals totals,
       List<TrafficChartPoint> traffic,
-      List<TrafficJdbcRepository.ReferrerRow> referrers,
+      List<ReferrerRow> referrers,
       Instant referrerSnapshotAt,
-      List<TrafficJdbcRepository.PathRow> paths,
+      List<PathRow> paths,
       Instant pathSnapshotAt,
       CollectionRunMapper.CollectionRunResponse lastCollection,
       TrafficNotice trafficGap) {}

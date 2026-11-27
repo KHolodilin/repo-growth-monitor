@@ -23,6 +23,8 @@ import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
+import com.kholodilin.repogrowth.traffic.model.PathRow;
+import com.kholodilin.repogrowth.traffic.model.ReferrerRow;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -250,14 +252,14 @@ class PortfolioDashboardIT extends AbstractPostgresTest {
         adminTrafficService.traffic(kafka.id(), "7d", false);
     assertThat(sevenDays.referrers())
         .containsExactly(
-            new TrafficJdbcRepository.ReferrerRow("github.com", 81, 3),
-            new TrafficJdbcRepository.ReferrerRow("mvnrepository.com", 1, 1));
+            new ReferrerRow("github.com", 81, 3),
+            new ReferrerRow("mvnrepository.com", 1, 1));
     assertThat(sevenDays.paths())
-        .containsExactly(new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5, false));
+        .containsExactly(new PathRow("/readme", "README", 38, 5, false));
     assertThat(adminTrafficService.traffic(kafka.id(), "7d", true).paths())
         .containsExactly(
-            new TrafficJdbcRepository.PathRow("/readme", "README", 38, 5, false),
-            new TrafficJdbcRepository.PathRow("/pulse", "Pulse", 17, 1, true));
+            new PathRow("/readme", "README", 38, 5, false),
+            new PathRow("/pulse", "Pulse", 17, 1, true));
     assertThat(sevenDays.referrerSnapshotAt()).isEqualTo(latest);
     assertThat(sevenDays.pathSnapshotAt()).isEqualTo(latest);
 

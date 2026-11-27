@@ -15,12 +15,16 @@ import com.kholodilin.repogrowth.common.model.period.ComparisonRange;
 import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
+import com.kholodilin.repogrowth.traffic.model.LatestTrafficDate;
+import com.kholodilin.repogrowth.traffic.model.PathSnapshot;
+import com.kholodilin.repogrowth.traffic.model.ReferrerSnapshot;
+import com.kholodilin.repogrowth.traffic.model.RepositoryDayTotals;
+import com.kholodilin.repogrowth.traffic.model.RepositoryPeriodTotals;
 import com.kholodilin.repogrowth.traffic.model.SnapshotKind;
+import com.kholodilin.repogrowth.traffic.model.StoredTrafficDay;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
+import com.kholodilin.repogrowth.traffic.model.TrafficTotals;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
 import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -31,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
@@ -160,6 +165,77 @@ public class TrafficReadService {
       long repositoryId, String periodParam, Integer days, boolean includeServicePaths) {
     return snapshotHistory(
         repositoryId, SnapshotKind.PATHS, periodParam, days, includeServicePaths);
+  }
+
+  /** Portfolio / admin dashboard reads — narrow projections over tracked traffic. */
+  public Optional<LocalDate> earliestTrackedTrafficDate() {
+    return traffic.earliestTrackedTrafficDate();
+  }
+
+  public boolean hasTrackedTraffic() {
+    return traffic.hasTrackedTraffic();
+  }
+
+  public TrafficTotals totals(long repositoryId, LocalDate fromInclusive) {
+    return traffic.totals(repositoryId, fromInclusive);
+  }
+
+  public TrafficTotals totalsInRange(
+      long repositoryId, LocalDate fromInclusive, LocalDate toInclusive) {
+    return traffic.totalsInRange(repositoryId, fromInclusive, toInclusive);
+  }
+
+  public TrafficTotals portfolioTotalsInRange(LocalDate fromInclusive, LocalDate toInclusive) {
+    return traffic.portfolioTotalsInRange(fromInclusive, toInclusive);
+  }
+
+  public List<RepositoryPeriodTotals> totalsByTrackedRepository(
+      LocalDate fromInclusive, LocalDate toInclusive) {
+    return traffic.totalsByTrackedRepository(fromInclusive, toInclusive);
+  }
+
+  public List<RepositoryDayTotals> dailyByRepository(
+      LocalDate fromInclusive, LocalDate toInclusive) {
+    return traffic.dailyByRepository(fromInclusive, toInclusive);
+  }
+
+  public List<StoredTrafficDay> trackedTrafficDays(LocalDate fromInclusive, LocalDate toInclusive) {
+    return traffic.trackedTrafficDays(fromInclusive, toInclusive);
+  }
+
+  public List<LatestTrafficDate> latestTrackedTrafficDates() {
+    return traffic.latestTrackedTrafficDates();
+  }
+
+  public Optional<LocalDate> latestDate(long repositoryId) {
+    return traffic.latestDate(repositoryId);
+  }
+
+  public long observedDays(Set<Long> repositoryIds, LocalDate from, LocalDate to) {
+    return traffic.observedDays(repositoryIds, from, to);
+  }
+
+  public List<TrafficDaily> history(long repositoryId, LocalDate fromInclusive) {
+    return traffic.history(repositoryId, fromInclusive);
+  }
+
+  public Optional<LocalDate> earliestReferrerSnapshotDate(long repositoryId) {
+    return traffic.earliestReferrerSnapshotDate(repositoryId);
+  }
+
+  public Optional<LocalDate> earliestPathSnapshotDate(
+      long repositoryId, boolean includeServicePaths) {
+    return traffic.earliestPathSnapshotDate(repositoryId, includeServicePaths);
+  }
+
+  public List<Observation> referrerSnapshotsForDelta(
+      long repositoryId, LocalDate from, LocalDate to) {
+    return traffic.referrerSnapshotsForDelta(repositoryId, from, to);
+  }
+
+  public List<Observation> pathSnapshotsForDelta(
+      long repositoryId, LocalDate from, LocalDate to, boolean includeServicePaths) {
+    return traffic.pathSnapshotsForDelta(repositoryId, from, to, includeServicePaths);
   }
 
   /**

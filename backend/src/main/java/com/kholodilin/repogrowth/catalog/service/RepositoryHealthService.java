@@ -5,7 +5,7 @@ import com.kholodilin.repogrowth.catalog.service.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
-import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.search.service.SearchQueryService;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -13,15 +13,15 @@ import org.springframework.stereotype.Service;
 public class RepositoryHealthService {
 
   private final RepositoryJdbcRepository repositoryJdbcRepository;
-  private final SearchQueryJdbcRepository searchQueryJdbcRepository;
+  private final SearchQueryService searchQueries;
   private final RepositoryHealthEvaluator evaluator;
 
   public RepositoryHealthService(
       RepositoryJdbcRepository repositoryJdbcRepository,
-      SearchQueryJdbcRepository searchQueryJdbcRepository,
+      SearchQueryService searchQueries,
       RepositoryHealthEvaluator evaluator) {
     this.repositoryJdbcRepository = repositoryJdbcRepository;
-    this.searchQueryJdbcRepository = searchQueryJdbcRepository;
+    this.searchQueries = searchQueries;
     this.evaluator = evaluator;
   }
 
@@ -31,7 +31,7 @@ public class RepositoryHealthService {
     return evaluator.evaluate(
         repository,
         repositoryJdbcRepository.findTopics(repository.id()),
-        searchQueryJdbcRepository.countByRepository(repository.id()),
+        searchQueries.countByRepository(repository.id()),
         facts);
   }
 

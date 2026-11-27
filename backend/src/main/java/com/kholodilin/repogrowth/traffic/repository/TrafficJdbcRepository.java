@@ -1,7 +1,17 @@
 package com.kholodilin.repogrowth.traffic.repository;
 
 import com.kholodilin.repogrowth.common.persistence.SqlTime;
+import com.kholodilin.repogrowth.traffic.model.DailyTotals;
+import com.kholodilin.repogrowth.traffic.model.LatestTrafficDate;
+import com.kholodilin.repogrowth.traffic.model.PathRow;
+import com.kholodilin.repogrowth.traffic.model.PathSnapshot;
+import com.kholodilin.repogrowth.traffic.model.ReferrerRow;
+import com.kholodilin.repogrowth.traffic.model.ReferrerSnapshot;
+import com.kholodilin.repogrowth.traffic.model.RepositoryDayTotals;
+import com.kholodilin.repogrowth.traffic.model.RepositoryPeriodTotals;
+import com.kholodilin.repogrowth.traffic.model.StoredTrafficDay;
 import com.kholodilin.repogrowth.traffic.model.TrafficDaily;
+import com.kholodilin.repogrowth.traffic.model.TrafficTotals;
 import com.kholodilin.repogrowth.traffic.service.SnapshotHistoryMath.Observation;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -727,48 +737,6 @@ public class TrafficJdbcRepository {
         result.add(new Observation(date, null, null, 0, 0));
     return result;
   }
-
-  public record TrafficTotals(long views, long uniqueVisitors, long clones, long uniqueCloners) {}
-
-  public record RepositoryPeriodTotals(
-      long repositoryId,
-      String fullName,
-      long uniqueVisitors,
-      long views,
-      long clones,
-      int stars,
-      int forks,
-      boolean archived,
-      Instant lastCommitAt,
-      Instant githubPushedAt) {}
-
-  public record DailyTotals(LocalDate date, long views, long uniqueVisitors, long clones) {}
-
-  public record StoredTrafficDay(long repositoryId, LocalDate date) {}
-
-  public record LatestTrafficDate(long repositoryId, LocalDate date) {}
-
-  public record RepositoryDayTotals(
-      LocalDate date,
-      String fullName,
-      long views,
-      long uniqueVisitors,
-      long clones,
-      long uniqueCloners) {
-    public RepositoryDayTotals(
-        LocalDate date, String fullName, long views, long uniqueVisitors, long clones) {
-      this(date, fullName, views, uniqueVisitors, clones, 0);
-    }
-  }
-
-  public record ReferrerRow(String referrer, int views, int uniqueVisitors) {}
-
-  public record PathRow(
-      String path, String title, int views, int uniqueVisitors, boolean servicePath) {}
-
-  public record ReferrerSnapshot(Instant snapshotAt, List<ReferrerRow> rows) {}
-
-  public record PathSnapshot(Instant snapshotAt, List<PathRow> rows) {}
 
   private record TimedReferrer(Instant snapshotAt, ReferrerRow row) {}
 

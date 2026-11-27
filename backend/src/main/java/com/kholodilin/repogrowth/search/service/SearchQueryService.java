@@ -7,6 +7,7 @@ import com.kholodilin.repogrowth.common.config.SearchProperties;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
 import com.kholodilin.repogrowth.search.model.SearchResult;
 import com.kholodilin.repogrowth.search.model.SearchRun;
+import com.kholodilin.repogrowth.search.model.SuccessfulRank;
 import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchResultJdbcRepository;
 import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
@@ -226,6 +227,16 @@ public class SearchQueryService {
 
   public List<SearchHistory> visibility(long repositoryId) {
     return list(repositoryId).stream().map(query -> history(query.id())).toList();
+  }
+
+  /** Count of search queries tracked for a repository (health / discoverability). */
+  public int countByRepository(long repositoryId) {
+    return queryRepository.countByRepository(repositoryId);
+  }
+
+  /** Successful tracked positions through {@code to} for portfolio highlights. */
+  public List<SuccessfulRank> successfulPositions(LocalDate to) {
+    return runRepository.successfulPositions(to);
   }
 
   private Integer latestPosition(List<SearchRun> runs) {

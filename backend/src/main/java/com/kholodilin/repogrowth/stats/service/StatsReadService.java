@@ -14,6 +14,7 @@ import com.kholodilin.repogrowth.common.model.period.DateRange;
 import com.kholodilin.repogrowth.common.model.period.Period;
 import com.kholodilin.repogrowth.common.model.period.PeriodRanges;
 import com.kholodilin.repogrowth.stats.model.RepositoryDailyStats;
+import com.kholodilin.repogrowth.stats.model.RepositoryStatDay;
 import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -72,6 +73,21 @@ public class StatsReadService {
         history.range(),
         history.totals(),
         history.points());
+  }
+
+  /** Portfolio dashboard: tip stars delta since period start across tracked repositories. */
+  public Long starsChangeSince(LocalDate fromInclusive) {
+    return stats.starsChangeSince(fromInclusive);
+  }
+
+  /** Portfolio stats series rows for tracked repositories in the window. */
+  public List<RepositoryStatDay> trackedDailyStats(LocalDate fromInclusive, LocalDate toInclusive) {
+    return stats.trackedDailyStats(fromInclusive, toInclusive);
+  }
+
+  /** Per-repo tip stats on or before {@code asOf} for tracked repositories. */
+  public List<RepositoryStatDay> latestTrackedDailyStatsOnOrBefore(LocalDate asOf) {
+    return stats.latestTrackedDailyStatsOnOrBefore(asOf);
   }
 
   private History repositoryHistory(long repositoryId, String periodParam) {

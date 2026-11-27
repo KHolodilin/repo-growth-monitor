@@ -22,18 +22,18 @@ import com.kholodilin.repogrowth.collection.model.CollectionJobType;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
 import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
+import com.kholodilin.repogrowth.collection.service.CollectionTrafficProbe;
 import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
-import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
+import com.kholodilin.repogrowth.stats.service.StatsReadService;
+import com.kholodilin.repogrowth.traffic.model.LatestTrafficDate;
+import com.kholodilin.repogrowth.traffic.model.PathSnapshot;
+import com.kholodilin.repogrowth.traffic.model.ReferrerSnapshot;
+import com.kholodilin.repogrowth.traffic.model.RepositoryPeriodTotals;
+import com.kholodilin.repogrowth.traffic.model.StoredTrafficDay;
+import com.kholodilin.repogrowth.traffic.model.TrafficTotals;
 import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.LatestTrafficDate;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.PathSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.ReferrerSnapshot;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.RepositoryPeriodTotals;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.StoredTrafficDay;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository.TrafficTotals;
+import com.kholodilin.repogrowth.traffic.service.TrafficReadService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -54,8 +54,7 @@ class PortfolioDashboardTrafficNoticeTest {
     Repository repository = repository(13L, "acme/outbox");
     RepositoryService repositories = mock(RepositoryService.class);
     TrafficJdbcRepository traffic = mock(TrafficJdbcRepository.class);
-    CollectionRunJdbcRepository runs = mock(CollectionRunJdbcRepository.class);
-    CollectionJobJdbcRepository jobs = mock(CollectionJobJdbcRepository.class);
+    CollectionTrafficProbe collections = mock(CollectionTrafficProbe.class);
     PlanningWindow window = mock(PlanningWindow.class);
     when(repositories.get(13L)).thenReturn(repository);
     when(repositories.owner(1L))
@@ -64,14 +63,14 @@ class PortfolioDashboardTrafficNoticeTest {
                 1L, 9L, "acme", OwnerType.USER, null, "https://github.com/acme", NOW, NOW));
     when(traffic.history(anyLong(), any())).thenReturn(List.of());
     when(traffic.totalsInRange(anyLong(), any(), any())).thenReturn(new TrafficTotals(0, 0, 0, 0));
-    when(runs.latestForRepository(13L)).thenReturn(Optional.empty());
+    when(collections.latestForRepository(13L)).thenReturn(Optional.empty());
     when(traffic.latestReferrerSnapshot(13L)).thenReturn(new ReferrerSnapshot(null, List.of()));
     when(traffic.latestPathSnapshot(anyLong(), anyBoolean()))
         .thenReturn(new PathSnapshot(null, List.of()));
     CollectionRun run =
         new CollectionRun(5L, 13L, TODAY, CollectionRunStatus.PARTIAL, 2, 1, 1, NOW, NOW);
-    when(runs.find(13L, TODAY)).thenReturn(Optional.of(run));
-    when(jobs.findByRun(5L))
+    when(collections.find(13L, TODAY)).thenReturn(Optional.of(run));
+    when(collections.findByRun(5L))
         .thenReturn(
             List.of(
                 job(2L, 13L, CollectionJobType.REFERRERS, CollectionJobStatus.SUCCESS, null, null),
@@ -88,8 +87,7 @@ AdminTrafficService service =
         new AdminTrafficService(
             repositories,
             traffic,
-            runs,
-            jobs,
+            collections,
             mock(CollectionRunMapper.class),
             window,
             Clock.fixed(NOW, ZoneOffset.UTC));
@@ -97,7 +95,7 @@ AdminTrafficService service =
     assertThat(service.traffic(13L, "7d", false).trafficGap().reason())
         .isEqualTo("COLLECTION_FAILED");
 
-    when(runs.find(13L, TODAY)).thenReturn(Optional.empty());
+    when(collections.find(13L, TODAY)).thenReturn(Optional.empty());
     when(traffic.latestDate(13L)).thenReturn(Optional.empty());
     when(window.isOpen()).thenReturn(false);
     assertThat(service.traffic(13L, "7d", false).trafficGap().reason())
@@ -113,11 +111,10 @@ AdminTrafficService service =
     Repository complete = repository(13L, "acme/complete");
     Repository missing = repository(14L, "acme/missing");
     RepositoryService repositories = mock(RepositoryService.class);
-    TrafficJdbcRepository traffic = mock(TrafficJdbcRepository.class);
-    StatsJdbcRepository stats = mock(StatsJdbcRepository.class);
-    CollectionRunJdbcRepository runs = mock(CollectionRunJdbcRepository.class);
-    CollectionJobJdbcRepository jobs = mock(CollectionJobJdbcRepository.class);
-    PlanningWindow window = mock(PlanningWindow.class);
+    TrafficReadService traffic = mock(TrafficReadService.class);
+    StatsReadService stats = mock(StatsReadService.class);
+    CollectionTrafficProbe collections = mock(CollectionTrafficProbe.class);
+        PlanningWindow window = mock(PlanningWindow.class);
     RepositoryHealthService health = mock(RepositoryHealthService.class);
     when(repositories.tracked()).thenReturn(List.of(complete, missing));
     when(repositories.signalsFor(any())).thenReturn(Map.of());
@@ -146,10 +143,10 @@ AdminTrafficService service =
                 new LatestTrafficDate(15L, null)));
     CollectionRun run =
         new CollectionRun(5L, 13L, TODAY, CollectionRunStatus.SUCCESS, 2, 2, 0, NOW, NOW);
-    when(runs.trackedOn(TODAY)).thenReturn(List.of(run));
-    when(runs.latestPerTrackedRepository()).thenReturn(List.of());
-    when(runs.latestCompletedAtForTracked()).thenReturn(null);
-    when(jobs.findByRunIds(any()))
+    when(collections.trackedOn(TODAY)).thenReturn(List.of(run));
+    when(collections.latestPerTrackedRepository()).thenReturn(List.of());
+    when(collections.latestCompletedAtForTracked()).thenReturn(null);
+    when(collections.findByRunIds(any()))
         .thenReturn(
             List.of(
                 job(2L, 13L, CollectionJobType.REFERRERS, CollectionJobStatus.SUCCESS, null, null),
@@ -169,9 +166,7 @@ PortfolioDashboardService service =
             repositories,
             traffic,
             stats,
-            runs,
-            jobs,
-            mock(CollectionRunMapper.class),
+            collections,
             activity,
             health,
             highlights,
@@ -195,17 +190,14 @@ PortfolioDashboardService service =
 
   private static PortfolioDashboardService service(
       RepositoryService repositories,
-      TrafficJdbcRepository traffic,
-      CollectionRunJdbcRepository runs,
-      CollectionJobJdbcRepository jobs,
+      TrafficReadService traffic,
+      CollectionTrafficProbe collections,
       PlanningWindow window) {
 return new PortfolioDashboardService(
         repositories,
         traffic,
-        mock(StatsJdbcRepository.class),
-        runs,
-        jobs,
-        mock(CollectionRunMapper.class),
+        mock(StatsReadService.class),
+        collections,
         mock(ActivityClassifier.class),
         mock(RepositoryHealthService.class),
         mock(PortfolioHighlightsService.class),

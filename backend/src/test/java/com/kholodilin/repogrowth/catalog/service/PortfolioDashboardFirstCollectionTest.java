@@ -20,11 +20,9 @@ import com.kholodilin.repogrowth.collection.model.CollectionJobType;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
 import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
-import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
-import com.kholodilin.repogrowth.stats.repository.StatsJdbcRepository;
-import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
+import com.kholodilin.repogrowth.collection.service.CollectionTrafficProbe;
+import com.kholodilin.repogrowth.stats.service.StatsReadService;
+import com.kholodilin.repogrowth.traffic.service.TrafficReadService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -94,9 +92,9 @@ class PortfolioDashboardFirstCollectionTest {
             "GITHUB_API_ERROR",
             "rate limit");
     RepositoryService repositoryService = mock(RepositoryService.class);
-    TrafficJdbcRepository traffic = mock(TrafficJdbcRepository.class);
-    CollectionRunJdbcRepository runs = mock(CollectionRunJdbcRepository.class);
-    CollectionJobJdbcRepository jobs = mock(CollectionJobJdbcRepository.class);
+    TrafficReadService traffic = mock(TrafficReadService.class);
+    CollectionTrafficProbe collections = mock(CollectionTrafficProbe.class);
+    
     ActivityClassifier activity = mock(ActivityClassifier.class);
     RepositoryHealthService health = mock(RepositoryHealthService.class);
     Repository unrated =
@@ -130,9 +128,9 @@ class PortfolioDashboardFirstCollectionTest {
     when(repositoryService.signalsFor(anyList())).thenReturn(Map.of());
     when(traffic.earliestTrackedTrafficDate()).thenReturn(Optional.empty());
     when(traffic.hasTrackedTraffic()).thenReturn(false);
-    when(runs.latestPerTrackedRepository()).thenReturn(List.of(run));
-    when(runs.latestCompletedAtForTracked()).thenReturn(null);
-    when(jobs.findByRunIds(any())).thenReturn(List.of(job));
+    when(collections.latestPerTrackedRepository()).thenReturn(List.of(run));
+    when(collections.latestCompletedAtForTracked()).thenReturn(null);
+    when(collections.findByRunIds(any())).thenReturn(List.of(job));
     when(health.discoverabilityScore(repository))
         .thenReturn(new RepositoryHealthService.DiscoverabilityScore(4, 13));
     when(activity.classify(anyBoolean(), nullable(Instant.class)))
@@ -141,10 +139,8 @@ PortfolioDashboardService service =
         new PortfolioDashboardService(
         repositoryService,
         traffic,
-        mock(StatsJdbcRepository.class),
-        runs,
-            jobs,
-            mock(CollectionRunMapper.class),
+        mock(StatsReadService.class),
+        collections,
             activity,
             health,
             mock(PortfolioHighlightsService.class),
