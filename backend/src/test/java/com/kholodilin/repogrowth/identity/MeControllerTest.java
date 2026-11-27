@@ -1,7 +1,11 @@
 package com.kholodilin.repogrowth.identity;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 import com.kholodilin.repogrowth.identity.config.AuthProvider;
 import com.kholodilin.repogrowth.identity.controller.MeController;
@@ -12,32 +16,43 @@ import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import org.springframework.test.web.servlet.MockMvc;
 
-@ExtendWith(MockitoExtension.class)
 class MeControllerTest {
 
-  @Mock UserAccountService users;
+  UserAccountService users;
+  MockMvc mockMvc;
+
+  @BeforeEach
+  void setUp() {
+    users = mock(UserAccountService.class);
+    mockMvc = standaloneSetup(new MeController(users, AuthProvider.MOCK)).build();
+  }
 
   @Test
-  void anonymousForMissingDisabledOrWrongPrincipal() {
-    MeController controller = new MeController(users, AuthProvider.ZITADEL);
-    assertThat(controller.me(null).loginUrl()).isEqualTo("/oauth2/authorization/oidc");
-    assertThat(controller.me(null).authenticated()).isFalse();
+  void anonymousForMissingDisabledOrWrongPrincipal() throws Exception {
+    mockMvc
+        .perform(get("/api/v1/me"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.authenticated").value(false))
+        .andExpect(jsonPath("$.loginUrl").value("/login"));
 
-    Authentication wrong = UsernamePasswordAuthenticationToken.authenticated("x", null, List.of());
-    assertThat(controller.me(wrong).authenticated()).isFalse();
+    var wrong = UsernamePasswordAuthenticationToken.authenticated("x", null, List.of());
+    mockMvc
+        .perform(get("/api/v1/me").principal(wrong))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.authenticated").value(false));
 
     AppUserPrincipal principal = new AppUserPrincipal(9L, "Gone");
-    Authentication auth =
-        UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
+    var auth = UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
     when(users.findById(9L)).thenReturn(Optional.empty());
-    assertThat(controller.me(auth).authenticated()).isFalse();
+    mockMvc
+        .perform(get("/api/v1/me").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.authenticated").value(false));
 
     when(users.findById(9L))
         .thenReturn(
@@ -52,12 +67,14 @@ class MeControllerTest {
                     Instant.now(),
                     Instant.now(),
                     List.of(AppRole.USER))));
-    assertThat(controller.me(auth).authenticated()).isFalse();
+    mockMvc
+        .perform(get("/api/v1/me").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.authenticated").value(false));
   }
 
   @Test
-  void authenticatedAdminIncludesMutate() {
-    MeController controller = new MeController(users, AuthProvider.MOCK);
+  void authenticatedAdminIncludesMutate() throws Exception {
     AppUser admin =
         new AppUser(
             1L,
@@ -71,11 +88,13 @@ class MeControllerTest {
             List.of(AppRole.USER, AppRole.ADMIN));
     when(users.findById(1L)).thenReturn(Optional.of(admin));
     AppUserPrincipal principal = new AppUserPrincipal(1L, "Admin");
-    Authentication auth =
-        UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
-    MeController.MeResponse me = controller.me(auth);
-    assertThat(me.authenticated()).isTrue();
-    assertThat(me.actions()).containsExactly("MUTATE");
-    assertThat(me.loginUrl()).isEqualTo("/login");
+    var auth = UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
+
+    mockMvc
+        .perform(get("/api/v1/me").principal(auth))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.authenticated").value(true))
+        .andExpect(jsonPath("$.actions[0]").value("MUTATE"))
+        .andExpect(jsonPath("$.loginUrl").value("/login"));
   }
 }

@@ -1,75 +1,80 @@
 package com.kholodilin.repogrowth.collection.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
 import com.kholodilin.repogrowth.collection.service.CollectorResultIngestion;
-import jakarta.servlet.http.HttpServletRequest;
-import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.json.JsonMapper;
 
 class CollectorResultControllerTest {
-  private final CollectorResultIngestion ingestion = mock(CollectorResultIngestion.class);
-  private final JsonMapper json = JsonMapper.builder().build();
-  private final CollectorResultController controller =
-      new CollectorResultController(ingestion, json);
+
+  private CollectorResultIngestion ingestion;
+  private MockMvc mvc;
+  private Authentication auth;
+
+  @BeforeEach
+  void setUp() {
+    ingestion = mock(CollectorResultIngestion.class);
+    mvc =
+        standaloneSetup(new CollectorResultController(ingestion, JsonMapper.builder().build()))
+            .build();
+    auth = UsernamePasswordAuthenticationToken.authenticated("node-a", null, List.of());
+  }
 
   @Test
   void rejectsOversizedMalformedAndPersistenceFailures() throws Exception {
-    Authentication auth = mock(Authentication.class);
-    when(auth.getName()).thenReturn("node-a");
-    assertThat(controller.result(request(new byte[5 * 1024 * 1024 + 1]), auth).getStatusCode())
-        .isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
-    assertThat(
-            controller.result(request("{".getBytes(StandardCharsets.UTF_8)), auth).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+    mvc.perform(
+            post("/internal/v1/collector-results")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(new byte[5 * 1024 * 1024 + 1]))
+        .andExpect(status().isContentTooLarge());
+
+    mvc.perform(
+            post("/internal/v1/collector-results")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{".getBytes(StandardCharsets.UTF_8)))
+        .andExpect(status().isBadRequest());
+
     doThrow(new IllegalArgumentException("bad")).when(ingestion).apply(anyString(), any());
-    assertThat(controller.result(request(minimalBody()), auth).getStatusCode())
-        .isEqualTo(HttpStatus.BAD_REQUEST);
+    mvc.perform(
+            post("/internal/v1/collector-results")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(minimalBody()))
+        .andExpect(status().isBadRequest());
+
     doThrow(new DuplicateKeyException("dup")).when(ingestion).apply(anyString(), any());
-    assertThat(controller.result(request(minimalBody()), auth).getStatusCode())
-        .isEqualTo(HttpStatus.CONFLICT);
+    mvc.perform(
+            post("/internal/v1/collector-results")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(minimalBody()))
+        .andExpect(status().isConflict());
+
     doThrow(new DataAccessResourceFailureException("db")).when(ingestion).apply(anyString(), any());
-    assertThat(controller.result(request(minimalBody()), auth).getStatusCode())
-        .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-  }
-
-  private static HttpServletRequest request(byte[] body) throws Exception {
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getInputStream())
-        .thenReturn(
-            new jakarta.servlet.ServletInputStream() {
-              private final ByteArrayInputStream in = new ByteArrayInputStream(body);
-
-              @Override
-              public int read() {
-                return in.read();
-              }
-
-              @Override
-              public boolean isFinished() {
-                return in.available() == 0;
-              }
-
-              @Override
-              public boolean isReady() {
-                return true;
-              }
-
-              @Override
-              public void setReadListener(jakarta.servlet.ReadListener readListener) {}
-            });
-    return request;
+    mvc.perform(
+            post("/internal/v1/collector-results")
+                .principal(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(minimalBody()))
+        .andExpect(status().isServiceUnavailable());
   }
 
   private static byte[] minimalBody() {

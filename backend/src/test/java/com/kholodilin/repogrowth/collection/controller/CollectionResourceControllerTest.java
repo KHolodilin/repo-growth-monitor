@@ -1,18 +1,23 @@
 package com.kholodilin.repogrowth.collection.controller;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup;
 
+import com.kholodilin.collector.contracts.CollectorHttpHeaders;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.collection.service.IdempotentCollectionRequests;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.common.api.GlobalExceptionHandler;
 import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
@@ -25,34 +30,39 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.MockMvc;
 
-@ExtendWith(MockitoExtension.class)
 class CollectionResourceControllerTest {
 
-  @Mock ResourceAccessPolicy access;
-  @Mock IdempotentCollectionRequests idempotent;
-  @Mock PlanningWindow window;
-  @Mock SearchQueryService searchQueries;
-  @Mock TopicVisibilityService topicWatches;
-  @Mock CollectionRequestService commands;
-
-  CollectionResourceController controller;
+  private ResourceAccessPolicy access;
+  private IdempotentCollectionRequests idempotent;
+  private PlanningWindow window;
+  private SearchQueryService searchQueries;
+  private TopicVisibilityService topicWatches;
+  private CollectionRequestService commands;
+  private CollectionResourceController controller;
+  private MockMvc mvc;
 
   @BeforeEach
   void setUp() {
+    access = mock(ResourceAccessPolicy.class);
+    idempotent = mock(IdempotentCollectionRequests.class);
+    window = mock(PlanningWindow.class);
+    searchQueries = mock(SearchQueryService.class);
+    topicWatches = mock(TopicVisibilityService.class);
+    commands = mock(CollectionRequestService.class);
     controller =
         new CollectionResourceController(access, idempotent, window, searchQueries, topicWatches);
     ReflectionTestUtils.setField(controller, "commands", commands);
     when(window.businessDate()).thenReturn(LocalDate.of(2026, 11, 10));
+    mvc = standaloneSetup(controller).setControllerAdvice(new GlobalExceptionHandler()).build();
   }
 
   @Test
-  void repositoryCollectionRequiresIdempotencyKeyAndAdmin() {
+  void repositoryCollectionRequiresIdempotencyKeyAndAdmin() throws Exception {
     doNothing()
         .when(access)
         .requireAction(
@@ -65,11 +75,18 @@ class CollectionResourceControllerTest {
             new CollectionRequestService.Created(requestId, List.of(UUID.randomUUID()), false));
     AppUserPrincipal principal = new AppUserPrincipal(42L, "admin");
     var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
-    assertThat(controller.collect(13L, "key-1", auth).getStatusCode().value()).isEqualTo(201);
+
+    mvc.perform(
+            post("/api/v1/repositories/13/collections")
+                .principal(auth)
+                .header(CollectorHttpHeaders.IDEMPOTENCY_KEY, "key-1")
+                .contentType(MediaType.APPLICATION_JSON))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.coalesced").value(false));
   }
 
   @Test
-  void runCommandsDelegateToOrchestration() {
+  void runCommandsReturnCreatedPayloadAndUnavailableWithoutOrchestration() throws Exception {
     Instant now = Instant.parse("2026-11-10T06:00:00Z");
     SearchQuery query = new SearchQuery(5L, 13L, "outbox", "q", true, 50, now, now);
     TopicWatch watch = new TopicWatch(7L, 13L, "outbox", null, "stars", "desc", true, 50, now, now);
@@ -94,14 +111,27 @@ class CollectionResourceControllerTest {
     when(commands.topicCommand(anyLong(), any())).thenReturn(created);
     when(commands.topicsCommand(anyLong(), any(), any())).thenReturn(created);
 
-    assertThat(controller.runSearchQuery(5L)).isEqualTo(created);
-    assertThat(controller.runRepositorySearchQueries(13L)).isEqualTo(created);
-    assertThat(controller.runTopicWatch(7L)).isEqualTo(created);
-    assertThat(controller.runRepositoryTopicWatches(13L, "language")).isEqualTo(created);
+    mvc.perform(post("/api/v1/search-queries/5/run"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.coalesced").value(false));
+    mvc.perform(post("/api/v1/repositories/13/search-queries/run"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.coalesced").value(false));
+    mvc.perform(post("/api/v1/topic-watches/7/run"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.coalesced").value(false));
+    mvc.perform(post("/api/v1/repositories/13/topic-watches/run").param("scope", "language"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.coalesced").value(false));
+
     when(topicWatches.getWatch(9L)).thenThrow(ApiException.notFound("Topic watch not found"));
-    assertThatThrownBy(() -> controller.runTopicWatch(9L)).isInstanceOf(ApiException.class);
+    mvc.perform(post("/api/v1/topic-watches/9/run"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
     ReflectionTestUtils.setField(controller, "commands", null);
-    assertThatThrownBy(() -> controller.runSearchQuery(5L)).isInstanceOf(ApiException.class);
+    mvc.perform(post("/api/v1/search-queries/5/run"))
+        .andExpect(status().isServiceUnavailable())
+        .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
   }
 }

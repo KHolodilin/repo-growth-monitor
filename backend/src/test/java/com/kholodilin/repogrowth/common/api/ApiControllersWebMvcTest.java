@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -20,11 +19,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.kholodilin.repogrowth.administration.controller.RepositoryController;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.controller.PortfolioDashboardController;
-import com.kholodilin.repogrowth.catalog.service.PortfolioDashboardService;
-import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
-import com.kholodilin.repogrowth.stats.service.AdminStatsHistoryService;
 import com.kholodilin.repogrowth.catalog.controller.HealthCheckItem;
+import com.kholodilin.repogrowth.catalog.controller.PortfolioDashboardController;
 import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
@@ -32,6 +28,7 @@ import com.kholodilin.repogrowth.catalog.model.OwnerType;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositorySignals;
 import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
+import com.kholodilin.repogrowth.catalog.service.PortfolioDashboardService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.collection.controller.CollectionController;
@@ -41,36 +38,37 @@ import com.kholodilin.repogrowth.collection.model.CollectionJobStatus;
 import com.kholodilin.repogrowth.collection.model.CollectionJobType;
 import com.kholodilin.repogrowth.collection.model.CollectionRun;
 import com.kholodilin.repogrowth.collection.model.CollectionRunStatus;
-import com.kholodilin.repogrowth.collection.service.DailyPlanner;
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
 import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
 import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.collection.service.CollectionRequestService;
 import com.kholodilin.repogrowth.collection.service.CollectionRunMapper;
 import com.kholodilin.repogrowth.collection.service.CollectionRunQueryService;
+import com.kholodilin.repogrowth.collection.service.DailyPlanner;
 import com.kholodilin.repogrowth.common.web.SpaController;
 import com.kholodilin.repogrowth.credentials.service.GitHubAccessStatusService;
 import com.kholodilin.repogrowth.events.controller.EventsResourceController;
-import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.events.model.GrowthEvent;
 import com.kholodilin.repogrowth.events.model.GrowthEventSetting;
 import com.kholodilin.repogrowth.events.service.GrowthEventService;
-import com.kholodilin.repogrowth.common.api.GitHubException;
 import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.search.controller.SearchQueryController;
 import com.kholodilin.repogrowth.search.model.SearchQuery;
 import com.kholodilin.repogrowth.search.model.SearchRun;
 import com.kholodilin.repogrowth.search.model.SearchRunStatus;
 import com.kholodilin.repogrowth.search.service.CompetitorCardService;
 import com.kholodilin.repogrowth.search.service.SearchKpiService;
-import com.kholodilin.repogrowth.topics.service.TopicsKpiService;
 import com.kholodilin.repogrowth.search.service.SearchQueryService;
+import com.kholodilin.repogrowth.stats.service.AdminStatsHistoryService;
 import com.kholodilin.repogrowth.support.WebMvcTestSecurityConfig;
 import com.kholodilin.repogrowth.topics.controller.TopicVisibilityController;
 import com.kholodilin.repogrowth.topics.model.TopicRun;
 import com.kholodilin.repogrowth.topics.model.TopicWatch;
 import com.kholodilin.repogrowth.topics.service.TopicCompetitorService;
 import com.kholodilin.repogrowth.topics.service.TopicVisibilityService;
+import com.kholodilin.repogrowth.topics.service.TopicsKpiService;
+import com.kholodilin.repogrowth.traffic.service.AdminTrafficService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -262,7 +260,12 @@ class ApiControllersWebMvcTest {
                 Instant.parse("2026-09-23T06:00:00Z"),
                 List.of(
                     new CollectionRunMapper.CollectionJobResponse(
-                        2L, "TRAFFIC", "SUCCESS", 1, null, null,
+                        2L,
+                        "TRAFFIC",
+                        "SUCCESS",
+                        1,
+                        null,
+                        null,
                         Instant.parse("2026-09-23T06:00:00Z"),
                         Instant.parse("2026-09-23T06:00:00Z")))));
     when(collectionRunQueryService.get(99L))
@@ -366,6 +369,23 @@ class ApiControllersWebMvcTest {
             anyLong(),
             any(ResourceAccessPolicy.ResourceAction.class),
             any(PublicationService.Module.class));
+    when(resourceAccessPolicy.filterReadable(any(), any()))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(trafficReadService.ownerKpi(anyLong(), any(), anyString())).thenReturn(null);
+    when(trafficReadService.repositoryKpi(anyLong(), anyString())).thenReturn(null);
+    when(trafficReadService.ownerDailyHistory(anyLong(), any(), anyString())).thenReturn(null);
+    when(trafficReadService.dailyHistory(anyLong(), anyString())).thenReturn(null);
+    when(trafficReadService.latestReferrers(anyLong())).thenReturn(null);
+    when(trafficReadService.latestPaths(anyLong(), anyBoolean())).thenReturn(null);
+    when(trafficReadService.referrerHistory(anyLong(), any(), any())).thenReturn(null);
+    when(trafficReadService.pathHistory(anyLong(), any(), any(), anyBoolean())).thenReturn(null);
+    when(statsReadService.ownerKpi(anyLong(), any(), anyString())).thenReturn(null);
+    when(statsReadService.repositoryKpi(anyLong(), anyString())).thenReturn(null);
+    when(statsReadService.ownerHistoryResponse(anyLong(), any(), anyString())).thenReturn(null);
+    when(searchKpiService.ownerKpi(anyLong(), any(), anyString())).thenReturn(null);
+    when(searchKpiService.repositoryKpi(anyLong(), anyString())).thenReturn(null);
+    when(topicsKpiService.ownerKpi(anyLong(), any(), anyString(), anyString())).thenReturn(null);
+    when(topicsKpiService.repositoryKpi(anyLong(), anyString(), anyString())).thenReturn(null);
     TopicRun topicRun =
         new TopicRun(
             3L,
@@ -457,9 +477,7 @@ class ApiControllersWebMvcTest {
     mockMvc.perform(delete("/api/v1/search-queries/5")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/search-queries/5")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/search-queries/5/history")).andExpect(status().isOk());
-    mockMvc
-        .perform(get("/api/v1/repositories/13/search-visibility"))
-        .andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/search-visibility")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/search-queries/5/results")).andExpect(status().isOk());
     mockMvc
         .perform(get("/api/v1/search-queries/5/series"))
@@ -497,9 +515,7 @@ class ApiControllersWebMvcTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("[{\"eventType\":\"STAR_MILESTONE\",\"enabled\":false}]"))
         .andExpect(status().isOk());
-    mockMvc
-        .perform(get("/api/v1/repositories/13/topics-visibility"))
-        .andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/topics-visibility")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/topic-watches/7/history")).andExpect(status().isOk());
     mockMvc.perform(get("/api/v1/topic-watches/7/results")).andExpect(status().isOk());
     mockMvc
@@ -650,9 +666,80 @@ class ApiControllersWebMvcTest {
   }
 
   @Test
-  void searchAndTopicRunsAreCoveredByCollectionResourceControllerUnitTest() {
-    // Run commands live on CollectionResourceController (ConditionalOnProperty orchestration);
-    // see CollectionResourceControllerTest — not sliced into this WebMvc suite.
+  void resourceTrafficStatsSearchTopicsAndOwnerEventsContracts() throws Exception {
+    mockMvc.perform(get("/api/v1/owners/1/traffic/kpi")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/traffic/kpi")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/owners/1/traffic-history")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/traffic-history")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/referrers")).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/repositories/13/paths?includeServicePaths=true"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/repositories/13/referrer-history?period=7d"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/repositories/13/path-history?period=7d"))
+        .andExpect(status().isOk());
+    verify(trafficReadService).pathHistory(13L, "7d", null, false);
+
+    mockMvc.perform(get("/api/v1/owners/1/stats/kpi")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/stats/kpi")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/owners/1/stats-history")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/stats-history")).andExpect(status().isOk());
+    verify(adminStatsHistoryService).statsHistory(13L, "7d");
+
+    mockMvc.perform(get("/api/v1/owners/1/search/kpi")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/repositories/13/search/kpi")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/owners/1/topics/kpi")).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/repositories/13/topics/kpi?scope=language"))
+        .andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/owners/1/growth-events"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].title").value("Posted"));
+  }
+
+  @Test
+  void ownerResourceReadsReturnNotFoundWhenNoReadableRepositories() throws Exception {
+    when(resourceAccessPolicy.filterReadable(any(), any())).thenReturn(List.of());
+    mockMvc
+        .perform(get("/api/v1/owners/1/traffic/kpi"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+        .andExpect(jsonPath("$.message").value("Owner not found"));
+    mockMvc
+        .perform(get("/api/v1/owners/1/stats/kpi"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    mockMvc
+        .perform(get("/api/v1/owners/1/search/kpi"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    mockMvc
+        .perform(get("/api/v1/owners/1/topics/kpi"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    mockMvc
+        .perform(get("/api/v1/owners/1/growth-events"))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+  }
+
+  @Test
+  void growthEventSettingsStayPrivateToOperators() throws Exception {
+    when(currentUserAccess.canSeePrivateRepositories()).thenReturn(false);
+    when(currentUserAccess.authenticated()).thenReturn(false);
+    mockMvc
+        .perform(get("/api/v1/repositories/13/growth-event-settings"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    when(currentUserAccess.authenticated()).thenReturn(true);
+    mockMvc
+        .perform(get("/api/v1/repositories/13/growth-event-settings"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("FORBIDDEN"));
   }
 
   @Test
