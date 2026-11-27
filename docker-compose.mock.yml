@@ -49,6 +49,8 @@ services:
       COLLECTION_PLANNER_INTERVAL: 1m
       AUTH_PROVIDER: mock
       AUTH_PRODUCTION: "false"
+      # Materialize northstar owner/repos/~30d metrics into Postgres (WireMock alone does not seed DB).
+      RGM_MOCK_SEED_NORTHSTAR: "true"
     depends_on:
       postgres:
         condition: service_healthy

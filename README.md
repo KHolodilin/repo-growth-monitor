@@ -162,12 +162,15 @@ No live GitHub token — WireMock only (`GITHUB_TOKEN=mock-token`). Isolated Pos
 
 Fixtures include legacy `acme/*` plus deterministic owner **`northstar`** (10 repos, 30 days of
 traffic/clones for period/chart regression). Manifest: `wiremock/northstar-fixture-manifest.json`.
+WireMock serves GitHub; `RGM_MOCK_SEED_NORTHSTAR=true` seeds Postgres on startup so the public
+owners directory and charts are non-empty without orchestration/collector. Live mock collect still
+needs the split collector stack (`docker compose` + `deploy/prepare-combined-local.py`).
 
 ```bash
 docker compose -f docker-compose.mock.yml up -d --build
 ```
 
-- App: http://localhost:8082
+- App: http://localhost:8082 (expect **northstar** on the public owners homepage)
 - WireMock: http://localhost:8081/__admin
 - Test Postgres: `localhost:5433` (user/password `postgres`, db `repogrowth_mock`)
 
