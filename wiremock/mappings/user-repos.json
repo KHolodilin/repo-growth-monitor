@@ -25,7 +25,14 @@
         "forks_count": 19,
         "open_issues_count": 4,
         "html_url": "https://github.com/acme/spring-outbox",
-        "topics": ["kafka", "outbox", "outbox-pattern", "postgresql", "spring-boot", "transactional-outbox"],
+        "topics": [
+          "kafka",
+          "outbox",
+          "outbox-pattern",
+          "postgresql",
+          "spring-boot",
+          "transactional-outbox"
+        ],
         "created_at": "2023-03-12T10:00:00Z",
         "updated_at": "2026-08-27T12:00:00Z",
         "owner": {
@@ -53,7 +60,11 @@
         "open_issues_count": 2,
         "html_url": "https://github.com/acme/kafka-starter",
         "homepage": "https://docs.acme.dev/kafka-starter",
-        "license": { "key": "mit", "name": "MIT License", "spdx_id": "MIT" },
+        "license": {
+          "key": "mit",
+          "name": "MIT License",
+          "spdx_id": "MIT"
+        },
         "topics": [
           "gatling",
           "grafana",
@@ -111,6 +122,326 @@
           "type": "User",
           "avatar_url": "https://avatars.githubusercontent.com/u/42?v=4",
           "html_url": "https://github.com/acme"
+        }
+      },
+      {
+        "id": 91001,
+        "name": "pulse-board",
+        "full_name": "northstar/pulse-board",
+        "description": "Deterministic mock repository pulse-board for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 240,
+        "subscribers_count": 24,
+        "forks_count": 20,
+        "open_issues_count": 1,
+        "html_url": "https://github.com/northstar/pulse-board",
+        "topics": [
+          "observability",
+          "dashboard",
+          "metrics"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91002,
+        "name": "signal-router",
+        "full_name": "northstar/signal-router",
+        "description": "Deterministic mock repository signal-router for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 180,
+        "subscribers_count": 18,
+        "forks_count": 15,
+        "open_issues_count": 2,
+        "html_url": "https://github.com/northstar/signal-router",
+        "topics": [
+          "kafka",
+          "routing",
+          "events"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91003,
+        "name": "lake-ingest",
+        "full_name": "northstar/lake-ingest",
+        "description": "Deterministic mock repository lake-ingest for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Python",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 95,
+        "subscribers_count": 9,
+        "forks_count": 7,
+        "open_issues_count": 3,
+        "html_url": "https://github.com/northstar/lake-ingest",
+        "topics": [
+          "etl",
+          "data",
+          "batch"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91004,
+        "name": "edge-cache",
+        "full_name": "northstar/edge-cache",
+        "description": "Deterministic mock repository edge-cache for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Go",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 310,
+        "subscribers_count": 31,
+        "forks_count": 25,
+        "open_issues_count": 4,
+        "html_url": "https://github.com/northstar/edge-cache",
+        "topics": [
+          "cache",
+          "cdn",
+          "performance"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91005,
+        "name": "trust-vault",
+        "full_name": "northstar/trust-vault",
+        "description": "Deterministic mock repository trust-vault for RGM UI regression",
+        "private": true,
+        "visibility": "private",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 150,
+        "subscribers_count": 15,
+        "forks_count": 12,
+        "open_issues_count": 5,
+        "html_url": "https://github.com/northstar/trust-vault",
+        "topics": [
+          "security",
+          "secrets",
+          "vault"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91006,
+        "name": "schema-forge",
+        "full_name": "northstar/schema-forge",
+        "description": "Deterministic mock repository schema-forge for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "TypeScript",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 88,
+        "subscribers_count": 8,
+        "forks_count": 7,
+        "open_issues_count": 1,
+        "html_url": "https://github.com/northstar/schema-forge",
+        "topics": [
+          "schema",
+          "codegen",
+          "api"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91007,
+        "name": "fleet-agent",
+        "full_name": "northstar/fleet-agent",
+        "description": "Deterministic mock repository fleet-agent for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Go",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 122,
+        "subscribers_count": 12,
+        "forks_count": 10,
+        "open_issues_count": 2,
+        "html_url": "https://github.com/northstar/fleet-agent",
+        "topics": [
+          "agent",
+          "ops",
+          "fleet"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91008,
+        "name": "chart-kit",
+        "full_name": "northstar/chart-kit",
+        "description": "Deterministic mock repository chart-kit for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "TypeScript",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 64,
+        "subscribers_count": 6,
+        "forks_count": 5,
+        "open_issues_count": 3,
+        "html_url": "https://github.com/northstar/chart-kit",
+        "topics": [
+          "charts",
+          "kpi",
+          "ui"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91009,
+        "name": "rank-engine",
+        "full_name": "northstar/rank-engine",
+        "description": "Deterministic mock repository rank-engine for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 205,
+        "subscribers_count": 20,
+        "forks_count": 17,
+        "open_issues_count": 4,
+        "html_url": "https://github.com/northstar/rank-engine",
+        "topics": [
+          "search",
+          "ranking",
+          "topics"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
+        }
+      },
+      {
+        "id": 91010,
+        "name": "audit-ledger",
+        "full_name": "northstar/audit-ledger",
+        "description": "Deterministic mock repository audit-ledger for RGM UI regression",
+        "private": false,
+        "visibility": "public",
+        "default_branch": "main",
+        "language": "Java",
+        "fork": false,
+        "archived": false,
+        "stargazers_count": 73,
+        "subscribers_count": 7,
+        "forks_count": 6,
+        "open_issues_count": 5,
+        "html_url": "https://github.com/northstar/audit-ledger",
+        "topics": [
+          "audit",
+          "ledger",
+          "compliance"
+        ],
+        "created_at": "2024-01-15T10:00:00Z",
+        "updated_at": "2026-11-01T12:00:00Z",
+        "pushed_at": "2026-11-01T08:00:00Z",
+        "owner": {
+          "id": 90042,
+          "login": "northstar",
+          "type": "User",
+          "avatar_url": "https://avatars.githubusercontent.com/u/90042?v=4",
+          "html_url": "https://github.com/northstar"
         }
       }
     ]

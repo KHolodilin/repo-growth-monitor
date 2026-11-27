@@ -1,3 +1,6 @@
+# Mock GitHub via WireMock — no live GITHUB_TOKEN.
+# Fixtures: legacy acme/* plus deterministic owner northstar (10 repos, 30d traffic).
+# Manifest: wiremock/northstar-fixture-manifest.json
 name: repo-growth-mock
 
 services:
@@ -26,6 +29,7 @@ services:
       - "8081:8080"
     volumes:
       - ./wiremock/mappings:/home/wiremock/mappings
+      - ./wiremock/northstar-fixture-manifest.json:/home/wiremock/__files/northstar-fixture-manifest.json:ro
 
   repo-growth-monitor:
     build: .

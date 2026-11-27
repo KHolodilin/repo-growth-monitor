@@ -13,6 +13,40 @@
       "incomplete_results": false,
       "items": [
         {
+          "id": 91009,
+          "full_name": "northstar/rank-engine",
+          "description": "Deterministic mock ranking engine",
+          "stargazers_count": 205,
+          "forks_count": 17,
+          "language": "Java",
+          "created_at": "2024-01-15T10:00:00Z",
+          "updated_at": "2026-11-01T12:00:00Z",
+          "pushed_at": "2026-11-01T08:00:00Z",
+          "html_url": "https://github.com/northstar/rank-engine",
+          "owner": {
+            "id": 90042,
+            "login": "northstar",
+            "type": "User"
+          }
+        },
+        {
+          "id": 91001,
+          "full_name": "northstar/pulse-board",
+          "description": "Deterministic mock pulse board",
+          "stargazers_count": 240,
+          "forks_count": 20,
+          "language": "Java",
+          "created_at": "2024-01-15T10:00:00Z",
+          "updated_at": "2026-11-01T12:00:00Z",
+          "pushed_at": "2026-11-01T08:00:00Z",
+          "html_url": "https://github.com/northstar/pulse-board",
+          "owner": {
+            "id": 90042,
+            "login": "northstar",
+            "type": "User"
+          }
+        },
+        {
           "id": 9001,
           "full_name": "competitor/outbox-kit",
           "description": "Outbox kit",
@@ -23,7 +57,11 @@
           "updated_at": "2026-08-20T00:00:00Z",
           "pushed_at": "2026-08-26T00:00:00Z",
           "html_url": "https://github.com/competitor/outbox-kit",
-          "owner": { "id": 501, "login": "competitor", "type": "Organization" }
+          "owner": {
+            "id": 501,
+            "login": "competitor",
+            "type": "Organization"
+          }
         },
         {
           "id": 9002,
@@ -36,7 +74,11 @@
           "updated_at": "2026-08-18T00:00:00Z",
           "pushed_at": "2026-05-01T00:00:00Z",
           "html_url": "https://github.com/another/spring-outbox",
-          "owner": { "id": 502, "login": "another", "type": "User" }
+          "owner": {
+            "id": 502,
+            "login": "another",
+            "type": "User"
+          }
         },
         {
           "id": 9003,
@@ -49,7 +91,11 @@
           "updated_at": "2026-08-10T00:00:00Z",
           "pushed_at": "2024-01-01T00:00:00Z",
           "html_url": "https://github.com/labs/kafka-outbox",
-          "owner": { "id": 503, "login": "labs", "type": "Organization" }
+          "owner": {
+            "id": 503,
+            "login": "labs",
+            "type": "Organization"
+          }
         },
         {
           "id": 1001,
@@ -62,7 +108,11 @@
           "updated_at": "2026-08-27T12:00:00Z",
           "pushed_at": "2026-08-28T08:00:00Z",
           "html_url": "https://github.com/acme/spring-outbox",
-          "owner": { "id": 42, "login": "acme", "type": "User" }
+          "owner": {
+            "id": 42,
+            "login": "acme",
+            "type": "User"
+          }
         },
         {
           "id": 9004,
@@ -75,7 +125,11 @@
           "updated_at": "2026-08-01T00:00:00Z",
           "pushed_at": "2026-07-15T00:00:00Z",
           "html_url": "https://github.com/oss/outbox-jdbc",
-          "owner": { "id": 504, "login": "oss", "type": "User" }
+          "owner": {
+            "id": 504,
+            "login": "oss",
+            "type": "User"
+          }
         }
       ]
     }

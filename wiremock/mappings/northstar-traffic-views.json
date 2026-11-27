@@ -1,0 +1,1724 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/pulse-board/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 2409,
+          "uniques": 951,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 40,
+              "uniques": 16
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 43,
+              "uniques": 17
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 46,
+              "uniques": 18
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 49,
+              "uniques": 19
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 52,
+              "uniques": 20
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 43,
+              "uniques": 17
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 46,
+              "uniques": 18
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 61,
+              "uniques": 24
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 64,
+              "uniques": 25
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 67,
+              "uniques": 26
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 70,
+              "uniques": 28
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 73,
+              "uniques": 29
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 64,
+              "uniques": 25
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 67,
+              "uniques": 26
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 82,
+              "uniques": 32
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 85,
+              "uniques": 34
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 88,
+              "uniques": 35
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 91,
+              "uniques": 36
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 94,
+              "uniques": 37
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 85,
+              "uniques": 34
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 88,
+              "uniques": 35
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 103,
+              "uniques": 41
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 106,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 109,
+              "uniques": 43
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 112,
+              "uniques": 44
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 115,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 106,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 109,
+              "uniques": 43
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 124,
+              "uniques": 49
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 127,
+              "uniques": 50
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/signal-router/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 3030,
+          "uniques": 1200,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 59,
+              "uniques": 23
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 61,
+              "uniques": 24
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 63,
+              "uniques": 25
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 74,
+              "uniques": 29
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 76,
+              "uniques": 30
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 66,
+              "uniques": 26
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 68,
+              "uniques": 27
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 82,
+              "uniques": 32
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 84,
+              "uniques": 33
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 86,
+              "uniques": 34
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 88,
+              "uniques": 35
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 90,
+              "uniques": 36
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 89,
+              "uniques": 35
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 91,
+              "uniques": 36
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 105,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 107,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 109,
+              "uniques": 43
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 111,
+              "uniques": 44
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 113,
+              "uniques": 45
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 103,
+              "uniques": 41
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 105,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 128,
+              "uniques": 51
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 130,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 132,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 134,
+              "uniques": 53
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 136,
+              "uniques": 54
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 126,
+              "uniques": 50
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 128,
+              "uniques": 51
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 142,
+              "uniques": 56
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 144,
+              "uniques": 57
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/lake-ingest/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 3543,
+          "uniques": 1406,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 78,
+              "uniques": 31
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 79,
+              "uniques": 31
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 80,
+              "uniques": 32
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 90,
+              "uniques": 36
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 91,
+              "uniques": 36
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 80,
+              "uniques": 32
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 81,
+              "uniques": 32
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 103,
+              "uniques": 41
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 104,
+              "uniques": 41
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 105,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 106,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 107,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 105,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 106,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 119,
+              "uniques": 47
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 120,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 130,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 131,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 132,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 121,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 122,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 144,
+              "uniques": 57
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 145,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 146,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 147,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 157,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 146,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 147,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 161,
+              "uniques": 64
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/edge-cache/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 4029,
+          "uniques": 1598,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 97,
+              "uniques": 38
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 97,
+              "uniques": 38
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 97,
+              "uniques": 38
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 106,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 106,
+              "uniques": 42
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 94,
+              "uniques": 37
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 103,
+              "uniques": 41
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 115,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 115,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 124,
+              "uniques": 49
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 124,
+              "uniques": 49
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 124,
+              "uniques": 49
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 121,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 121,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 133,
+              "uniques": 53
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 142,
+              "uniques": 56
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 142,
+              "uniques": 56
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 142,
+              "uniques": 56
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 151,
+              "uniques": 60
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 139,
+              "uniques": 55
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 139,
+              "uniques": 55
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 169,
+              "uniques": 67
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 169,
+              "uniques": 67
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 157,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 166,
+              "uniques": 66
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 178,
+              "uniques": 71
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 178,
+              "uniques": 71
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/trust-vault/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 4569,
+          "uniques": 1816,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 116,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 115,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 114,
+              "uniques": 45
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 122,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 121,
+              "uniques": 48
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 117,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 116,
+              "uniques": 46
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 136,
+              "uniques": 54
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 135,
+              "uniques": 54
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 143,
+              "uniques": 57
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 142,
+              "uniques": 56
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 141,
+              "uniques": 56
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 137,
+              "uniques": 54
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 136,
+              "uniques": 54
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 156,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 155,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 163,
+              "uniques": 65
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 162,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 170,
+              "uniques": 68
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 157,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 156,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 176,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 175,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 183,
+              "uniques": 73
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 182,
+              "uniques": 72
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 190,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 177,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 185,
+              "uniques": 74
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 196,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 195,
+              "uniques": 78
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/schema-forge/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 5073,
+          "uniques": 2019,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 126,
+              "uniques": 50
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 133,
+              "uniques": 53
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 131,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 138,
+              "uniques": 55
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 145,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 131,
+              "uniques": 52
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 138,
+              "uniques": 55
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 148,
+              "uniques": 59
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 155,
+              "uniques": 62
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 153,
+              "uniques": 61
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 158,
+              "uniques": 63
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 153,
+              "uniques": 61
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 170,
+              "uniques": 68
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 177,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 175,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 182,
+              "uniques": 72
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 180,
+              "uniques": 72
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 175,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 173,
+              "uniques": 69
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 192,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 199,
+              "uniques": 79
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 197,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 204,
+              "uniques": 81
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 202,
+              "uniques": 80
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 197,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 195,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 214,
+              "uniques": 85
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 212,
+              "uniques": 84
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/fleet-agent/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 5559,
+          "uniques": 2213,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 145,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 151,
+              "uniques": 60
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 148,
+              "uniques": 59
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 154,
+              "uniques": 61
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 160,
+              "uniques": 64
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 145,
+              "uniques": 58
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 151,
+              "uniques": 60
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 169,
+              "uniques": 67
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 166,
+              "uniques": 66
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 172,
+              "uniques": 68
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 178,
+              "uniques": 71
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 175,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 169,
+              "uniques": 67
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 175,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 184,
+              "uniques": 73
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 190,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 196,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 193,
+              "uniques": 77
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 199,
+              "uniques": 79
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 193,
+              "uniques": 77
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 190,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 208,
+              "uniques": 83
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 214,
+              "uniques": 85
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 211,
+              "uniques": 84
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 217,
+              "uniques": 86
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 223,
+              "uniques": 89
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 208,
+              "uniques": 83
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 214,
+              "uniques": 85
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 232,
+              "uniques": 92
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 229,
+              "uniques": 91
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/chart-kit/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 6099,
+          "uniques": 2429,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 164,
+              "uniques": 65
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 169,
+              "uniques": 67
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 165,
+              "uniques": 66
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 170,
+              "uniques": 68
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 175,
+              "uniques": 70
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 168,
+              "uniques": 67
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 173,
+              "uniques": 69
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 181,
+              "uniques": 72
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 186,
+              "uniques": 74
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 191,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 196,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 192,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 185,
+              "uniques": 74
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 190,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 207,
+              "uniques": 82
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 212,
+              "uniques": 84
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 208,
+              "uniques": 83
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 213,
+              "uniques": 85
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 218,
+              "uniques": 87
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 211,
+              "uniques": 84
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 207,
+              "uniques": 82
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 224,
+              "uniques": 89
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 229,
+              "uniques": 91
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 234,
+              "uniques": 93
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 239,
+              "uniques": 95
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 235,
+              "uniques": 94
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 228,
+              "uniques": 91
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 233,
+              "uniques": 93
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 250,
+              "uniques": 100
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 246,
+              "uniques": 98
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/rank-engine/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 6612,
+          "uniques": 2632,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 183,
+              "uniques": 73
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 187,
+              "uniques": 74
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 182,
+              "uniques": 72
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 186,
+              "uniques": 74
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 190,
+              "uniques": 76
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 182,
+              "uniques": 72
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 186,
+              "uniques": 74
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 202,
+              "uniques": 80
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 206,
+              "uniques": 82
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 210,
+              "uniques": 84
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 214,
+              "uniques": 85
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 209,
+              "uniques": 83
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 201,
+              "uniques": 80
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 205,
+              "uniques": 82
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 221,
+              "uniques": 88
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 225,
+              "uniques": 90
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 229,
+              "uniques": 91
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 233,
+              "uniques": 93
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 237,
+              "uniques": 94
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 229,
+              "uniques": 91
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 224,
+              "uniques": 89
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 240,
+              "uniques": 96
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 244,
+              "uniques": 97
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 248,
+              "uniques": 99
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 252,
+              "uniques": 100
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 256,
+              "uniques": 102
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 248,
+              "uniques": 99
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 252,
+              "uniques": 100
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 268,
+              "uniques": 107
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 263,
+              "uniques": 105
+            }
+          ]
+        }
+      }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPath": "/repos/northstar/audit-ledger/traffic/views"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "transformers": [
+          "response-template"
+        ],
+        "jsonBody": {
+          "count": 6999,
+          "uniques": 2787,
+          "views": [
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-29 days'}}T00:00:00Z",
+              "count": 193,
+              "uniques": 77
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-28 days'}}T00:00:00Z",
+              "count": 196,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-27 days'}}T00:00:00Z",
+              "count": 199,
+              "uniques": 79
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-26 days'}}T00:00:00Z",
+              "count": 202,
+              "uniques": 80
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-25 days'}}T00:00:00Z",
+              "count": 205,
+              "uniques": 82
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-24 days'}}T00:00:00Z",
+              "count": 196,
+              "uniques": 78
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-23 days'}}T00:00:00Z",
+              "count": 199,
+              "uniques": 79
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-22 days'}}T00:00:00Z",
+              "count": 214,
+              "uniques": 85
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-21 days'}}T00:00:00Z",
+              "count": 217,
+              "uniques": 86
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-20 days'}}T00:00:00Z",
+              "count": 220,
+              "uniques": 88
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-19 days'}}T00:00:00Z",
+              "count": 223,
+              "uniques": 89
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-18 days'}}T00:00:00Z",
+              "count": 226,
+              "uniques": 90
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-17 days'}}T00:00:00Z",
+              "count": 217,
+              "uniques": 86
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-16 days'}}T00:00:00Z",
+              "count": 220,
+              "uniques": 88
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-15 days'}}T00:00:00Z",
+              "count": 235,
+              "uniques": 94
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-14 days'}}T00:00:00Z",
+              "count": 238,
+              "uniques": 95
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-13 days'}}T00:00:00Z",
+              "count": 241,
+              "uniques": 96
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-12 days'}}T00:00:00Z",
+              "count": 244,
+              "uniques": 97
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-11 days'}}T00:00:00Z",
+              "count": 247,
+              "uniques": 98
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-10 days'}}T00:00:00Z",
+              "count": 238,
+              "uniques": 95
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-9 days'}}T00:00:00Z",
+              "count": 241,
+              "uniques": 96
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-8 days'}}T00:00:00Z",
+              "count": 256,
+              "uniques": 102
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-7 days'}}T00:00:00Z",
+              "count": 259,
+              "uniques": 103
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-6 days'}}T00:00:00Z",
+              "count": 262,
+              "uniques": 104
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-5 days'}}T00:00:00Z",
+              "count": 265,
+              "uniques": 106
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-4 days'}}T00:00:00Z",
+              "count": 268,
+              "uniques": 107
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-3 days'}}T00:00:00Z",
+              "count": 259,
+              "uniques": 103
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-2 days'}}T00:00:00Z",
+              "count": 262,
+              "uniques": 104
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd' offset='-1 days'}}T00:00:00Z",
+              "count": 277,
+              "uniques": 110
+            },
+            {
+              "timestamp": "{{now timezone='UTC' format='yyyy-MM-dd'}}T00:00:00Z",
+              "count": 280,
+              "uniques": 112
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

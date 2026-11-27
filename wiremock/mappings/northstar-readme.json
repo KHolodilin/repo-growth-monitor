@@ -1,0 +1,25 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "GET",
+        "urlPathPattern": "/repos/northstar/.*/readme"
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "jsonBody": {
+          "name": "README.md",
+          "path": "README.md",
+          "type": "file",
+          "content": "IyBub3J0aHN0YXIgbW9jaw==",
+          "encoding": "base64",
+          "html_url": "https://github.com/northstar/pulse-board#readme"
+        }
+      }
+    }
+  ]
+}

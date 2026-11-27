@@ -157,7 +157,11 @@ Stop with `docker compose down`.
 
 ### Mock stack (WireMock + test database)
 
-No GitHub token. Isolated Postgres volume `pgdata_mock_18`, database `repogrowth_mock`.
+No live GitHub token — WireMock only (`GITHUB_TOKEN=mock-token`). Isolated Postgres volume
+`pgdata_mock_18`, database `repogrowth_mock`.
+
+Fixtures include legacy `acme/*` plus deterministic owner **`northstar`** (10 repos, 30 days of
+traffic/clones for period/chart regression). Manifest: `wiremock/northstar-fixture-manifest.json`.
 
 ```bash
 docker compose -f docker-compose.mock.yml up -d --build

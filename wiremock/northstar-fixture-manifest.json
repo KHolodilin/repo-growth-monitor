@@ -1,0 +1,84 @@
+{
+  "owner": "northstar",
+  "ownerId": 90042,
+  "repositoryCount": 10,
+  "trafficDays": 30,
+  "repositories": [
+    {
+      "id": 91001,
+      "name": "pulse-board",
+      "private": false,
+      "language": "Java",
+      "stars": 240
+    },
+    {
+      "id": 91002,
+      "name": "signal-router",
+      "private": false,
+      "language": "Java",
+      "stars": 180
+    },
+    {
+      "id": 91003,
+      "name": "lake-ingest",
+      "private": false,
+      "language": "Python",
+      "stars": 95
+    },
+    {
+      "id": 91004,
+      "name": "edge-cache",
+      "private": false,
+      "language": "Go",
+      "stars": 310
+    },
+    {
+      "id": 91005,
+      "name": "trust-vault",
+      "private": true,
+      "language": "Java",
+      "stars": 150
+    },
+    {
+      "id": 91006,
+      "name": "schema-forge",
+      "private": false,
+      "language": "TypeScript",
+      "stars": 88
+    },
+    {
+      "id": 91007,
+      "name": "fleet-agent",
+      "private": false,
+      "language": "Go",
+      "stars": 122
+    },
+    {
+      "id": 91008,
+      "name": "chart-kit",
+      "private": false,
+      "language": "TypeScript",
+      "stars": 64
+    },
+    {
+      "id": 91009,
+      "name": "rank-engine",
+      "private": false,
+      "language": "Java",
+      "stars": 205
+    },
+    {
+      "id": 91010,
+      "name": "audit-ledger",
+      "private": false,
+      "language": "Java",
+      "stars": 73
+    }
+  ],
+  "scenarios": [
+    "onboarding",
+    "collect",
+    "chart-period-switch"
+  ],
+  "determinism": "values from stable formulas; timestamps use WireMock now-relative offsets so same calendar day repeats"
+}
