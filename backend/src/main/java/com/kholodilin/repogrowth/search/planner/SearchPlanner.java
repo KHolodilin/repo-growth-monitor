@@ -2,8 +2,8 @@ package com.kholodilin.repogrowth.search.planner;
 
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
-import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
-import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import java.time.LocalDate;
 import java.util.Objects;
 import org.springframework.stereotype.Service;

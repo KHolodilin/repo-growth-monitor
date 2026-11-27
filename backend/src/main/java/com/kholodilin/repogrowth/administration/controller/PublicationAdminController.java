@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.administration.controller;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.auth.security.AppUserPrincipal;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.web.AppHttpHeaders;
+import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
 import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;

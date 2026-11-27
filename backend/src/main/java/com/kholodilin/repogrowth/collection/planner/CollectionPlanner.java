@@ -1,11 +1,11 @@
 package com.kholodilin.repogrowth.collection.planner;
 
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
-import com.kholodilin.repogrowth.collection.domain.CollectionRun;
-import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
+import com.kholodilin.repogrowth.collection.model.CollectionRun;
+import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
+import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.LocalDate;
 import java.util.Objects;
 import org.springframework.stereotype.Service;

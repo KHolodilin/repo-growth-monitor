@@ -4,7 +4,10 @@ import com.kholodilin.repogrowth.administration.configuration.PublicRoutes;
 import com.kholodilin.repogrowth.administration.configuration.PublicationProperties;
 import com.kholodilin.repogrowth.administration.service.*;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.analytics.application.*;
+import com.kholodilin.repogrowth.analytics.service.*;
+import com.kholodilin.repogrowth.analytics.service.DashboardPeriod;
+import com.kholodilin.repogrowth.analytics.service.GrowthMath;
+import com.kholodilin.repogrowth.analytics.service.PortfolioHighlightMath;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import java.time.*;
@@ -369,7 +372,7 @@ public class PublicReadService {
             "SELECT r.id,r.full_name,q.name AS query,s.business_date,s.tracked_repository_position FROM search_run s JOIN search_query q ON q.id=s.search_query_id AND q.repository_id=s.repository_id JOIN repository r ON r.id=s.repository_id WHERE r.id IN (:ids) AND q.public_enabled AND s.status='SUCCESS' AND s.tracked_repository_position IS NOT NULL AND s.business_date<=:to",
             p,
             (rs, n) ->
-                new com.kholodilin.repogrowth.search.domain.SuccessfulRank(
+                new com.kholodilin.repogrowth.search.model.SuccessfulRank(
                     rs.getLong("id"),
                     rs.getString("full_name"),
                     rs.getString("query"),
@@ -380,7 +383,7 @@ public class PublicReadService {
             "SELECT r.id,r.full_name,count(*) AS count FROM growth_event e JOIN repository r ON r.id=e.repository_id WHERE r.id IN (:ids) AND e.category='PROMOTION' AND (e.event_at AT TIME ZONE 'UTC')::date BETWEEN :from AND :to GROUP BY r.id,r.full_name",
             p,
             (rs, n) ->
-                new com.kholodilin.repogrowth.event.domain.PromotionCount(
+                new com.kholodilin.repogrowth.events.model.PromotionCount(
                     rs.getLong("id"), rs.getString("full_name"), rs.getInt("count")));
     var answer = new LinkedHashMap<String, Object>();
     answer.put(
@@ -445,7 +448,7 @@ public class PublicReadService {
   }
 
   private Object rankHighlight(
-      com.kholodilin.repogrowth.analytics.api.DashboardResponse.RankHighlight value) {
+      com.kholodilin.repogrowth.analytics.controller.DashboardResponse.RankHighlight value) {
     return value == null
         ? null
         : Map.of(

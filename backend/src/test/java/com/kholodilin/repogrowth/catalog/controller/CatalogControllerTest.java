@@ -6,7 +6,6 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.catalog.model.ActivityStatus;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.OwnerType;
@@ -17,6 +16,7 @@ import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;

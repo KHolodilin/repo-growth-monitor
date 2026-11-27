@@ -1,7 +1,6 @@
 package com.kholodilin.repogrowth.catalog.controller;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel;
@@ -11,6 +10,7 @@ import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
 import com.kholodilin.repogrowth.common.model.page.CursorPage;
+import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;

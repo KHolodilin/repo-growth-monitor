@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.github.client;
 
 import com.kholodilin.repogrowth.collection.planner.PlanningWindow;
-import com.kholodilin.repogrowth.credentials.GitHubAccessStatusService;
+import com.kholodilin.repogrowth.credentials.service.GitHubAccessStatusService;
 import java.time.format.DateTimeFormatter;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

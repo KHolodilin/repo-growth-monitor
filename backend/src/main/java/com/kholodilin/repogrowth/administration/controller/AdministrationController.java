@@ -1,10 +1,10 @@
 package com.kholodilin.repogrowth.administration.controller;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiSurface;
+import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.PathVariable;

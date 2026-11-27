@@ -8,7 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.kholodilin.repogrowth.collection.persistence.PlannerSlotJdbcRepository;
+import com.kholodilin.repogrowth.collection.repository.PlannerSlotJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
 import com.kholodilin.repogrowth.orchestration.CollectionRequestService;

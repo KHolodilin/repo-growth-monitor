@@ -1,12 +1,12 @@
 package com.kholodilin.repogrowth;
 
-import com.kholodilin.repogrowth.auth.application.UserAccountService;
-import com.kholodilin.repogrowth.auth.cli.UsersCli;
 import com.kholodilin.repogrowth.common.config.AppProperties;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
 import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
 import com.kholodilin.repogrowth.common.config.TrafficProperties;
+import com.kholodilin.repogrowth.identity.cli.UsersCli;
+import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.AutoConfigurationExcludeFilter;

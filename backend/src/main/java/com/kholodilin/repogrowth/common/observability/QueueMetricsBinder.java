@@ -1,9 +1,9 @@
 package com.kholodilin.repogrowth.common.observability;
 
-import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
-import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
-import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
+import com.kholodilin.repogrowth.collection.model.CollectionJobStatus;
+import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
+import com.kholodilin.repogrowth.search.model.SearchRunStatus;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.stereotype.Component;

@@ -33,7 +33,7 @@ public class CollectionRequestController {
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(
             service.create(
-                ((com.kholodilin.repogrowth.auth.security.AppUserPrincipal)
+                ((com.kholodilin.repogrowth.identity.security.AppUserPrincipal)
                         authentication.getPrincipal())
                     .userId(),
                 key,

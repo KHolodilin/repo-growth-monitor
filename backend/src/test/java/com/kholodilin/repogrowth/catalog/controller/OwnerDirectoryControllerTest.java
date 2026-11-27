@@ -5,10 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.auth.security.ResourceAccessPolicy;
 import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel;
 import com.kholodilin.repogrowth.catalog.repository.OwnerDirectoryReadModel.OwnerRow;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

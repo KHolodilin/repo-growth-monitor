@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
-import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository;
+import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
+import com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

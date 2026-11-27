@@ -8,9 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.exception.MissingTransactionException;
 import com.kholodilin.idempotency.jdbc.JdbcIdempotencyPersistenceCleanup;
-import com.kholodilin.repogrowth.auth.application.UserAccountService;
-import com.kholodilin.repogrowth.auth.mock.MockUserCatalog;
-import com.kholodilin.repogrowth.auth.security.*;
+import com.kholodilin.repogrowth.identity.mock.MockUserCatalog;
+import com.kholodilin.repogrowth.identity.security.*;
+import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
+import com.kholodilin.repogrowth.identity.security.SecurityAuthorities;
+import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import com.kholodilin.repogrowth.orchestration.idempotency.InvalidIdempotencyKeyException;
 import com.kholodilin.repogrowth.orchestration.idempotency.ScopedIdempotency;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;

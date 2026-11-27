@@ -5,9 +5,11 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.kholodilin.repogrowth.auth.application.UserAccountService;
-import com.kholodilin.repogrowth.auth.mock.MockUserCatalog;
-import com.kholodilin.repogrowth.auth.security.*;
+import com.kholodilin.repogrowth.identity.mock.MockUserCatalog;
+import com.kholodilin.repogrowth.identity.security.*;
+import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
+import com.kholodilin.repogrowth.identity.security.SecurityAuthorities;
+import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
 import java.time.*;
 import java.util.*;

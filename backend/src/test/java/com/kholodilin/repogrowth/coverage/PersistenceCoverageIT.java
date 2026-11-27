@@ -13,18 +13,18 @@ import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
-import com.kholodilin.repogrowth.search.domain.SearchQuery;
-import com.kholodilin.repogrowth.search.domain.SearchResult;
-import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
-import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
-import com.kholodilin.repogrowth.search.persistence.SearchResultJdbcRepository;
-import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
+import com.kholodilin.repogrowth.search.model.SearchQuery;
+import com.kholodilin.repogrowth.search.model.SearchResult;
+import com.kholodilin.repogrowth.search.model.SearchRunStatus;
+import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchResultJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
-import com.kholodilin.repogrowth.topic.domain.TopicResult;
-import com.kholodilin.repogrowth.topic.persistence.TopicResultJdbcRepository;
-import com.kholodilin.repogrowth.topic.persistence.TopicRunJdbcRepository;
-import com.kholodilin.repogrowth.topic.persistence.TopicWatchJdbcRepository;
-import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import com.kholodilin.repogrowth.topics.model.TopicResult;
+import com.kholodilin.repogrowth.topics.repository.TopicResultJdbcRepository;
+import com.kholodilin.repogrowth.topics.repository.TopicRunJdbcRepository;
+import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
+import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -49,11 +49,11 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
   @Autowired TrafficJdbcRepository trafficJdbcRepository;
 
   @Autowired
-  com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository
+  com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository
       collectionJobJdbcRepository;
 
   @Autowired
-  com.kholodilin.repogrowth.collection.persistence.CollectionRunJdbcRepository
+  com.kholodilin.repogrowth.collection.repository.CollectionRunJdbcRepository
       collectionRunJdbcRepository;
 
   @Autowired JdbcClient jdbcClient;
@@ -381,7 +381,7 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
         run.id(),
         repository.id(),
         today,
-        com.kholodilin.repogrowth.collection.domain.CollectionJobType.TRAFFIC);
+        com.kholodilin.repogrowth.collection.model.CollectionJobType.TRAFFIC);
     assertThat(collectionJobJdbcRepository.findByRunIds(List.of())).isEmpty();
     assertThat(collectionJobJdbcRepository.findByRunIds(null)).isEmpty();
     var jobs = collectionJobJdbcRepository.findByRun(run.id());
@@ -392,7 +392,7 @@ class PersistenceCoverageIT extends AbstractPostgresTest {
     collectionJobJdbcRepository.markSuccess(jobs.getFirst().id());
     assertThat(
             collectionJobJdbcRepository.countByStatus(
-                com.kholodilin.repogrowth.collection.domain.CollectionJobStatus.SUCCESS))
+                com.kholodilin.repogrowth.collection.model.CollectionJobStatus.SUCCESS))
         .isPositive();
   }
 }

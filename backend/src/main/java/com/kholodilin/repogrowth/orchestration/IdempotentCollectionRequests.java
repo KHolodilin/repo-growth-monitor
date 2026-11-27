@@ -3,7 +3,7 @@ package com.kholodilin.repogrowth.orchestration;
 import com.kholodilin.idempotency.*;
 import com.kholodilin.idempotency.exception.IdempotencyConflictException;
 import com.kholodilin.idempotency.model.IdempotencyKey;
-import com.kholodilin.repogrowth.auth.application.UserAccountService;
+import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import com.kholodilin.repogrowth.orchestration.idempotency.ScopedIdempotency;
 import java.time.LocalDate;
 import java.util.Map;

@@ -1,0 +1,37 @@
+package com.kholodilin.repogrowth.identity.security;
+
+import com.kholodilin.repogrowth.identity.model.AppUser;
+import com.kholodilin.repogrowth.identity.service.UserAccountService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CurrentUserAccess {
+
+  private final UserAccountService users;
+
+  public CurrentUserAccess(UserAccountService users) {
+    this.users = users;
+  }
+
+  /** True when the security context holds an application principal. */
+  public boolean authenticated() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    return auth != null
+        && auth.isAuthenticated()
+        && auth.getPrincipal() instanceof AppUserPrincipal;
+  }
+
+  /** Admins may see private/internal repositories; guests and USER may not. */
+  public boolean canSeePrivateRepositories() {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth == null
+        || !auth.isAuthenticated()
+        || !(auth.getPrincipal() instanceof AppUserPrincipal principal)) {
+      return false;
+    }
+    AppUser user = users.findById(principal.userId()).orElse(null);
+    return users.canMutate(user);
+  }
+}

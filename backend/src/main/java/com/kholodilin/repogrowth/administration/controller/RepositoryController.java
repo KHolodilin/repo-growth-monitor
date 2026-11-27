@@ -1,6 +1,5 @@
 package com.kholodilin.repogrowth.administration.controller;
 
-import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
 import com.kholodilin.repogrowth.catalog.model.GitHubOwner;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryVisibility;
@@ -9,6 +8,7 @@ import com.kholodilin.repogrowth.catalog.service.ActivityClassifier;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthService;
 import com.kholodilin.repogrowth.catalog.service.RepositoryService;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;

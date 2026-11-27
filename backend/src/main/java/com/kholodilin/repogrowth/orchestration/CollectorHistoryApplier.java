@@ -6,17 +6,35 @@ import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.catalog.repository.GitHubOwnerJdbcRepository;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.catalog.service.RepositoryHealthEvaluator;
-import com.kholodilin.repogrowth.event.detect.*;
-import com.kholodilin.repogrowth.event.domain.*;
-import com.kholodilin.repogrowth.event.persistence.*;
+import com.kholodilin.repogrowth.events.detect.*;
+import com.kholodilin.repogrowth.events.detect.GitHubActivitySnapshot;
+import com.kholodilin.repogrowth.events.detect.GrowthEventDetections;
+import com.kholodilin.repogrowth.events.model.*;
+import com.kholodilin.repogrowth.events.model.GrowthEventCatalog;
+import com.kholodilin.repogrowth.events.repository.*;
+import com.kholodilin.repogrowth.events.repository.GrowthEventJdbcRepository;
+import com.kholodilin.repogrowth.events.repository.GrowthEventStateJdbcRepository;
 import com.kholodilin.repogrowth.github.model.*;
-import com.kholodilin.repogrowth.search.application.RepositoryEnricher;
-import com.kholodilin.repogrowth.search.persistence.*;
-import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
-import com.kholodilin.repogrowth.topic.domain.TopicResult;
-import com.kholodilin.repogrowth.topic.persistence.*;
+import com.kholodilin.repogrowth.github.model.GitHubCommitResponse;
+import com.kholodilin.repogrowth.github.model.GitHubCommunityProfileResponse;
+import com.kholodilin.repogrowth.github.model.GitHubContributorItem;
+import com.kholodilin.repogrowth.github.model.GitHubIssueItem;
+import com.kholodilin.repogrowth.github.model.GitHubPullItem;
+import com.kholodilin.repogrowth.github.model.GitHubReadmeResponse;
+import com.kholodilin.repogrowth.github.model.GitHubReleaseItem;
+import com.kholodilin.repogrowth.github.model.GitHubRepositoryResponse;
+import com.kholodilin.repogrowth.github.model.GitHubSearchItem;
+import com.kholodilin.repogrowth.search.repository.*;
+import com.kholodilin.repogrowth.search.repository.SearchResultJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
+import com.kholodilin.repogrowth.search.service.RepositoryEnricher;
+import com.kholodilin.repogrowth.topics.model.TopicResult;
+import com.kholodilin.repogrowth.topics.repository.*;
+import com.kholodilin.repogrowth.topics.repository.TopicResultJdbcRepository;
+import com.kholodilin.repogrowth.topics.repository.TopicRunJdbcRepository;
+import com.kholodilin.repogrowth.topics.service.TopicWatchSync;
 import com.kholodilin.repogrowth.traffic.ServicePathClassifier;
-import com.kholodilin.repogrowth.traffic.persistence.TrafficJdbcRepository;
+import com.kholodilin.repogrowth.traffic.repository.TrafficJdbcRepository;
 import java.sql.Timestamp;
 import java.time.*;
 import java.util.*;
@@ -33,7 +51,7 @@ public class CollectorHistoryApplier {
   private com.kholodilin.repogrowth.administration.service.PublicationService publication;
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.credentials.CredentialVault credentialVault;
+  private com.kholodilin.repogrowth.credentials.service.CredentialVault credentialVault;
 
   private final JdbcTemplate jdbc;
   private final JsonMapper json;
@@ -440,7 +458,7 @@ public class CollectorHistoryApplier {
       topicRuns.markSuccess(
           run, Math.toIntExact(snapshot.totalResults()), snapshot.trackedPosition());
     } else {
-      List<com.kholodilin.repogrowth.search.domain.SearchResult> rows = new ArrayList<>();
+      List<com.kholodilin.repogrowth.search.model.SearchResult> rows = new ArrayList<>();
       int pos = 1;
       for (var value : raw.path("items"))
         rows.add(

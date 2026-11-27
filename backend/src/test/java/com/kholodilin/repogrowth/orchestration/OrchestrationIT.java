@@ -9,15 +9,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.kholodilin.collector.contracts.CollectorProtocol.*;
-import com.kholodilin.repogrowth.auth.application.UserAccountService;
-import com.kholodilin.repogrowth.auth.domain.AppUser;
-import com.kholodilin.repogrowth.auth.mock.MockUserCatalog;
-import com.kholodilin.repogrowth.auth.security.*;
 import com.kholodilin.repogrowth.collection.planner.*;
+import com.kholodilin.repogrowth.collection.planner.CollectionPlanner;
+import com.kholodilin.repogrowth.collection.planner.DailyPlanner;
 import com.kholodilin.repogrowth.common.api.ApiException;
+import com.kholodilin.repogrowth.identity.mock.MockUserCatalog;
+import com.kholodilin.repogrowth.identity.model.AppUser;
+import com.kholodilin.repogrowth.identity.security.*;
+import com.kholodilin.repogrowth.identity.security.AppUserPrincipal;
+import com.kholodilin.repogrowth.identity.security.SecurityAuthorities;
+import com.kholodilin.repogrowth.identity.service.UserAccountService;
 import com.kholodilin.repogrowth.search.planner.SearchPlanner;
 import com.kholodilin.repogrowth.support.AbstractPostgresTest;
-import com.kholodilin.repogrowth.topic.planner.TopicPlanner;
+import com.kholodilin.repogrowth.topics.planner.TopicPlanner;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;

@@ -6,7 +6,7 @@ import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
 import com.kholodilin.repogrowth.common.observability.AppMetrics;
-import com.kholodilin.repogrowth.event.detect.ReadmeSignificance;
+import com.kholodilin.repogrowth.events.detect.ReadmeSignificance;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;

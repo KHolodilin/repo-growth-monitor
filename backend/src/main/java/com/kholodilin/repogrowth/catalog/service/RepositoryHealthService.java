@@ -5,7 +5,7 @@ import com.kholodilin.repogrowth.catalog.controller.RepositoryHealthResponse;
 import com.kholodilin.repogrowth.catalog.model.Repository;
 import com.kholodilin.repogrowth.catalog.model.RepositoryHealthFacts;
 import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
-import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 

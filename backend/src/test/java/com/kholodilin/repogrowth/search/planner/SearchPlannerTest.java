@@ -6,8 +6,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.SearchProperties;
-import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
-import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import java.time.Duration;
 import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;

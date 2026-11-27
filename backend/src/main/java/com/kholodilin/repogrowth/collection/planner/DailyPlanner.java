@@ -1,6 +1,6 @@
 package com.kholodilin.repogrowth.collection.planner;
 
-import com.kholodilin.repogrowth.collection.persistence.PlannerSlotJdbcRepository;
+import com.kholodilin.repogrowth.collection.repository.PlannerSlotJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.config.CollectionProperties;
 import java.time.LocalDate;

@@ -6,10 +6,10 @@ import com.kholodilin.repogrowth.catalog.repository.RepositoryJdbcRepository;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import com.kholodilin.repogrowth.common.api.ErrorCode;
 import com.kholodilin.repogrowth.common.config.CollectorSearchProperties;
-import com.kholodilin.repogrowth.event.persistence.GrowthEventSettingJdbcRepository;
-import com.kholodilin.repogrowth.search.persistence.SearchQueryJdbcRepository;
-import com.kholodilin.repogrowth.topic.application.TopicWatchSync;
-import com.kholodilin.repogrowth.topic.persistence.TopicWatchJdbcRepository;
+import com.kholodilin.repogrowth.events.repository.GrowthEventSettingJdbcRepository;
+import com.kholodilin.repogrowth.search.repository.SearchQueryJdbcRepository;
+import com.kholodilin.repogrowth.topics.repository.TopicWatchJdbcRepository;
+import com.kholodilin.repogrowth.topics.service.TopicWatchSync;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -46,7 +46,7 @@ public class CollectionRequestService {
   }
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
-  private com.kholodilin.repogrowth.credentials.CredentialVault credentialVault;
+  private com.kholodilin.repogrowth.credentials.service.CredentialVault credentialVault;
 
   @org.springframework.beans.factory.annotation.Autowired(required = false)
   private CollectorNodeMonitor nodeMonitor;
@@ -907,7 +907,7 @@ public class CollectionRequestService {
   /**
    * Freeze the node-configured search sort into the assignment so Rank History matches collection.
    */
-  private Parameters searchParameters(com.kholodilin.repogrowth.search.domain.SearchQuery query) {
+  private Parameters searchParameters(com.kholodilin.repogrowth.search.model.SearchQuery query) {
     return new Parameters(
         query.query(),
         null,

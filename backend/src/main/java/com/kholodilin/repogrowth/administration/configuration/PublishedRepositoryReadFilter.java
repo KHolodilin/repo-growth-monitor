@@ -1,7 +1,7 @@
 package com.kholodilin.repogrowth.administration.configuration;
 
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.auth.security.CurrentUserAccess;
+import com.kholodilin.repogrowth.identity.security.CurrentUserAccess;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

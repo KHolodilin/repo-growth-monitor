@@ -4,10 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.kholodilin.repogrowth.collection.domain.CollectionJobStatus;
-import com.kholodilin.repogrowth.collection.persistence.CollectionJobJdbcRepository;
-import com.kholodilin.repogrowth.search.domain.SearchRunStatus;
-import com.kholodilin.repogrowth.search.persistence.SearchRunJdbcRepository;
+import com.kholodilin.repogrowth.collection.model.CollectionJobStatus;
+import com.kholodilin.repogrowth.collection.repository.CollectionJobJdbcRepository;
+import com.kholodilin.repogrowth.search.model.SearchRunStatus;
+import com.kholodilin.repogrowth.search.repository.SearchRunJdbcRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
