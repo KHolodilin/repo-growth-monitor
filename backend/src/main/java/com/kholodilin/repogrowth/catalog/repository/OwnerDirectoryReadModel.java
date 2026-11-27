@@ -25,7 +25,7 @@ public class OwnerDirectoryReadModel {
         SELECT o.id AS owner_id, o.login, r.id AS repository_id
         FROM github_owner o
         JOIN repository r ON r.owner_id = o.id
-        WHERE (? IS NULL OR lower(o.login) = lower(?))
+        WHERE (?::text IS NULL OR lower(o.login) = lower(?))
         ORDER BY o.id, r.id
         """;
     Map<Long, OwnerRow> byId = new LinkedHashMap<>();

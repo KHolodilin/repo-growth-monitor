@@ -684,4 +684,30 @@ class PublicApiIT extends AbstractPostgresTest {
                         "Static assets must not be handled as public repository pages.")));
     mvc.perform(get("/assets/not-present.js")).andExpect(status().isNotFound());
   }
+
+  @Test
+  void resolveAndTopicFamilyEndpointsAreReachableWhenPublished() throws Exception {
+    mvc.perform(get("/api/v1/public/resolve").param("path", "/Alpha/one"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.ownerId").value(Long.toString(owner)))
+        .andExpect(jsonPath("$.repositoryId").value(Long.toString(a)))
+        .andExpect(jsonPath("$.canonicalPath").isString());
+    mvc.perform(get("/api/v1/public/topic-watches/" + watch))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.repositoryId").value(Long.toString(a)));
+    mvc.perform(get("/api/v1/public/topic-watches/" + watch + "/history"))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/public/topic-runs/" + topicRun + "/results"))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/public/topic-watches/" + watch + "/results"))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/public/topic-watches/" + watch + "/competitors/555"))
+        .andExpect(status().isOk());
+    jdbc.update(
+        "INSERT INTO traffic_referrer_snapshot(repository_id,snapshot_date,snapshot_at,referrer,views,unique_visitors) VALUES (?,CURRENT_DATE-1,clock_timestamp(),'github.com',3,2)",
+        a);
+    mvc.perform(get("/api/v1/public/repositories/Alpha/one/referrer-history?period=7d&limit=1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items").isArray());
+  }
 }
