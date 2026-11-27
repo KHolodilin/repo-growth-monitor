@@ -145,6 +145,7 @@ PortfolioDashboardService service =
             health,
             mock(PortfolioHighlightsService.class),
             mock(PlanningWindow.class),
+            mock(com.kholodilin.repogrowth.administration.service.PublicationService.class),
             Clock.fixed(now, ZoneOffset.UTC));
 
     var response = service.dashboard("30d", true);

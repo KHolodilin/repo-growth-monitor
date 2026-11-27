@@ -1,37 +1,34 @@
 package com.kholodilin.repogrowth.catalog.controller;
 
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.*;
 
-import com.kholodilin.repogrowth.administration.service.*;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.service.PublicReadService;
+import com.kholodilin.repogrowth.catalog.service.PublicHtmlService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import org.junit.jupiter.api.*;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.test.web.servlet.MockMvc;
 
 class PublicPageControllerTest {
-  PublicReadService reads;
+  PublicHtmlService pages;
   MockMvc mvc;
 
   @BeforeEach
   void setup() {
-    reads = mock(PublicReadService.class);
+    pages = mock(PublicHtmlService.class);
     mvc =
         standaloneSetup(
                 new PublicPageController(
-                    reads, new ByteArrayResource("<!doctype html>".getBytes())))
+                    pages, new ByteArrayResource("<!doctype html>".getBytes())))
             .build();
   }
 
   @Test
   void servesOnlyResolvedPagesAndKeepsDottedRepositoryNames() throws Exception {
-    when(reads.resolve("/Alpha/project.js"))
+    when(pages.resolve("/Alpha/project.js"))
         .thenReturn(new PublicationService.Resolved(1, 2L, "/Alpha/project.js", false));
     mvc.perform(get("/Alpha/project.js").accept("text/html"))
         .andExpect(status().isOk())
@@ -41,39 +38,39 @@ class PublicPageControllerTest {
 
   @Test
   void unknownOrReservedPathsAreNotSoft404s() throws Exception {
-    when(reads.resolve("/Hidden")).thenThrow(ApiException.notFound("Page not found"));
+    when(pages.resolve("/Hidden")).thenThrow(ApiException.notFound("Page not found"));
     for (String path : new String[] {"/Hidden", "/api/unknown", "/admin/unknown", "/favicon.ico"})
       mvc.perform(get(path).accept("text/html")).andExpect(status().isNotFound());
-    verify(reads, never()).resolve("/api/unknown");
+    verify(pages, never()).resolve("/api/unknown");
   }
 
   @Test
   void aliasesRedirectPreserveNestedSpaSuffix() throws Exception {
-    when(reads.resolve("/Old/project"))
+    when(pages.resolve("/Old/project"))
         .thenReturn(new PublicationService.Resolved(1, 2L, "/Alpha/new-project", true));
-    when(reads.scope("Old", "project", PublicationService.Module.PATHS))
+    when(pages.scope("Old", "project", PublicationService.Module.PATHS))
         .thenReturn(java.util.List.of(2L));
     mvc.perform(get("/Old/project/traffic/history?kind=paths&period=7d").accept("text/html"))
         .andExpect(status().isPermanentRedirect())
         .andExpect(
             header().string("Location", "/Alpha/new-project/traffic/history?kind=paths&period=7d"));
-    verify(reads).scope("Old", "project", PublicationService.Module.PATHS);
+    verify(pages).scope("Old", "project", PublicationService.Module.PATHS);
   }
 
   @Test
   void nestedSpaRoutesRequirePublishedParentAndDefinition() throws Exception {
-    when(reads.resolve("/Alpha/project"))
+    when(pages.resolve("/Alpha/project"))
         .thenReturn(new PublicationService.Resolved(1, 2L, "/Alpha/project", false));
-    when(reads.scope("Alpha", "project", PublicationService.Module.REFERRERS))
+    when(pages.scope("Alpha", "project", PublicationService.Module.REFERRERS))
         .thenReturn(java.util.List.of(2L));
     mvc.perform(get("/Alpha/project/traffic/history?kind=referrers").accept("text/html"))
         .andExpect(status().isOk());
     doThrow(ApiException.notFound("Page not found"))
-        .when(reads)
+        .when(pages)
         .validateDefinition("Alpha", "project", false, 99L);
     mvc.perform(get("/Alpha/project/search-queries/99").accept("text/html"))
         .andExpect(status().isNotFound());
-    when(reads.validateTopic("Alpha", "project", "spring")).thenReturn(7L);
+    when(pages.validateTopic("Alpha", "project", "spring")).thenReturn(7L);
     mvc.perform(get("/Alpha/project/topics/spring").accept("text/html")).andExpect(status().isOk());
     mvc.perform(get("/Alpha/project/analytics/unsupported").accept("text/html"))
         .andExpect(status().isNotFound());
@@ -81,17 +78,16 @@ class PublicPageControllerTest {
 
   @Test
   void competitorHtmlServesShellWhenParentDefinitionIsPublished() throws Exception {
-    when(reads.resolve("/Alpha/project"))
+    when(pages.resolve("/Alpha/project"))
         .thenReturn(new PublicationService.Resolved(1, 2L, "/Alpha/project", false));
-    doNothing().when(reads).validateDefinition("Alpha", "project", false, 5L);
-    when(reads.validateTopic("Alpha", "project", "spring")).thenReturn(7L);
+    doNothing().when(pages).validateDefinition("Alpha", "project", false, 5L);
+    when(pages.validateTopic("Alpha", "project", "spring")).thenReturn(7L);
     mvc.perform(get("/Alpha/project/search-queries/5/competitors/555").accept("text/html"))
         .andExpect(status().isOk());
     mvc.perform(get("/Alpha/project/topics/spring/competitors/999").accept("text/html"))
         .andExpect(status().isOk());
-    verify(reads, never()).competitor(anyBoolean(), anyLong(), anyLong());
     doThrow(ApiException.notFound("Page not found"))
-        .when(reads)
+        .when(pages)
         .validateDefinition("Alpha", "project", false, 99L);
     mvc.perform(get("/Alpha/project/search-queries/99/competitors/555").accept("text/html"))
         .andExpect(status().isNotFound());

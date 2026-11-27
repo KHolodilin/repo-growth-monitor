@@ -6,20 +6,15 @@ import type { DashboardViewData } from "../lib/dashboardViewData";
 import { DashboardViewContext, useDashboardView } from "../lib/dashboardView";
 import { PERIODS, type Period } from "../components/PeriodSelector";
 import { readPublicPreference, writePublicPreference } from "../lib/publicPrefs";
-import {
-  publicBase,
-  publicScope,
-  publicRepositoryRows,
-  adaptPublicDashboard,
-  historyRows,
-  publicEvents,
-  type PublicOverview,
-  type PublicRow,
-  type StatsResponse,
-  type TrafficResponse,
-} from "../lib/publicDashboard";
+import { findOwnerByLogin } from "../lib/catalogApi";
+import { publicScope } from "../lib/publicDashboard";
 import { PublicNotFound } from "./PublicLayout";
-import { PublicModules } from "./PublicModules";
+
+type OwnerAbout = {
+  ownerId: string;
+  login: string;
+  ownerType?: string | null;
+};
 
 /** Public owner portfolio only. Repository pages use RepositoryDetailsPage. */
 export function PublicScopePage() {
@@ -28,14 +23,13 @@ export function PublicScopePage() {
   const navigate = useNavigate();
   const layoutView = useDashboardView();
   const [params, setParams] = useSearchParams();
-  const [overview, setOverview] = useState<PublicOverview | null>(null);
+  const [about, setAbout] = useState<OwnerAbout | null>(null);
   const [model, setModel] = useState<DashboardViewData | null>(null);
-  const [rows, setRows] = useState<PublicRow[]>([]);
   const [events, setEvents] = useState<GrowthEvent[]>([]);
   const [error, setError] = useState<Error | null>(null);
   const [busy, setBusy] = useState(true);
   const [retry, setRetry] = useState(0);
-  const scope = overview ? publicScope(overview) : "";
+  const scope = about ? publicScope({ owner: { id: about.ownerId, login: about.login } }) : "";
   const stored = scope
     ? readPublicPreference(scope, "period", (v): v is Period => PERIODS.includes(v as Period))
     : undefined;
@@ -48,17 +42,16 @@ export function PublicScopePage() {
   const [seenOwnerLoadKey, setSeenOwnerLoadKey] = useState(ownerLoadKey);
   if (ownerLoadKey !== seenOwnerLoadKey) {
     setSeenOwnerLoadKey(ownerLoadKey);
-    setOverview(null);
+    setAbout(null);
     setModel(null);
-    setRows([]);
     setError(null);
     setBusy(true);
   }
-  const detailLoadKey = overview ? `${publicScope(overview)}:${period}:${retry}` : null;
+  const detailLoadKey = about ? `${publicScope({ owner: { id: about.ownerId, login: about.login } })}:${period}:${retry}` : null;
   const [seenDetailLoadKey, setSeenDetailLoadKey] = useState(detailLoadKey);
   if (detailLoadKey !== seenDetailLoadKey) {
     setSeenDetailLoadKey(detailLoadKey);
-    if (overview) {
+    if (about) {
       setBusy(true);
       setError(null);
       setModel(null);
@@ -67,23 +60,22 @@ export function PublicScopePage() {
 
   useEffect(() => {
     const abort = new AbortController();
-    api<PublicOverview>(publicBase(owner), { signal: abort.signal })
-      .then((next) => {
+    findOwnerByLogin(owner)
+      .then(async (card) => {
         if (abort.signal.aborted) return;
-        if (next.repository) {
-          void navigate(
-            `/${encodeURIComponent(next.owner.login)}/${encodeURIComponent(next.repository.name)}${location.search}`,
-            {
-              replace: true,
-            },
-          );
+        if (!card) {
+          throw new ApiError(404, "Owner not found");
+        }
+        const next = await api<OwnerAbout>(`/api/v1/owners/${encodeURIComponent(card.ownerId)}`, {
+          signal: abort.signal,
+        });
+        if (abort.signal.aborted) return;
+        const canonical = `/${next.login}`;
+        if (canonical !== location.pathname.replace(/\/$/, "")) {
+          void navigate(canonical + location.search, { replace: true });
           return;
         }
-        if (next.canonicalPath !== location.pathname.replace(/\/$/, "")) {
-          void navigate(next.canonicalPath + location.search, { replace: true });
-          return;
-        }
-        setOverview(next);
+        setAbout(next);
       })
       .catch((err: unknown) => {
         if (!abort.signal.aborted) {
@@ -95,28 +87,24 @@ export function PublicScopePage() {
   }, [owner, retry, location.pathname, location.search, navigate]);
 
   useEffect(() => {
-    if (!overview) return;
+    if (!about) return;
     const abort = new AbortController();
-    const base = publicBase(overview.owner.login);
     Promise.all([
-      api<StatsResponse>(`${base}/stats?period=${period}`, { signal: abort.signal }),
-      historyRows(`${base}/stats-history?period=${period}`, abort.signal),
-      overview.modules.traffic
-        ? api<TrafficResponse>(`${base}/traffic?period=${period}`, { signal: abort.signal })
-        : Promise.resolve(null),
-      overview.modules.traffic
-        ? historyRows(`${base}/traffic-history?period=${period}`, abort.signal)
-        : Promise.resolve([]),
-      publicRepositoryRows(base, period, abort.signal),
-      publicEvents(base, abort.signal),
+      api<DashboardViewData>(
+        `/api/v1/dashboard?period=${period}&owner=${encodeURIComponent(about.login)}`,
+        { signal: abort.signal },
+      ),
+      Promise.resolve(
+        api<GrowthEvent[]>(
+          `/api/v1/owners/${encodeURIComponent(about.ownerId)}/growth-events?period=${period}`,
+          { signal: abort.signal },
+        ),
+      ).catch(() => [] as GrowthEvent[]),
     ])
-      .then(([stats, statsRows, traffic, trafficRows, repositories, loadedEvents]) => {
+      .then(([dashboard, loadedEvents]) => {
         if (abort.signal.aborted) return;
-        setRows(repositories);
         setEvents(loadedEvents);
-        setModel(
-          adaptPublicDashboard(overview, stats, statsRows, traffic, trafficRows, repositories),
-        );
+        setModel(dashboard);
       })
       .catch((err: unknown) => {
         if (!abort.signal.aborted) {
@@ -127,7 +115,7 @@ export function PublicScopePage() {
         if (!abort.signal.aborted) setBusy(false);
       });
     return () => abort.abort();
-  }, [overview, period, retry]);
+  }, [about, period, retry]);
 
   const changePeriod = (next: Period) => {
     writePublicPreference(scope, "period", next);
@@ -155,25 +143,30 @@ export function PublicScopePage() {
         </button>
       </section>
     );
-  if (!overview)
+  if (!about)
     return (
       <p role="status" className="py-10">
         Loading dashboard…
       </p>
     );
 
-  const heading = overview.owner.login;
+  const heading = about.login;
   const breadcrumb = (
     <nav aria-label="Breadcrumb" className="flex min-w-0 flex-wrap gap-2 text-sm">
       <Link to="/" className="text-primary">
         Home
       </Link>
       <span aria-hidden="true">›</span>
-      <span aria-current="page">{overview.owner.login}</span>
+      <span aria-current="page">{about.login}</span>
     </nav>
   );
-  const href = (id: number | string) =>
-    `/${encodeURIComponent(overview.owner.login)}/${encodeURIComponent(rows.find((row) => row.id === String(id))?.name ?? "")}`;
+  const href = (id: number | string) => {
+    const row = model?.repositories.find((item) => String(item.id) === String(id));
+    const name = row?.fullName?.includes("/")
+      ? row.fullName.slice(row.fullName.indexOf("/") + 1)
+      : (row?.fullName ?? "");
+    return `/${encodeURIComponent(about.login)}/${encodeURIComponent(name)}`;
+  };
 
   return (
     <DashboardViewContext.Provider
@@ -186,11 +179,11 @@ export function PublicScopePage() {
         headerLeading: breadcrumb,
         repositoryHref: href,
         showRepositories: true,
-        trafficEnabled: overview.modules.traffic,
+        trafficEnabled: true,
       }}
     >
       <div className="space-y-4" key={scope}>
-        {overview.freshness.state === "EMPTY" && (
+        {model && !model.lastSyncAt && model.state !== "READY" && (
           <p role="status" className="text-sm text-muted-foreground">
             No saved snapshots yet.
           </p>
@@ -199,7 +192,7 @@ export function PublicScopePage() {
           <p role="status" className="py-12">
             Loading observations…
           </p>
-        ) : model && (tab === "traffic" || tab === "stats") ? (
+        ) : model ? (
           <DashboardPresentation
             key={scope}
             data={model}
@@ -207,14 +200,6 @@ export function PublicScopePage() {
             onPeriod={changePeriod}
             tab={tab}
             onTab={changeTab}
-            events={events}
-          />
-        ) : model ? (
-          <PublicModules
-            overview={overview}
-            rows={rows}
-            tab={tab}
-            period={period}
             events={events}
           />
         ) : null}

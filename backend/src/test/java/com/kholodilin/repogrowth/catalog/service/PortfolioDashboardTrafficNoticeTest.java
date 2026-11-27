@@ -171,6 +171,7 @@ PortfolioDashboardService service =
             health,
             highlights,
             window,
+            mock(com.kholodilin.repogrowth.administration.service.PublicationService.class),
             Clock.fixed(NOW, ZoneOffset.UTC));
 
     var dashboard = service.dashboard("7d", true);
@@ -202,6 +203,7 @@ return new PortfolioDashboardService(
         mock(RepositoryHealthService.class),
         mock(PortfolioHighlightsService.class),
         window,
+        mock(com.kholodilin.repogrowth.administration.service.PublicationService.class),
         Clock.fixed(NOW, ZoneOffset.UTC));
   }
 

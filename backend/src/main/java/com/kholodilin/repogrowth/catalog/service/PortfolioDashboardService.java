@@ -1,5 +1,6 @@
 package com.kholodilin.repogrowth.catalog.service;
 
+import com.kholodilin.repogrowth.administration.service.PublicationService;
 import com.kholodilin.repogrowth.traffic.service.TrafficCompleteness;
 import com.kholodilin.repogrowth.common.model.period.DashboardPeriod;
 import com.kholodilin.repogrowth.common.model.GrowthMath;
@@ -72,6 +73,7 @@ public class PortfolioDashboardService {
   private final RepositoryHealthService healthService;
   private final PortfolioHighlightsService highlightsService;
   private final PlanningWindow planningWindow;
+  private final PublicationService publication;
   private final Clock clock;
 
   public PortfolioDashboardService(
@@ -83,6 +85,7 @@ public class PortfolioDashboardService {
       RepositoryHealthService healthService,
       PortfolioHighlightsService highlightsService,
       PlanningWindow planningWindow,
+      PublicationService publication,
       Clock clock) {
     this.repositoryService = repositoryService;
     this.trafficReads = trafficReads;
@@ -92,6 +95,7 @@ public class PortfolioDashboardService {
     this.healthService = healthService;
     this.highlightsService = highlightsService;
     this.planningWindow = planningWindow;
+    this.publication = publication;
     this.clock = clock;
   }
 
@@ -152,12 +156,13 @@ public class PortfolioDashboardService {
         tracked.size(), views, visitors, clones, uniqueCloners, stars, rows);
   }
 
-  private static List<Repository> visibleTracked(List<Repository> tracked, boolean includePrivate) {
+  private List<Repository> visibleTracked(List<Repository> tracked, boolean includePrivate) {
     if (includePrivate) {
       return tracked;
     }
     return tracked.stream()
         .filter(repository -> RepositoryVisibility.isPublic(repository.visibility()))
+        .filter(repository -> publication.allows(repository.id(), PublicationService.Module.DASHBOARD))
         .toList();
   }
 

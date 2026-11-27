@@ -120,6 +120,6 @@ class ResourceAccessPolicyTest {
     assertThat(policy.isOpsSurface("/internal/v1/collectors")).isTrue();
     assertThat(policy.surfaceOf(null)).isEqualTo(ApiSurface.RESOURCE);
     assertThat(policy.isOpsSurface("/api/v1/admin/repositories/13/traffic")).isFalse();
-    assertThat(policy.isOpsSurface("/api/v1/public/owners/acme")).isFalse();
+    assertThat(policy.isOpsSurface("/api/v1/owners/acme")).isFalse();
   }
 }

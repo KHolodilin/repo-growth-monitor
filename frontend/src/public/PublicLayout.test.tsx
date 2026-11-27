@@ -34,6 +34,25 @@ function mount(path: string) {
   );
 }
 
+function mockSyncApis(lastSyncAt: string | null | "reject") {
+  api.mockImplementation((path: string) => {
+    const url = String(path);
+    if (url.includes("/api/v1/owners?login=")) {
+      return Promise.resolve({
+        items: [{ ownerId: "1", login: "Alpha" }],
+        nextCursor: null,
+      });
+    }
+    if (url.includes("/api/v1/dashboard?")) {
+      if (lastSyncAt === "reject") {
+        return Promise.reject(new Error("gone"));
+      }
+      return Promise.resolve({ lastSyncAt });
+    }
+    return Promise.resolve({});
+  });
+}
+
 beforeEach(() => {
   api.mockReset();
   loadMe.mockReset();
@@ -57,7 +76,7 @@ describe("PublicLayout", () => {
   });
 
   it("hides collection-incomplete markers for anonymous and keeps them for signed-in users", async () => {
-    api.mockResolvedValue({ freshness: {} });
+    mockSyncApis(null);
     function Probe() {
       const view = useDashboardView();
       return <p>{`public=${String(view.public)} expected=${String(view.collectionExpected)}`}</p>;
@@ -104,15 +123,13 @@ describe("PublicLayout", () => {
 
   it("loads last sync for owner pages and clears it for admin routes", async () => {
     const user = userEvent.setup();
-    api.mockResolvedValueOnce({
-      freshness: { lastSuccessfulSnapshotAt: "2026-11-01T12:00:00Z" },
-    });
+    mockSyncApis("2026-11-01T12:00:00Z");
     mount("/Alpha/project");
     await waitFor(() => expect(screen.getByText(/Last sync:/)).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "About data" }));
     expect(screen.getByText(/Data is collected once per day/)).toBeInTheDocument();
 
-    api.mockRejectedValueOnce(new Error("gone"));
+    mockSyncApis("reject");
     mount("/Alpha/project");
     await waitFor(() => expect(screen.getByText("No successful sync yet")).toBeInTheDocument());
 
@@ -121,28 +138,42 @@ describe("PublicLayout", () => {
     expect(api.mock.calls.every(([url]) => !String(url).includes("/admin"))).toBe(true);
   });
 
-  it("ignores aborted sync success and failure after unmount", () => {
-    let finish!: (value: unknown) => void;
-    api.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
-        }),
-    );
+  it("ignores aborted sync success and failure after unmount", async () => {
+    let finish: ((value: unknown) => void) | undefined;
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/api/v1/owners?login=")) {
+        return Promise.resolve({
+          items: [{ ownerId: "1", login: "Alpha" }],
+          nextCursor: null,
+        });
+      }
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
     const first = mount("/Alpha/project");
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
     first.unmount();
-    finish({ freshness: { lastSuccessfulSnapshotAt: "2026-11-01T12:00:00Z" } });
+    finish!({ lastSyncAt: "2026-11-01T12:00:00Z" });
 
-    let fail!: (error: Error) => void;
-    api.mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          fail = reject;
-        }),
-    );
+    let fail: ((error: Error) => void) | undefined;
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/api/v1/owners?login=")) {
+        return Promise.resolve({
+          items: [{ ownerId: "1", login: "Alpha" }],
+          nextCursor: null,
+        });
+      }
+      return new Promise((_, reject) => {
+        fail = reject;
+      });
+    });
     const second = mount("/Alpha/project");
+    await waitFor(() => expect(fail).toBeTypeOf("function"));
     second.unmount();
-    fail(new Error("cancelled"));
+    fail!(new Error("cancelled"));
     expect(api).toHaveBeenCalled();
   });
 });

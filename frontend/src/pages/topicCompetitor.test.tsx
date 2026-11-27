@@ -4,8 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, topicHistory, topicResults } from "../test/fixtures";
 import {
-  isPublicResolve,
-  publicResolveResponse,
+  respondCatalogResolve,
   emptyCursorPage,
   isOwnersCatalog,
 } from "../test/repoRoutes";
@@ -72,11 +71,12 @@ function renderTopics(path: string) {
 function mockTopicApi(competitor: unknown = card) {
   api.mockImplementation((path: string) => {
     const url = String(path);
+    const catalog = respondCatalogResolve(
+      url,
+      url.toLowerCase().includes("other") ? other.id : repository.id,
+    );
+    if (catalog) return Promise.resolve(catalog);
     if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-    if (isPublicResolve(url)) {
-      const id = url.toLowerCase().includes("other") ? other.id : repository.id;
-      return Promise.resolve(publicResolveResponse(id));
-    }
     if (
       url.includes("/admin/repositories?refresh") ||
       url.includes("/admin/repositories?refresh=false")
@@ -181,7 +181,8 @@ describe("topic competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/"))
         return Promise.reject(new Error("Repository was not found in this topic"));
@@ -196,7 +197,8 @@ describe("topic competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
@@ -215,7 +217,8 @@ describe("topic competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/history")) return Promise.resolve(topicHistory);
@@ -244,7 +247,8 @@ describe("topic competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.includes("/competitors/2"))
         return new Promise<unknown>((resolve) => {

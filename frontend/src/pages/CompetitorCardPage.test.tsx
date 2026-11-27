@@ -4,8 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { repository, searchHistory } from "../test/fixtures";
 import {
-  isPublicResolve,
-  publicResolveResponse,
+  respondCatalogResolve,
   repoBase,
   emptyCursorPage,
   isOwnersCatalog,
@@ -55,7 +54,8 @@ describe("competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       if (url.endsWith("/history")) return Promise.resolve(searchHistory);
@@ -89,7 +89,8 @@ describe("competitor card", () => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.endsWith("/history")) return Promise.resolve(searchHistory);
       if (url.endsWith("/competitors/1")) {
@@ -115,7 +116,8 @@ describe("competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       return Promise.reject(new Error("github down"));
@@ -127,7 +129,8 @@ describe("competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?")) return Promise.resolve([repository]);
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
@@ -140,7 +143,8 @@ describe("competitor card", () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       return new Promise(() => undefined);
     });

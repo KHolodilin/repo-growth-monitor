@@ -17,8 +17,7 @@ import {
   traffic,
 } from "../test/fixtures";
 import {
-  isPublicResolve,
-  publicResolveResponse,
+  respondCatalogResolve,
   emptyCursorPage,
   isOwnersCatalog,
 } from "../test/repoRoutes";
@@ -196,8 +195,9 @@ describe("pages", () => {
     api.mockImplementation((path: string, init?: RequestInit) => {
       const url = String(path);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (isPublicResolve(url)) {
-        return Promise.resolve(json(publicResolveResponse()));
+      const catalog = respondCatalogResolve(url);
+      if (catalog) {
+        return Promise.resolve(json(catalog));
       }
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(json(repository));

@@ -19,7 +19,7 @@ vi.mock("../lib/auth", async (original) => ({
 
 const owners = [
   {
-    id: "2",
+    ownerId: "2",
     login: "Beta",
     canonicalPath: "/Beta",
     repositories: 1,
@@ -29,7 +29,7 @@ const owners = [
     contributors: 5,
   },
   {
-    id: "1",
+    ownerId: "1",
     login: "Alpha",
     canonicalPath: "/Alpha",
     repositories: 2,
@@ -54,7 +54,7 @@ beforeEach(() => {
   loadMe.mockReset();
   loadMe.mockResolvedValue(anonymousMe);
   api.mockImplementation((path: string) => {
-    if (!path.startsWith("/api/v1/public/owners?")) {
+    if (!path.startsWith("/api/v1/owners?")) {
       return Promise.reject(new Error("Unexpected private request: " + path));
     }
     const url = new URL(path, "http://local.test");
@@ -66,10 +66,11 @@ beforeEach(() => {
     const sorted = [...owners].sort((left, right) => {
       const leftValue = left[key as keyof (typeof owners)[number]];
       const rightValue = right[key as keyof (typeof owners)[number]];
-      if (leftValue == null && rightValue == null) return Number(left.id) - Number(right.id);
+      if (leftValue == null && rightValue == null)
+        return Number(left.ownerId) - Number(right.ownerId);
       if (leftValue == null) return 1;
       if (rightValue == null) return -1;
-      if (leftValue === rightValue) return Number(left.id) - Number(right.id);
+      if (leftValue === rightValue) return Number(left.ownerId) - Number(right.ownerId);
       const compared = leftValue < rightValue ? -1 : 1;
       return order === "asc" ? compared : -compared;
     });
@@ -104,7 +105,7 @@ describe("public homepage owners directory", () => {
     expect(within(table).getByRole("link", { name: "Alpha" })).toHaveAttribute("href", "/Alpha");
     expect(within(table).getByText("—")).toBeInTheDocument();
     expect(screen.queryByText(/avatar|github\.com|Top 5/i)).not.toBeInTheDocument();
-    expect(api.mock.calls.every(([request]) => String(request).startsWith("/api/v1/public/"))).toBe(
+    expect(api.mock.calls.every(([request]) => String(request).startsWith("/api/v1/owners?"))).toBe(
       true,
     );
   });
@@ -140,7 +141,7 @@ describe("public homepage owners directory", () => {
   it("keeps Next/Previous tied to the server cursor and Back-friendly URL state", async () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
-      if (!String(path).startsWith("/api/v1/public/owners?"))
+      if (!String(path).startsWith("/api/v1/owners?"))
         return Promise.reject(new Error(String(path)));
       const url = new URL(String(path), "http://local.test");
       const after = Number(url.searchParams.get("after") ?? "0");

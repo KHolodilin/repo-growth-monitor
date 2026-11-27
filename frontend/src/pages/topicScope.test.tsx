@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useSearchParams } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { repository, topicHistory, traffic } from "../test/fixtures";
-import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
+import { emptyCursorPage, isOwnersCatalog, respondCatalogResolve } from "../test/repoRoutes";
 import { readTopicScope, topicScopeCookie, writeTopicScope } from "../lib/topicScope";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 import { TopicDetailsPage } from "./TopicDetailsPage";
@@ -55,6 +55,8 @@ describe("topics visibility scope cookie", () => {
     document.cookie = `${topicScopeCookie(8)}=; path=/; max-age=0`;
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.endsWith("/admin/repositories/13") || url.endsWith("/admin/repositories/8")) {
         const id = url.endsWith("/admin/repositories/8") ? 8 : 13;
@@ -162,6 +164,8 @@ describe("topics visibility scope cookie", () => {
     const bare = { ...repository, language: null };
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/admin/repositories?")) {
         return Promise.resolve([bare]);
@@ -189,6 +193,8 @@ describe("topics visibility scope cookie", () => {
     const bare = { ...repository, language: null };
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/admin/repositories?")) {
         return Promise.resolve([bare]);
@@ -264,6 +270,8 @@ describe("topics visibility scope cookie", () => {
     const bare = { ...repository, language: null };
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
       if (url.includes("/admin/repositories?")) {
         return Promise.resolve([bare]);

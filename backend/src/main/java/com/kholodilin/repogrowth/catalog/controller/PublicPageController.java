@@ -1,18 +1,23 @@
 package com.kholodilin.repogrowth.catalog.controller;
 
 import com.kholodilin.repogrowth.administration.configuration.PublicRoutes;
-import com.kholodilin.repogrowth.administration.service.*;
 import com.kholodilin.repogrowth.administration.service.PublicationService;
-import com.kholodilin.repogrowth.catalog.service.PublicReadService;
+import com.kholodilin.repogrowth.catalog.service.PublicHtmlService;
 import com.kholodilin.repogrowth.common.api.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import org.springframework.core.io.*;
-import org.springframework.http.*;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 /** Resolve publication before returning HTML. Unknown and unpublished paths are real 404s. */
 @Controller
@@ -22,16 +27,16 @@ public class PublicPageController {
   private static final String OWNER =
       "/{owner:(?!(?i:api|admin|login|logout|oauth2|settings|assets|actuator|dashboard|repositories|search-runs|error|v3|swagger-ui.*)$)[A-Za-z0-9][A-Za-z0-9-]{0,99}}";
   private static final String REPO = OWNER + "/{repository}";
-  private final PublicReadService reads;
+  private final PublicHtmlService pages;
   private final Resource index;
 
   @org.springframework.beans.factory.annotation.Autowired
-  public PublicPageController(PublicReadService reads) {
-    this(reads, new ClassPathResource("static/index.html"));
+  public PublicPageController(PublicHtmlService pages) {
+    this(pages, new ClassPathResource("static/index.html"));
   }
 
-  PublicPageController(PublicReadService reads, Resource index) {
-    this.reads = reads;
+  PublicPageController(PublicHtmlService pages, Resource index) {
+    this.pages = pages;
     this.index = index;
   }
 
@@ -57,7 +62,7 @@ public class PublicPageController {
     if (!PublicRoutes.owner(owner) || repository != null && !PublicRoutes.repository(repository))
       return ResponseEntity.notFound().build();
     try {
-      var target = reads.resolve("/" + owner + (repository == null ? "" : "/" + repository));
+      var target = pages.resolve("/" + owner + (repository == null ? "" : "/" + repository));
       String path = request.getRequestURI();
       String suffix =
           path.startsWith(target.canonicalPath())
@@ -66,7 +71,7 @@ public class PublicPageController {
       if (repository != null) {
         if (path.endsWith("/traffic/history")) {
           boolean paths = "paths".equals(kind);
-          reads.scope(
+          pages.scope(
               owner,
               repository,
               paths ? PublicationService.Module.PATHS : PublicationService.Module.REFERRERS);
@@ -76,11 +81,11 @@ public class PublicPageController {
           // by
           // the SPA/API the same way as in-app navigation; gating F5 on public_scope_verified made
           // reload 404 while click-through still worked for the same URL.
-          reads.validateDefinition(owner, repository, false, queryId);
+          pages.validateDefinition(owner, repository, false, queryId);
           suffix =
               "/search-queries/" + queryId + (githubId == null ? "" : "/competitors/" + githubId);
         } else if (topic != null) {
-          reads.validateTopic(owner, repository, decode(topic));
+          pages.validateTopic(owner, repository, decode(topic));
           suffix = "/topics/" + topic + (githubId == null ? "" : "/competitors/" + githubId);
         }
       }

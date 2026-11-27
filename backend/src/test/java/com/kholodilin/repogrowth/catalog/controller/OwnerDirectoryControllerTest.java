@@ -85,4 +85,36 @@ class OwnerDirectoryControllerTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
   }
+
+  @Test
+  void publishedDirectoryUsesSortOffsetContract() throws Exception {
+    when(readModel.directory("stars", "desc", 0, 1))
+        .thenReturn(
+            new OwnerDirectoryService.DirectoryPage(
+                java.util.List.of(
+                    java.util.Map.of(
+                        "ownerId",
+                        "2",
+                        "login",
+                        "Beta",
+                        "canonicalPath",
+                        "/Beta",
+                        "repositories",
+                        1,
+                        "stars",
+                        40)),
+                "1"));
+
+    mockMvc
+        .perform(
+            get("/api/v1/owners")
+                .param("sort", "stars")
+                .param("order", "desc")
+                .param("after", "0")
+                .param("limit", "1"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.items[0].login").value("Beta"))
+        .andExpect(jsonPath("$.items[0].ownerId").value("2"))
+        .andExpect(jsonPath("$.nextCursor").value("1"));
+  }
 }

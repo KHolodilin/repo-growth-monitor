@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { repository, searchHistory, searchResults } from "../test/fixtures";
-import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
+import { emptyCursorPage, isOwnersCatalog, respondCatalogResolve } from "../test/repoRoutes";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
@@ -18,15 +18,9 @@ describe("QueryDetailsPage run now", () => {
     const requestStates = [{ state: "ACTIVE" }, { state: "SUCCEEDED" }];
     api.mockImplementation((path: string) => {
       const url = String(path);
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
-      if (url.includes("/api/v1/public/resolve")) {
-        return Promise.resolve({
-          ownerId: "1",
-          repositoryId: "13",
-          canonicalPath: "/acme/outbox",
-          redirect: false,
-        });
-      }
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
       }

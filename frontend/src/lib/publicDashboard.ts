@@ -1,18 +1,18 @@
 import { api, type GrowthEvent, type Dashboard } from "./api";
 import type { DashboardViewData } from "./dashboardViewData";
 export type PublicOverview = {
-  owner: { id: string; login: string; type: string };
+  owner: { id: string; login: string; type?: string };
   repository?: { id: string; name: string; description?: string; pathPrefixes?: string[] };
-  canonicalPath: string;
-  repositoryCount: number;
-  modules: {
+  canonicalPath?: string;
+  repositoryCount?: number;
+  modules?: {
     traffic: boolean;
     referrers: boolean;
     paths: boolean;
     search: boolean;
     topics: boolean;
   };
-  freshness: { state: string; stale?: boolean; lastSuccessfulSnapshotAt?: string };
+  freshness?: { state: string; stale?: boolean; lastSuccessfulSnapshotAt?: string };
 };
 export type PublicRow = {
   id: string;
@@ -75,10 +75,17 @@ export type HistoryRow = {
   watchersLeaders?: HistoryLeader[] | null;
   contributorsLeaders?: HistoryLeader[] | null;
 };
-export function publicBase(owner: string, repository?: string) {
-  return `/api/v1/public/${repository ? `repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}` : `owners/${encodeURIComponent(owner)}`}`;
+
+/** Resource API base for an owner or repository id. */
+export function publicBase(ownerId: string, repositoryId?: string) {
+  return repositoryId
+    ? `/api/v1/repositories/${encodeURIComponent(repositoryId)}`
+    : `/api/v1/owners/${encodeURIComponent(ownerId)}`;
 }
-export function publicScope(overview: PublicOverview) {
+export function publicScope(overview: {
+  owner: { id: string };
+  repository?: { id: string };
+}) {
   return overview.repository
     ? `public:repository:${overview.repository.id}`
     : `public:owner:${overview.owner.id}`;
@@ -143,7 +150,7 @@ export function adaptPublicDashboard(
     from: stats.from,
     to: stats.to,
     state: "READY",
-    lastSyncAt: overview.freshness.lastSuccessfulSnapshotAt ?? null,
+    lastSyncAt: overview.freshness?.lastSuccessfulSnapshotAt ?? null,
     partialData: null,
     collectionWarning: null,
     activeCollection: null,
@@ -216,34 +223,50 @@ export function relativeRepositoryPath(raw: string, prefixes: string[]) {
 }
 export async function publicEvents(base: string, signal: AbortSignal): Promise<GrowthEvent[]> {
   const page = await api<
-    PublicPage<{
-      id: string;
-      repositoryId?: string;
-      eventAt: string;
-      title: string;
-      type: string;
-      category: string;
-      source: string;
-    }>
+    | PublicPage<{
+        id: string;
+        repositoryId?: string;
+        eventAt: string;
+        title: string;
+        type: string;
+        category: string;
+        source: string;
+      }>
+    | Array<{
+        id: string;
+        repositoryId?: string;
+        eventAt: string;
+        title: string;
+        type: string;
+        category: string;
+        source: string;
+      }>
   >(`${base}/growth-events?limit=100`, { signal });
-  return page.items.map((event) => ({ ...event, repositoryId: event.repositoryId ?? "" }));
+  const items = Array.isArray(page) ? page : page.items;
+  return items.map((event) => ({ ...event, repositoryId: event.repositoryId ?? "" }));
 }
 
 export async function publicRepositoryRows(
   base: string,
-  period: string,
+  _period: string,
   signal: AbortSignal,
 ): Promise<PublicRow[]> {
   const rows: PublicRow[] = [];
-  let after: string | undefined;
+  let cursor: string | undefined;
   for (let index = 0; index < 20; index++) {
-    const page = await api<PublicPage<PublicRow>>(
-      `${base}/repositories?limit=100&period=${period}${after ? `&after=${encodeURIComponent(after)}` : ""}`,
+    const page = await api<PublicPage<PublicRow & { repositoryId?: string }>>(
+      `${base}/repositories?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
       { signal },
     );
-    rows.push(...page.items);
+    rows.push(
+      ...page.items.map((row) => ({
+        ...row,
+        id: row.id ?? row.repositoryId ?? "",
+        name: row.name,
+      })),
+    );
     if (!page.nextCursor) return rows;
-    after = page.nextCursor;
+    cursor = page.nextCursor;
   }
   throw new Error(
     "This owner has too many repositories for one dashboard. Open an individual repository.",

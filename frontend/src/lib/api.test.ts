@@ -138,13 +138,13 @@ describe("api", () => {
     );
     await expect(api("/api/v1/admin/x")).rejects.toThrow("async body");
   });
-  it("omits account cookies on public reads", async () => {
+  it("includes credentials on resource reads", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: () => "{}" });
     vi.stubGlobal("fetch", fetchMock);
-    await api("/api/v1/public/owners");
+    await api("/api/v1/owners");
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/public/owners",
-      expect.objectContaining({ credentials: "omit" }),
+      "/api/v1/owners",
+      expect.objectContaining({ credentials: "include" }),
     );
   });
 });

@@ -7,20 +7,23 @@ import com.kholodilin.repogrowth.common.model.page.CursorPage;
 import com.kholodilin.repogrowth.identity.security.ResourceAccessPolicy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Phase 1 skeleton for catalog owner directory ({@link ApiSurface#RESOURCE}). Visibility is
- * filtered before pagination/cursor so hidden owners never inflate counts or nextCursor.
+ * Catalog owner directory ({@link ApiSurface#RESOURCE}). Exact {@code login} supports F5; {@code
+ * sort}/{@code order}/{@code after} serves the published landing directory.
  */
 @RestController
 @RequestMapping("/api/v1")
 public class OwnerDirectoryController {
 
   public record OwnerCard(String ownerId, String login) {}
+
+  public record DirectoryPage(List<Map<String, Object>> items, String nextCursor) {}
 
   private final ResourceAccessPolicy access;
   private final OwnerDirectoryService readModel;
@@ -31,13 +34,19 @@ public class OwnerDirectoryController {
   }
 
   @GetMapping("/owners")
-  public CursorPage<OwnerCard> owners(
+  public Object owners(
       @RequestParam(required = false) String login,
       @RequestParam(required = false) String cursor,
+      @RequestParam(required = false) String sort,
+      @RequestParam(defaultValue = "desc") String order,
+      @RequestParam(defaultValue = "0") long after,
       @RequestParam(defaultValue = "20") int limit) {
+    if (sort != null && !sort.isBlank() && (login == null || login.isBlank())) {
+      OwnerDirectoryService.DirectoryPage page = readModel.directory(sort, order, after, limit);
+      return new DirectoryPage(page.items(), page.nextCursor());
+    }
     int pageSize = Math.min(Math.max(limit, 1), 100);
     List<OwnerDirectoryService.OwnerRow> rows = readModel.list(login);
-    // Filter by readable repositories belonging to the owner before paging.
     List<OwnerCard> visible = new ArrayList<>();
     for (OwnerDirectoryService.OwnerRow row : rows) {
       List<Long> readable =

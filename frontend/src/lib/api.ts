@@ -51,7 +51,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers,
-    credentials: path.startsWith("/api/v1/public/") ? "omit" : "include",
+    credentials: "include",
   });
   if (!response.ok) {
     let body: unknown;

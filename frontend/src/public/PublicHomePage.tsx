@@ -21,7 +21,7 @@ import type { PublicPage } from "../lib/publicDashboard";
 import { cn, formatNumber } from "../lib/utils";
 
 export type PublicOwnerRow = {
-  id: string;
+  ownerId: string;
   login: string;
   type?: string;
   canonicalPath: string;
@@ -69,7 +69,7 @@ function ownersUrl(prefs: LandingDirectoryPrefs, after: number) {
     after: String(after),
     limit: String(prefs.limit),
   });
-  return `/api/v1/public/owners?${params}`;
+  return `/api/v1/owners?${params}`;
 }
 
 function metric(value: number | null | undefined) {
@@ -327,7 +327,7 @@ export function PublicHomePage() {
                 </tr>
               ) : (
                 items.map((row) => (
-                  <tr key={row.id} className="border-t">
+                  <tr key={row.ownerId} className="border-t">
                     <th scope="row" className="p-3 text-left font-normal">
                       <Link
                         className="font-medium text-primary hover:underline"

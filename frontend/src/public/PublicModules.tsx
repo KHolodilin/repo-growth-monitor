@@ -39,7 +39,7 @@ export function PublicModules({
   const [busy, setBusy] = useState(false);
   const [moreBusy, setMoreBusy] = useState(false);
   const [more, setMore] = useState<string | null>(null);
-  const base = publicBase(overview.owner.login, overview.repository?.name);
+  const base = publicBase(overview.owner.id, overview.repository?.id);
   const kind = tab === "topics" ? "topics" : "search-queries";
   const definitionsKey = tab === "search" || tab === "topics" ? `${base}:${kind}` : "idle";
   const [seenDefinitionsKey, setSeenDefinitionsKey] = useState(definitionsKey);
@@ -210,7 +210,7 @@ function PublicSourceCards({ overview, period }: { overview: PublicOverview; per
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
-  const base = publicBase(overview.owner.login, overview.repository?.name);
+  const base = publicBase(overview.owner.id, overview.repository?.id);
   const sourcesKey = `${base}:${overview.modules.referrers}:${overview.modules.paths}`;
   const [seenSourcesKey, setSeenSourcesKey] = useState(sourcesKey);
   if (sourcesKey !== seenSourcesKey) {

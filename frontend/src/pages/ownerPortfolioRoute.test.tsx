@@ -25,6 +25,19 @@ const admin = {
   actions: ["MUTATE"],
 };
 
+const ownerDashboard = {
+  ...dashboardReady,
+  repositories: [
+    {
+      ...dashboardReady.repositories[0],
+      discoverabilityPassed: 12,
+      discoverabilityTotal: 13,
+      activityStatus: "ACTIVE",
+      activityAt: "2026-09-23T00:00:00Z",
+    },
+  ],
+};
+
 describe("owner portfolio route", () => {
   it("shows Disc. and Activity for admin like main Portfolio", async () => {
     loadMe.mockResolvedValue(admin);
@@ -37,18 +50,7 @@ describe("owner portfolio route", () => {
           planner: { timezone: "UTC", from: "06:00", to: "18:00", open: false },
         });
       }
-      return Promise.resolve({
-        ...dashboardReady,
-        repositories: [
-          {
-            ...dashboardReady.repositories[0],
-            discoverabilityPassed: 12,
-            discoverabilityTotal: 13,
-            activityStatus: "ACTIVE",
-            activityAt: "2026-09-23T00:00:00Z",
-          },
-        ],
-      });
+      return Promise.resolve(ownerDashboard);
     });
     render(
       <MemoryRouter initialEntries={["/KHolodilin"]}>
@@ -74,73 +76,24 @@ describe("owner portfolio route", () => {
     loadMe.mockResolvedValue(anonymousMe);
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.includes("/api/v1/public/owners/")) {
-        if (url.endsWith("/KHolodilin") || url.match(/owners\/[^/?]+$/)) {
-          return Promise.resolve({
-            owner: { id: "1", login: "KHolodilin", type: "USER" },
-            canonicalPath: "/KHolodilin",
-            repositoryCount: 1,
-            modules: {
-              traffic: true,
-              referrers: false,
-              paths: false,
-              search: false,
-              topics: false,
-            },
-            freshness: { state: "READY", lastSuccessfulSnapshotAt: "2026-09-23T00:00:00Z" },
-          });
-        }
-        if (url.includes("/stats?")) {
-          return Promise.resolve({
-            period: "30d",
-            from: "2026-08-24",
-            to: "2026-09-23",
-            repositories: 1,
-            totals: {
-              stars: { value: 1, absoluteChange: 0, growthPercent: 0, complete: true },
-              forks: { value: 0, absoluteChange: 0, growthPercent: 0, complete: true },
-              watchers: { value: 0, absoluteChange: 0, growthPercent: 0, complete: true },
-              contributors: { value: 1, absoluteChange: 0, growthPercent: 0, complete: true },
-            },
-          });
-        }
-        if (url.includes("/traffic?")) {
-          return Promise.resolve({
-            totals: {
-              views: { value: 1, absoluteChange: 0, growthPercent: 0, complete: true },
-              visitors: { value: 1, absoluteChange: 0, growthPercent: 0, complete: true },
-              clones: { value: 0, absoluteChange: 0, growthPercent: 0, complete: true },
-              uniqueCloners: { value: 0, absoluteChange: 0, growthPercent: 0, complete: true },
-            },
-          });
-        }
-        if (url.includes("-history")) {
-          return Promise.resolve({ items: [], nextDate: null });
-        }
-        if (url.includes("/repositories?")) {
-          return Promise.resolve({
-            items: [
-              {
-                id: "13",
-                name: "outbox",
-                visitors: 1,
-                views: 1,
-                clones: 0,
-                stars: 1,
-                forks: 0,
-                growthPercent: 0,
-                activityAt: "2026-09-23T00:00:00Z",
-                activityStatus: "ACTIVE",
-                discoverabilityPassed: 12,
-                discoverabilityTotal: 13,
-              },
-            ],
-            nextCursor: null,
-          });
-        }
-        if (url.includes("/growth-events")) {
-          return Promise.resolve({ items: [], nextCursor: null });
-        }
+      if (url.startsWith("/api/v1/owners?login=")) {
+        return Promise.resolve({
+          items: [{ ownerId: "1", login: "KHolodilin" }],
+          nextCursor: null,
+        });
+      }
+      if (url === "/api/v1/owners/1") {
+        return Promise.resolve({
+          ownerId: "1",
+          login: "KHolodilin",
+          ownerType: "USER",
+        });
+      }
+      if (url.includes("/api/v1/dashboard?")) {
+        return Promise.resolve(ownerDashboard);
+      }
+      if (url.includes("/growth-events")) {
+        return Promise.resolve([]);
       }
       return Promise.resolve({});
     });

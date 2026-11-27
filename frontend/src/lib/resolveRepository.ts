@@ -1,17 +1,10 @@
 import { api, ApiError, type Repository } from "./api";
 import { findOwnerByLogin, findRepositoryByName } from "./catalogApi";
 
-type PublicResolve = {
-  ownerId: string;
-  repositoryId: string | null;
-  canonicalPath: string;
-  redirect: boolean;
-};
-
 /**
  * Resolve /{owner}/{repo} for F5 / deep links.
- * Prefer catalog exact login/name filters (no localStorage); keep public /resolve and admin list
- * as fallbacks until HTML+SPA drop /resolve together.
+ * Prefer catalog exact login/name filters (no localStorage); fall back to the admin list for
+ * operators when the catalog miss is expected for unpublished repos.
  */
 export async function resolveRepository(owner: string, repository: string): Promise<Repository> {
   const fullName = `${owner}/${repository}`;
@@ -26,19 +19,6 @@ export async function resolveRepository(owner: string, repository: string): Prom
     }
   } catch (err) {
     if (!(err instanceof ApiError && (err.status === 404 || err.status === 401))) {
-      throw err;
-    }
-  }
-
-  try {
-    const resolved = await api<PublicResolve>(
-      `/api/v1/public/resolve?path=${encodeURIComponent(`/${owner}/${repository}`)}`,
-    );
-    if (resolved.repositoryId) {
-      return api<Repository>(`/api/v1/admin/repositories/${resolved.repositoryId}`);
-    }
-  } catch (err) {
-    if (!(err instanceof ApiError && err.status === 404)) {
       throw err;
     }
   }

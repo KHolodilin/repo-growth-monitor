@@ -3,8 +3,9 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { LogoMark, SignInIcon } from "../components/icons";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/AuthContext";
+import { findOwnerByLogin } from "../lib/catalogApi";
 import { DashboardViewContext } from "../lib/dashboardView";
-import { publicBase, type PublicOverview } from "../lib/publicDashboard";
+import type { DashboardViewData } from "../lib/dashboardViewData";
 import { formatSyncTime } from "../lib/utils";
 
 const PROJECT_GITHUB = "https://github.com/KHolodilin/repo-growth-monitor";
@@ -33,12 +34,20 @@ export function PublicLayout() {
     if (syncPathKey === null) {
       return;
     }
-    const [owner, repository] = syncPathKey.split("/").filter(Boolean);
+    const [owner] = syncPathKey.split("/").filter(Boolean);
     const abort = new AbortController();
-    api<PublicOverview>(publicBase(owner, repository), { signal: abort.signal })
-      .then((overview) => {
+    findOwnerByLogin(owner)
+      .then(async (card) => {
+        if (abort.signal.aborted || !card) {
+          if (!abort.signal.aborted) setSyncAt(null);
+          return;
+        }
+        const dashboard = await api<DashboardViewData>(
+          `/api/v1/dashboard?period=7d&owner=${encodeURIComponent(card.login)}`,
+          { signal: abort.signal },
+        );
         if (!abort.signal.aborted) {
-          setSyncAt(overview.freshness.lastSuccessfulSnapshotAt ?? null);
+          setSyncAt(dashboard.lastSyncAt ?? null);
         }
       })
       .catch(() => {

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { repository, searchHistory, searchResults } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
+import { respondCatalogResolve } from "../test/repoRoutes";
 import { QueryDetailsPage } from "./QueryDetailsPage";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
@@ -19,8 +19,9 @@ describe("query neighbor chart", () => {
     const user = userEvent.setup();
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (isPublicResolve(url)) {
-        return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) {
+        return Promise.resolve(catalog);
       }
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.resolve(repository);
@@ -138,7 +139,8 @@ describe("query neighbor chart", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.includes("/search-queries/5/")) return Promise.reject(new Error("query-5-down"));
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/search-queries/7/history")) {

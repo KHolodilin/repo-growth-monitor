@@ -2,7 +2,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { growthEvent, repository, searchHistory, traffic } from "../test/fixtures";
-import { isPublicResolve, publicResolveResponse } from "../test/repoRoutes";
+import { respondCatalogResolve } from "../test/repoRoutes";
 import { RepositoryDetailsPage } from "./RepositoryDetailsPage";
 
 const { api } = vi.hoisted(() => ({ api: vi.fn() }));
@@ -24,7 +24,8 @@ function renderDetails(path = "/admin/repositories/13") {
 function mockDetailsApi(handlers: { repository?: () => Promise<unknown> }) {
   api.mockImplementation((path: unknown) => {
     const url = String(path);
-    if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+    const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
     if (url.endsWith("/admin/repositories/13")) {
       return handlers.repository ? handlers.repository() : Promise.resolve(repository);
     }
@@ -47,7 +48,8 @@ describe("RepositoryDetailsPage load races", () => {
   it("clears a previous error when a newer load succeeds", async () => {
     api.mockImplementation((path: unknown) => {
       const url = String(path);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) {
         return Promise.reject(new Error("temporary outage"));
       }
@@ -119,7 +121,8 @@ describe("RepositoryDetailsPage load races", () => {
       if (init?.signal) {
         signals.push(init.signal);
       }
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) {
         repoCalls += 1;
         if (repoCalls === 1) {
@@ -154,7 +157,8 @@ describe("RepositoryDetailsPage load races", () => {
   it("keeps repository traffic visible when growth events fail", async () => {
     api.mockImplementation((path: unknown) => {
       const url = String(path);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?") || url.endsWith("/admin/repositories")) {
         return Promise.resolve([repository]);
@@ -194,7 +198,8 @@ describe("RepositoryDetailsPage load races", () => {
     let eventCalls = 0;
     api.mockImplementation((path: unknown) => {
       const url = String(path);
-      if (isPublicResolve(url)) return Promise.resolve(publicResolveResponse());
+      const catalog = respondCatalogResolve(url);
+      if (catalog) return Promise.resolve(catalog);
       if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
       if (url.includes("/admin/repositories?") || url.endsWith("/admin/repositories")) {
         return Promise.resolve([repository]);

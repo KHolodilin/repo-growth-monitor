@@ -21,14 +21,10 @@ import { snapshotChartOption, snapshotSeriesKey } from "../lib/snapshotChart";
 import { chartCsv } from "../lib/chartExport";
 import { withCollectionWarning } from "../lib/chartPresentation";
 import type { SnapshotHistory } from "../lib/api";
-import { repository, searchHistory, traffic } from "../test/fixtures";
-import {
-  isPublicResolve,
-  publicResolveResponse,
-  emptyCursorPage,
-  isOwnersCatalog,
-} from "../test/repoRoutes";
+import { dashboardReady, repository, searchHistory, traffic } from "../test/fixtures";
+import { emptyCursorPage, isOwnersCatalog } from "../test/repoRoutes";
 import { respondKpi } from "../test/kpiFixtures";
+
 const { api, loadMe } = vi.hoisted(() => ({ api: vi.fn(), loadMe: vi.fn() }));
 vi.mock("../lib/api", async (original) => ({
   ...(await original<typeof import("../lib/api")>()),
@@ -38,6 +34,7 @@ vi.mock("../lib/auth", async (original) => ({
   ...(await original<typeof import("../lib/auth")>()),
   loadMe,
 }));
+
 const overview: PublicOverview = {
   owner: { id: "1", login: "Alpha", type: "USER" },
   canonicalPath: "/Alpha",
@@ -61,6 +58,7 @@ const totals = {
   clones: emptyMetric,
   uniqueCloners: emptyMetric,
 } satisfies StatsResponse["totals"] & TrafficResponse["totals"];
+
 const publishedRepo = {
   ...repository,
   id: 13,
@@ -68,30 +66,62 @@ const publishedRepo = {
   fullName: "Alpha/project",
   owner: { ...repository.owner, login: "Alpha" },
 };
-function respondPublic(path: string) {
-  if (path.includes("/repositories?"))
-    return { items: [{ id: "9007199254740993", name: "project", stars: 0, forks: 0 }] };
-  if (path.includes("-history")) return { items: [] };
-  if (path.includes("/growth-events")) return { items: [] };
-  if (path.includes("/stats?"))
-    return { period: "30d", from: "2026-10-01", to: "2026-10-30", repositories: 1, totals };
-  if (path.includes("/traffic?")) return { totals };
-  if (path.includes("/search-queries?"))
-    return {
-      items: [
-        { id: "5", repositoryId: "9007199254740993", name: "Search visibility", query: "spring" },
-      ],
-    };
-  if (path.includes("/paths?"))
-    return { items: [{ id: "1", label: "/Alpha/project/issues", views: 0, visitors: 0 }] };
-  if (path.includes("/referrers?")) return { items: [] };
-  return overview;
-}
+
+const alphaDashboard = {
+  ...dashboardReady,
+  period: "30d",
+  repositories: [
+    {
+      ...dashboardReady.repositories[0],
+      id: "9007199254740993",
+      fullName: "Alpha/project",
+      stars: 0,
+      forks: 0,
+    },
+  ],
+};
+
 function respond(path: string) {
   const url = String(path);
+  if (url.startsWith("/api/v1/owners?login=")) {
+    const login = new URL(url, "http://local.test").searchParams.get("login") ?? "Alpha";
+    return { items: [{ ownerId: "1", login }], nextCursor: null };
+  }
+  if (url.includes("/api/v1/owners/1/repositories?name=")) {
+    return {
+      items: [
+        {
+          repositoryId: "13",
+          ownerId: "1",
+          name: "project",
+          fullName: "Alpha/project",
+          description: null,
+          language: "Java",
+          archived: false,
+          fork: false,
+          activityStatus: "ACTIVE",
+          modules: {
+            dashboard: true,
+            traffic: true,
+            referrers: true,
+            paths: true,
+            topics: true,
+          },
+        },
+      ],
+      nextCursor: null,
+    };
+  }
+  if (url === "/api/v1/owners/1" || url.match(/^\/api\/v1\/owners\/1(\?|$)/)) {
+    return { ownerId: "1", login: "Alpha", ownerType: "USER" };
+  }
+  if (url.includes("/api/v1/dashboard?")) {
+    return alphaDashboard;
+  }
+  if (url.includes("/api/v1/owners/1/growth-events")) {
+    return [];
+  }
   if (isOwnersCatalog(url)) return emptyCursorPage;
-  if (isPublicResolve(url)) return publicResolveResponse(publishedRepo.id);
-  if (url.startsWith("/api/v1/public/")) return respondPublic(url);
   if (url.endsWith("/admin/repositories/13")) return publishedRepo;
   if (url.includes("/admin/repositories?") || url.includes("/admin/repositories?refresh"))
     return [publishedRepo];
@@ -110,6 +140,7 @@ function respond(path: string) {
   }
   throw Error("Unexpected request: " + url);
 }
+
 function page(path = "/Alpha") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -117,6 +148,7 @@ function page(path = "/Alpha") {
     </MemoryRouter>,
   );
 }
+
 beforeEach(() => {
   localStorage.clear();
   api.mockReset();
@@ -124,17 +156,32 @@ beforeEach(() => {
   loadMe.mockResolvedValue(anonymousMe);
   api.mockImplementation((path: string) => Promise.resolve(respond(path)));
 });
+
 describe("public dashboards", () => {
-  it("uses the existing dashboard without identity or management requests", async () => {
+  it("uses the resource dashboard without identity or management requests", async () => {
     page();
     expect(await screen.findByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "project" })).toHaveAttribute("href", "/Alpha/project");
+    expect(screen.getByRole("link", { name: "Alpha/project" })).toHaveAttribute(
+      "href",
+      "/Alpha/project",
+    );
     expect(screen.queryByText("Portfolio")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /collect/i })).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Alpha analytics" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Search Visibility" })).not.toBeInTheDocument();
-    expect(api.mock.calls.every(([path]) => String(path).startsWith("/api/v1/public/"))).toBe(true);
+    expect(
+      api.mock.calls.every(([path]) => {
+        const url = String(path);
+        return (
+          url.startsWith("/api/v1/owners") ||
+          url.startsWith("/api/v1/dashboard") ||
+          url.startsWith("/api/v1/repositories")
+        );
+      }),
+    ).toBe(true);
+    expect(api.mock.calls.every(([path]) => !String(path).includes("/api/v1/public/"))).toBe(true);
   });
+
   it("serves repository pages through RepositoryDetails without the public repo shell", async () => {
     const user = userEvent.setup();
     page("/Alpha/project");
@@ -159,6 +206,7 @@ describe("public dashboards", () => {
       "/Alpha/project/search-queries/5",
     );
   });
+
   it("shows observed traffic totals on owner Partial data cards", () => {
     const stats: StatsResponse = {
       period: "30d",
@@ -167,7 +215,7 @@ describe("public dashboards", () => {
       repositories: 10,
       totals,
     };
-    const traffic: TrafficResponse = {
+    const trafficResponse: TrafficResponse = {
       coverage: { observedRepositoryDays: 279, expectedRepositoryDays: 290 },
       previousCoverage: { observedRepositoryDays: 200, expectedRepositoryDays: 290 },
       totals: {
@@ -201,13 +249,14 @@ describe("public dashboards", () => {
         },
       },
     };
-    const model = adaptPublicDashboard(overview, stats, [], traffic, [], []);
+    const model = adaptPublicDashboard(overview, stats, [], trafficResponse, [], []);
     expect(model.summary.views.value).toBe(2547);
     expect(model.summary.visitors.value).toBe(446);
     expect(model.summary.uniqueCloners.value).toBe(1688);
     expect(model.summary.views.coverage).toEqual({ observedDays: 279, expectedDays: 290 });
     expect(model.summary.views.previousCoverage).toEqual({ observedDays: 200, expectedDays: 290 });
   });
+
   it("shows observed unique contributors when tip login sets are incomplete", () => {
     const stats: StatsResponse = {
       period: "30d",
@@ -228,9 +277,10 @@ describe("public dashboards", () => {
     const model = adaptPublicDashboard(overview, stats, [], null, [], []);
     expect(model.stats.totals.contributors.value).toBe(14);
   });
+
   it("keeps complete public metrics, repository scope and history pagination edges", async () => {
-    expect(publicBase("Alpha", "project")).toBe("/api/v1/public/repositories/Alpha/project");
-    expect(publicBase("Alpha")).toBe("/api/v1/public/owners/Alpha");
+    expect(publicBase("1", "9")).toBe("/api/v1/repositories/9");
+    expect(publicBase("1")).toBe("/api/v1/owners/1");
     const repoOverview = {
       ...overview,
       repository: { id: "9", name: "project", pathPrefixes: ["/Alpha/project"] },
@@ -254,7 +304,7 @@ describe("public dashboards", () => {
       },
       highlights: { rankRise: null, rankDrop: null, events: null, visitors: null },
     };
-    const traffic: TrafficResponse = {
+    const trafficResponse: TrafficResponse = {
       totals: {
         views: {
           value: 12,
@@ -290,7 +340,7 @@ describe("public dashboards", () => {
       repoOverview,
       stats,
       [{ date: "2026-10-16", stars: null, forks: 2, watchers: null, contributors: 3 }],
-      traffic,
+      trafficResponse,
       [{ date: "2026-10-16", views: null, visitors: 2, clones: null, uniqueCloners: 1 }],
       [
         {
@@ -335,37 +385,33 @@ describe("public dashboards", () => {
     });
     expect(relativeRepositoryPath("/Alpha/project", ["/Alpha/project"])).toBe("/");
     expect(relativeRepositoryPath("Alpha/project/issues", ["Alpha/project"])).toBe("/issues");
-    api.mockResolvedValueOnce({
-      items: [
-        {
-          id: "e1",
-          eventAt: "2026-10-16T00:00:00Z",
-          title: "Ship",
-          type: "RELEASE",
-          category: "PROMOTION",
-          source: "manual",
-        },
-      ],
-    });
-    expect(await publicEvents("/api/v1/public/owners/Alpha", new AbortController().signal)).toEqual(
-      [
-        {
-          id: "e1",
-          repositoryId: "",
-          eventAt: "2026-10-16T00:00:00Z",
-          title: "Ship",
-          type: "RELEASE",
-          category: "PROMOTION",
-          source: "manual",
-        },
-      ],
-    );
+    api.mockResolvedValueOnce([
+      {
+        id: "e1",
+        eventAt: "2026-10-16T00:00:00Z",
+        title: "Ship",
+        type: "RELEASE",
+        category: "PROMOTION",
+        source: "manual",
+      },
+    ]);
+    expect(await publicEvents("/api/v1/owners/1", new AbortController().signal)).toEqual([
+      {
+        id: "e1",
+        repositoryId: "",
+        eventAt: "2026-10-16T00:00:00Z",
+        title: "Ship",
+        type: "RELEASE",
+        category: "PROMOTION",
+        source: "manual",
+      },
+    ]);
     api
       .mockResolvedValueOnce({ items: [{ date: "2026-10-16" }], nextDate: "2026-10-16" })
       .mockResolvedValueOnce({ items: [{ date: "2026-10-15" }] });
     expect(
       await historyRows(
-        "/api/v1/public/owners/Alpha/stats-history?period=30d",
+        "/api/v1/owners/1/stats-history?period=30d",
         new AbortController().signal,
       ),
     ).toEqual([{ date: "2026-10-15" }, { date: "2026-10-16" }]);
@@ -373,27 +419,25 @@ describe("public dashboards", () => {
       Promise.resolve({ items: [{ date: String(Math.random()) }], nextDate: "2026-10-01" }),
     );
     await expect(
-      historyRows(
-        "/api/v1/public/owners/Alpha/stats-history?period=all",
-        new AbortController().signal,
-      ),
+      historyRows("/api/v1/owners/1/stats-history?period=all", new AbortController().signal),
     ).rejects.toThrow(/too large/);
     api.mockImplementation(() =>
       Promise.resolve({ items: [{ id: String(Math.random()), name: "r" }], nextCursor: "1" }),
     );
     await expect(
-      publicRepositoryRows("/api/v1/public/owners/Alpha", "30d", new AbortController().signal),
+      publicRepositoryRows("/api/v1/owners/1", "30d", new AbortController().signal),
     ).rejects.toThrow(/too many repositories/);
   });
+
   it("reports errors and retries rather than leaking a different dashboard", async () => {
     let fail = true;
-    api.mockImplementation((path: string) =>
-      Promise.resolve(
-        fail && String(path).split("?")[0] === "/api/v1/public/owners/Alpha"
-          ? Promise.reject(Error("Unavailable"))
-          : Promise.resolve(respond(path)),
-      ),
-    );
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (fail && url.startsWith("/api/v1/owners?login=")) {
+        return Promise.reject(Error("Unavailable"));
+      }
+      return Promise.resolve(respond(url));
+    });
     const user = userEvent.setup();
     page();
     expect(await screen.findByRole("alert")).toHaveTextContent("Unavailable");
@@ -401,10 +445,10 @@ describe("public dashboards", () => {
     await user.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
   });
+
   it("maps non-Error overview failures into Data unavailable", async () => {
     api.mockImplementation((path: string) => {
-      if (String(path).split("?")[0] === "/api/v1/public/owners/Alpha") {
-        // Cover setError(non-Error) fallback; production accepts unknown rejections.
+      if (String(path).startsWith("/api/v1/owners?login=")) {
         // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
         return Promise.reject({ reason: "down" });
       }
@@ -414,28 +458,28 @@ describe("public dashboards", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("[object Object]");
     view.unmount();
   });
+
   it("renders PublicNotFound for overview 404 responses", async () => {
     const { ApiError } = await import("../lib/api");
     api.mockImplementation((path: string) => {
-      if (String(path).split("?")[0] === "/api/v1/public/owners/Alpha") {
-        return Promise.reject(new ApiError(404, "missing"));
+      if (String(path).startsWith("/api/v1/owners?login=")) {
+        return Promise.resolve(emptyCursorPage);
       }
       return Promise.resolve(respond(path));
     });
     const view = page("/Alpha?tab=stats");
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();
+    void ApiError;
     view.unmount();
   });
-  it("covers stats-load failures with and without Error when traffic is disabled", async () => {
+
+  it("covers dashboard-load failures with and without Error", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.split("?")[0] === "/api/v1/public/owners/Alpha") {
-        return Promise.resolve({
-          ...overview,
-          modules: { ...overview.modules, traffic: false },
-        });
+      if (url.startsWith("/api/v1/owners?login=") || url === "/api/v1/owners/1") {
+        return Promise.resolve(respond(url));
       }
-      if (url.includes("/stats?") && !url.includes("history")) {
+      if (url.includes("/api/v1/dashboard?")) {
         // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- non-Error path
         return Promise.reject({ code: "stats-down" });
       }
@@ -447,13 +491,10 @@ describe("public dashboards", () => {
 
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.split("?")[0] === "/api/v1/public/owners/Alpha") {
-        return Promise.resolve({
-          ...overview,
-          modules: { ...overview.modules, traffic: false },
-        });
+      if (url.startsWith("/api/v1/owners?login=") || url === "/api/v1/owners/1") {
+        return Promise.resolve(respond(url));
       }
-      if (url.includes("/stats?") && !url.includes("history")) {
+      if (url.includes("/api/v1/dashboard?")) {
         return Promise.reject(new Error("stats boom"));
       }
       return Promise.resolve(respond(url));
@@ -462,6 +503,7 @@ describe("public dashboards", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("stats boom");
     asError.unmount();
   });
+
   it("updates period and stats tab from the public owner dashboard", async () => {
     const user = userEvent.setup();
     const view = page("/Alpha");
@@ -473,60 +515,53 @@ describe("public dashboards", () => {
       "true",
     );
     expect(api.mock.calls.some(([path]) => String(path).includes("period=7d"))).toBe(true);
-    expect(api.mock.calls.some(([path]) => String(path).includes("/stats?"))).toBe(true);
+    expect(api.mock.calls.some(([path]) => String(path).includes("/api/v1/dashboard?"))).toBe(true);
     view.unmount();
   });
+
   it("follows canonical owner path redirects", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.split("?")[0] === "/api/v1/public/owners/Alpha") {
+      if (url.startsWith("/api/v1/owners?login=Alpha")) {
+        return Promise.resolve({ items: [{ ownerId: "1", login: "Alpha" }], nextCursor: null });
+      }
+      if (url === "/api/v1/owners/1") {
+        return Promise.resolve({ ownerId: "1", login: "Beta", ownerType: "USER" });
+      }
+      if (url.startsWith("/api/v1/owners?login=Beta")) {
+        return Promise.resolve({ items: [{ ownerId: "1", login: "Beta" }], nextCursor: null });
+      }
+      if (url.includes("/api/v1/dashboard?")) {
         return Promise.resolve({
-          ...overview,
-          owner: { ...overview.owner, login: "Beta" },
-          canonicalPath: "/Beta",
+          ...alphaDashboard,
+          repositories: [{ ...alphaDashboard.repositories[0], fullName: "Beta/project" }],
         });
       }
-      if (url.split("?")[0] === "/api/v1/public/owners/Beta") {
-        return Promise.resolve({
-          ...overview,
-          owner: { ...overview.owner, login: "Beta" },
-          canonicalPath: "/Beta",
-        });
-      }
-      if (url.startsWith("/api/v1/public/owners/Beta/")) {
-        return Promise.resolve(respond(url.replace("/owners/Beta/", "/owners/Alpha/")));
-      }
+      if (url.includes("/growth-events")) return Promise.resolve([]);
       return Promise.resolve(respond(url));
     });
     const view = page("/Alpha");
     expect(await screen.findByRole("navigation", { name: "Breadcrumb" })).toHaveTextContent("Beta");
     view.unmount();
   });
-  it("redirects repository-shaped owner overviews to the repository route", async () => {
-    api.mockImplementation((path: string) => {
-      const url = String(path);
-      if (url.split("?")[0] === "/api/v1/public/owners/Alpha") {
-        return Promise.resolve({
-          ...overview,
-          repository: { id: "13", name: "project", pathPrefixes: ["/Alpha/project"] },
-        });
-      }
-      return Promise.resolve(respond(url));
-    });
-    const view = page("/Alpha");
-    expect(await screen.findByRole("button", { name: "Traffic" })).toBeInTheDocument();
-    view.unmount();
-  });
+
   it("shows empty states without operational tracking signals", async () => {
     api.mockImplementation((path: string) => {
       const url = String(path);
-      if (url.split("?")[0] === "/api/v1/public/owners/Alpha")
-        return Promise.resolve({ ...overview, freshness: { state: "EMPTY" } });
+      if (url.includes("/api/v1/dashboard?")) {
+        return Promise.resolve({
+          ...alphaDashboard,
+          lastSyncAt: null,
+          state: "NO_REPOSITORIES",
+          repositories: [],
+        });
+      }
       return Promise.resolve(respond(url));
     });
     page();
     expect(await screen.findByText(/No saved snapshots yet/)).toBeInTheDocument();
   });
+
   it("isolates stable owner/repository preferences without growing cookies", () => {
     const cookies = document.cookie;
     writePublicPreference("public:owner:1", "period", "7d");
@@ -550,6 +585,7 @@ describe("public dashboards", () => {
     expect(Object.keys(storedPrefs as Record<string, unknown>)).toHaveLength(256);
     expect(document.cookie).toBe(cookies);
   });
+
   it("matches only complete repository prefixes and retains cross-owner names", () => {
     expect(relativeRepositoryPath("/Alpha/project/issues", ["/Alpha/project"])).toBe("/issues");
     expect(relativeRepositoryPath("/Alpha/project-other/issues", ["/Alpha/project"])).toBe(
@@ -559,6 +595,7 @@ describe("public dashboards", () => {
       "/?tab=readme",
     );
   });
+
   it("changes chart labels and exports without changing raw path identity or missing values", () => {
     const history: SnapshotHistory = {
       repositoryId: "public:repository:9007199254740993",
@@ -604,6 +641,7 @@ describe("public dashboards", () => {
     expect(chartCsv(option)).toContain("/issues - Visitors");
     expect(chartCsv(option)).not.toContain("/Alpha/project");
   });
+
   it("keeps unknown measurements null and actual zeros intact", () => {
     const stats: StatsResponse = {
       period: "30d",
@@ -625,6 +663,7 @@ describe("public dashboards", () => {
     expect(model.traffic[0].views).toBe(0);
     expect(model.traffic[0].visitors).toBeNull();
   });
+
   it("keeps stats-history incompleteness for tooltips", () => {
     const stats: StatsResponse = {
       period: "30d",
@@ -657,6 +696,7 @@ describe("public dashboards", () => {
       missingRepositories: 1,
     });
   });
+
   it("passes through traffic and stats leaders for chart tooltips", () => {
     const stats: StatsResponse = {
       period: "7d",
@@ -713,15 +753,72 @@ describe("public dashboards", () => {
     ]);
     expect(model.stats.points[0].starsLeaders).toEqual([{ fullName: "KHolodilin/a", value: 40 }]);
   });
+
+  it("accepts paged growth-event payloads from resource owners", async () => {
+    api.mockResolvedValueOnce({
+      items: [
+        {
+          id: "e2",
+          repositoryId: "13",
+          eventAt: "2026-10-16T00:00:00Z",
+          title: "Ship",
+          type: "RELEASE",
+          category: "PROMOTION",
+          source: "manual",
+        },
+      ],
+    });
+    expect(await publicEvents("/api/v1/owners/1", new AbortController().signal)).toEqual([
+      {
+        id: "e2",
+        repositoryId: "13",
+        eventAt: "2026-10-16T00:00:00Z",
+        title: "Ship",
+        type: "RELEASE",
+        category: "PROMOTION",
+        source: "manual",
+      },
+    ]);
+  });
+
+  it("keeps the dashboard when growth-events fail for an owner", async () => {
+    api.mockImplementation((path: string) => {
+      const url = String(path);
+      if (url.includes("/growth-events")) {
+        return Promise.reject(new Error("events down"));
+      }
+      return Promise.resolve(respond(url));
+    });
+    page("/Alpha");
+    expect(await screen.findByRole("navigation", { name: "Breadcrumb" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Alpha/project" })).toBeInTheDocument();
+  });
+
   it("loads subsequent owner pages without truncating the repository list", async () => {
     api
-      .mockResolvedValueOnce({ items: [{ id: "1", name: "first" }], nextCursor: "1" })
+      .mockResolvedValueOnce({
+        items: [{ repositoryId: "1", name: "first" }],
+        nextCursor: "1",
+      })
       .mockResolvedValueOnce({ items: [{ id: "2", name: "second" }] });
     expect(
-      await publicRepositoryRows("/api/v1/public/owners/Alpha", "7d", new AbortController().signal),
-    ).toHaveLength(2);
-    expect(api.mock.calls[1][0]).toContain("after=1");
+      await publicRepositoryRows("/api/v1/owners/1", "7d", new AbortController().signal),
+    ).toEqual([
+      expect.objectContaining({ id: "1", name: "first" }),
+      expect.objectContaining({ id: "2", name: "second" }),
+    ]);
+    expect(api.mock.calls[1][0]).toContain("cursor=1");
   });
+
+  it("builds repository hrefs from dashboard full names", async () => {
+    const user = userEvent.setup();
+    page("/Alpha");
+    const link = await screen.findByRole("link", { name: "Alpha/project" });
+    expect(link).toHaveAttribute("href", "/Alpha/project");
+    await user.click(link);
+    expect(await screen.findByRole("button", { name: "Traffic" })).toBeInTheDocument();
+  });
+
   it("does not invent planner warnings from paused public archives", () => {
     const option = {
       collectionExpected: false,
@@ -731,6 +828,7 @@ describe("public dashboards", () => {
     };
     expect(withCollectionWarning(option, "2026-11-03")).toEqual(option);
   });
+
   it("leaves unknown browser routes as not found", async () => {
     page("/Alpha/project/unavailable");
     expect(await screen.findByRole("heading", { name: "Page not found" })).toBeInTheDocument();

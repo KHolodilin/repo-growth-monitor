@@ -185,10 +185,6 @@ public class SecurityConfig {
       protected void doFilterInternal(
           HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
           throws ServletException, IOException {
-        if (request.getRequestURI().startsWith("/api/v1/public/")) {
-          filterChain.doFilter(request, response);
-          return;
-        }
         CsrfToken token = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
         if (token != null) {
           token.getToken();

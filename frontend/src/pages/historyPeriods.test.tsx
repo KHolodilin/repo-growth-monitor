@@ -5,8 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TrafficHistoryPage } from "./TrafficHistoryPage";
 import { repository, snapshotHistory } from "../test/fixtures";
 import {
-  isPublicResolve,
-  publicResolveResponse,
+  respondCatalogResolve,
   emptyCursorPage,
   isOwnersCatalog,
 } from "../test/repoRoutes";
@@ -94,26 +93,20 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));
   writeStoredRepoPeriod("13", "90d");
-  api.mockImplementation((url: string) =>
-    Promise.resolve(
-      isOwnersCatalog(url)
-        ? emptyCursorPage
-        : url.includes("/api/v1/public/resolve")
-          ? {
-              ownerId: String(repository.owner.id),
-              repositoryId: String(repository.id),
-              canonicalPath: `/${repository.owner.login}/${repository.name}`,
-              redirect: false,
-            }
-          : url.includes("traffic-history") ||
-              url.includes("referrer-history") ||
-              url.includes("path-history")
-            ? data(url)
-            : url.endsWith("/admin/repositories/13")
-              ? repository
-              : [],
-    ),
-  );
+  api.mockImplementation((url: string) => {
+    const catalog = respondCatalogResolve(url);
+    if (catalog) return Promise.resolve(catalog);
+    if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
+    if (
+      url.includes("traffic-history") ||
+      url.includes("referrer-history") ||
+      url.includes("path-history")
+    ) {
+      return Promise.resolve(data(url));
+    }
+    if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+    return Promise.resolve([]);
+  });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -200,21 +193,20 @@ it("uses repository preference for an invalid period and preserves restricted fi
 });
 
 it("uses the saved period for an empty archive and keeps the empty state honest", async () => {
-  api.mockImplementation((url: string) =>
-    Promise.resolve(
-      isOwnersCatalog(url)
-        ? emptyCursorPage
-        : isPublicResolve(url)
-          ? publicResolveResponse()
-          : url.includes("traffic-history") ||
-              url.includes("referrer-history") ||
-              url.includes("path-history")
-            ? { ...snapshotHistory, dates: [], rows: [] }
-            : url.endsWith("/admin/repositories/13")
-              ? repository
-              : [],
-    ),
-  );
+  api.mockImplementation((url: string) => {
+    const catalog = respondCatalogResolve(url);
+    if (catalog) return Promise.resolve(catalog);
+    if (isOwnersCatalog(url)) return Promise.resolve(emptyCursorPage);
+    if (
+      url.includes("traffic-history") ||
+      url.includes("referrer-history") ||
+      url.includes("path-history")
+    ) {
+      return Promise.resolve({ ...snapshotHistory, dates: [], rows: [] });
+    }
+    if (url.endsWith("/admin/repositories/13")) return Promise.resolve(repository);
+    return Promise.resolve([]);
+  });
   mount();
   const group = await screen.findByRole("group", { name: "History period" });
   expect(within(group).getByRole("button", { name: "90d" })).toHaveAttribute(
