@@ -79,4 +79,20 @@ class NorthstarMockSeedTest {
     assertThat(NorthstarMockSeed.directoryTopics(1, 0)).isNotEqualTo(NorthstarMockSeed.directoryTopics(0, 0));
     assertThat(NorthstarMockSeed.directoryTopics(0, 1)).hasSize(3);
   }
+
+  @Test
+  void contributorSeedingCoversAboutThirtyPercentOfAtlasOwners() {
+    assertThat(NorthstarMockSeed.seedContributorsForOwner("northstar")).isTrue();
+    assertThat(NorthstarMockSeed.seedContributorsForOwner("atlas-01")).isTrue();
+    assertThat(NorthstarMockSeed.seedContributorsForOwner("atlas-02")).isFalse();
+    assertThat(NorthstarMockSeed.seedContributorsForOwner("atlas-04")).isTrue();
+    long seeded =
+        java.util.stream.IntStream.range(0, NorthstarMockSeed.DIRECTORY_OWNER_COUNT)
+            .mapToObj(NorthstarMockSeed::directoryOwnerLogin)
+            .filter(NorthstarMockSeed::seedContributorsForOwner)
+            .count();
+    assertThat(seeded).isBetween(8L, 12L);
+    assertThat(NorthstarMockSeed.contributorCount(91_010L)).isBetween(1, 20);
+    assertThat(NorthstarMockSeed.contributorCount(93_001L)).isBetween(1, 20);
+  }
 }

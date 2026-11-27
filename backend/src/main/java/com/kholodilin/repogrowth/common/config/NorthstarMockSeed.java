@@ -154,10 +154,69 @@ public class NorthstarMockSeed implements ApplicationRunner {
     boolean publishPublic = !spec.privateRepo();
     publishAndTrack(repositoryId, publishPublic, now);
     seedMetrics(repositoryId, ordinal, today, spec);
+    if (seedContributorsForOwner(spec.ownerLogin())) {
+      seedContributorLogins(repositoryId, today, contributorCount(spec.githubId()));
+    }
     seedReferrersAndPaths(repositoryId, ordinal, today, spec);
     seedSearch(repositoryId, ordinal, today, spec, publishPublic);
     seedTopics(repositoryId, ordinal, today, spec);
     seedEvents(repositoryId, ordinal, today, spec);
+  }
+
+  /**
+   * Owner-directory Contributors stays "—" unless every published repo of the owner has complete
+   * login collection. Seed ~30% of atlas owners (and northstar) so those cards show 1..20.
+   */
+  static boolean seedContributorsForOwner(String ownerLogin) {
+    if (OWNER_LOGIN.equals(ownerLogin)) {
+      return true;
+    }
+    if (ownerLogin != null && ownerLogin.startsWith("atlas-")) {
+      int n = Integer.parseInt(ownerLogin.substring("atlas-".length()));
+      return n % 3 == 1;
+    }
+    return false;
+  }
+
+  /** Deterministic contributor headcount in 1..20. */
+  static int contributorCount(long githubId) {
+    return 1 + (int) (githubId % 20L);
+  }
+
+  private void seedContributorLogins(long repositoryId, LocalDate today, int contributors) {
+    for (int dayIndex = 0; dayIndex < TRAFFIC_DAYS; dayIndex++) {
+      LocalDate date = today.minusDays(TRAFFIC_DAYS - 1L - dayIndex);
+      jdbc.sql(
+              """
+              UPDATE repository_daily_stats SET
+                contributors = :contributors,
+                contributor_logins_collected = TRUE
+              WHERE repository_id = :repositoryId AND stat_date = :statDate
+              """)
+          .param("contributors", contributors)
+          .param("repositoryId", repositoryId)
+          .param("statDate", date)
+          .update();
+      jdbc.sql(
+              """
+              DELETE FROM repository_daily_contributor_login
+              WHERE repository_id = :repositoryId AND stat_date = :statDate
+              """)
+          .param("repositoryId", repositoryId)
+          .param("statDate", date)
+          .update();
+      for (int i = 1; i <= contributors; i++) {
+        jdbc.sql(
+                """
+                INSERT INTO repository_daily_contributor_login (repository_id, stat_date, login)
+                VALUES (:repositoryId, :statDate, :login)
+                """)
+            .param("repositoryId", repositoryId)
+            .param("statDate", date)
+            .param("login", "contrib-" + i)
+            .update();
+      }
+    }
   }
 
   private long upsertOwner(long githubId, String login) {

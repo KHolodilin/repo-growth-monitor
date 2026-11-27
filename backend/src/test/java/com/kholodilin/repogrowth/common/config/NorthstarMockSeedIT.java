@@ -214,6 +214,39 @@ class NorthstarMockSeedIT extends AbstractPostgresTest {
                 .query(Long.class)
                 .single())
         .isGreaterThanOrEqualTo(14L);
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM repository_daily_stats s
+                    JOIN repository r ON r.id = s.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-01' AND s.contributor_logins_collected
+                    """)
+                .query(Long.class)
+                .single())
+        .isEqualTo(2L * NorthstarMockSeed.TRAFFIC_DAYS);
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM repository_daily_contributor_login c
+                    JOIN repository r ON r.id = c.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-01' AND c.stat_date = CURRENT_DATE
+                    """)
+                .query(Long.class)
+                .single())
+        .isBetween(2L, 40L);
+    assertThat(
+            jdbc.sql(
+                    """
+                    SELECT count(*) FROM repository_daily_stats s
+                    JOIN repository r ON r.id = s.repository_id
+                    JOIN github_owner o ON o.id = r.owner_id
+                    WHERE o.login = 'atlas-02' AND s.contributor_logins_collected
+                    """)
+                .query(Long.class)
+                .single())
+        .isZero();
 
     // Second pass exercises ON CONFLICT update paths.
     seed.run(new DefaultApplicationArguments());
